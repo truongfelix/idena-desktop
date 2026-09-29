@@ -139,7 +139,7 @@
     }
   },
   "devDependencies": {
-    "electron": "43.1.1",
+    "electron": "43.5.0",
     "electron-builder": "^26.8.2",
     "eslint": "^8.36.0",
     "eslint-config-wesbos": "^3.2.3",
