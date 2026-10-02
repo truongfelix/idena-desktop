@@ -157,7 +157,7 @@
     "@react-hook/hover": "^4.0.0",
     "@xstate/react": "^3.2.1",
     "ansi-to-react": "^6.2.6",
-    "axios": "^1.13.2",
+    "axios": "^1.20.0",
     "buffer": "^6.0.3",
     "canvas-confetti": "^1.4.0",
     "color-convert": "^2.0.1",
