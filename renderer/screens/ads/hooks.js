@@ -13,6 +13,7 @@ import {
 } from '../../shared/providers/identity-context'
 import {callRpc, prependHex, HASH_IN_MEMPOOL} from '../../shared/utils/utils'
 import {AdRotationStatus, AdStatus} from './types'
+import {fetchNetworkSize} from '../../shared/api/dna'
 import {
   adFallbackSrc,
   areCompetingAds,
@@ -23,10 +24,9 @@ import {
   isApprovedVoting,
   isRejectedVoting,
   isValidImage,
-  calculateMinOracleReward,
+  adReviewDeposit,
   selectProfileHash,
   sendToIpfs,
-  adVotingDefaults,
   isTargetedAd,
   sendTx,
   calculateTotalAdScore,
@@ -753,16 +753,10 @@ export function useDeployContractAmount() {
   })
 }
 
+// The refundable deposit sent to start an ad review (utils.js adReviewDeposit).
 export function useStartAdVotingAmount() {
-  return useStartVotingAmount(adVotingDefaults.committeeSize)
-}
-
-export function useStartVotingAmount(committeeSize) {
-  return useQuery(
-    ['useStartVotingAmount', committeeSize],
-    // eslint-disable-next-line no-shadow
-    async ({queryKey: [, committeeSize]}) =>
-      (await calculateMinOracleReward()) * committeeSize
+  return useQuery(['useStartAdVotingAmount'], async () =>
+    adReviewDeposit(await fetchNetworkSize())
   )
 }
 

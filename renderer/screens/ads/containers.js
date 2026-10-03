@@ -864,6 +864,14 @@ export function ReviewAdDrawer({
 
   const [isPending, {on: setIsPendingOn, off: setIsPendingOff}] = useBoolean()
 
+  // One review at a time, from the click on: reading the ad and compressing its images come before the
+  // mutation, and a second click there deployed a second review contract (another stake).
+  const isSubmittingRef = React.useRef(false)
+  const releaseSubmit = React.useCallback(() => {
+    isSubmittingRef.current = false
+    setIsPendingOff()
+  }, [setIsPendingOff])
+
   const [rewardsFund, setRewardsFund] = React.useState(100)
 
   const {submit} = useReviewAd({
@@ -873,16 +881,16 @@ export function ReviewAdDrawer({
     onStartVoting: React.useCallback(
       (data) => {
         onStartVoting(data)
-        setIsPendingOff()
+        releaseSubmit()
       },
-      [onStartVoting, setIsPendingOff]
+      [onStartVoting, releaseSubmit]
     ),
     onError: React.useCallback(
       (error) => {
         failToast(error)
-        setIsPendingOff()
+        releaseSubmit()
       },
-      [failToast, setIsPendingOff]
+      [failToast, releaseSubmit]
     ),
   })
 
@@ -949,11 +957,16 @@ export function ReviewAdDrawer({
             onSubmit={async (e) => {
               e.preventDefault()
 
+              if (isSubmittingRef.current) return
+              isSubmittingRef.current = true
+              setIsPendingOn()
+
               const {thumb, media} = await dexieDb.table('ads').get(ad.id)
 
               const errors = validateAd({...ad, thumb, media})
 
               if (Object.values(errors).some(Boolean)) {
+                releaseSubmit()
                 failToast({
                   title: t('Unable to send invalid ad'),
                   description: t(`Please check {{fields}} fields`, {
@@ -984,17 +997,21 @@ export function ReviewAdDrawer({
                         await compressAdImage(await media.arrayBuffer(), {
                           width: 320,
                           height: 320,
-                          type: thumb.type,
+                          // Its own type: with the thumbnail's, a PNG thumbnail made the photo a PNG,
+                          // several times larger and so dearer to store (25-70 iDNA more).
+                          type: media.type,
                         })
                       ),
                     })
                   } catch (error) {
+                    releaseSubmit()
                     failToast({
                       title: t('Error compressing images'),
                       description: error?.message,
                     })
                   }
                 } else {
+                  releaseSubmit()
                   failToast(
                     t(
                       `Insufficient funds to start reviewing ad. Please deposit at least {{missingAmount}}.`,
@@ -1006,6 +1023,9 @@ export function ReviewAdDrawer({
                     )
                   )
                 }
+              } else {
+                // The stake or the deposit is not known yet: nothing sent, try again.
+                releaseSubmit()
               }
             }}
           >

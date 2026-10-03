@@ -1,6 +1,5 @@
 /* eslint-disable no-use-before-define */
 import i18n from '../../i18n'
-import {fetchNetworkSize} from '../../shared/api/dna'
 import {Profile} from '../../shared/models/profile'
 import {VotingStatus} from '../../shared/types'
 import {dexieDb} from '../../shared/utils/dexieDb'
@@ -14,6 +13,7 @@ import {
 import {isValidUrl} from '../dna/utils'
 import {AdVotingOption, AdVotingOptionId} from './types'
 import {resizeImageToArrayBuffer} from '../../shared/utils/image-canvas'
+import {minOwnerDeposit} from '../oracles/utils'
 
 export const OS = {
   Windows: 'windows',
@@ -177,8 +177,28 @@ export const buildAdReviewVoting = ({title, adCid}) => ({
   adCid,
 })
 
-export const calculateMinOracleReward = async () =>
-  5000 / (await fetchNetworkSize())
+/**
+ * The owner deposit an ad review needs: the contract caps the committee at the network size and asks the minimum
+ * oracle reward (5000 / network size) for each seat, so 5000 iDNA below 300 identities. It is refunded when the
+ * voting ends; anything sent above it was paid to the oracles (13,158 iDNA instead of 5,000 at 114 identities).
+ */
+export const adReviewDeposit = (networkSize) =>
+  minOwnerDeposit(networkSize, adVotingDefaults.committeeSize)
+
+/**
+ * Whether a voting has the committee of an ad review: the contract stores min(300, network size at deploy), so
+ * 300, or a smaller network with the 5000 iDNA deposit of a full committee. A voting deployed with a small
+ * committee (a few chosen oracles) has a smaller deposit and does not pass.
+ */
+export function isAdReviewCommittee({committeeSize, ownerDeposit}) {
+  const size = Number(committeeSize)
+  if (size === adVotingDefaults.committeeSize) return true
+  return (
+    size > 0 &&
+    size < adVotingDefaults.committeeSize &&
+    Number(ownerDeposit) >= 5000 - 0.01
+  )
+}
 
 export async function fetchProfileAds(address) {
   try {
@@ -337,17 +357,16 @@ export const validateAdVoting = ({ad, voting}) => {
   if (global.isDev) return true
 
   if (ad?.votingParams) {
-    const areSameVotingParams = [
-      'votingDuration',
-      'publicVotingDuration',
-      'quorum',
-      'committeeSize',
-    ].every(
-      (prop) =>
-        ad.votingParams[prop] === voting[prop] &&
-        ad.votingParams[prop] === adVotingDefaults[prop] &&
-        voting[prop] === adVotingDefaults[prop]
-    )
+    const areSameVotingParams =
+      ['votingDuration', 'publicVotingDuration', 'quorum'].every(
+        (prop) =>
+          ad.votingParams[prop] === voting[prop] &&
+          ad.votingParams[prop] === adVotingDefaults[prop] &&
+          voting[prop] === adVotingDefaults[prop]
+      ) &&
+      // The ad asked for 300 oracles; on chain the committee is min(300, network size).
+      ad.votingParams.committeeSize === adVotingDefaults.committeeSize &&
+      isAdReviewCommittee(voting)
 
     const [maybeApproveOption, maybeRejectOption] = voting.options
 
