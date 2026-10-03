@@ -297,8 +297,21 @@ export default function FlipEditor({
         IMAGE_WIDTH,
         IMAGE_HEIGHT
       )
-      setImageUrl({url})
       setInsertImageMode(0)
+      // A picture the bridge cannot decode gives no URL: keep the slot's picture and say so.
+      if (!url) {
+        toast({
+          // eslint-disable-next-line react/display-name
+          render: () => (
+            <Toast
+              title={t('This picture cannot be used, try another file')}
+              status="error"
+            />
+          ),
+        })
+        return
+      }
+      setImageUrl({url})
     })
     reader.readAsDataURL(file)
     e.target.value = ''
@@ -1049,7 +1062,8 @@ export default function FlipEditor({
       <ImageSearchDialog
         isOpen={showImageSearch}
         onPick={(url) => {
-          if (visible) {
+          // "Select" with nothing picked gives no URL: keep the slot's picture.
+          if (visible && url) {
             setImageUrl({url})
           }
           setInsertImageMode(0)

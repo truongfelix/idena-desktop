@@ -787,6 +787,9 @@ export const flipMasterMachine = Machine(
           },
           protect: {
             on: {
+              // Protection gave no image (an empty slot, too few images for the nonsense picture, an error):
+              // leave "protecting", which disables Prev and Next.
+              PROTECT_FAILED: '.idle',
               CHANGE_PROTECTED_IMAGES: {
                 target: '.idle',
                 actions: [

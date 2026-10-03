@@ -364,6 +364,7 @@ export default function EditFlipPage() {
                   adversarialImageId={adversarialImageId}
                   didShowShuffleAdversarial={didShowShuffleAdversarial}
                   onProtecting={() => send('PROTECTING')}
+                  onProtectFailed={() => send('PROTECT_FAILED')}
                   onProtectImage={(image, currentIndex) =>
                     send('CHANGE_PROTECTED_IMAGES', {image, currentIndex})
                   }
