@@ -721,6 +721,7 @@ export function FlipProtectStep({
   adversarialImageId,
   didShowShuffleAdversarial,
   onProtecting,
+  onProtectFailed,
   onProtectImage,
   onChangeAdversarial,
   onShowAdversarialShuffle,
@@ -736,36 +737,48 @@ export function FlipProtectStep({
       return
     }
     onProtecting()
-    let advImageScr
-    let imageSrc
-    if (originalOrder[currentIndex] === adversarialImageId) {
-      advImageScr = await getAdversarialImage(adversarialImages)
-      imageSrc = advImageScr.slice()
-    } else {
-      imageSrc = images[originalOrder[currentIndex]]
+    try {
+      let advImageScr
+      let imageSrc
+      if (originalOrder[currentIndex] === adversarialImageId) {
+        advImageScr = await getAdversarialImage(adversarialImages)
+        imageSrc = advImageScr.slice()
+      } else {
+        imageSrc = images[originalOrder[currentIndex]]
+      }
+
+      if (!imageSrc) {
+        onProtectFailed()
+        return
+      }
+
+      const regeneratedImageSrc = await protectFlipImage(imageSrc)
+
+      const compressedImage = await resizeImageToDataUrl(regeneratedImageSrc, {
+        width: 240,
+        height: 180,
+        type: 'image/jpeg',
+        quality: 0.6,
+        exact: true,
+      })
+      if (advImageScr) {
+        onChangeAdversarial(advImageScr)
+      }
+      onProtectImage(compressedImage, originalOrder[currentIndex])
+    } catch (error) {
+      global.logger?.error?.(
+        'error while protecting a flip image',
+        error?.message
+      )
+      onProtectFailed()
     }
-
-    if (!imageSrc) return
-
-    const regeneratedImageSrc = await protectFlipImage(imageSrc)
-
-    const compressedImage = await resizeImageToDataUrl(regeneratedImageSrc, {
-      width: 240,
-      height: 180,
-      type: 'image/jpeg',
-      quality: 0.6,
-      exact: true,
-    })
-    if (advImageScr) {
-      onChangeAdversarial(advImageScr)
-    }
-    onProtectImage(compressedImage, originalOrder[currentIndex])
   }, [
     adversarialImageId,
     adversarialImages,
     currentIndex,
     images,
     onChangeAdversarial,
+    onProtectFailed,
     onProtectImage,
     onProtecting,
     originalOrder,
