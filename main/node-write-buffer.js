@@ -9,11 +9,20 @@ const DB_WRITE_BUFFER_SIZES = [4, 16, 32, 64]
 function dbWriteBufferArgs(mib, helpText) {
   if (
     !DB_WRITE_BUFFER_SIZES.includes(mib) ||
-    !String(helpText || '').includes('--dbwritebuffer')
+    !nodeSupportsWriteBuffer(helpText)
   ) {
     return []
   }
   return ['--dbwritebuffer', String(mib)]
 }
 
-module.exports = {DB_WRITE_BUFFER_SIZES, dbWriteBufferArgs}
+/** Whether a node binary has the flag, from its `--help` text. */
+function nodeSupportsWriteBuffer(helpText) {
+  return String(helpText || '').includes('--dbwritebuffer')
+}
+
+module.exports = {
+  DB_WRITE_BUFFER_SIZES,
+  dbWriteBufferArgs,
+  nodeSupportsWriteBuffer,
+}

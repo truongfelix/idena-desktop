@@ -377,7 +377,11 @@ export function WriteBufferSetting() {
 
   const settings = useSettingsState()
   const {setDbWriteBuffer} = useSettingsDispatch()
-  const {nodeStarted, dbWriteBufferMiB: runningMiB} = useNodeState()
+  const {
+    nodeStarted,
+    dbWriteBufferMiB: runningMiB,
+    dbWriteBufferSupported: supported,
+  } = useNodeState()
   const epoch = useEpochState()
 
   const [isConfirming, setIsConfirming] = React.useState(false)
@@ -387,7 +391,9 @@ export function WriteBufferSetting() {
     DB_WRITE_BUFFERS.find(({mib}) => mib === chosenMiB) ?? DB_WRITE_BUFFERS[2]
   const isPending =
     settings.runInternalNode &&
-    writeBufferPending({nodeStarted, runningMiB, chosenMiB})
+    writeBufferPending({nodeStarted, runningMiB, chosenMiB, supported})
+  // A node binary without the flag (an official one) runs with idena-go's 4 MiB whatever the choice.
+  const isUnsupported = settings.runInternalNode && supported === false
   const risk = restartRisk(new Date(), epoch)
 
   return (
@@ -396,7 +402,12 @@ export function WriteBufferSetting() {
         <Box flex={1}>
           <Text fontWeight={500}>{t('Database write buffer')}</Text>
           <Text color="muted">
-            {isPending
+            {/* eslint-disable-next-line no-nested-ternary */}
+            {isUnsupported
+              ? t('The node in use cannot change it: it runs with 4 MiB', {
+                  nsSeparator: '!!',
+                })
+              : isPending
               ? t('The node uses {{size}} MiB until it restarts', {
                   size: runningMiB,
                 })
@@ -413,7 +424,7 @@ export function WriteBufferSetting() {
         <Box>
           <Select
             value={chosen.mib}
-            isDisabled={!settings.runInternalNode}
+            isDisabled={!settings.runInternalNode || isUnsupported}
             borderColor="gray.300"
             h={8}
             onChange={(e) => {
@@ -421,7 +432,12 @@ export function WriteBufferSetting() {
               setDbWriteBuffer(mib)
               setIsConfirming(
                 settings.runInternalNode &&
-                  writeBufferPending({nodeStarted, runningMiB, chosenMiB: mib})
+                  writeBufferPending({
+                    nodeStarted,
+                    runningMiB,
+                    chosenMiB: mib,
+                    supported,
+                  })
               )
             }}
           >
@@ -442,12 +458,12 @@ export function WriteBufferSetting() {
           <Text>
             {t(
               'The node uses the {{size}} MiB write buffer from its next start. A restart takes a few minutes: the node opens its database and looks for peers again.',
-              {size: chosen.mib}
+              {size: chosen.mib, nsSeparator: '!!'}
             )}
           </Text>
           {risk && (
             <Text color="red.500" mt={2}>
-              {t(risk.message)}
+              {t(risk.message, {nsSeparator: '!!'})}
             </Text>
           )}
         </DialogBody>

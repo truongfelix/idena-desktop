@@ -24,6 +24,25 @@ describe('write buffer setting', () => {
     ).toBe(false)
   })
 
+  it('is never pending for a node binary without the flag', () => {
+    expect(
+      writeBufferPending({
+        nodeStarted: true,
+        runningMiB: 4,
+        chosenMiB: 32,
+        supported: false,
+      })
+    ).toBe(false)
+    expect(
+      writeBufferPending({
+        nodeStarted: true,
+        runningMiB: 4,
+        chosenMiB: 32,
+        supported: true,
+      })
+    ).toBe(true)
+  })
+
   it('blocks a restart during the validation', () => {
     for (const currentPeriod of [
       'FlipLottery',

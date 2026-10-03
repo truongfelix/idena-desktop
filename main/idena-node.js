@@ -15,7 +15,11 @@ const {
   parseNodeChecksum,
   validateDownloadedNode,
 } = require('./node-download-safety')
-const {dbWriteBufferArgs} = require('./node-write-buffer')
+const {
+  dbWriteBufferArgs,
+  nodeSupportsWriteBuffer,
+} = require('./node-write-buffer')
+const {shouldReplaceInstalledNode, sha256File} = require('./bundled-node')
 
 const idenaBin = 'idena-go'
 const pinnedNodeVersion = '1.1.2'
@@ -362,10 +366,8 @@ async function startNode(
     parameters.push('--autoonline')
   }
 
-  const writeBufferArgs = dbWriteBufferArgs(
-    dbWriteBufferMiB,
-    await getBinaryHelp(getNodeFile())
-  )
+  const help = await getBinaryHelp(getNodeFile())
+  const writeBufferArgs = dbWriteBufferArgs(dbWriteBufferMiB, help)
   parameters.push(...writeBufferArgs)
 
   const configFile = getNodeConfigFile()
@@ -395,6 +397,7 @@ async function startNode(
 
   // The write buffer the node runs with: the chosen size, or idena-go's 4 MiB without the flag.
   idenaNode.dbWriteBufferMiB = writeBufferArgs.length > 0 ? dbWriteBufferMiB : 4
+  idenaNode.dbWriteBufferSupported = nodeSupportsWriteBuffer(help)
 
   idenaNode.on('exit', (code) => {
     if (useLogging) {
@@ -480,6 +483,52 @@ function updateNode() {
   })
 }
 
+let installingBundledNode = null
+
+/**
+ * Installs the bundled node over another node in userData/node (main/bundled-node.js decides): the official
+ * app's, or an older community build's. Call it while the node does not run. Resolves to whether it did.
+ */
+function installBundledNodeOverOther() {
+  if (installingBundledNode) return installingBundledNode
+  installingBundledNode = (async () => {
+    const installed = getNodeFile()
+    const bundled = await findBundledNodeFile()
+    if (!bundled || !(await fs.pathExists(installed))) return false
+    const [installedHash, bundledHash] = await Promise.all([
+      sha256File(installed),
+      sha256File(bundled),
+    ])
+    if (installedHash === bundledHash) return false
+    const [installedVersion, bundledVersion] = await Promise.all([
+      getBinaryVersion(installed).catch(() => undefined),
+      getBinaryVersion(bundled).catch(() => undefined),
+    ])
+    if (
+      !shouldReplaceInstalledNode({
+        installedHash,
+        bundledHash,
+        installedVersion,
+        bundledVersion,
+      })
+    ) {
+      return false
+    }
+    if (!(await copyBundledNode(getTempNodeFile()))) return false
+    await updateNode()
+    logger.info('installed the bundled node over another one', {
+      installedVersion,
+      bundledVersion,
+      installedHash,
+      bundledHash,
+    })
+    return true
+  })().finally(() => {
+    installingBundledNode = null
+  })
+  return installingBundledNode
+}
+
 function nodeExists() {
   return fs.existsSync(getNodeFile())
 }
@@ -518,6 +567,7 @@ module.exports = {
   updateNode,
   nodeExists,
   cleanNodeState,
+  installBundledNodeOverOther,
   getLastLogs,
   getNodeFile,
   getNodeChainDbFolder,

@@ -22,9 +22,22 @@ if (
   throw new Error('write buffer sizes differ from main/node-write-buffer.js')
 }
 
-/** Whether the running node uses another write buffer than the one chosen: it applies at the next start. */
-export function writeBufferPending({nodeStarted, runningMiB, chosenMiB}) {
-  return Boolean(nodeStarted) && runningMiB != null && runningMiB !== chosenMiB
+/**
+ * Whether the running node uses another write buffer than the one chosen: it applies at the next start. Never
+ * for a node binary without the flag (`supported` false): a restart would not change it.
+ */
+export function writeBufferPending({
+  nodeStarted,
+  runningMiB,
+  chosenMiB,
+  supported,
+}) {
+  return (
+    Boolean(nodeStarted) &&
+    supported !== false &&
+    runningMiB != null &&
+    runningMiB !== chosenMiB
+  )
 }
 
 const RESTART_MARGIN_MS = 3 * 60 * 60 * 1000

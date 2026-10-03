@@ -1,6 +1,7 @@
 const {
   DB_WRITE_BUFFER_SIZES,
   dbWriteBufferArgs,
+  nodeSupportsWriteBuffer,
 } = require('./node-write-buffer')
 
 const ourHelp =
@@ -28,5 +29,11 @@ describe('chain database write buffer', () => {
     expect(dbWriteBufferArgs('32', ourHelp)).toEqual([])
     expect(dbWriteBufferArgs(undefined, ourHelp)).toEqual([])
     expect(dbWriteBufferArgs(1024, ourHelp)).toEqual([])
+  })
+
+  it('tells whether a node binary has the flag', () => {
+    expect(nodeSupportsWriteBuffer(ourHelp)).toBe(true)
+    expect(nodeSupportsWriteBuffer(officialHelp)).toBe(false)
+    expect(nodeSupportsWriteBuffer(undefined)).toBe(false)
   })
 })
