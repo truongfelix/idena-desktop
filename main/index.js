@@ -783,7 +783,11 @@ ipcMain.on(AUTO_UPDATE_COMMAND, async (event, command, data) => {
         didConfirmQuit = true
         autoUpdater.quitAndInstall()
       } else {
-        openExternalUrl(shell, 'https://www.idena.io/download', logger)
+        openExternalUrl(
+          shell,
+          'https://github.com/truongfelix/idena-desktop/releases/latest',
+          logger
+        )
       }
       break
     }
@@ -807,7 +811,7 @@ ipcMain.on(AUTO_UPDATE_COMMAND, async (event, command, data) => {
 })
 
 const RELEASE_URL =
-  'https://api.github.com/repos/ubiubi18/idena-desktop/releases/latest'
+  'https://api.github.com/repos/truongfelix/idena-desktop/releases/latest'
 
 function checkForUpdates() {
   if (isDev) {

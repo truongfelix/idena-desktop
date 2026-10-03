@@ -3,9 +3,9 @@
   "productName": "Idena",
   "version": "0.0.1",
   "description": "Desktop client for the Idena network.",
-  "author": "Idena Network",
+  "author": "truongfelix (community build)",
   "main": "main/index.js",
-  "repository": "ubiubi18/idena-desktop",
+  "repository": "truongfelix/idena-desktop",
   "license": "MIT",
   "engines": {
     "node": ">=24.18.0 <25",
@@ -130,7 +130,7 @@
         "github"
       ],
       "icon": "main/static/icons/icon-512@2x.icns",
-      "maintainer": "Idena <info@idena.io> (https://idena.io/)",
+      "maintainer": "truongfelix <189600415+truongfelix@users.noreply.github.com> (https://github.com/truongfelix)",
       "extraResources": [
         {
           "from": "build/node/current",

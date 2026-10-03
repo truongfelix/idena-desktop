@@ -852,7 +852,7 @@ function HardForkScreen({
               <SecondaryButton
                 onClick={() => {
                   global.openExternal(
-                    `https://github.com/ubiubi18/idena-go/releases/tag/v${semver.minVersion(
+                    `https://github.com/truongfelix/idena-go/releases/tag/v${semver.minVersion(
                       `<=${version} >=${`${semver.major(
                         version
                       )}.${semver.minor(version)}.0`}`,

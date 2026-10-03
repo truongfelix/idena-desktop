@@ -20,7 +20,7 @@ const {
 const idenaBin = 'idena-go'
 const pinnedNodeVersion = '1.1.2'
 const idenaNodeReleasesUrl =
-  'https://api.github.com/repos/ubiubi18/idena-go/releases/latest'
+  'https://api.github.com/repos/truongfelix/idena-go/releases/latest'
 const idenaChainDbFolder = 'idenachain.db'
 
 const getBinarySuffix = () => (process.platform === 'win32' ? '.exe' : '')
