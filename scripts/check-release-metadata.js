@@ -11,6 +11,7 @@ const buildNodeScript = fs.readFileSync(
 const releaseWorkflow = fs.readFileSync('.github/workflows/release.yml', 'utf8')
 const lintWorkflow = fs.readFileSync('.github/workflows/lint.yml', 'utf8')
 const releaseCheckScript = fs.readFileSync('scripts/release-check.js', 'utf8')
+const npmAuditScript = fs.readFileSync('scripts/check-npm-audit.js', 'utf8')
 
 function requireCondition(condition, message) {
   if (!condition) failures.push(message)
@@ -80,10 +81,15 @@ requireCondition(
   /npm test -- --runInBand/u.test(releaseWorkflow),
   'release workflow must run the full unit test suite before packaging'
 )
+// The full npm audit (dev dependencies included) runs through scripts/check-npm-audit.js, which fails on
+// every advisory at moderate severity or above except dated exceptions for advisories without a fix.
 requireCondition(
-  /npmCommand,\s*\[\s*'audit',\s*'--audit-level=moderate',?\s*\]/u.test(
-    releaseCheckScript
-  ),
+  /npmCommand,\s*\[\s*'run',\s*'audit:npm',?\s*\]/u.test(releaseCheckScript) &&
+    packageJson.scripts['audit:npm'] === 'node scripts/check-npm-audit.js' &&
+    /\['audit',\s*'--json'\]/u.test(npmAuditScript) &&
+    /FAILING_SEVERITIES = new Set\(\['moderate', 'high', 'critical'\]\)/u.test(
+      npmAuditScript
+    ),
   'release check must include full moderate-severity npm audit'
 )
 requireCondition(
