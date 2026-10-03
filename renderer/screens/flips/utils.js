@@ -77,7 +77,9 @@ export function handleOutdatedFlips() {
 export function markFlipsArchived(epoch) {
   const persistedState = loadPersistentStateValue('flipArchive', epoch)
   if (persistedState && persistedState.archived) return
-  persistItem('flipArchive', epoch, {
+  // The store bridge takes string keys only: a number threw (swallowed), so the epoch was never marked and the
+  // flips were archived again at every start.
+  persistItem('flipArchive', String(epoch), {
     archived: true,
     archivedAt: new Date().toISOString(),
   })
