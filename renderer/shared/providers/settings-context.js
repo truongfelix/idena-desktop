@@ -14,6 +14,7 @@ const UPDATE_UI_VERSION = 'UPDATE_UI_VERSION'
 const SET_INTERNAL_KEY = 'SET_INTERNAL_KEY'
 const SET_CONNECTION_DETAILS = 'SET_CONNECTION_DETAILS'
 const TOGGLE_AUTO_ACTIVATE_MINING = 'TOGGLE_AUTO_ACTIVATE_MINING'
+const SET_DB_WRITE_BUFFER = 'SET_DB_WRITE_BUFFER'
 
 const CHANGE_LANGUAGE = 'CHANGE_LANGUAGE'
 
@@ -29,6 +30,8 @@ const initialState = {
   externalApiKey: '',
   lng: AVAILABLE_LANGS[0],
   autoActivateMining: true,
+  // The built-in node's chain database write buffer in MiB (see main/node-write-buffer.js).
+  dbWriteBufferMiB: 32,
 }
 
 if (global.env && global.env.NODE_ENV === 'e2e') {
@@ -85,6 +88,12 @@ function settingsReducer(state, action) {
       return {
         ...state,
         autoActivateMining: !state.autoActivateMining,
+      }
+    }
+    case SET_DB_WRITE_BUFFER: {
+      return {
+        ...state,
+        dbWriteBufferMiB: action.data,
       }
     }
     default:
@@ -154,6 +163,11 @@ export function SettingsProvider({children}) {
     dispatch({type: TOGGLE_AUTO_ACTIVATE_MINING})
   }, [dispatch])
 
+  const setDbWriteBuffer = useCallback(
+    (mib) => dispatch({type: SET_DB_WRITE_BUFFER, data: mib}),
+    [dispatch]
+  )
+
   const setConnectionDetails = useCallback(
     ({url, apiKey}) => {
       dispatch({type: SET_CONNECTION_DETAILS, url, apiKey})
@@ -171,10 +185,12 @@ export function SettingsProvider({children}) {
             changeLanguage,
             setConnectionDetails,
             toggleAutoActivateMining,
+            setDbWriteBuffer,
           }),
           [
             changeLanguage,
             setConnectionDetails,
+            setDbWriteBuffer,
             toggleAutoActivateMining,
             toggleRunInternalNode,
             toggleUseExternalNode,

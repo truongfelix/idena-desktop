@@ -43,6 +43,8 @@ function nodeReducer(state, action) {
         ...state,
         nodeStarted: true,
         runningTroubleshooter: false,
+        // The write buffer the node started with (main/idena-node.js).
+        dbWriteBufferMiB: action.data?.dbWriteBufferMiB ?? null,
       }
     }
     case NODE_STOP: {
@@ -97,7 +99,7 @@ export function NodeProvider({children}) {
           dispatch({type: NODE_FAILED})
           break
         case 'node-started':
-          dispatch({type: NODE_START})
+          dispatch({type: NODE_START, data})
           break
         case 'node-stopped':
           dispatch({type: NODE_STOP})
@@ -121,6 +123,7 @@ export function NodeProvider({children}) {
             ipfsPort: settings.ipfsPort,
             apiKey: settings.internalApiKey,
             autoActivateMining: settings.autoActivateMining,
+            dbWriteBufferMiB: settings.dbWriteBufferMiB,
           })
         }
         case 'troubleshooting-update-node': {
@@ -161,6 +164,7 @@ export function NodeProvider({children}) {
         ipfsPort: settings.ipfsPort,
         apiKey: settings.internalApiKey,
         autoActivateMining: settings.autoActivateMining,
+        dbWriteBufferMiB: settings.dbWriteBufferMiB,
       })
     }
   }, [
@@ -173,6 +177,7 @@ export function NodeProvider({children}) {
     state.nodeFailed,
     settings.internalApiKey,
     settings.autoActivateMining,
+    settings.dbWriteBufferMiB,
   ])
 
   useEffect(() => {

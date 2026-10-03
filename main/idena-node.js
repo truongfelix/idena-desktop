@@ -16,6 +16,7 @@ const {
   parseNodeChecksum,
   validateDownloadedNode,
 } = require('./node-download-safety')
+const {dbWriteBufferArgs} = require('./node-write-buffer')
 
 const idenaBin = 'idena-go'
 const pinnedNodeVersion = '1.1.2'
@@ -74,6 +75,22 @@ async function findBundledNodeFile() {
   }
 
   return null
+}
+
+// The node's --help text ('' when it cannot be read), to know the flags this binary has.
+function getBinaryHelp(binaryPath) {
+  return new Promise((resolve) => {
+    const help = spawn(binaryPath, ['--help'])
+    let output = ''
+    help.stdout.on('data', (data) => {
+      output += data.toString()
+    })
+    help.stderr.on('data', (data) => {
+      output += data.toString()
+    })
+    help.on('error', () => resolve(''))
+    help.on('exit', () => resolve(output))
+  })
 }
 
 function getBinaryVersion(binaryPath) {
@@ -321,6 +338,7 @@ async function startNode(
   ipfsPort,
   apiKey,
   autoActivateMining,
+  dbWriteBufferMiB,
   // eslint-disable-next-line default-param-last
   useLogging = true,
   onLog,
@@ -344,6 +362,12 @@ async function startNode(
   if (autoActivateMining && semver.gt(version, '0.28.3')) {
     parameters.push('--autoonline')
   }
+
+  const writeBufferArgs = dbWriteBufferArgs(
+    dbWriteBufferMiB,
+    await getBinaryHelp(getNodeFile())
+  )
+  parameters.push(...writeBufferArgs)
 
   const configFile = getNodeConfigFile()
   if (fs.existsSync(configFile)) {
@@ -369,6 +393,9 @@ async function startNode(
       console.error(str)
     }
   })
+
+  // The write buffer the node runs with: the chosen size, or idena-go's 4 MiB without the flag.
+  idenaNode.dbWriteBufferMiB = writeBufferArgs.length > 0 ? dbWriteBufferMiB : 4
 
   idenaNode.on('exit', (code) => {
     if (useLogging) {
