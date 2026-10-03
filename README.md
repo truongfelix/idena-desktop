@@ -15,6 +15,30 @@ Built with [Electron](https://www.electronjs.org),
 > releases. The upstream Idena release feed does not contain these changes.
 > Build from a reviewed commit before using the app with a valuable identity.
 
+## Community build
+
+This is the community build maintained at [github.com/truongfelix](https://github.com/truongfelix). It runs on the
+same chain and rules as the official app (consensus v12, no hard fork). Contact: the GitHub account.
+
+What it changes for users (October 2026):
+
+- **Its own node**: the bundled node is built from
+  [truongfelix/idena-go](https://github.com/truongfelix/idena-go) and replaces an older or official node found in
+  the app's data folder. The node is stopped cleanly when the app quits, a node that stops by itself is reported
+  (troubleshooting screen), and a restart never starts two nodes.
+- **Validation**: the validation in progress is saved again (a restart or a page change no longer loses it); Quit
+  works on the validation pages; the "Wrong time" warning comes from the node's own clock check and stays.
+- **Ads**: an ad review sent about 13,000 iDNA as "refundable deposit" (at 114 identities) while the oracle voting
+  contract refunds only 5,000; the rest went to the oracles. It now sends the 5,000 the contract needs (refunded
+  whether the ad is approved or rejected), ad reviews are no longer shown to oracles as malicious, and sending an
+  ad to review works again. The same review costs apply in the official app.
+- **Flips**: the Protect step no longer gets stuck, and an empty image-search pick keeps the picture.
+- **Fewer third-party calls**: the clock check, the staking APY (staking and mining, from the node) and the robot
+  avatars (drawn by the app) no longer call api.idena.io or robohash.idena.io; the oracle To-Do badge reads every 5
+  minutes, only for validated identities. Still on api.idena.io: the oracle votings list, the validation report
+  and the hard-fork screen.
+- **New setting**: Settings > Node > Database write buffer (4 to 64 MiB): fewer disk writes for more memory.
+
 ## Fork status
 
 The renderer remains compatible with the existing Idena RPC and application
