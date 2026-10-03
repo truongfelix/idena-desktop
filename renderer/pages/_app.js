@@ -14,6 +14,7 @@ import {EpochProvider} from '../shared/providers/epoch-context'
 import {IdentityProvider} from '../shared/providers/identity-context'
 import {VotingNotificationProvider} from '../shared/providers/voting-notification-context'
 import {OnboardingProvider} from '../shared/providers/onboarding-context'
+import {ConfirmQuit} from '../shared/components/confirm-quit'
 import {queryClient} from '../shared/utils/utils'
 
 export default function App({Component, ...pageProps}) {
@@ -42,6 +43,7 @@ export default function App({Component, ...pageProps}) {
         <ChakraProvider theme={extendTheme(theme)}>
           <AppProviders>
             <Component {...pageProps} />
+            <ConfirmQuit />
           </AppProviders>
         </ChakraProvider>
       ) : null}

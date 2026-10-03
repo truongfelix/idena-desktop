@@ -17,6 +17,7 @@ const i18next = require('i18next')
 const macosVersion = require('macos-version')
 const semver = require('semver')
 const axios = require('axios')
+const kill = require('tree-kill')
 const {zoomIn, zoomOut, resetZoom} = require('./utils')
 const loadRoute = require('./utils/routes')
 const {getI18nConfig} = require('./language')
@@ -68,7 +69,6 @@ const {
 } = require('./channels')
 const {
   startNode,
-  stopNode,
   downloadNode,
   updateNode,
   getCurrentVersion,
@@ -77,18 +77,42 @@ const {
   getNodeChainDbFolder,
   getNodeFile,
   getNodeIpfsDir,
-  tryStopNode,
 } = require('./idena-node')
 
 const NodeUpdater = require('./node-updater')
+const {createNodeProcess} = require('./node-process')
 
 let mainWindow
-let node
 let nodeDownloadPromise = null
 let tray
 let e2eSmokeFinished = false
 
 const nodeUpdater = new NodeUpdater(logger)
+
+// The built-in node's process (main/node-process.js): one at a time, stops that wait for the exit.
+const nodeProcess = createNodeProcess({
+  signal: (child, signal) =>
+    new Promise((resolve) => {
+      if (process.platform === 'win32') {
+        try {
+          child.kill(signal === 'SIGKILL' ? 'SIGKILL' : undefined)
+        } catch (e) {
+          logger.warn('error while signalling node', e.toString())
+        }
+        resolve()
+        return
+      }
+      kill(child.pid, signal, (err) => {
+        if (err) logger.warn('error while signalling node', err.toString())
+        resolve()
+      })
+    }),
+  onFailed(message) {
+    logger.error(message)
+    sendMainWindowMsg(NODE_EVENT, 'node-failed')
+  },
+  logger,
+})
 
 function finishE2ESmoke(ok, detail) {
   if (!isE2ESmoke || e2eSmokeFinished) return
@@ -516,18 +540,40 @@ app.on('will-finish-launching', () => {
 
 let didConfirmQuit = false
 
+// A window that can answer the quit confirmation (asked only when the node mines: renderer ConfirmQuit).
+const canConfirmQuit = () =>
+  Boolean(mainWindow) &&
+  !mainWindow.isDestroyed() &&
+  !mainWindow.webContents.isCrashed()
+
 app.on('before-quit', (e) => {
-  if (mainWindow) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.show()
     mainWindow.focus()
   }
 
-  if (didConfirmQuit || isDev) {
-    mainWindow.forceClose = true
+  if (didConfirmQuit || isDev || !canConfirmQuit()) {
+    didConfirmQuit = true
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.forceClose = true
   } else {
     e.preventDefault()
     sendMainWindowMsg('confirm-quit')
   }
+})
+
+// The node is a child process: quitting would leave it running (on Linux and macOS until its next log line
+// kills it with SIGPIPE, without a clean shutdown) and a quick restart of the app would find its ports and
+// database taken. Stop it first, then quit.
+let nodeStoppedForQuit = false
+app.on('will-quit', (e) => {
+  if (nodeStoppedForQuit || !nodeProcess.current) return
+  e.preventDefault()
+  nodeStoppedForQuit = true
+  nodeProcess
+    .stop()
+    .then((log) => logger.info(log))
+    .catch((err) => logger.error('error while stopping node', err.toString()))
+    .finally(() => app.quit())
 })
 
 ipcMain.on('confirm-quit', (event) => {
@@ -570,15 +616,14 @@ ipcMain.on(NODE_COMMAND, async (event, command, data) => {
           nodeDownloadPromise = downloadNode((info) => {
             sendMainWindowMsg(AUTO_UPDATE_EVENT, 'node-download-progress', info)
           })
-            .then(() => {
-              stopNode(node).then(async (log) => {
+            .then(() =>
+              nodeProcess.stop().then(async (log) => {
                 logger.info(log)
-                node = null
                 sendMainWindowMsg(NODE_EVENT, 'node-stopped')
                 await updateNode()
                 sendMainWindowMsg(NODE_EVENT, 'node-ready')
               })
-            })
+            )
             .catch((err) => {
               sendMainWindowMsg(NODE_EVENT, 'node-failed')
               logger.error('error while downloading node', err.toString())
@@ -590,36 +635,29 @@ ipcMain.on(NODE_COMMAND, async (event, command, data) => {
       break
     }
     case 'start-local-node': {
-      startNode(
-        data.rpcPort,
-        data.tcpPort,
-        data.ipfsPort,
-        data.apiKey,
-        data.autoActivateMining,
-        data.dbWriteBufferMiB,
-        isDev,
-        (log) => {
-          sendMainWindowMsg(NODE_EVENT, 'node-log', log)
-        },
-        (msg, code) => {
-          if (code) {
-            logger.error(msg)
-            node = null
-            sendMainWindowMsg(NODE_EVENT, 'node-failed')
-          } else {
-            logger.info(msg)
-          }
-        }
-      )
-        .then((n) => {
-          logger.info(
-            `node started, PID: ${n.pid}, previous PID: ${
-              node ? node.pid : 'undefined'
-            }`
+      nodeProcess
+        .start(() =>
+          startNode(
+            data.rpcPort,
+            data.tcpPort,
+            data.ipfsPort,
+            data.apiKey,
+            data.autoActivateMining,
+            data.dbWriteBufferMiB,
+            isDev,
+            (log) => {
+              sendMainWindowMsg(NODE_EVENT, 'node-log', log)
+            }
           )
-          node = n
+        )
+        .then(({child, started}) => {
+          logger.info(
+            started
+              ? `node started, PID: ${child.pid}`
+              : `node already running, PID: ${child.pid}`
+          )
           sendMainWindowMsg(NODE_EVENT, 'node-started', {
-            dbWriteBufferMiB: n.dbWriteBufferMiB,
+            dbWriteBufferMiB: child.dbWriteBufferMiB,
           })
         })
         .catch((e) => {
@@ -629,10 +667,10 @@ ipcMain.on(NODE_COMMAND, async (event, command, data) => {
       break
     }
     case 'stop-local-node': {
-      stopNode(node)
+      nodeProcess
+        .stop()
         .then((log) => {
           logger.info(log)
-          node = null
           sendMainWindowMsg(NODE_EVENT, 'node-stopped')
         })
         .catch((e) => {
@@ -642,10 +680,11 @@ ipcMain.on(NODE_COMMAND, async (event, command, data) => {
       break
     }
     case 'clean-state': {
-      stopNode(node)
+      // The stop waits for the node to exit: the chain DB is deleted only once it is closed.
+      nodeProcess
+        .stop()
         .then((log) => {
           logger.info(log)
-          node = null
           sendMainWindowMsg(NODE_EVENT, 'node-stopped')
           cleanNodeState()
           sendMainWindowMsg(NODE_EVENT, 'state-cleaned')
@@ -657,10 +696,10 @@ ipcMain.on(NODE_COMMAND, async (event, command, data) => {
       break
     }
     case 'restart-node': {
-      stopNode(node)
+      nodeProcess
+        .stop()
         .then((log) => {
           logger.info(log)
-          node = null
           sendMainWindowMsg(NODE_EVENT, 'node-stopped')
         })
         .then(
@@ -691,11 +730,10 @@ ipcMain.on(NODE_COMMAND, async (event, command, data) => {
     }
 
     case 'troubleshooting-restart-node': {
-      await tryStopNode(node, {
-        onSuccess() {
-          node = null
-        },
-      })
+      await nodeProcess
+        .stop()
+        .then((log) => logger.info(log))
+        .catch((e) => logger.error('error while stopping node', e.toString()))
 
       return sendMainWindowMsg(NODE_EVENT, 'troubleshooting-restart-node')
     }
@@ -703,11 +741,10 @@ ipcMain.on(NODE_COMMAND, async (event, command, data) => {
     case 'troubleshooting-update-node': {
       if (nodeDownloadPromise) return
 
-      await tryStopNode(node, {
-        onSuccess() {
-          node = null
-        },
-      })
+      await nodeProcess
+        .stop()
+        .then((log) => logger.info(log))
+        .catch((e) => logger.error('error while stopping node', e.toString()))
 
       sendMainWindowMsg(NODE_EVENT, 'troubleshooting-update-node')
 
@@ -730,11 +767,10 @@ ipcMain.on(NODE_COMMAND, async (event, command, data) => {
     }
 
     case 'troubleshooting-reset-node': {
-      await tryStopNode(node, {
-        onSuccess() {
-          node = null
-        },
-      })
+      await nodeProcess
+        .stop()
+        .then((log) => logger.info(log))
+        .catch((e) => logger.error('error while stopping node', e.toString()))
 
       try {
         await fs.remove(getNodeFile())
@@ -795,7 +831,8 @@ ipcMain.on(AUTO_UPDATE_COMMAND, async (event, command, data) => {
       break
     }
     case 'update-node': {
-      stopNode(node)
+      nodeProcess
+        .stop()
         .then(async () => {
           sendMainWindowMsg(NODE_EVENT, 'node-stopped')
           await updateNode()

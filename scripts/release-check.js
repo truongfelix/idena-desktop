@@ -34,6 +34,7 @@ const syntaxCheckedFiles = [
   'main/stores/setup.js',
   'main/logger.js',
   'main/idena-node.js',
+  'main/node-process.js',
 ].filter((filePath) => fs.existsSync(filePath))
 
 function runStep(label, command, args) {
