@@ -1,6 +1,7 @@
 /* eslint-disable react/prop-types */
 import * as React from 'react'
 import {
+  Box,
   Button,
   Flex,
   FormControl,
@@ -35,9 +36,18 @@ import {
 } from '../../shared/components/components'
 import {FillCenter} from '../oracles/components'
 import {callRpc, eitherState} from '../../shared/utils/utils'
-import {useNodeDispatch} from '../../shared/providers/node-context'
+import {
+  useNodeDispatch,
+  useNodeState,
+} from '../../shared/providers/node-context'
 import {importKey} from '../../shared/api/dna'
-import {useSettingsDispatch} from '../../shared/providers/settings-context'
+import {
+  useSettingsDispatch,
+  useSettingsState,
+} from '../../shared/providers/settings-context'
+import {useEpochState} from '../../shared/providers/epoch-context'
+import {NODE_COMMAND} from '../../../main/channels'
+import {DB_WRITE_BUFFERS, restartRisk, writeBufferPending} from './write-buffer'
 import {AVAILABLE_LANGS, isoLangs} from '../../i18n'
 import {EyeIcon, EyeOffIcon} from '../../shared/components/icons'
 
@@ -355,5 +365,107 @@ export function LocaleSwitcher() {
         </option>
       ))}
     </Select>
+  )
+}
+
+/**
+ * The built-in node's chain database write buffer: a size from DB_WRITE_BUFFERS, taken by the node at its
+ * start. When it changes while the node runs, a dialog offers a restart (not during the validation).
+ */
+export function WriteBufferSetting() {
+  const {t} = useTranslation()
+
+  const settings = useSettingsState()
+  const {setDbWriteBuffer} = useSettingsDispatch()
+  const {nodeStarted, dbWriteBufferMiB: runningMiB} = useNodeState()
+  const epoch = useEpochState()
+
+  const [isConfirming, setIsConfirming] = React.useState(false)
+
+  const chosenMiB = settings.dbWriteBufferMiB
+  const chosen =
+    DB_WRITE_BUFFERS.find(({mib}) => mib === chosenMiB) ?? DB_WRITE_BUFFERS[2]
+  const isPending =
+    settings.runInternalNode &&
+    writeBufferPending({nodeStarted, runningMiB, chosenMiB})
+  const risk = restartRisk(new Date(), epoch)
+
+  return (
+    <>
+      <Stack isInline spacing={3} align="center">
+        <Box flex={1}>
+          <Text fontWeight={500}>{t('Database write buffer')}</Text>
+          <Text color="muted">
+            {isPending
+              ? t('The node uses {{size}} MiB until it restarts', {
+                  size: runningMiB,
+                })
+              : `${t(chosen.detail)}. ${t(
+                  'Fewer disk writes for more memory; the node takes it when it starts'
+                )}`}
+          </Text>
+        </Box>
+        {isPending && (
+          <SecondaryButton onClick={() => setIsConfirming(true)}>
+            {t('Restart')}
+          </SecondaryButton>
+        )}
+        <Box>
+          <Select
+            value={chosen.mib}
+            isDisabled={!settings.runInternalNode}
+            borderColor="gray.300"
+            h={8}
+            onChange={(e) => {
+              const mib = Number(e.target.value)
+              setDbWriteBuffer(mib)
+              setIsConfirming(
+                settings.runInternalNode &&
+                  writeBufferPending({nodeStarted, runningMiB, chosenMiB: mib})
+              )
+            }}
+          >
+            {DB_WRITE_BUFFERS.map(({mib, label}) => (
+              <option key={mib} value={mib}>
+                {`${mib} MiB · ${t(label)}`}
+              </option>
+            ))}
+          </Select>
+        </Box>
+      </Stack>
+      <Dialog
+        isOpen={isConfirming}
+        onClose={() => setIsConfirming(false)}
+        title={t('Restart the node?')}
+      >
+        <DialogBody>
+          <Text>
+            {t(
+              'The node uses the {{size}} MiB write buffer from its next start. A restart takes a few minutes: the node opens its database and looks for peers again.',
+              {size: chosen.mib}
+            )}
+          </Text>
+          {risk && (
+            <Text color="red.500" mt={2}>
+              {t(risk.message)}
+            </Text>
+          )}
+        </DialogBody>
+        <DialogFooter>
+          <SecondaryButton onClick={() => setIsConfirming(false)}>
+            {t('Later')}
+          </SecondaryButton>
+          <PrimaryButton
+            isDisabled={risk?.canRestart === false}
+            onClick={() => {
+              setIsConfirming(false)
+              global.ipcRenderer.send(NODE_COMMAND, 'restart-node')
+            }}
+          >
+            {t('Restart now')}
+          </PrimaryButton>
+        </DialogFooter>
+      </Dialog>
+    </>
   )
 }

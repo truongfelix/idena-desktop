@@ -596,6 +596,7 @@ ipcMain.on(NODE_COMMAND, async (event, command, data) => {
         data.ipfsPort,
         data.apiKey,
         data.autoActivateMining,
+        data.dbWriteBufferMiB,
         isDev,
         (log) => {
           sendMainWindowMsg(NODE_EVENT, 'node-log', log)
@@ -617,7 +618,9 @@ ipcMain.on(NODE_COMMAND, async (event, command, data) => {
             }`
           )
           node = n
-          sendMainWindowMsg(NODE_EVENT, 'node-started')
+          sendMainWindowMsg(NODE_EVENT, 'node-started', {
+            dbWriteBufferMiB: n.dbWriteBufferMiB,
+          })
         })
         .catch((e) => {
           sendMainWindowMsg(NODE_EVENT, 'node-failed')

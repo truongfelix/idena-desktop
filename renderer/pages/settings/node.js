@@ -30,6 +30,7 @@ import {
   SettingsFormLabel,
   SettingsSection,
 } from '../../screens/settings/components'
+import {WriteBufferSetting} from '../../screens/settings/containers'
 import SettingsLayout from '../../screens/settings/layout'
 import {EyeIcon, EyeOffIcon} from '../../shared/components/icons'
 
@@ -195,6 +196,8 @@ function NodeSettings() {
               </Text>
             </Box>
           </Stack>
+
+          <WriteBufferSetting />
 
           <HDivider />
 
