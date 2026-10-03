@@ -454,8 +454,8 @@ export default function FlipEditor({
       objId && editor && editor._graphics && editor._graphics._objects[objId]
     if (obj) {
       return {
-        x: obj.translateX,
-        y: obj.translateY,
+        x: obj.left,
+        y: obj.top,
         width: obj.width,
         height: obj.height,
         angle: obj.angle,
@@ -656,6 +656,7 @@ export default function FlipEditor({
 
           <EditorContextMenu
             isOpen={showContextMenu}
+            onClose={() => setShowContextMenu(false)}
             {...contextMenuCursor}
             onCopy={handleOnCopy}
             onPaste={handleOnPaste}
@@ -830,7 +831,7 @@ export default function FlipEditor({
                 tooltip={`${t('Redo')} (${
                   global.isMac ? 'Cmd+Shift+Z' : 'Ctrl+Shift+Z'
                 })`}
-                isDisabled={editors[idx] && editors[idx].isEmptyUndoStack()}
+                isDisabled={editors[idx] && editors[idx].isEmptyRedoStack()}
                 onClick={handleRedo}
               />
 
