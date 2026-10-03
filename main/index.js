@@ -77,6 +77,7 @@ const {
   getNodeChainDbFolder,
   getNodeFile,
   getNodeIpfsDir,
+  installBundledNodeOverOther,
 } = require('./idena-node')
 
 const NodeUpdater = require('./node-updater')
@@ -604,7 +605,18 @@ ipcMain.on(NODE_COMMAND, async (event, command, data) => {
         return sendMainWindowMsg(NODE_EVENT, 'unsupported-macos-version')
       }
 
-      getCurrentVersion()
+      // Our bundled node replaces another one first (the official app's: same userData folder).
+      const installBundled = nodeProcess.current
+        ? Promise.resolve(false)
+        : installBundledNodeOverOther().catch((e) => {
+            logger.error(
+              'error while installing the bundled node',
+              e.toString()
+            )
+            return false
+          })
+      installBundled
+        .then(() => getCurrentVersion())
         .then((version) => {
           sendMainWindowMsg(NODE_EVENT, 'node-ready', version)
         })
@@ -658,6 +670,7 @@ ipcMain.on(NODE_COMMAND, async (event, command, data) => {
           )
           sendMainWindowMsg(NODE_EVENT, 'node-started', {
             dbWriteBufferMiB: child.dbWriteBufferMiB,
+            dbWriteBufferSupported: child.dbWriteBufferSupported,
           })
         })
         .catch((e) => {

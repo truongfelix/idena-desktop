@@ -43,8 +43,9 @@ function nodeReducer(state, action) {
         ...state,
         nodeStarted: true,
         runningTroubleshooter: false,
-        // The write buffer the node started with (main/idena-node.js).
+        // The write buffer the node started with, and whether its binary has the flag (main/idena-node.js).
         dbWriteBufferMiB: action.data?.dbWriteBufferMiB ?? null,
+        dbWriteBufferSupported: action.data?.dbWriteBufferSupported ?? null,
       }
     }
     case NODE_STOP: {
