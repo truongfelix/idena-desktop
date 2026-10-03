@@ -30,11 +30,7 @@ export function useDnaLink({onInvalidLink}) {
   React.useEffect(() => {
     const handleDnaLink = (_, e) => setUrl(e)
 
-    global.ipcRenderer.on('DNA_LINK', handleDnaLink)
-
-    return () => {
-      global.ipcRenderer.removeListener('DNA_LINK', handleDnaLink)
-    }
+    return global.ipcRenderer.on('DNA_LINK', handleDnaLink)
   }, [])
 
   const [method, setMethod] = React.useState()

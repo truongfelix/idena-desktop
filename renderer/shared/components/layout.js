@@ -185,11 +185,7 @@ export default function Layout({
       }
     }
 
-    global.ipcRenderer.on('confirm-quit', handleRequestQuit)
-
-    return () => {
-      global.ipcRenderer.removeListener('confirm-quit', handleRequestQuit)
-    }
+    return global.ipcRenderer.on('confirm-quit', handleRequestQuit)
   }, [isReady, onOpenConfirmQuit, runInternalNode])
 
   const {onOpen: onOpenSignInDialog, ...dnaSignInDisclosure} = useDisclosure()

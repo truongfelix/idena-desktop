@@ -113,11 +113,7 @@ function NodeSettings() {
       }
     }
 
-    global.ipcRenderer.on(NODE_EVENT, onEvent)
-
-    return () => {
-      global.ipcRenderer.removeListener(NODE_EVENT, onEvent)
-    }
+    return global.ipcRenderer.on(NODE_EVENT, onEvent)
   })
 
   useEffect(() => {

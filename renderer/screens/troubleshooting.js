@@ -127,11 +127,7 @@ function ResetNodeConfirmationDialog(props) {
       }
     }
 
-    global.ipcRenderer.on(NODE_EVENT, handleNodeEvent)
-
-    return () => {
-      global.ipcRenderer.removeListener(NODE_EVENT, handleNodeEvent)
-    }
+    return global.ipcRenderer.on(NODE_EVENT, handleNodeEvent)
   }, [setIsPendingOff])
 
   return (
