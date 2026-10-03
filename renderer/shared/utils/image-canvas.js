@@ -77,8 +77,23 @@ export async function resizeImageToDataUrl(
   }
 }
 
+/**
+ * The bytes of a data URL, decoded here: the renderer's CSP does not allow fetching data: URLs (connect-src),
+ * so fetching it failed in the packaged app ("Error compressing images" when sending an ad to review).
+ */
+export function dataUrlToArrayBuffer(dataUrl) {
+  const comma = dataUrl.indexOf(',')
+  if (!dataUrl.startsWith('data:') || comma < 0) {
+    throw new Error('Not a data URL')
+  }
+  const isBase64 = dataUrl.slice(0, comma).endsWith(';base64')
+  const data = dataUrl.slice(comma + 1)
+  const binary = isBase64 ? atob(data) : decodeURIComponent(data)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i)
+  return bytes.buffer
+}
+
 export async function resizeImageToArrayBuffer(source, options = {}) {
-  const dataUrl = await resizeImageToDataUrl(source, options)
-  const response = await fetch(dataUrl)
-  return response.arrayBuffer()
+  return dataUrlToArrayBuffer(await resizeImageToDataUrl(source, options))
 }
