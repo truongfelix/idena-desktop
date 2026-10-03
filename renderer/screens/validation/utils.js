@@ -86,10 +86,14 @@ export function exponentialBackoff(retry) {
 }
 
 export function persistValidationState(state) {
+  // Through the context bridge an XState State loses its prototype, so its toJSON, and keeps its cycles
+  // (configuration, machine): lowdb's JSON.stringify then threw and nothing was saved. Save its JSON form,
+  // made here where toJSON still exists.
+  const json = JSON.parse(JSON.stringify(state))
   persistState('validation2', {
-    ...state,
+    ...json,
     context: {
-      ...state.context,
+      ...json.context,
       reports: [...state.context.reports],
     },
   })

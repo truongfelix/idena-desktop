@@ -53,16 +53,16 @@ export function TimingProvider(props) {
     true
   )
 
+  // Given with the timing on every render: the minute poll above replaces the timing object, so a flag kept in it
+  // was dropped after a minute and "Wrong time" disappeared.
   const wrongClientTime = nodeReportsWrongTime(useChainState())
 
-  React.useEffect(() => {
-    setTiming((prevTiming) => ({
-      ...prevTiming,
-      wrongClientTime,
-    }))
-  }, [wrongClientTime])
+  const value = React.useMemo(
+    () => ({...timing, wrongClientTime}),
+    [timing, wrongClientTime]
+  )
 
-  return <TimingStateContext.Provider value={timing} {...props} />
+  return <TimingStateContext.Provider value={value} {...props} />
 }
 
 export function useTimingState() {
