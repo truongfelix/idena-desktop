@@ -1,10 +1,16 @@
 import React from 'react'
-import {apiUrl} from '../api/api-client'
 import {fetchCeremonyIntervals} from '../api/dna'
 import {useInterval} from '../hooks/use-interval'
-import {ntp} from '../utils/utils'
+import {useChainState} from './chain-context'
 
-const TIME_DRIFT_THRESHOLD = 10 * 1000
+/**
+ * Whether the node finds its computer's clock wrong (this computer with the built-in node): it compares
+ * the clock with internet time (NTP) every minute and reports a drift over 10 s in bcn_syncing's
+ * wrongTime. Nothing while the node does not answer.
+ */
+export function nodeReportsWrongTime({offline, wrongTime}) {
+  return !offline && wrongTime === true
+}
 
 const TimingStateContext = React.createContext()
 
@@ -47,27 +53,7 @@ export function TimingProvider(props) {
     true
   )
 
-  const [wrongClientTime, setWrongClientTime] = React.useState()
-
-  useInterval(
-    async () => {
-      try {
-        const requestOriginTime = Date.now()
-
-        const {result} = await (await fetch(apiUrl('now'))).json()
-        const serverTime = new Date(result)
-
-        setWrongClientTime(
-          ntp(requestOriginTime, serverTime, serverTime, Date.now()).offset >
-            TIME_DRIFT_THRESHOLD
-        )
-      } catch {
-        global.logger.error('An error occured while fetching time API')
-      }
-    },
-    1000 * 60 * 1,
-    true
-  )
+  const wrongClientTime = nodeReportsWrongTime(useChainState())
 
   React.useEffect(() => {
     setTiming((prevTiming) => ({
