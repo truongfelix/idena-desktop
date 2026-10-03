@@ -58,6 +58,7 @@ import {
   FormHelperText,
 } from '@chakra-ui/react'
 import {rem} from '../theme'
+import {cachedRobot, robot, robotLayers} from '../utils/robohash'
 import {IconButton2} from './button'
 import {
   ChevronDownIcon,
@@ -280,16 +281,52 @@ export function ChainedInputAddon({isDisabled, bg = 'white', ...props}) {
   )
 }
 
+/** The robot of `address` (renderer/shared/utils/robohash.js): its pictures stacked in a box. */
 export function Avatar({address, ...props}) {
+  const text = address?.toLowerCase()
+  const [drawn, setDrawn] = React.useState(() => text && cachedRobot(text))
+
+  React.useEffect(() => {
+    let isCurrent = true
+    setDrawn(text && cachedRobot(text))
+    if (text) {
+      robot(text)
+        .then((next) => {
+          if (isCurrent) setDrawn(next)
+        })
+        .catch(() => {})
+    }
+    return () => {
+      isCurrent = false
+    }
+  }, [text])
+
   return (
-    <Image
+    <Box
+      position="relative"
+      overflow="hidden"
+      flexShrink={0}
       boxSize={rem(80)}
-      src={`https://robohash.idena.io/${address?.toLowerCase()}`}
       bg="gray.50"
       rounded="lg"
-      ignoreFallback
       {...props}
-    />
+    >
+      {drawn &&
+        robotLayers(drawn).map((src) => (
+          <Image
+            key={src}
+            src={src}
+            alt=""
+            position="absolute"
+            top={0}
+            left={0}
+            w="full"
+            h="full"
+            draggable={false}
+            ignoreFallback
+          />
+        ))}
+    </Box>
   )
 }
 
