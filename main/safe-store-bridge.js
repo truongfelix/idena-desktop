@@ -1,6 +1,16 @@
 const SAFE_STORE_NAME = /^[A-Za-z0-9_-]{1,64}$/u
 const SAFE_STORE_KEY = /^[A-Za-z0-9._-]{1,128}$/u
-const ALLOWED_STORE_NAMES = new Set(['settings'])
+// The stores the renderer keeps its state in (renderer/shared/utils/persist.js), one JSON file each in the
+// user data directory. A name missing here makes every write to that store fail silently: validation2
+// holds the validation in progress, so a restart or a page change would lose it.
+const ALLOWED_STORE_NAMES = new Set([
+  'settings',
+  'validation2',
+  'validationResults',
+  'validationNotification',
+  'flipArchive',
+  'flipFilter',
+])
 
 function assertSafeName(value, pattern, label) {
   if (typeof value !== 'string' || !pattern.test(value)) {
