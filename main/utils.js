@@ -17,9 +17,15 @@ function sleep(ms) {
   })
 }
 
+// A GitHub API answer "Not Found": for /releases/latest, the repository has no published release yet.
+function isNotFoundError(error) {
+  return error?.response?.status === 404
+}
+
 module.exports = {
   promiseTimeout,
   sleep,
+  isNotFoundError,
   zoomIn(window) {
     const nextLevel = window.webContents.zoomLevel + 1
     window.webContents.zoomLevel = nextLevel

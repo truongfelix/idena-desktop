@@ -6,7 +6,7 @@ const {
   nodeExists,
   getCurrentVersion,
 } = require('./idena-node')
-const {promiseTimeout} = require('./utils')
+const {isNotFoundError, promiseTimeout} = require('./utils')
 
 const checkingInterval = 10 * 60 * 1000
 
@@ -66,7 +66,11 @@ class NodeUpdater extends events.EventEmitter {
         return true
       }
     } catch (e) {
-      this.logger.error('error while checking update', e.toString())
+      if (isNotFoundError(e)) {
+        this.logger.info('no node release published yet')
+      } else {
+        this.logger.error('error while checking update', e.toString())
+      }
     } finally {
       this.timeout = setTimeout(() => this.doUpdateCheck(), checkingInterval)
     }
