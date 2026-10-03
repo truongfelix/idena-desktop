@@ -1,3 +1,6 @@
+const {EventEmitter} = require('events')
+const fs = require('fs')
+const path = require('path')
 const {
   AUTO_UPDATE_COMMAND,
   AUTO_UPDATE_EVENT,
@@ -87,5 +90,63 @@ describe('safe ipcRenderer bridge', () => {
       AUTO_UPDATE_EVENT,
       ipcRenderer.on.mock.calls[0][1]
     )
+  })
+
+  it('removes a listener with the function on() returns', () => {
+    const ipcRenderer = new EventEmitter()
+    const safeIpcRenderer = createSafeIpcRenderer(ipcRenderer)
+    const received = []
+    const listener = (_event, ...args) => received.push(args)
+
+    const unsubscribe = safeIpcRenderer.on(NODE_EVENT, listener)
+    ipcRenderer.emit(NODE_EVENT, {}, 'node-ready')
+    unsubscribe()
+    ipcRenderer.emit(NODE_EVENT, {}, 'node-started')
+
+    expect(received).toEqual([['node-ready']])
+    expect(ipcRenderer.listenerCount(NODE_EVENT)).toBe(0)
+  })
+
+  it('does not pile up listeners re-subscribed through the context bridge', () => {
+    // The bridge hands the preload a new proxy of the renderer's function on every call: removeListener
+    // with the "same" function finds nothing, the returned unsubscribe does.
+    const ipcRenderer = new EventEmitter()
+    const safeIpcRenderer = createSafeIpcRenderer(ipcRenderer)
+    const listener = jest.fn()
+    const bridged =
+      () =>
+      (...args) =>
+        listener(...args)
+
+    for (let render = 0; render < 6; render += 1) {
+      const unsubscribe = safeIpcRenderer.on(NODE_EVENT, bridged())
+      safeIpcRenderer.removeListener(NODE_EVENT, bridged())
+      expect(ipcRenderer.listenerCount(NODE_EVENT)).toBe(1)
+      unsubscribe()
+    }
+    safeIpcRenderer.on(NODE_EVENT, bridged())
+    ipcRenderer.emit(NODE_EVENT, {}, 'troubleshooting-restart-node')
+
+    expect(listener).toHaveBeenCalledTimes(1)
+  })
+
+  it('leaves no renderer code removing listeners by function', () => {
+    const offenders = []
+    const visit = (dir) => {
+      for (const entry of fs.readdirSync(dir, {withFileTypes: true})) {
+        const file = path.join(dir, entry.name)
+        if (entry.isDirectory()) {
+          if (!['.next', 'out', 'node_modules'].includes(entry.name))
+            visit(file)
+        } else if (
+          entry.name.endsWith('.js') &&
+          fs.readFileSync(file, 'utf8').includes('ipcRenderer.removeListener(')
+        ) {
+          offenders.push(path.relative(path.join(__dirname, '..'), file))
+        }
+      }
+    }
+    visit(path.join(__dirname, '..', 'renderer'))
+    expect(offenders).toEqual([])
   })
 })

@@ -137,11 +137,7 @@ export function AutoUpdateProvider({children}) {
       }
     }
 
-    global.ipcRenderer.on(AUTO_UPDATE_EVENT, onEvent)
-
-    return () => {
-      global.ipcRenderer.removeListener(AUTO_UPDATE_EVENT, onEvent)
-    }
+    return global.ipcRenderer.on(AUTO_UPDATE_EVENT, onEvent)
   })
 
   useEffect(() => {

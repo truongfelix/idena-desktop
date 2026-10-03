@@ -105,7 +105,12 @@ function createSafeIpcRenderer(ipcRenderer) {
       if (typeof listener !== 'function') {
         throw new Error('IPC listener must be a function')
       }
-      ipcRenderer.on(channel, getWrappedListener(channel, listener))
+      const wrappedListener = getWrappedListener(channel, listener)
+      ipcRenderer.on(channel, wrappedListener)
+      // Through the context bridge the renderer's function arrives as a new proxy on every call, so a
+      // later removeListener(channel, listener) from the renderer never matches it and listeners pile up.
+      // The renderer removes its listener with the function returned here.
+      return () => ipcRenderer.removeListener(channel, wrappedListener)
     },
     removeListener(channel, listener) {
       assertAllowedChannel(channel, LISTEN_CHANNELS, 'removeListener')
