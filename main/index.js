@@ -18,7 +18,7 @@ const macosVersion = require('macos-version')
 const semver = require('semver')
 const axios = require('axios')
 const kill = require('tree-kill')
-const {zoomIn, zoomOut, resetZoom} = require('./utils')
+const {zoomIn, zoomOut, resetZoom, isNotFoundError} = require('./utils')
 const loadRoute = require('./utils/routes')
 const {getI18nConfig} = require('./language')
 const {searchImages} = require('./image-search')
@@ -888,7 +888,11 @@ function checkForUpdates() {
         await autoUpdater.checkForUpdates()
       }
     } catch (e) {
-      logger.error('error while checking UI update', e.toString())
+      if (isNotFoundError(e)) {
+        logger.info('no app release published yet')
+      } else {
+        logger.error('error while checking UI update', e.toString())
+      }
     } finally {
       setTimeout(runCheck, 10 * 60 * 1000)
     }
