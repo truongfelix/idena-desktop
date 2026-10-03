@@ -442,9 +442,19 @@ export default function ProfilePage() {
                             </Stack>
                             <UserStat flex={1}>
                               <Stack spacing="1">
-                                <UserStatLabel fontWeight={500}>
-                                  {t('APY')}
-                                </UserStatLabel>
+                                <Tooltip
+                                  shouldWrapChildren
+                                  placement="top"
+                                  hasArrow
+                                  label={t(
+                                    'Staking and mining, if the identity validates and mines itself; flip and invitation rewards are not counted'
+                                  )}
+                                  w="200px"
+                                >
+                                  <UserStatLabel fontWeight={500}>
+                                    {t('APY')}
+                                  </UserStatLabel>
+                                </Tooltip>
                                 <UserStatValue>
                                   <Stack direction="row" spacing="2">
                                     <Text as="span">
