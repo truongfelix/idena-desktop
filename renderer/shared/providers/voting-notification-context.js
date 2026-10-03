@@ -6,97 +6,124 @@ import {useIdentityState} from './identity-context'
 import {useEpochState} from './epoch-context'
 import {fetchLastOpenVotings} from '../../screens/oracles/utils'
 import {requestDb, subDb} from '../utils/db'
+import {IdentityStatus} from '../types'
 
 const VotingNotificationStateContext = React.createContext()
 const VotingNotificationDispatchContext = React.createContext()
 
-export function VotingNotificationProvider(props) {
-  const {address} = useIdentityState()
-  const {epoch} = useEpochState() ?? {epoch: -1}
+// How often the count of new oracle votings is read (api.idena.io, sent with the address): it was every 10 s.
+export const VOTING_NOTIFICATION_INTERVAL_MS = 5 * 60 * 1000
 
-  const [current, send] = useMachine(
-    Machine(
-      {
-        context: {
-          todoCount: 0,
+/** Whether an identity in `state` can sit on an oracle committee (validated): only then is the count read. */
+export function canBeOracle(state) {
+  return [
+    IdentityStatus.Newbie,
+    IdentityStatus.Verified,
+    IdentityStatus.Human,
+    IdentityStatus.Suspended,
+    IdentityStatus.Zombie,
+  ].includes(state)
+}
+
+/**
+ * The To-Do count of new oracle votings: read once started, then every VOTING_NOTIFICATION_INTERVAL_MS; a failed
+ * read waits for the next one (it stopped the count for the session).
+ */
+export function createVotingNotificationMachine({fetchUnreadCount}) {
+  return Machine(
+    {
+      context: {
+        todoCount: 0,
+      },
+      initial: 'waiting',
+      states: {
+        waiting: {
+          on: {
+            START: {
+              target: 'ready',
+              actions: ['setStartParams'],
+            },
+          },
         },
-        initial: 'waiting',
-        states: {
-          waiting: {
-            on: {
-              START: {
-                target: 'ready',
-                actions: ['setStartParams'],
+        ready: {
+          initial: 'fetch',
+          states: {
+            fetch: {
+              invoke: {
+                src: 'fetchUnreadCount',
+                onDone: {
+                  target: 'idle',
+                  actions: ['applyTodoCount', log()],
+                },
+                onError: 'idle',
+              },
+            },
+            idle: {
+              after: {
+                [VOTING_NOTIFICATION_INTERVAL_MS]: 'fetch',
               },
             },
           },
-          ready: {
-            initial: 'fetch',
-            states: {
-              fetch: {
-                invoke: {
-                  src: 'fetchUnreadCount',
-                  onDone: {
-                    target: 'idle',
-                    actions: ['applyTodoCount', log()],
-                  },
-                },
-              },
-              idle: {
-                after: {
-                  10000: 'fetch',
-                },
-              },
-            },
-            on: {
-              RESET: '.fetch',
-            },
+          on: {
+            RESET: '.fetch',
+            STOP: 'waiting',
           },
         },
       },
-      {
-        services: {
-          // eslint-disable-next-line no-shadow
-          fetchUnreadCount: async ({address}) => {
-            const lastVotings =
-              (await fetchLastOpenVotings({oracle: address})) ?? []
+    },
+    {
+      services: {fetchUnreadCount},
+      actions: {
+        // eslint-disable-next-line no-shadow
+        setStartParams: assign((context, {epoch, address}) => ({
+          ...context,
+          epoch,
+          address,
+        })),
+        applyTodoCount: assign({
+          todoCount: (_, {data}) => data.length,
+        }),
+      },
+    }
+  )
+}
 
-            const votingDb = subDb(requestDb(), 'votings')
+// eslint-disable-next-line no-shadow
+async function readUnreadVotings({address}) {
+  const lastVotings = (await fetchLastOpenVotings({oracle: address})) ?? []
 
-            const lastVotingTimestamp = await (async () => {
-              try {
-                return await votingDb.get('lastVotingTimestamp')
-              } catch (error) {
-                if (error.notFound) {
-                  return new Date(0)
-                }
-              }
-            })()
+  const votingDb = subDb(requestDb(), 'votings')
 
-            return lastVotings.filter(
-              ({createTime}) =>
-                new Date(createTime) > new Date(lastVotingTimestamp)
-            )
-          },
-        },
-        actions: {
-          // eslint-disable-next-line no-shadow
-          setStartParams: assign((context, {epoch, address}) => ({
-            ...context,
-            epoch,
-            address,
-          })),
-          applyTodoCount: assign({
-            todoCount: (_, {data}) => data.length,
-          }),
-        },
+  const lastVotingTimestamp = await (async () => {
+    try {
+      return await votingDb.get('lastVotingTimestamp')
+    } catch (error) {
+      if (error.notFound) {
+        return new Date(0)
       }
-    )
+    }
+  })()
+
+  return lastVotings.filter(
+    ({createTime}) => new Date(createTime) > new Date(lastVotingTimestamp)
+  )
+}
+
+export function VotingNotificationProvider(props) {
+  const {address, state} = useIdentityState()
+  const {epoch} = useEpochState() ?? {epoch: -1}
+
+  const [current, send] = useMachine(() =>
+    createVotingNotificationMachine({fetchUnreadCount: readUnreadVotings})
   )
 
   React.useEffect(() => {
-    if (epoch && address) send('START', {epoch, address})
-  }, [address, epoch, send])
+    if (epoch && address && canBeOracle(state)) {
+      send('START', {epoch, address})
+    } else {
+      send('STOP')
+    }
+  }, [address, epoch, send, state])
 
   return (
     <VotingNotificationStateContext.Provider value={current.context}>
