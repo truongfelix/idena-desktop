@@ -44,6 +44,7 @@
     "audit:metadata": "node scripts/check-release-metadata.js",
     "audit:artifacts": "node scripts/check-release-artifacts.js",
     "audit:deps": "node scripts/check-dependency-footprint.js",
+    "audit:npm": "node scripts/check-npm-audit.js",
     "audit:electron": "node scripts/check-electron-safety.js",
     "release:check": "node scripts/release-check.js"
   },

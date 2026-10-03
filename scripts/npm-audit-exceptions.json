@@ -1,0 +1,14 @@
+[
+  {
+    "id": "GHSA-vfj7-8cjw-p6xm",
+    "package": "braces",
+    "reason": "No fixed version (all braces <= 3.0.3, the latest). Dev only: jest's micromatch and the eslint config; nothing in the app. Leaving it needs jest 30.",
+    "expires": "2026-11-02"
+  },
+  {
+    "id": "GHSA-ch52-4w7c-c8xp",
+    "package": "http-cache-semantics",
+    "reason": "No fixed version (all http-cache-semantics <= 4.2.0, the latest). Dev only: electron-builder's @electron/get -> got -> cacheable-request; nothing in the app.",
+    "expires": "2026-11-02"
+  }
+]

@@ -15,6 +15,7 @@ const syntaxCheckedFiles = [
   'scripts/run-next-static-build.js',
   'scripts/e2e-smoke.js',
   'scripts/release-check.js',
+  'scripts/check-npm-audit.js',
   'scripts/setup-sources.js',
   'scripts/build-node-from-sources.js',
   'scripts/run-electron-builder.js',
@@ -59,10 +60,7 @@ runStep('ESLint', npmCommand, ['run', 'lint', '--', '--format', 'unix'])
 runStep('Release metadata audit', npmCommand, ['run', 'audit:metadata'])
 runStep('Release artifact audit', npmCommand, ['run', 'audit:artifacts'])
 runStep('Dependency footprint audit', npmCommand, ['run', 'audit:deps'])
-runStep('NPM vulnerability audit', npmCommand, [
-  'audit',
-  '--audit-level=moderate',
-])
+runStep('NPM vulnerability audit', npmCommand, ['run', 'audit:npm'])
 runStep('NPM registry signature audit', npmCommand, ['audit', 'signatures'])
 runStep('Electron safety audit', npmCommand, ['run', 'audit:electron'])
 runStep('Privacy audit', npmCommand, ['run', 'audit:privacy'])
