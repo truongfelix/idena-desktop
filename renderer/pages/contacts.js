@@ -136,7 +136,7 @@ export default function ContactsPage() {
               successToast('Invite terminated')
               onCloseKillContactDrawer()
             }}
-            onFail={(error) => {
+            onKillFail={(error) => {
               failToast({
                 title: 'Failed to terminate invite',
                 description: error,
