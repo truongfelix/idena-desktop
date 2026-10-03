@@ -161,3 +161,9 @@ Pull requests are welcome.
 ### Localization
 
 Please check your language plurals [here](https://jsfiddle.net/sm9wgLze).
+
+## Credits
+
+The robot avatars are drawn by the app (no request to robohash.idena.io): RoboHash set1 "Classic
+robots" by Zikri Kader (CC-BY-3.0 / CC-BY-4.0) and the RoboHash selection code (e1ven/Robohash, MIT),
+ported to `renderer/shared/utils/robohash.js`. Details in `renderer/public/static/robohash/CREDITS.txt`.
