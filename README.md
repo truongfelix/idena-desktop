@@ -9,7 +9,7 @@ Idena Desktop client for Windows, macOS, and Linux.
 Built with [Electron](https://www.electronjs.org),
 [React](https://react.dev), and [Next.js](https://nextjs.org/).
 
-[![Lint and tests](https://github.com/ubiubi18/idena-desktop/actions/workflows/lint.yml/badge.svg?branch=master)](https://github.com/ubiubi18/idena-desktop/actions/workflows/lint.yml)
+[![Lint and tests](https://github.com/truongfelix/idena-desktop/actions/workflows/lint.yml/badge.svg?branch=master)](https://github.com/truongfelix/idena-desktop/actions/workflows/lint.yml)
 
 > This community-maintained fork has no published or code-signed desktop
 > releases. The upstream Idena release feed does not contain these changes.

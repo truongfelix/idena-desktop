@@ -10,7 +10,7 @@ describe('node download safety', () => {
   it('allows only Idena node release asset URLs from GitHub', () => {
     expect(
       isSafeNodeDownloadUrl(
-        'https://github.com/ubiubi18/idena-go/releases/download/v1.1.2/idena-node-mac-1.1.2'
+        'https://github.com/truongfelix/idena-go/releases/download/v1.1.2/idena-node-mac-1.1.2'
       )
     ).toBe(true)
 
@@ -21,12 +21,12 @@ describe('node download safety', () => {
     ).toBe(false)
     expect(
       isSafeNodeDownloadUrl(
-        'http://github.com/ubiubi18/idena-go/releases/download/v1.1.2/idena-node-mac'
+        'http://github.com/truongfelix/idena-go/releases/download/v1.1.2/idena-node-mac'
       )
     ).toBe(false)
     expect(
       isSafeNodeDownloadUrl(
-        'https://user:token@github.com/ubiubi18/idena-go/releases/download/v1.1.2/idena-node-mac'
+        'https://user:token@github.com/truongfelix/idena-go/releases/download/v1.1.2/idena-node-mac'
       )
     ).toBe(false)
   })
@@ -34,10 +34,10 @@ describe('node download safety', () => {
   it('returns a normalized safe node download URL', () => {
     expect(
       assertSafeNodeDownloadUrl(
-        'https://github.com/ubiubi18/idena-go/releases/download/v1.1.2/idena-node-linux'
+        'https://github.com/truongfelix/idena-go/releases/download/v1.1.2/idena-node-linux'
       )
     ).toBe(
-      'https://github.com/ubiubi18/idena-go/releases/download/v1.1.2/idena-node-linux'
+      'https://github.com/truongfelix/idena-go/releases/download/v1.1.2/idena-node-linux'
     )
   })
 

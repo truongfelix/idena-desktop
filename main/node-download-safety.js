@@ -4,7 +4,7 @@ const path = require('path')
 const semver = require('semver')
 
 const MIN_NODE_BINARY_SIZE = 1024 * 1024
-const NODE_RELEASE_PATH_PREFIX = '/ubiubi18/idena-go/releases/download/'
+const NODE_RELEASE_PATH_PREFIX = '/truongfelix/idena-go/releases/download/'
 
 function isSafeNodeDownloadUrl(value) {
   if (typeof value !== 'string') {
