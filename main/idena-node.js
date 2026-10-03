@@ -5,7 +5,6 @@ const {spawn} = require('child_process')
 const axios = require('axios')
 const progress = require('progress-stream')
 const semver = require('semver')
-const kill = require('tree-kill')
 const lineReader = require('reverse-line-reader')
 // eslint-disable-next-line import/no-extraneous-dependencies
 const appDataPath = require('./app-data-path')
@@ -409,33 +408,6 @@ async function startNode(
   return idenaNode
 }
 
-async function stopNode(node) {
-  return new Promise((resolve, reject) => {
-    try {
-      if (!node) {
-        resolve('node process not found')
-      }
-      if (node.exitCode != null) {
-        resolve(`node already exited with code ${node.exitCode}`)
-      }
-      if (process.platform !== 'win32') {
-        kill(node.pid, 'SIGINT', (err) => {
-          if (err) {
-            return reject(err)
-          }
-          return resolve(`node ${node.pid} stopped successfully`)
-        })
-      } else {
-        node.on('exit', () => resolve(`node ${node.pid} stopped successfully`))
-        node.on('error', reject)
-        node.kill()
-      }
-    } catch (e) {
-      reject(e)
-    }
-  })
-}
-
 function getCurrentVersion(tempNode) {
   return new Promise((resolve, reject) => {
     const node = tempNode ? getTempNodeFile() : getNodeFile()
@@ -538,29 +510,11 @@ function getLastLogs() {
   })
 }
 
-async function tryStopNode(node, {onSuccess, onFail}) {
-  try {
-    if (node) {
-      const log = await stopNode(node)
-      logger.info(log)
-      if (onSuccess) {
-        onSuccess()
-      }
-    }
-  } catch (e) {
-    logger.error('error while stopping node', e.toString())
-    if (onFail) {
-      onFail()
-    }
-  }
-}
-
 module.exports = {
   downloadNode,
   getCurrentVersion,
   getRemoteVersion,
   startNode,
-  stopNode,
   updateNode,
   nodeExists,
   cleanNodeState,
@@ -568,5 +522,4 @@ module.exports = {
   getNodeFile,
   getNodeChainDbFolder,
   getNodeIpfsDir,
-  tryStopNode,
 }

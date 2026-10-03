@@ -16,12 +16,6 @@ import {
   useToast,
   Alert,
   Link,
-  AlertDialog,
-  AlertDialogOverlay,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogBody,
-  AlertDialogFooter,
 } from '@chakra-ui/react'
 import {useMachine} from '@xstate/react'
 import semver from 'semver'
@@ -88,8 +82,6 @@ import {OfflineBanner} from './layout/offline'
 import {TroubleshootingScreen} from '../../screens/troubleshooting'
 
 const AVAILABLE_TIMEOUT = global.isDev || global.isTest ? 0 : 1000 * 5
-
-const sendConfirmQuit = () => global.ipcRenderer.send('confirm-quit')
 
 export default function Layout({
   loading,
@@ -162,31 +154,6 @@ export default function Layout({
   const isReady = !loading && !debouncedOffline && !debouncedSyncing
 
   const isNotOffline = !debouncedOffline && !loading
-
-  const {onOpen: onOpenConfirmQuit, ...confirmQuitDisclosure} = useDisclosure()
-
-  const [{runInternalNode}] = useSettings()
-
-  React.useEffect(() => {
-    const handleRequestQuit = async () => {
-      if (isReady) {
-        try {
-          const {online} = await callRpc('dna_identity')
-          if (online && runInternalNode && isReady) {
-            onOpenConfirmQuit()
-          } else {
-            sendConfirmQuit()
-          }
-        } catch {
-          sendConfirmQuit()
-        }
-      } else {
-        sendConfirmQuit()
-      }
-    }
-
-    return global.ipcRenderer.on('confirm-quit', handleRequestQuit)
-  }, [isReady, onOpenConfirmQuit, runInternalNode])
 
   const {onOpen: onOpenSignInDialog, ...dnaSignInDisclosure} = useDisclosure()
 
@@ -276,8 +243,6 @@ export default function Layout({
       )}
 
       <UpdateExternalNodeDialog />
-
-      <ConfirmQuitDialog {...confirmQuitDisclosure} />
     </LayoutContainer>
   )
 }
@@ -1020,61 +985,5 @@ function UpdateExternalNodeDialog() {
         </PrimaryButton>
       </DialogFooter>
     </Dialog>
-  )
-}
-
-function ConfirmQuitDialog({onClose, onError, ...props}) {
-  const {t} = useTranslation()
-
-  const stopMiningAndQuitRef = React.useRef()
-
-  return (
-    <AlertDialog
-      isCentered
-      leastDestructiveRef={stopMiningAndQuitRef}
-      onClose={onClose}
-      {...props}
-    >
-      <AlertDialogOverlay bg="xblack.080" />
-      <AlertDialogContent
-        bg="white"
-        color="brandGray.500"
-        fontSize="md"
-        p={8}
-        pt={6}
-        rounded="lg"
-      >
-        <AlertDialogHeader fontSize="lg" fontWeight={500} p={0} mb={4}>
-          {t('Are you sure you want to exit?')}
-        </AlertDialogHeader>
-
-        <AlertDialogBody p={0} mb={8}>
-          {t(`Your mining status is active. Closing the app may cause the mining
-      penalty.`)}
-        </AlertDialogBody>
-
-        <AlertDialogFooter p={0}>
-          <Stack isInline justify="flex-end">
-            <SecondaryButton onClick={onClose}>{t('Cancel')}</SecondaryButton>
-            <SecondaryButton onClick={sendConfirmQuit}>
-              {t('Exit')}
-            </SecondaryButton>
-            <PrimaryButton
-              ref={stopMiningAndQuitRef}
-              onClick={async () => {
-                try {
-                  await callRpc('dna_becomeOffline', {})
-                  sendConfirmQuit()
-                } catch (error) {
-                  onError(error?.message)
-                }
-              }}
-            >
-              {t('Stop mining and exit')}
-            </PrimaryButton>
-          </Stack>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
   )
 }
