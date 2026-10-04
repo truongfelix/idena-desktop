@@ -516,6 +516,27 @@ export function ErrorAlert({children, ...props}) {
   )
 }
 
+export function WarningAlert({children, ...props}) {
+  return (
+    <Alert
+      status="warning"
+      flexShrink={0}
+      bg="orange.010"
+      borderWidth="1px"
+      borderColor="orange.050"
+      fontSize="md"
+      fontWeight={500}
+      rounded="md"
+      px="3"
+      py="2"
+      {...props}
+    >
+      <InfoIcon color="orange.500" boxSize="5" mr="3" />
+      {children}
+    </Alert>
+  )
+}
+
 export const VDivider = React.forwardRef((props, ref) => (
   <Divider
     ref={ref}
