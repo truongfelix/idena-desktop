@@ -45,7 +45,6 @@ import {
   DialogBody,
   DialogFooter,
   DialogHeader,
-  ExternalLink,
   Progress,
   TextLink,
   Toast,
@@ -759,9 +758,6 @@ function HardForkScreen({
                         nsSeparator: '!!',
                       })}
                     </Text>
-                    <ExternalLink href="https://scan.idena.io/hardfork">
-                      {t('See voting stats')}
-                    </ExternalLink>
                   </Box>
                 </Stack>
               </Stack>

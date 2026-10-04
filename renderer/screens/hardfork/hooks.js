@@ -5,8 +5,7 @@ import {log} from 'xstate/lib/actions'
 import {eitherState, skipSSR} from '../../shared/utils/utils'
 import {useAutoUpdateState} from '../../shared/providers/update-context'
 import {requestDb, subDb} from '../../shared/utils/db'
-import {isFork} from '../../shared/utils/node'
-import {apiUrl} from '../../shared/api/api-client'
+import {isHardForkUpdate} from '../../shared/utils/node'
 
 function createVotingStatusDb(version) {
   const db = subDb(requestDb(), 'updates')
@@ -34,7 +33,17 @@ const HardforkVotingStatus = {
 }
 
 export function useHardFork() {
-  const {nodeCurrentVersion, nodeRemoteVersion} = useAutoUpdateState()
+  const {nodeCurrentVersion, nodeRemoteVersion, nodeRemoteHardFork} =
+    useAutoUpdateState()
+
+  // Declared by our own node release (main/hard-fork-info.js), no third-party service.
+  const hardFork = isHardForkUpdate(
+    nodeCurrentVersion,
+    nodeRemoteVersion,
+    nodeRemoteHardFork
+  )
+    ? nodeRemoteHardFork
+    : null
 
   const statusDb = React.useMemo(
     () => skipSSR(() => createVotingStatusDb(nodeRemoteVersion)),
@@ -60,31 +69,13 @@ export function useHardFork() {
           },
           fetching: {
             invoke: {
-              src: async (_, {version}) => {
-                const fetchJsonResult = async (path) =>
-                  (await (await fetch(apiUrl(path))).json()).result
-
-                const forkChangelog = await fetchJsonResult(
-                  `node/${version}/forkchangelog`
-                )
-
-                const [{upgrade: highestUpgrade}] = await fetchJsonResult(
-                  'upgrades?limit=1'
-                )
-
-                const nextTiming =
-                  forkChangelog &&
-                  (await fetchJsonResult(`upgrade/${forkChangelog.Upgrade}`))
-
-                return {
-                  changes: forkChangelog?.Changes ?? [],
-                  didActivate:
-                    forkChangelog === null ||
-                    highestUpgrade >= forkChangelog.Upgrade,
-                  votingStatus: await statusDb.get(),
-                  ...nextTiming,
-                }
-              },
+              src: async (_, {hardFork: declared}) => ({
+                changes: declared.changes,
+                didActivate: declared.activated,
+                startActivationDate: declared.startActivationDate,
+                endActivationDate: declared.endActivationDate,
+                votingStatus: await statusDb.get(),
+              }),
               onDone: {
                 target: 'fetched',
                 actions: [
@@ -101,6 +92,7 @@ export function useHardFork() {
           fetched: {
             entry: [assign({isReady: true})],
             on: {
+              FETCH: 'fetching',
               REJECT: {
                 actions: [
                   assign({votingStatus: HardforkVotingStatus.Reject}),
@@ -115,7 +107,7 @@ export function useHardFork() {
               },
             },
           },
-          failed: {entry: [log()]},
+          failed: {entry: [log()], on: {FETCH: 'fetching'}},
         },
       },
       {
@@ -128,10 +120,10 @@ export function useHardFork() {
   )
 
   React.useEffect(() => {
-    if (isFork(nodeCurrentVersion, nodeRemoteVersion)) {
-      send('FETCH', {version: nodeRemoteVersion})
+    if (hardFork) {
+      send('FETCH', {hardFork})
     }
-  }, [nodeCurrentVersion, nodeRemoteVersion, send])
+  }, [hardFork, send])
 
   const {
     changes,
@@ -149,7 +141,7 @@ export function useHardFork() {
         endActivationDate,
       },
       votingStatus,
-      isAvailable: eitherState(current, 'fetched'),
+      isAvailable: Boolean(hardFork) && eitherState(current, 'fetched'),
       didActivate,
       didReject: current.context.votingStatus === HardforkVotingStatus.Reject,
     },

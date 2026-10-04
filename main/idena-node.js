@@ -20,6 +20,7 @@ const {
   nodeSupportsWriteBuffer,
 } = require('./node-write-buffer')
 const {shouldReplaceInstalledNode, sha256File} = require('./bundled-node')
+const {fetchHardForkInfo} = require('./hard-fork-info')
 
 const idenaBin = 'idena-go'
 const pinnedNodeVersion = '1.1.2'
@@ -210,7 +211,7 @@ function getNodeAssetName(version) {
   }`
 }
 
-const getReleaseInfo = async () => {
+const getReleaseInfo = async ({withHardFork = false} = {}) => {
   const {data} = await axios.get(idenaNodeReleasesUrl)
   const version = semver.clean(data.tag_name)
   const assetName = version && getNodeAssetName(version)
@@ -236,17 +237,36 @@ const getReleaseInfo = async () => {
     maxBodyLength: 4096,
   })
 
-  return {
+  const releaseInfo = {
     assetName,
     expectedSha256: parseNodeChecksum(String(checksumData), assetName),
     url,
     version,
   }
+
+  if (withHardFork) {
+    try {
+      releaseInfo.hardFork = await fetchHardForkInfo({
+        assets: data.assets,
+        version,
+        get: axios.get,
+      })
+    } catch (error) {
+      // An unverifiable description shows no hard fork screen; the update itself goes on.
+      logger.error('cannot read the hard fork description', error.toString())
+      releaseInfo.hardFork = null
+    }
+  }
+
+  return releaseInfo
 }
 
-const getRemoteVersion = async () => {
-  const releaseInfo = await getReleaseInfo()
-  return releaseInfo ? releaseInfo.version : null
+// The latest node release: its version, and the hard fork it declares (null for an ordinary update).
+const getRemoteRelease = async () => {
+  const releaseInfo = await getReleaseInfo({withHardFork: true})
+  return releaseInfo
+    ? {version: releaseInfo.version, hardFork: releaseInfo.hardFork}
+    : null
 }
 
 async function downloadNode(onProgress) {
@@ -562,7 +582,7 @@ function getLastLogs() {
 module.exports = {
   downloadNode,
   getCurrentVersion,
-  getRemoteVersion,
+  getRemoteRelease,
   startNode,
   updateNode,
   nodeExists,
