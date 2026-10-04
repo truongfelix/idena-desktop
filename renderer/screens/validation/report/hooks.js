@@ -4,9 +4,12 @@ import {useEpochState} from '../../../shared/providers/epoch-context'
 import {useIdentity} from '../../../shared/providers/identity-context'
 import {validationReportMachine} from './machines'
 
+// Score over the identity's last validations; undefined before any flip counted.
 export function useTotalValidationScore() {
   const [{totalShortFlipPoints, totalQualifiedFlips}] = useIdentity()
-  return Math.min(totalShortFlipPoints / totalQualifiedFlips, 1)
+  return totalQualifiedFlips
+    ? Math.min(totalShortFlipPoints / totalQualifiedFlips, 1)
+    : undefined
 }
 
 export function useValidationReportSummary() {
@@ -29,6 +32,6 @@ export function useValidationReportSummary() {
   return {
     ...current.context,
     totalScore,
-    isLoading: current.matches('fetching'),
+    isLoading: current.matches('idle') || current.matches('fetching'),
   }
 }

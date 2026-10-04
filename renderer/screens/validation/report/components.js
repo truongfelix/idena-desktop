@@ -25,19 +25,48 @@ import {
   TwitterIcon,
 } from '../../../shared/components/icons'
 import {TableCol} from '../../../shared/components/table'
-import {useIdentity} from '../../../shared/providers/identity-context'
 import {toLocaleDna, toPercent} from '../../../shared/utils/utils'
 import {useValidationReportSummary} from './hooks'
-import {ValidationResult} from './types'
+import {ValidationResult, ValidationSummaryStatus} from './types'
+
+// Title and explanation when the node has no summary to show.
+export function validationSummaryStatusText(t, status) {
+  switch (status) {
+    case ValidationSummaryStatus.NotRecorded:
+      return [
+        t('Your node has no result for this validation'),
+        t(
+          'The node records the validations it goes through. It was not running or not synchronized during this one.'
+        ),
+      ]
+    case ValidationSummaryStatus.NotParticipated:
+      return [
+        t('This account did not take part in this validation'),
+        t('It had no identity that could be validated.'),
+      ]
+    case ValidationSummaryStatus.ValidationFailed:
+      return [
+        t('Nobody was validated in this validation'),
+        t('Identities stay as they were and no rewards were paid.'),
+      ]
+    case ValidationSummaryStatus.Unavailable:
+      return [
+        t('Your node cannot show validation results'),
+        t('A node that records them is needed (community build node).'),
+      ]
+    default:
+      return ['', '']
+  }
+}
 
 export function ValidationReportSummary({onClose}) {
   const {t, i18n} = useTranslation()
 
   const {colors} = useTheme()
 
-  const [{isValidated}] = useIdentity()
-
   const {
+    status,
+    isValidated,
     lastValidationScore,
     totalScore,
     earnings,
@@ -46,6 +75,12 @@ export function ValidationReportSummary({onClose}) {
     validationResult,
     isLoading,
   } = useValidationReportSummary()
+
+  const isRecorded = status === ValidationSummaryStatus.Recorded
+  const [statusTitle, statusDescription] = validationSummaryStatusText(
+    t,
+    status
+  )
 
   const {
     short: {score: shortScore},
@@ -61,6 +96,9 @@ export function ValidationReportSummary({onClose}) {
         // eslint-disable-next-line no-nested-ternary
         isLoading
           ? 'transparent'
+          : // eslint-disable-next-line no-nested-ternary
+          !isRecorded
+          ? 'orange.500'
           : // eslint-disable-next-line no-nested-ternary
           isValidated
           ? validationResult === ValidationResult.Penalty
@@ -91,6 +129,7 @@ export function ValidationReportSummary({onClose}) {
         >
           <AlertTitle fontSize="lg" fontWeight={500}>
             {(() => {
+              if (!isRecorded) return statusTitle
               switch (validationResult) {
                 case ValidationResult.Success:
                   return t('Successfully validated')
@@ -107,14 +146,19 @@ export function ValidationReportSummary({onClose}) {
             })()}
           </AlertTitle>
         </Skeleton>
-        <AlertDescription>
+        {!isLoading && !isRecorded && (
+          <AlertDescription>
+            <Text color="muted">{statusDescription}</Text>
+          </AlertDescription>
+        )}
+        <AlertDescription display={isRecorded || isLoading ? 'block' : 'none'}>
           <Stack spacing={10}>
             <Flex justify="space-between" px={2}>
               <ValidationReportGauge>
                 <ValidationReportGaugeBox>
                   {isValidated ? (
                     <ValidationReportGaugeBar
-                      value={totalScore * 100}
+                      value={(totalScore ?? 0) * 100 || 2}
                       color={
                         // eslint-disable-next-line no-nested-ternary
                         totalScore <= 0.75
@@ -135,7 +179,7 @@ export function ValidationReportSummary({onClose}) {
                 <ValidationReportGaugeStat>
                   {isValidated ? (
                     <ValidationReportGaugeStatValue>
-                      {toPercent(totalScore)}
+                      {toPercent(totalScore) ?? '–'}
                     </ValidationReportGaugeStatValue>
                   ) : (
                     <ValidationReportGaugeStatValue color="red.500">

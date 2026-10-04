@@ -1,7 +1,9 @@
 import {assign, createMachine} from 'xstate'
 import {log} from 'xstate/lib/actions'
-import {apiUrl} from '../../../shared/api/api-client'
-import {ValidationResult} from './types'
+import {callRpc} from '../../../shared/utils/utils'
+import {ValidationResult, ValidationSummaryStatus} from './types'
+
+const validatedStates = ['Newbie', 'Verified', 'Human']
 
 export const validationReportMachine = createMachine({
   context: {
@@ -21,23 +23,31 @@ export const validationReportMachine = createMachine({
       },
     },
     fetching: {
-      entry: [assign({identity: (_, {identity}) => identity})],
+      entry: [
+        assign({
+          identity: (_, {identity}) => identity,
+          epochNumber: (_, {epochNumber}) => epochNumber,
+        }),
+      ],
       invoke: {
-        src: async (_, {epochNumber, identity: {address}}) => {
-          const {result, error} = await (
-            await fetch(
-              apiUrl(
-                `Epoch/${epochNumber}/Identity/${address}/ValidationSummary`
-              )
-            )
-          ).json()
-
-          if (error) throw new Error(error)
-
-          return result
-        },
-        onDone: 'fetched',
-        onError: 'failed',
+        // Recorded by the node while it applied the ceremony block; null when it did not.
+        src: (_, {epochNumber, identity: {address}}) =>
+          callRpc('dna_validationSummary', address, epochNumber),
+        onDone: [
+          {target: 'notRecorded', cond: (_, {data}) => !data},
+          {
+            target: 'validationFailed',
+            cond: (_, {data}) => data.validationFailed,
+          },
+          {
+            target: 'notParticipated',
+            cond: (_, {data}) =>
+              !data.participated &&
+              ['Undefined', 'Invite'].includes(data.prevState),
+          },
+          {target: 'fetched'},
+        ],
+        onError: 'unavailable',
       },
     },
     fetched: {
@@ -45,10 +55,11 @@ export const validationReportMachine = createMachine({
         log(),
         assign(
           (
-            {identity: {isValidated}, ...context},
+            context,
             {
               data: {
                 prevState,
+                state,
                 shortAnswers,
                 longAnswers,
                 shortAnswersCount,
@@ -81,7 +92,10 @@ export const validationReportMachine = createMachine({
               {}
             )
 
-            const flipScore = ({point, flipsCount}) => point / flipsCount
+            const flipScore = ({point, flipsCount}) =>
+              flipsCount ? point / flipsCount : undefined
+
+            const isValidated = validatedStates.includes(state)
 
             const lastValidationScore = {
               short: {
@@ -106,13 +120,18 @@ export const validationReportMachine = createMachine({
                 : ValidationResult.MissedValidation
               : ValidationResult.WrongAnswers
 
+            const totalReward = totalEarnedReward + totalMissedReward
+
             return {
               ...context,
+              status: ValidationSummaryStatus.Recorded,
               prevState,
+              newState: state,
+              isValidated,
               validationResult,
               earnings: totalEarnedReward,
               totalMissedReward,
-              earningsScore: totalEarnedReward / totalMissedReward,
+              earningsScore: totalReward ? totalEarnedReward / totalReward : 0,
               validationReward: earnedReward('validation'),
               missedValidationReward: missedReward('validation'),
               invitationReward: maybePenaltyReward(earnedReward('invitations')),
@@ -135,12 +154,19 @@ export const validationReportMachine = createMachine({
         ),
       ],
     },
-    failed: {
+    notRecorded: {
+      entry: [assign({status: ValidationSummaryStatus.NotRecorded})],
+    },
+    validationFailed: {
+      entry: [assign({status: ValidationSummaryStatus.ValidationFailed})],
+    },
+    notParticipated: {
+      entry: [assign({status: ValidationSummaryStatus.NotParticipated})],
+    },
+    unavailable: {
       entry: [
-        assign({
-          validationResult: ({identity: {isValidated}}) =>
-            isValidated ? ValidationResult.Success : ValidationResult.Fail,
-        }),
+        assign({status: ValidationSummaryStatus.Unavailable}),
+        log((_, {data}) => data?.message),
       ],
     },
   },
