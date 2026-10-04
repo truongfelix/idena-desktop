@@ -2,7 +2,7 @@ const events = require('events')
 const semver = require('semver')
 const {
   downloadNode,
-  getRemoteVersion,
+  getRemoteRelease,
   nodeExists,
   getCurrentVersion,
 } = require('./idena-node')
@@ -34,7 +34,8 @@ class NodeUpdater extends events.EventEmitter {
 
   async doUpdateCheck() {
     try {
-      const remoteVersion = await getRemoteVersion()
+      const remoteRelease = await getRemoteRelease()
+      const remoteVersion = remoteRelease ? remoteRelease.version : null
       if (this.isInternalNode && !nodeExists()) {
         this.logger.info('node does not exist, return')
         return false
@@ -44,7 +45,10 @@ class NodeUpdater extends events.EventEmitter {
 
       if (semver.lt(this.currentVersion, remoteVersion)) {
         this.logger.info('update available')
-        this.emit('update-available', {version: remoteVersion})
+        this.emit('update-available', {
+          version: remoteVersion,
+          hardFork: remoteRelease.hardFork,
+        })
 
         if (this.isInternalNode) {
           if (!this.downloadPromise) {

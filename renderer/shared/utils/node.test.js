@@ -1,21 +1,27 @@
-import {isFork} from './node'
+import {isHardForkUpdate} from './node'
 
-describe('isFork', () => {
-  it('respects major version', () => {
-    expect(isFork('0.0.0', '0.0.0')).toBeFalsy()
-    expect(isFork('0.1.0', '0.1.0')).toBeFalsy()
-    expect(isFork('0.1.0', '0.1.1')).toBeFalsy()
+describe('isHardForkUpdate', () => {
+  const hardFork = {version: '1.2.0'}
 
-    expect(isFork('0.1.0', '0.2.0')).toBeTruthy()
-    expect(isFork('0.1.0', '0.2.2')).toBeTruthy()
-    expect(isFork('0.1.0', '0.3.0')).toBeTruthy()
-    expect(isFork('0.1.0', '1.0.0')).toBeTruthy()
+  it('needs a hard fork declared by the release', () => {
+    expect(isHardForkUpdate('1.1.2', '1.2.0', hardFork)).toBeTruthy()
+    expect(isHardForkUpdate('1.1.2', '1.2.0', null)).toBeFalsy()
+    expect(isHardForkUpdate('1.1.2', '2.0.0', undefined)).toBeFalsy()
+  })
+
+  it('needs the description of that very release', () => {
+    expect(isHardForkUpdate('1.1.2', '1.2.1', hardFork)).toBeFalsy()
+    expect(isHardForkUpdate('1.1.2', 'v1.2.0', hardFork)).toBeTruthy()
+  })
+
+  it('needs an older current node', () => {
+    expect(isHardForkUpdate('1.2.0', '1.2.0', hardFork)).toBeFalsy()
+    expect(isHardForkUpdate('1.3.0', '1.2.0', hardFork)).toBeFalsy()
   })
 
   it('handles edge cases', () => {
-    expect(isFork('0.1.0', '0.2.0-rc')).toBeFalsy()
-    expect(isFork('0.1.0', '0.2.0-beta')).toBeFalsy()
-    expect(isFork('0.1.0foo', '0.2.0bar')).toBeFalsy()
-    expect(isFork('not a', 'semver string')).toBeFalsy()
+    expect(isHardForkUpdate('0.0.1', '1.2.0', hardFork)).toBeFalsy()
+    expect(isHardForkUpdate('0.1.0foo', '1.2.0', hardFork)).toBeFalsy()
+    expect(isHardForkUpdate('not a', 'semver string', hardFork)).toBeFalsy()
   })
 })

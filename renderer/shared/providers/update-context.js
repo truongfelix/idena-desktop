@@ -39,6 +39,7 @@ function updateReducer(state, action) {
         ...state,
         nodeUpdateAvailable: true,
         nodeRemoteVersion: action.data,
+        nodeRemoteHardFork: action.hardFork,
       }
     case NODE_DOWNLOAD_PROGRESS: {
       return {
@@ -108,10 +109,21 @@ export function AutoUpdateProvider({children}) {
   useEffect(() => {
     const onEvent = (_sender, event, data) => {
       switch (event) {
-        case 'node-update-available':
-          if (!state.nodeUpdateAvailable)
-            dispatch({type: NODE_UPDATE_AVAILABLE, data: data.version})
+        case 'node-update-available': {
+          const hardFork = data.hardFork ?? null
+          // The hard fork description can change after its release (its "activated" flag).
+          if (
+            !state.nodeUpdateAvailable ||
+            JSON.stringify(hardFork) !==
+              JSON.stringify(state.nodeRemoteHardFork ?? null)
+          )
+            dispatch({
+              type: NODE_UPDATE_AVAILABLE,
+              data: data.version,
+              hardFork,
+            })
           break
+        }
         case 'node-download-progress':
           dispatch({type: NODE_DOWNLOAD_PROGRESS, data})
           break
