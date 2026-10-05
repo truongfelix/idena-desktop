@@ -655,7 +655,7 @@ ipcMain.on(NODE_COMMAND, async (event, command, data) => {
             data.ipfsPort,
             data.apiKey,
             data.autoActivateMining,
-            data.dbWriteBufferMiB,
+            data.nodeOptions,
             isDev,
             (log) => {
               sendMainWindowMsg(NODE_EVENT, 'node-log', log)
@@ -669,8 +669,8 @@ ipcMain.on(NODE_COMMAND, async (event, command, data) => {
               : `node already running, PID: ${child.pid}`
           )
           sendMainWindowMsg(NODE_EVENT, 'node-started', {
-            dbWriteBufferMiB: child.dbWriteBufferMiB,
-            dbWriteBufferSupported: child.dbWriteBufferSupported,
+            nodeOptions: child.nodeOptions,
+            nodeOptionsSupported: child.nodeOptionsSupported,
           })
         })
         .catch((e) => {

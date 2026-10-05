@@ -30,7 +30,7 @@ import {
   SettingsFormLabel,
   SettingsSection,
 } from '../../screens/settings/components'
-import {WriteBufferSetting} from '../../screens/settings/containers'
+import {AdvancedNodeSettings} from '../../screens/settings/containers'
 import SettingsLayout from '../../screens/settings/layout'
 import {EyeIcon, EyeOffIcon} from '../../shared/components/icons'
 
@@ -193,8 +193,6 @@ function NodeSettings() {
             </Box>
           </Stack>
 
-          <WriteBufferSetting />
-
           <HDivider />
 
           <Stack isInline spacing={3} align="center">
@@ -216,6 +214,12 @@ function NodeSettings() {
             </Box>
           </Stack>
         </Stack>
+
+        {settings.runInternalNode && (
+          <SettingsSection title={t('Advanced settings')} maxW="xl">
+            <AdvancedNodeSettings />
+          </SettingsSection>
+        )}
 
         {settings.useExternalNode && (
           <SettingsSection title={t('Node settings')}>

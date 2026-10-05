@@ -47,7 +47,15 @@ import {
 } from '../../shared/providers/settings-context'
 import {useEpochState} from '../../shared/providers/epoch-context'
 import {NODE_COMMAND} from '../../../main/channels'
-import {DB_WRITE_BUFFERS, restartRisk, writeBufferPending} from './write-buffer'
+import {
+  DB_WRITE_BUFFERS,
+  IPFS_CONNECTION_CHOICES,
+  IPFS_WRITE_BUFFERS,
+  PEER_LEVEL_CHOICES,
+  pendingNodeOptions,
+  restartRisk,
+} from './advanced-settings'
+import {ipfsConnectionsFor} from '../../../main/node-peers'
 import {AVAILABLE_LANGS, isoLangs} from '../../i18n'
 import {EyeIcon, EyeOffIcon} from '../../shared/components/icons'
 
@@ -369,86 +377,180 @@ export function LocaleSwitcher() {
 }
 
 /**
- * The built-in node's chain database write buffer: a size from DB_WRITE_BUFFERS, taken by the node at its
- * start. When it changes while the node runs, a dialog offers a restart (not during the validation).
+ * The built-in node's Advanced settings: its peer level and IPFS connection limit (main/node-peers.js), and
+ * the write buffers of its chain database and IPFS datastore (main/node-write-buffer.js). The node takes them
+ * at its start: while it runs with others, a line offers a restart (not during the validation), and so does a
+ * dialog right after a change. A setting the node binary has no flag for (an official one) is disabled.
  */
-export function WriteBufferSetting() {
+export function AdvancedNodeSettings() {
   const {t} = useTranslation()
 
   const settings = useSettingsState()
-  const {setDbWriteBuffer} = useSettingsDispatch()
+  const {setNodeOptions} = useSettingsDispatch()
   const {
     nodeStarted,
-    dbWriteBufferMiB: runningMiB,
-    dbWriteBufferSupported: supported,
+    nodeOptions: running,
+    nodeOptionsSupported: supported,
   } = useNodeState()
   const epoch = useEpochState()
 
   const [isConfirming, setIsConfirming] = React.useState(false)
 
-  const chosenMiB = settings.dbWriteBufferMiB
-  const chosen =
-    DB_WRITE_BUFFERS.find(({mib}) => mib === chosenMiB) ?? DB_WRITE_BUFFERS[2]
-  const isPending =
-    settings.runInternalNode &&
-    writeBufferPending({nodeStarted, runningMiB, chosenMiB, supported})
-  // A node binary without the flag (an official one) runs with idena-go's 4 MiB whatever the choice.
-  const isUnsupported = settings.runInternalNode && supported === false
+  const pending = settings.runInternalNode
+    ? pendingNodeOptions({nodeStarted, running, supported, settings})
+    : []
   const risk = restartRisk(new Date(), epoch)
 
+  // Saves `options`, and asks for the restart at once when the setting `title` is one the node does not run
+  // with now.
+  const save = (title, options) => {
+    setNodeOptions(options)
+    setIsConfirming(
+      pendingNodeOptions({
+        nodeStarted,
+        running,
+        supported,
+        settings: {...settings, ...options},
+      }).some((it) => it.title === title)
+    )
+  }
+
+  const peerLevel =
+    PEER_LEVEL_CHOICES.find(({value}) => value === settings.peerLevel) ??
+    PEER_LEVEL_CHOICES[1]
+  const ipfsConnections = ipfsConnectionsFor(
+    settings.ipfsConnections,
+    peerLevel.value
+  )
+  const dbBuffer =
+    DB_WRITE_BUFFERS.find(({mib}) => mib === settings.dbWriteBufferMiB) ??
+    DB_WRITE_BUFFERS[2]
+  const ipfsBuffer =
+    IPFS_WRITE_BUFFERS.find(({mib}) => mib === settings.ipfsWriteBufferMiB) ??
+    IPFS_WRITE_BUFFERS[0]
+  const unsupported = (flag) =>
+    settings.runInternalNode && supported?.[flag] === false
+
   return (
-    <>
-      <Stack isInline spacing={3} align="center">
-        <Box flex={1}>
-          <Text fontWeight={500}>{t('Database write buffer')}</Text>
-          <Text color="muted">
-            {/* eslint-disable-next-line no-nested-ternary */}
-            {isUnsupported
-              ? t('The node in use cannot change it: it runs with 4 MiB', {
-                  nsSeparator: '!!',
-                })
-              : isPending
-              ? t('The node uses {{size}} MiB until it restarts', {
-                  size: runningMiB,
-                })
-              : `${t(chosen.detail)}. ${t(
-                  'Fewer disk writes for more memory; the node takes it when it starts'
-                )}`}
+    <Stack spacing={4}>
+      {pending.length > 0 && (
+        <Stack isInline spacing={3} align="center">
+          <Text flex={1} color="muted">
+            {t('Restart to apply: {{settings}}', {
+              settings: pending.map((it) => t(it.title)).join(', '),
+              nsSeparator: '!!',
+            })}
           </Text>
-        </Box>
-        {isPending && (
           <SecondaryButton onClick={() => setIsConfirming(true)}>
             {t('Restart')}
           </SecondaryButton>
-        )}
-        <Box>
-          <Select
-            value={chosen.mib}
-            isDisabled={!settings.runInternalNode || isUnsupported}
-            borderColor="gray.300"
-            h={8}
-            onChange={(e) => {
-              const mib = Number(e.target.value)
-              setDbWriteBuffer(mib)
-              setIsConfirming(
-                settings.runInternalNode &&
-                  writeBufferPending({
-                    nodeStarted,
-                    runningMiB,
-                    chosenMiB: mib,
-                    supported,
-                  })
+        </Stack>
+      )}
+      <NodeOptionRow
+        title={t('Peer level')}
+        description={
+          unsupported('peerLimits')
+            ? t('The node in use cannot change it: it runs with Normal', {
+                nsSeparator: '!!',
+              })
+            : `${t('How many Idena nodes this node stays connected to')}. ${t(
+                peerLevel.detail,
+                {nsSeparator: '!!'}
+              )}`
+        }
+        value={peerLevel.value}
+        isDisabled={!settings.runInternalNode || unsupported('peerLimits')}
+        onChange={(value) =>
+          save('Peer level', {
+            peerLevel: value,
+            ipfsConnections: ipfsConnectionsFor(
+              settings.ipfsConnections,
+              value
+            ),
+          })
+        }
+        options={PEER_LEVEL_CHOICES.map((choice) => ({
+          value: choice.value,
+          label: `${t(choice.label)} · ${t('up to {{count}} peers', {
+            count: choice.maxPeers,
+          })}`,
+        }))}
+      />
+      <NodeOptionRow
+        title={t('IPFS connections')}
+        description={
+          unsupported('peerLimits')
+            ? t('The node in use cannot change it: it runs with 50', {
+                nsSeparator: '!!',
+              })
+            : t(
+                'Flips and posts travel over them, and the node finds its Idena peers among them. Fewer connections use less traffic'
               )
-            }}
-          >
-            {DB_WRITE_BUFFERS.map(({mib, label}) => (
-              <option key={mib} value={mib}>
-                {`${mib} MiB · ${t(label)}`}
-              </option>
-            ))}
-          </Select>
-        </Box>
-      </Stack>
+        }
+        value={ipfsConnections}
+        isDisabled={!settings.runInternalNode || unsupported('peerLimits')}
+        onChange={(value) =>
+          save('IPFS connections', {ipfsConnections: Number(value)})
+        }
+        options={IPFS_CONNECTION_CHOICES.map(({high, label}) => {
+          const allowed = ipfsConnectionsFor(high, peerLevel.value) === high
+          return {
+            value: high,
+            isDisabled: !allowed,
+            label: allowed
+              ? t(label)
+              : `${t(label)} · ${t('too few for {{level}}', {
+                  level: t(peerLevel.label),
+                })}`,
+          }
+        })}
+      />
+      <NodeOptionRow
+        title={t('Chain database write buffer')}
+        description={
+          unsupported('dbWriteBuffer')
+            ? t('The node in use cannot change it: it runs with 4 MiB', {
+                nsSeparator: '!!',
+              })
+            : `${t(dbBuffer.detail)}. ${t(
+                'Fewer disk writes for more memory; the node takes it when it starts'
+              )}`
+        }
+        value={dbBuffer.mib}
+        isDisabled={!settings.runInternalNode || unsupported('dbWriteBuffer')}
+        onChange={(value) =>
+          save('Chain database write buffer', {
+            dbWriteBufferMiB: Number(value),
+          })
+        }
+        options={DB_WRITE_BUFFERS.map(({mib, label}) => ({
+          value: mib,
+          label: `${mib} MiB · ${t(label)}`,
+        }))}
+      />
+      <NodeOptionRow
+        title={t('IPFS database write buffer')}
+        description={
+          unsupported('ipfsWriteBuffer')
+            ? t('The node in use cannot change it: it runs with 4 MiB', {
+                nsSeparator: '!!',
+              })
+            : t(
+                'It writes the most when nodes outside can reach this computer. Fewer disk writes for more memory'
+              )
+        }
+        value={ipfsBuffer.mib}
+        isDisabled={!settings.runInternalNode || unsupported('ipfsWriteBuffer')}
+        onChange={(value) =>
+          save('IPFS database write buffer', {
+            ipfsWriteBufferMiB: Number(value),
+          })
+        }
+        options={IPFS_WRITE_BUFFERS.map(({mib, label}) => ({
+          value: mib,
+          label: mib === 4 ? `${mib} MiB · ${t(label)}` : t(label),
+        }))}
+      />
       <Dialog
         isOpen={isConfirming}
         onClose={() => setIsConfirming(false)}
@@ -456,9 +558,17 @@ export function WriteBufferSetting() {
       >
         <DialogBody>
           <Text>
+            {t('The node takes these at its next start:', {nsSeparator: '!!'})}
+          </Text>
+          <Box as="ul" pl={5} mt={1}>
+            {pending.map((it) => (
+              <li key={it.title}>{`${t(it.title)}: ${t(it.value)}`}</li>
+            ))}
+          </Box>
+          <Text mt={2}>
             {t(
-              'The node uses the {{size}} MiB write buffer from its next start. A restart takes a few minutes: the node opens its database and looks for peers again.',
-              {size: chosen.mib, nsSeparator: '!!'}
+              'A restart takes a few minutes: the node opens its databases and looks for peers again.',
+              {nsSeparator: '!!'}
             )}
           </Text>
           {risk && (
@@ -482,6 +592,44 @@ export function WriteBufferSetting() {
           </PrimaryButton>
         </DialogFooter>
       </Dialog>
-    </>
+    </Stack>
+  )
+}
+
+/** One Advanced setting: its title and description, and a menu of `options` ({value, label, isDisabled}). */
+function NodeOptionRow({
+  title,
+  description,
+  value,
+  options,
+  isDisabled,
+  onChange,
+}) {
+  return (
+    <Stack isInline spacing={3} align="center">
+      <Box flex={1}>
+        <Text fontWeight={500}>{title}</Text>
+        <Text color="muted">{description}</Text>
+      </Box>
+      <Box>
+        <Select
+          value={value}
+          isDisabled={isDisabled}
+          borderColor="gray.300"
+          h={8}
+          onChange={(e) => onChange(e.target.value)}
+        >
+          {options.map((option) => (
+            <option
+              key={option.value}
+              value={option.value}
+              disabled={option.isDisabled}
+            >
+              {option.label}
+            </option>
+          ))}
+        </Select>
+      </Box>
+    </Stack>
   )
 }
