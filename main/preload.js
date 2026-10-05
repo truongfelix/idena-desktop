@@ -120,7 +120,6 @@ expose(
     FINALIZE_FLIPS: process.env.FINALIZE_FLIPS ?? null,
     FINALIZE_LONG_FLIPS: process.env.FINALIZE_LONG_FLIPS ?? null,
     FINALIZE_ALL_LONG_FLIPS: process.env.FINALIZE_ALL_LONG_FLIPS ?? null,
-    INDEXER_URL: process.env.INDEXER_URL ?? null,
   })
 )
 expose('toggleFullScreen', () => {
