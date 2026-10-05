@@ -18,7 +18,16 @@ const {
 const {
   dbWriteBufferArgs,
   nodeSupportsWriteBuffer,
+  ipfsWriteBufferArgs,
+  nodeSupportsIpfsWriteBuffer,
 } = require('./node-write-buffer')
+const {
+  DEFAULT_PEER_LEVEL,
+  DEFAULT_IPFS_CONNECTIONS,
+  ipfsConnectionsFor,
+  nodeSupportsPeerLimits,
+  peerLimitArgs,
+} = require('./node-peers')
 const {shouldReplaceInstalledNode, sha256File} = require('./bundled-node')
 const {fetchHardForkInfo} = require('./hard-fork-info')
 
@@ -361,7 +370,8 @@ async function startNode(
   ipfsPort,
   apiKey,
   autoActivateMining,
-  dbWriteBufferMiB,
+  // The Advanced settings: {dbWriteBufferMiB, ipfsWriteBufferMiB, peerLevel, ipfsConnections}.
+  nodeOptions,
   // eslint-disable-next-line default-param-last
   useLogging = true,
   onLog,
@@ -386,9 +396,16 @@ async function startNode(
     parameters.push('--autoonline')
   }
 
+  const options = nodeOptions || {}
   const help = await getBinaryHelp(getNodeFile())
-  const writeBufferArgs = dbWriteBufferArgs(dbWriteBufferMiB, help)
-  parameters.push(...writeBufferArgs)
+  const writeBufferArgs = dbWriteBufferArgs(options.dbWriteBufferMiB, help)
+  const ipfsBufferArgs = ipfsWriteBufferArgs(options.ipfsWriteBufferMiB, help)
+  const peerArgs = peerLimitArgs(
+    options.peerLevel,
+    options.ipfsConnections,
+    help
+  )
+  parameters.push(...writeBufferArgs, ...ipfsBufferArgs, ...peerArgs)
 
   const configFile = getNodeConfigFile()
   if (fs.existsSync(configFile)) {
@@ -415,9 +432,22 @@ async function startNode(
     }
   })
 
-  // The write buffer the node runs with: the chosen size, or idena-go's 4 MiB without the flag.
-  idenaNode.dbWriteBufferMiB = writeBufferArgs.length > 0 ? dbWriteBufferMiB : 4
-  idenaNode.dbWriteBufferSupported = nodeSupportsWriteBuffer(help)
+  // The settings the node runs with: the chosen ones, or idena-go's defaults without the flags.
+  idenaNode.nodeOptions = {
+    dbWriteBufferMiB: writeBufferArgs.length > 0 ? options.dbWriteBufferMiB : 4,
+    ipfsWriteBufferMiB:
+      ipfsBufferArgs.length > 0 ? options.ipfsWriteBufferMiB : 4,
+    peerLevel: peerArgs.length > 0 ? options.peerLevel : DEFAULT_PEER_LEVEL,
+    ipfsConnections:
+      peerArgs.length > 0
+        ? ipfsConnectionsFor(options.ipfsConnections, options.peerLevel)
+        : DEFAULT_IPFS_CONNECTIONS,
+  }
+  idenaNode.nodeOptionsSupported = {
+    dbWriteBuffer: nodeSupportsWriteBuffer(help),
+    ipfsWriteBuffer: nodeSupportsIpfsWriteBuffer(help),
+    peerLimits: nodeSupportsPeerLimits(help),
+  }
 
   idenaNode.on('exit', (code) => {
     if (useLogging) {

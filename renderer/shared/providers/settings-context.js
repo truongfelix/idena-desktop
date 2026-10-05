@@ -14,9 +14,19 @@ const UPDATE_UI_VERSION = 'UPDATE_UI_VERSION'
 const SET_INTERNAL_KEY = 'SET_INTERNAL_KEY'
 const SET_CONNECTION_DETAILS = 'SET_CONNECTION_DETAILS'
 const TOGGLE_AUTO_ACTIVATE_MINING = 'TOGGLE_AUTO_ACTIVATE_MINING'
-const SET_DB_WRITE_BUFFER = 'SET_DB_WRITE_BUFFER'
+const SET_NODE_OPTIONS = 'SET_NODE_OPTIONS'
 
 const CHANGE_LANGUAGE = 'CHANGE_LANGUAGE'
+
+// The built-in node's Advanced settings: the write buffers of its chain database and IPFS datastore in MiB
+// (main/node-write-buffer.js), its peer level and IPFS connection limit (main/node-peers.js). Settings saved
+// before one of them existed get its default at load.
+const NODE_OPTION_DEFAULTS = {
+  dbWriteBufferMiB: 32,
+  ipfsWriteBufferMiB: 4,
+  peerLevel: 'normal',
+  ipfsConnections: 50,
+}
 
 const initialState = {
   url: BASE_API_URL,
@@ -30,8 +40,7 @@ const initialState = {
   externalApiKey: '',
   lng: AVAILABLE_LANGS[0],
   autoActivateMining: true,
-  // The built-in node's chain database write buffer in MiB (see main/node-write-buffer.js).
-  dbWriteBufferMiB: 32,
+  ...NODE_OPTION_DEFAULTS,
 }
 
 if (global.env && global.env.NODE_ENV === 'e2e') {
@@ -90,10 +99,10 @@ function settingsReducer(state, action) {
         autoActivateMining: !state.autoActivateMining,
       }
     }
-    case SET_DB_WRITE_BUFFER: {
+    case SET_NODE_OPTIONS: {
       return {
         ...state,
-        dbWriteBufferMiB: action.data,
+        ...action.data,
       }
     }
     default:
@@ -110,6 +119,7 @@ export function SettingsProvider({children}) {
     useLogger(
       React.useReducer(settingsReducer, {
         autoActivateMining: initialState.autoActivateMining,
+        ...NODE_OPTION_DEFAULTS,
         ...(loadPersistentState('settings') || initialState),
       })
     ),
@@ -163,8 +173,9 @@ export function SettingsProvider({children}) {
     dispatch({type: TOGGLE_AUTO_ACTIVATE_MINING})
   }, [dispatch])
 
-  const setDbWriteBuffer = useCallback(
-    (mib) => dispatch({type: SET_DB_WRITE_BUFFER, data: mib}),
+  // `options`: some of dbWriteBufferMiB, ipfsWriteBufferMiB, peerLevel, ipfsConnections.
+  const setNodeOptions = useCallback(
+    (options) => dispatch({type: SET_NODE_OPTIONS, data: options}),
     [dispatch]
   )
 
@@ -185,12 +196,12 @@ export function SettingsProvider({children}) {
             changeLanguage,
             setConnectionDetails,
             toggleAutoActivateMining,
-            setDbWriteBuffer,
+            setNodeOptions,
           }),
           [
             changeLanguage,
             setConnectionDetails,
-            setDbWriteBuffer,
+            setNodeOptions,
             toggleAutoActivateMining,
             toggleRunInternalNode,
             toggleUseExternalNode,

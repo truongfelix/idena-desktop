@@ -43,9 +43,9 @@ function nodeReducer(state, action) {
         ...state,
         nodeStarted: true,
         runningTroubleshooter: false,
-        // The write buffer the node started with, and whether its binary has the flag (main/idena-node.js).
-        dbWriteBufferMiB: action.data?.dbWriteBufferMiB ?? null,
-        dbWriteBufferSupported: action.data?.dbWriteBufferSupported ?? null,
+        // The Advanced settings the node started with, and which flags its binary has (main/idena-node.js).
+        nodeOptions: action.data?.nodeOptions ?? null,
+        nodeOptionsSupported: action.data?.nodeOptionsSupported ?? null,
       }
     }
     case NODE_STOP: {
@@ -89,6 +89,22 @@ const NodeDispatchContext = React.createContext()
 export function NodeProvider({children}) {
   const settings = useSettingsState()
 
+  // The Advanced settings the built-in node takes at its start (main/idena-node.js startNode).
+  const nodeOptions = useMemo(
+    () => ({
+      dbWriteBufferMiB: settings.dbWriteBufferMiB,
+      ipfsWriteBufferMiB: settings.ipfsWriteBufferMiB,
+      peerLevel: settings.peerLevel,
+      ipfsConnections: settings.ipfsConnections,
+    }),
+    [
+      settings.dbWriteBufferMiB,
+      settings.ipfsWriteBufferMiB,
+      settings.peerLevel,
+      settings.ipfsConnections,
+    ]
+  )
+
   const [state, dispatch] = useLogger(
     React.useReducer(nodeReducer, initialState)
   )
@@ -124,7 +140,7 @@ export function NodeProvider({children}) {
             ipfsPort: settings.ipfsPort,
             apiKey: settings.internalApiKey,
             autoActivateMining: settings.autoActivateMining,
-            dbWriteBufferMiB: settings.dbWriteBufferMiB,
+            nodeOptions,
           })
         }
         case 'troubleshooting-update-node': {
@@ -161,7 +177,7 @@ export function NodeProvider({children}) {
         ipfsPort: settings.ipfsPort,
         apiKey: settings.internalApiKey,
         autoActivateMining: settings.autoActivateMining,
-        dbWriteBufferMiB: settings.dbWriteBufferMiB,
+        nodeOptions,
       })
     }
   }, [
@@ -174,7 +190,7 @@ export function NodeProvider({children}) {
     state.nodeFailed,
     settings.internalApiKey,
     settings.autoActivateMining,
-    settings.dbWriteBufferMiB,
+    nodeOptions,
   ])
 
   useEffect(() => {

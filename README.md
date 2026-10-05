@@ -37,7 +37,15 @@ What it changes for users (October 2026):
   avatars (drawn by the app) no longer call api.idena.io or robohash.idena.io; the oracle To-Do badge reads every 5
   minutes, only for validated identities. Still on api.idena.io: the oracle votings list, the validation report
   and the hard-fork screen.
-- **New setting**: Settings > Node > Database write buffer (4 to 64 MiB): fewer disk writes for more memory.
+- **New settings**: Settings > Node > Advanced settings, for the built-in node (the phone app has the same):
+  - Peer level: Eco (up to 7 peers), Normal (up to 18, Idena default) or Hub (up to 30: twice the incoming
+    slots, for nodes that reach this computer through its port open on the router).
+  - IPFS connections: 20, 50 (Idena default), 100 or no limit; a limit too low for the peer level is raised
+    (20 needs Eco, 50 Eco or Normal).
+  - Chain database and IPFS database write buffers (4 to 64 MiB each): fewer disk writes for more memory.
+
+  The node takes them at its start; the page offers a restart. A node binary without the flags (an official
+  one) keeps idena-go's defaults and the page shows these settings as fixed.
 
 ## Fork status
 
