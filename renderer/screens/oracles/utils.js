@@ -6,7 +6,6 @@ import {VotingStatus} from '../../shared/types'
 import {callRpc, roundToPrecision, toLocaleDna} from '../../shared/utils/utils'
 import {strip} from '../../shared/utils/obj'
 import {ContractRpcMode, VotingListFilter} from './types'
-import {apiUrl} from '../../shared/api/api-client'
 
 export const isVotingStatus =
   (targetStatus) =>
@@ -29,70 +28,45 @@ export const setVotingStatus = (status) =>
     status,
   })
 
+// The votings come from the node's own index (contract_oracleVotings and co.), which answers with the fields of
+// the indexer's OracleVotingContract API that used to serve them.
 export async function fetchVotings({
   all = false,
   own = false,
   oracle,
   address = oracle,
   limit = 20,
-  ...params
+  'states[]': states,
+  sortBy,
+  continuationToken,
 }) {
-  const url = new URL(
-    apiUrl(
-      own ? `Address/${address}/OracleVotingContracts` : 'OracleVotingContracts'
-    )
-  )
+  const {result, continuationToken: nextContinuationToken} =
+    (await callRpc(
+      'contract_oracleVotings',
+      strip(
+        own
+          ? {address, limit, continuationToken}
+          : {
+              oracle,
+              all,
+              states: states ? states.split(',') : undefined,
+              sortBy,
+              limit,
+              continuationToken,
+            }
+      )
+    )) ?? {}
 
-  const queryParams = {limit, all: all.toString(), oracle, ...params}
-
-  Object.entries(queryParams)
-    .filter(([, v]) => Boolean(v))
-    .forEach(([k, v]) => {
-      url.searchParams.append(k, v)
-    })
-
-  const {result, error, continuationToken} = await (await fetch(url)).json()
-
-  if (error) throw new Error(error.message)
-
-  return {result, continuationToken}
+  return {result, continuationToken: nextContinuationToken}
 }
 
 export async function fetchLastOpenVotings({oracle, limit = 11}) {
-  const {result, error} = await fetchVotings({
+  const {result} = await fetchVotings({
     oracle,
     'states[]': [VotingStatus.Open].join(','),
     limit,
     sortBy: 'timestamp',
   })
-
-  if (error) throw new Error(error.message)
-
-  return result
-}
-
-export async function fetchContractTxs({
-  address,
-  contractAddress,
-  limit,
-  continuationToken,
-}) {
-  const url = new URL(apiUrl('Contracts/AddressContractTxBalanceUpdates'))
-
-  Object.entries({
-    address,
-    contractAddress,
-    limit,
-    continuationToken,
-  })
-    .filter(([, v]) => Boolean(v))
-    .forEach(([k, v]) => {
-      url.searchParams.append(k, v)
-    })
-
-  const {result, error} = await (await fetch(url)).json()
-
-  if (error) throw new Error(error.message)
 
   return result
 }
@@ -102,29 +76,17 @@ export async function fetchContractBalanceUpdates({
   contractAddress,
   limit = 50,
 }) {
-  return (
-    (
-      await (
-        await fetch(
-          apiUrl(
-            `Address/${address}/Contract/${contractAddress}/BalanceUpdates?limit=${limit}`
-          )
-        )
-      ).json()
-    ).result || []
-  )
+  const {result} =
+    (await callRpc('contract_oracleVotingBalanceUpdates', {
+      address,
+      contract: contractAddress,
+      limit,
+    })) ?? {}
+  return result ?? []
 }
 
 export async function fetchVoting({id, contractHash = id, address}) {
-  const {result, error} = await (
-    await fetch(
-      apiUrl(`OracleVotingContract/${contractHash}?oracle=${address}`)
-    )
-  ).json()
-
-  if (error) throw new Error(error.message)
-
-  return result
+  return callRpc('contract_oracleVoting', contractHash, address)
 }
 
 export const createContractCaller =

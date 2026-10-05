@@ -732,10 +732,14 @@ export default function ViewVotingPage() {
                                 identity.address
                               )
 
+                              // Amounts are decimal strings: add them as numbers. The sender pays the fee and
+                              // the tips; the others only get what the voting paid them.
                               const txCost =
-                                (isSender ? -amount : 0) + balanceChange
+                                (isSender ? -Number(amount) : 0) +
+                                Number(balanceChange)
                               const totalTxCost =
-                                txCost - ((isSender ? fee : 0) + tips)
+                                txCost -
+                                (isSender ? Number(fee) + Number(tips) : 0)
 
                               const isCredit = totalTxCost > 0
 
