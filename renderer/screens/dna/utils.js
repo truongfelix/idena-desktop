@@ -59,8 +59,11 @@ export function isValidDnaUrl(url) {
   }
 }
 
+// A standard URL parser reads dna://send/v1 as host "send" and path "/v1"; older Chromium put it all in the path
+// ("//send/v1"), which is still read when the host is empty.
 export function dnaLinkMethod(dnaUrl) {
-  return new URL(dnaUrl).pathname.slice(2).split('/')[0]
+  const {host, pathname} = new URL(dnaUrl)
+  return host || pathname.slice(2).split('/')[0]
 }
 
 export function extractQueryParams(url) {
