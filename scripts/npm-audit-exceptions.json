@@ -4,5 +4,11 @@
     "package": "braces",
     "reason": "No fixed version (all braces <= 3.0.3, the latest). Dev only: jest's micromatch and the eslint config; nothing in the app. Leaving it needs jest 30.",
     "expires": "2026-11-02"
+  },
+  {
+    "id": "GHSA-hp3w-g68c-fv3c",
+    "package": "sprintf-js",
+    "reason": "No fixed version (all sprintf-js, 1.1.3 the latest). Dev only: electron-builder's download proxy agent (roarr) and jest's argparse; nothing in the app.",
+    "expires": "2026-11-02"
   }
 ]
