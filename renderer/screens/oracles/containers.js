@@ -91,6 +91,7 @@ import {
   getUrls,
   sumAccountableVotes,
   areSameCaseInsensitive,
+  isKnownAmount,
 } from './utils'
 import {
   AddFundIcon,
@@ -162,6 +163,8 @@ export function VotingCard({votingRef, ...props}) {
     VotingStatus.Terminated
   )
 
+  const prize = isClosed ? totalReward : estimatedTotalReward
+
   return (
     <Box position="relative" {...props}>
       {isNew && (
@@ -231,33 +234,37 @@ export function VotingCard({votingRef, ...props}) {
             <VotingResult votingService={votingRef} />
           </Stack>
         )}
-        <Stack
-          isInline
-          spacing={2}
-          align="center"
-          bg="orange.010"
-          borderColor="orange.050"
-          borderWidth="1px"
-          borderRadius="md"
-          py={2}
-          px={3}
-          mb={6}
-        >
-          <StarIcon boxSize="5" color="white" />
-          <Text fontWeight={500}>
-            {isClosed ? t('Oracles rewards paid') : t('Prize pool')}:{' '}
-            {formatPrizePool(isClosed ? totalReward : estimatedTotalReward)}
-          </Text>
-          {!isClosed && (
-            <Text color="orange.500">
-              {Number(votingMinPayment) > 0
-                ? t(`Lock {{amount}} for voting`, {
-                    amount: toLocaleDna(i18n.language)(votingMinPayment),
-                  })
-                : t('Free voting')}
-            </Text>
-          )}
-        </Stack>
+        {(isKnownAmount(prize) || !isClosed) && (
+          <Stack
+            isInline
+            spacing={2}
+            align="center"
+            bg="orange.010"
+            borderColor="orange.050"
+            borderWidth="1px"
+            borderRadius="md"
+            py={2}
+            px={3}
+            mb={6}
+          >
+            <StarIcon boxSize="5" color="white" />
+            {isKnownAmount(prize) && (
+              <Text fontWeight={500}>
+                {isClosed ? t('Oracles rewards paid') : t('Prize pool')}:{' '}
+                {formatPrizePool(prize)}
+              </Text>
+            )}
+            {!isClosed && (
+              <Text color="orange.500">
+                {Number(votingMinPayment) > 0
+                  ? t(`Lock {{amount}} for voting`, {
+                      amount: toLocaleDna(i18n.language)(votingMinPayment),
+                    })
+                  : t('Free voting')}
+              </Text>
+            )}
+          </Stack>
+        )}
         <Flex justify="space-between" align="center">
           <Stack isInline spacing={2}>
             {eitherIdleState(VotingStatus.Pending) && (

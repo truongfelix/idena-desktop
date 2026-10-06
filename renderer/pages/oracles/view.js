@@ -77,6 +77,7 @@ import {
   mapVotingStatus,
   quorumVotesCount,
   sumAccountableVotes,
+  isKnownAmount,
 } from '../../screens/oracles/utils'
 import {
   Table,
@@ -988,7 +989,7 @@ export default function ViewVotingPage() {
                           : toPercent(winnerThreshold / 100)
                       }
                     />
-                    {isClosed && (
+                    {isClosed && isKnownAmount(totalReward) && (
                       <AsideStat
                         label={t('Prize paid')}
                         value={formatDna(totalReward)}

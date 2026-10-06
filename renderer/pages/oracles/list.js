@@ -25,7 +25,6 @@ import {votingListMachine} from '../../screens/oracles/machines'
 import {
   VotingCardSkeleton,
   VotingSkeleton,
-  FillPlaceholder,
   FillCenter,
   OutlineButton,
   ScrollToTop,
@@ -135,8 +134,8 @@ export default function VotingListPage() {
                 <VDivider />
                 <Button
                   variant="tab"
-                  value={filter === 'own'}
-                  onClick={() => send('FILTER', {value: 'own'})}
+                  isActive={filter === VotingListFilter.Own}
+                  onClick={() => send('FILTER', {value: VotingListFilter.Own})}
                 >
                   <Stack isInline>
                     <UserIcon boxSize="4" />
@@ -147,9 +146,20 @@ export default function VotingListPage() {
             </VotingSkeleton>
             <Stack spacing={6} w="md" flex={1}>
               {current.matches('failure') && (
-                <FillPlaceholder>
-                  {current.context.errorMessage}
-                </FillPlaceholder>
+                <FillCenter justify="center">
+                  <Stack spacing={4} align="center">
+                    <Text color="muted" textAlign="center">
+                      {current.context.errorMessage}
+                    </Text>
+                    <OutlineButton
+                      isLoading={current.matches('failure.retrying')}
+                      loadingText={t('Loading')}
+                      onClick={() => send('RETRY')}
+                    >
+                      {t('Try again')}
+                    </OutlineButton>
+                  </Stack>
+                </FillCenter>
               )}
 
               {eitherState(current, 'loading.late') &&
@@ -217,9 +227,8 @@ export default function VotingListPage() {
                 {!current.matches('preload') && (
                   <Wrap spacing={2}>
                     {votingStatuses(filter).map((status) => (
-                      <WrapItem>
+                      <WrapItem key={status}>
                         <VotingFilter
-                          key={status}
                           isChecked={statuses.includes(status)}
                           status={status}
                           cursor="pointer"

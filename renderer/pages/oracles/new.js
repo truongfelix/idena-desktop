@@ -11,6 +11,7 @@ import {
   FormErrorMessage,
   RadioGroup,
   HStack,
+  Text,
 } from '@chakra-ui/react'
 import {useMachine} from '@xstate/react'
 import duration from 'dayjs/plugin/duration'
@@ -41,6 +42,7 @@ import {
   PresetFormControlOption,
   PresetFormControlInputBox,
   NumberInput,
+  OutlineButton,
 } from '../../screens/oracles/components'
 import {
   votingMinStake,
@@ -160,7 +162,28 @@ function NewVotingPage() {
 
           {current.matches('preload.late') && <NewVotingFormSkeleton />}
 
-          {!current.matches('preload') && (
+          {current.matches('preloadFailed') && (
+            <Stack spacing={4} align="flex-start" w="xl">
+              <Text color="muted">
+                {t(
+                  'Cannot get the voting parameters from the node: {{error}}',
+                  {
+                    error: current.context.preloadError,
+                    nsSeparator: '!!',
+                  }
+                )}
+              </Text>
+              <OutlineButton
+                isLoading={current.matches('preloadFailed.retrying')}
+                loadingText={t('Loading')}
+                onClick={() => send('RETRY')}
+              >
+                {t('Try again')}
+              </OutlineButton>
+            </Stack>
+          )}
+
+          {!eitherState(current, 'preload', 'preloadFailed') && (
             <Stack spacing={3}>
               <VotingInlineFormControl
                 htmlFor="title"
