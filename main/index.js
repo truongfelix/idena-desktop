@@ -418,12 +418,6 @@ const createMenu = () => {
         },
       },
       {
-        label: i18next.t('Explorer'),
-        click: () => {
-          openExternalUrl(shell, 'https://scan.idena.io/', logger)
-        },
-      },
-      {
         type: 'separator',
       },
       {
