@@ -75,15 +75,54 @@ export const DnaLinkMethod = {
   Sign: 'sign',
 }
 
-// A link the app can open: dna://<method>/v<n> with a known method and query values that decode.
-export function isOpenableDnaUrl(url) {
-  if (!isValidDnaUrl(url)) return false
-  if (!Object.values(DnaLinkMethod).includes(dnaLinkMethod(url))) return false
+const hasProtocol = (value, protocols) => {
   try {
-    dnaLinkParams(url)
-    return true
+    return protocols.includes(new URL(value).protocol)
   } catch {
     return false
+  }
+}
+
+// A sign-in posts to both endpoints, then opens the callback (the same protocols as isValidUrl).
+function hasRequiredParams(method, params) {
+  if (method === DnaLinkMethod.SignIn) {
+    return (
+      Boolean(params.token) &&
+      hasProtocol(params.callbackUrl, ['https:', 'http:', 'dna:']) &&
+      hasProtocol(params.nonce_endpoint, ['https:', 'http:']) &&
+      hasProtocol(params.authentication_endpoint, ['https:', 'http:'])
+    )
+  }
+  return true
+}
+
+// A link the app can open: dna://<method>/v<n> with a known method, query values that decode and the parameters
+// its dialog needs.
+export function isOpenableDnaUrl(url) {
+  if (!isValidDnaUrl(url)) return false
+  const method = dnaLinkMethod(url)
+  if (!Object.values(DnaLinkMethod).includes(method)) return false
+  try {
+    return hasRequiredParams(method, dnaLinkParams(url))
+  } catch {
+    return false
+  }
+}
+
+// The website a sign-in or sign dialog names: the callback's host and icon (the link's favicon_url, else
+// favicon.ico of an http(s) callback; a dna: callback has no origin to take it from).
+export function dnaCallbackSite(callbackUrl, faviconUrl) {
+  try {
+    const {protocol, hostname, origin} = new URL(callbackUrl)
+    const isWebsite = ['https:', 'http:'].includes(protocol)
+    return {
+      host: hostname || callbackUrl,
+      favicon:
+        faviconUrl ||
+        (isWebsite ? new URL('favicon.ico', origin).href : undefined),
+    }
+  } catch {
+    return {host: callbackUrl, favicon: faviconUrl}
   }
 }
 

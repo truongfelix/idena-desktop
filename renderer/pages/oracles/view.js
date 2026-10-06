@@ -273,6 +273,28 @@ export default function ViewVotingPage() {
   const redirectDisclosure = useDisclosure()
   const [redirectUrl, setRedirectUrl] = React.useState()
 
+  if (current.matches('invalid') && current.context.loadError && id) {
+    return (
+      <Layout syncing={syncing} offline={offline}>
+        <Page pt={8}>
+          <Stack spacing={4} w="full">
+            <Flex align="center" justify="space-between">
+              <Heading fontSize={21} fontWeight={500}>
+                {t('This oracle voting cannot be shown')}
+              </Heading>
+              <CloseButton onClick={() => redirect('/oracles/list')} />
+            </Flex>
+            <Stack isInline spacing={2} align="center">
+              <Avatar w={5} h={5} address={id} />
+              <Text>{id}</Text>
+            </Stack>
+            <Text color="muted">{current.context.loadError}</Text>
+          </Stack>
+        </Page>
+      </Layout>
+    )
+  }
+
   return (
     <>
       <Layout syncing={syncing} offline={offline}>
