@@ -131,7 +131,10 @@ describe('npm audit with dated exceptions', () => {
     const exceptions = readExceptions(
       path.join(__dirname, 'npm-audit-exceptions.json')
     )
-    expect(exceptions.map(({package: name}) => name)).toEqual(['braces'])
+    expect(exceptions.map(({package: name}) => name)).toEqual([
+      'braces',
+      'sprintf-js',
+    ])
   })
 
   it('rejects an exception without a reason or a date', () => {
