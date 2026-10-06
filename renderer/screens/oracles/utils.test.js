@@ -12,7 +12,22 @@ const {
   fetchVotings,
   fetchLastOpenVotings,
   fetchContractBalanceUpdates,
+  mapVoting,
+  votingFact,
+  isKnownAmount,
+  withTimeout,
+  pollTransaction,
 } = require('./utils')
+
+const {HASH_IN_MEMPOOL} = jest.requireActual('../../shared/utils/utils')
+
+global.TextEncoder = TextEncoder
+global.TextDecoder = TextDecoder
+
+const factHex = (value) =>
+  `0x${Buffer.from(
+    typeof value === 'string' ? value : JSON.stringify(value)
+  ).toString('hex')}`
 
 describe('buildDynamicArgs', () => {
   it('should filter nullish values out', () => {
@@ -145,5 +160,183 @@ describe('votings from the node', () => {
         limit: 50,
       }
     )
+  })
+})
+
+describe('votingFact', () => {
+  it('reads the fields the app writes', () => {
+    const fact = {
+      title: 'Title',
+      desc: 'Desc',
+      options: [
+        {id: 0, value: 'yes'},
+        {id: 1, value: 'no'},
+      ],
+      adCid: 'bafy',
+    }
+    expect(votingFact(factHex(fact))).toEqual(fact)
+  })
+
+  it('leaves out text fields of other types', () => {
+    expect(
+      votingFact(
+        factHex({
+          title: {text: 'object'},
+          desc: ['array'],
+          options: 'not a list',
+          adCid: 5,
+        })
+      )
+    ).toEqual({title: '', desc: '', options: []})
+  })
+
+  it('keeps only options with a text and an id', () => {
+    expect(
+      votingFact(
+        factHex({
+          options: [
+            {id: 0, value: 'yes'},
+            null,
+            'no',
+            {id: 2, value: {text: 'object'}},
+            {value: 'no id'},
+            {id: '3', value: 'text id'},
+          ],
+        })
+      ).options
+    ).toEqual([
+      {id: 0, value: 'yes'},
+      {id: '3', value: 'text id'},
+    ])
+  })
+
+  it('gives an untitled voting for facts that are not an object', () => {
+    for (const fact of [
+      factHex('null'),
+      factHex('[1, 2]'),
+      factHex('"text"'),
+      factHex('{broken'),
+      '0x',
+      null,
+      undefined,
+    ]) {
+      expect(votingFact(fact)).toEqual({title: '', desc: '', options: []})
+    }
+  })
+})
+
+describe('mapVoting', () => {
+  it('keeps what the node reports when the fact names the same fields', () => {
+    const voting = mapVoting({
+      contractAddress: '0xbb',
+      author: '0x01',
+      state: 'Open',
+      fact: factHex({
+        title: 'Title',
+        id: '0xaa',
+        contractHash: '0xaa',
+        status: 'Archived',
+        issuer: '0x02',
+        rewardsFund: 1000,
+      }),
+    })
+    expect(voting).toMatchObject({
+      id: '0xbb',
+      contractHash: '0xbb',
+      status: 'Open',
+      issuer: '0x01',
+      rewardsFund: 0,
+      title: 'Title',
+    })
+  })
+})
+
+describe('isKnownAmount', () => {
+  it('tells amounts from missing values', () => {
+    expect([0, '0', 12.5, '12.5'].every(isKnownAmount)).toBe(true)
+    expect(
+      [undefined, null, '', 'abc', NaN, Infinity].some(isKnownAmount)
+    ).toBe(false)
+  })
+})
+
+describe('withTimeout', () => {
+  afterEach(() => jest.useRealTimers())
+
+  it('passes the answer on', async () => {
+    await expect(withTimeout(Promise.resolve(1), 1000, 'late')).resolves.toBe(1)
+  })
+
+  it('rejects when there is no answer in time', async () => {
+    jest.useFakeTimers()
+    const pending = withTimeout(new Promise(() => {}), 1000, 'late')
+    jest.advanceTimersByTime(1000)
+    await expect(pending).rejects.toThrow('late')
+  })
+})
+
+describe('pollTransaction', () => {
+  beforeEach(() => jest.useFakeTimers())
+  afterEach(() => {
+    jest.useRealTimers()
+    jest.clearAllMocks()
+  })
+
+  // Runs the poll timer and the RPC answer behind it.
+  async function poll() {
+    jest.advanceTimersByTime(10 * 1000)
+    await Promise.resolve()
+    await Promise.resolve()
+  }
+
+  it('sends mined once the transaction is in a block', async () => {
+    callRpc
+      .mockResolvedValueOnce({blockHash: HASH_IN_MEMPOOL})
+      .mockResolvedValueOnce({blockHash: '0xblock'})
+    const send = jest.fn()
+    pollTransaction('0xtx', send)
+    await poll()
+    expect(send).not.toHaveBeenCalled()
+    await poll()
+    expect(send).toHaveBeenCalledWith('MINED')
+    expect(callRpc).toHaveBeenCalledWith('bcn_transaction', '0xtx')
+  })
+
+  it('sends dropped after the node did not know it 3 times in a row', async () => {
+    callRpc
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({blockHash: HASH_IN_MEMPOOL})
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+    const send = jest.fn()
+    const dropped = {type: 'TX_NULL', data: {message: 'dropped'}}
+    pollTransaction('0xtx', send, {dropped})
+    for (let i = 0; i < 4; i += 1) await poll()
+    expect(send).not.toHaveBeenCalled()
+    await poll()
+    expect(send).toHaveBeenCalledWith(dropped)
+  })
+
+  it('polls again after a failed poll', async () => {
+    callRpc
+      .mockRejectedValueOnce(new Error('Failed to fetch'))
+      .mockRejectedValueOnce(new Error('Failed to fetch'))
+      .mockRejectedValueOnce(new Error('Failed to fetch'))
+      .mockResolvedValueOnce({blockHash: '0xblock'})
+    const send = jest.fn()
+    pollTransaction('0xtx', send)
+    for (let i = 0; i < 3; i += 1) await poll()
+    expect(send).not.toHaveBeenCalled()
+    await poll()
+    expect(send).toHaveBeenCalledWith('MINED')
+  })
+
+  it('stops polling on cleanup', async () => {
+    callRpc.mockResolvedValue({blockHash: HASH_IN_MEMPOOL})
+    const stop = pollTransaction('0xtx', jest.fn())
+    stop()
+    await poll()
+    expect(callRpc).not.toHaveBeenCalled()
   })
 })

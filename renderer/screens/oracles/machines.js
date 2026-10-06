@@ -23,15 +23,28 @@ import {
   fetchLastOpenVotings,
   hasLinklessOptions,
   minOwnerDeposit,
+  NODE_ANSWER_TIMEOUT_MS,
+  pollTransaction,
+  withTimeout,
 } from './utils'
 import {VotingStatus} from '../../shared/types'
-import {callRpc, HASH_IN_MEMPOOL, isAddress} from '../../shared/utils/utils'
+import {callRpc, isAddress} from '../../shared/utils/utils'
 import {epochDb, requestDb, subDb} from '../../shared/utils/db'
 import {ContractRpcMode, VotingListFilter} from './types'
 import {fetchNetworkSize} from '../../shared/api/dna'
 
+const RETRY_AFTER_MS = 15 * 1000
+
+const withNodeTimeout = (promise) =>
+  withTimeout(
+    promise,
+    NODE_ANSWER_TIMEOUT_MS,
+    'The node did not answer in time'
+  )
+
 export const votingListMachine = createMachine(
   {
+    id: 'votingList',
     context: {
       votings: [],
       filter: VotingListFilter.Todo,
@@ -132,7 +145,7 @@ export const votingListMachine = createMachine(
               },
               onError: {
                 target: 'idle',
-                actions: ['setError', log()],
+                actions: ['setError', 'onError', log()],
               },
             },
           },
@@ -145,13 +158,38 @@ export const votingListMachine = createMachine(
               },
               onError: {
                 target: 'idle',
-                actions: ['setError', log()],
+                actions: ['setError', 'onError', log()],
               },
             },
           },
         },
       },
+      // The error stays on screen while the list is asked again, every 15 s or on Try again.
       failure: {
+        initial: 'waiting',
+        states: {
+          waiting: {
+            after: {
+              [RETRY_AFTER_MS]: 'retrying',
+            },
+            on: {
+              RETRY: 'retrying',
+            },
+          },
+          retrying: {
+            invoke: {
+              src: 'loadVotings',
+              onDone: {
+                target: '#votingList.loaded',
+                actions: ['applyVotings', log()],
+              },
+              onError: {
+                target: 'waiting',
+                actions: ['setError', log()],
+              },
+            },
+          },
+        },
         on: {
           FILTER: {target: 'loading', actions: ['setFilter', 'persistFilter']},
           TOGGLE_STATUS: {
@@ -228,18 +266,20 @@ export const votingListMachine = createMachine(
     services: {
       loadVotings: async ({address, filter, statuses, continuationToken}) => {
         const {result, continuationToken: nextContinuationToken} =
-          await fetchVotings({
-            all: [VotingListFilter.All, VotingListFilter.Own].some(
-              (s) => s === filter
-            ),
-            own: filter === VotingListFilter.Own,
-            oracle: address,
-            'states[]': (statuses.length
-              ? statuses
-              : votingStatuses(filter)
-            ).join(','),
-            continuationToken,
-          })
+          await withNodeTimeout(
+            fetchVotings({
+              all: [VotingListFilter.All, VotingListFilter.Own].some(
+                (s) => s === filter
+              ),
+              own: filter === VotingListFilter.Own,
+              oracle: address,
+              'states[]': (statuses.length
+                ? statuses
+                : votingStatuses(filter)
+              ).join(','),
+              continuationToken,
+            })
+          )
 
         const knownVotings = (result ?? []).map(mapVoting)
 
@@ -260,10 +300,12 @@ export const votingListMachine = createMachine(
         })()
 
         if (filter === VotingListFilter.Todo) {
-          const [{createTime}] = (await fetchLastOpenVotings({
-            oracle: address,
-            limit: 1,
-          })) ?? [{createTime: new Date(0)}]
+          const [{createTime}] = (await withNodeTimeout(
+            fetchLastOpenVotings({
+              oracle: address,
+              limit: 1,
+            })
+          )) ?? [{createTime: new Date(0)}]
 
           await votingDb.put('lastVotingTimestamp', createTime)
           await votingDb.put('prevLastVotingTimestamp', prevLastVotingTimestamp)
@@ -449,28 +491,8 @@ export const votingMachine = createMachine(
       loadOwnerDeposit,
       pollStatus:
         ({txHash}) =>
-        (cb) => {
-          let timeoutId
-
-          const fetchStatus = async () => {
-            try {
-              const result = await callRpc('bcn_transaction', txHash)
-              if (result.blockHash !== HASH_IN_MEMPOOL) {
-                cb('MINED')
-              } else {
-                timeoutId = setTimeout(fetchStatus, 10 * 1000)
-              }
-            } catch (error) {
-              cb('TX_NULL', {error})
-            }
-          }
-
-          timeoutId = setTimeout(fetchStatus, 10 * 1000)
-
-          return () => {
-            clearTimeout(timeoutId)
-          }
-        },
+        (cb) =>
+          pollTransaction(txHash, cb),
     },
     guards: {
       ...votingStatusGuards(),
@@ -481,6 +503,7 @@ export const votingMachine = createMachine(
 export const createNewVotingMachine = (epoch, address) =>
   createMachine(
     {
+      id: 'newVoting',
       context: {
         epoch,
         address,
@@ -497,22 +520,14 @@ export const createNewVotingMachine = (epoch, address) =>
       states: {
         preload: {
           invoke: {
-            src: () =>
-              Promise.all([callRpc('bcn_feePerGas'), fetchNetworkSize()]),
+            src: 'preload',
             onDone: {
               target: 'choosingPreset',
-              actions: [
-                assign((context, {data: [feePerGas, networkSize]}) => ({
-                  ...context,
-                  feePerGas,
-                  networkSize,
-                  ownerDeposit: minOwnerDeposit(
-                    networkSize,
-                    context.committeeSize
-                  ),
-                })),
-                log(),
-              ],
+              actions: ['applyPreloadData', log()],
+            },
+            onError: {
+              target: 'preloadFailed',
+              actions: ['setPreloadError', log()],
             },
           },
           initial: 'normal',
@@ -523,6 +538,33 @@ export const createNewVotingMachine = (epoch, address) =>
               },
             },
             late: {},
+          },
+        },
+        // The error stays on screen while the node is asked again, every 15 s or on Try again.
+        preloadFailed: {
+          initial: 'waiting',
+          states: {
+            waiting: {
+              after: {
+                [RETRY_AFTER_MS]: 'retrying',
+              },
+              on: {
+                RETRY: 'retrying',
+              },
+            },
+            retrying: {
+              invoke: {
+                src: 'preload',
+                onDone: {
+                  target: '#newVoting.choosingPreset',
+                  actions: ['applyPreloadData', log()],
+                },
+                onError: {
+                  target: 'waiting',
+                  actions: ['setPreloadError', log()],
+                },
+              },
+            },
           },
         },
         choosingPreset: {
@@ -734,6 +776,9 @@ export const createNewVotingMachine = (epoch, address) =>
                             actions: ['setPending', log()],
                           },
                         ],
+                        TX_NULL: {
+                          actions: ['onError', send('PUBLISH_FAILED'), log()],
+                        },
                       },
                     },
                     persist: {
@@ -777,12 +822,17 @@ export const createNewVotingMachine = (epoch, address) =>
                 },
                 mining: {
                   invoke: {
-                    src: 'pollStatus',
+                    src: 'pollStartStatus',
                   },
                   on: {
                     MINED: {
                       target: 'persist',
                       actions: ['setRunning', log()],
+                    },
+                    // The voting is published, only its start was lost: it stays pending, startable from its page.
+                    TX_NULL: {
+                      target: 'persist',
+                      actions: ['setPending', 'onError', log()],
                     },
                   },
                 },
@@ -813,6 +863,17 @@ export const createNewVotingMachine = (epoch, address) =>
     },
     {
       actions: {
+        applyPreloadData: assign(
+          (context, {data: [feePerGas, networkSize]}) => ({
+            ...context,
+            feePerGas,
+            networkSize,
+            ownerDeposit: minOwnerDeposit(networkSize, context.committeeSize),
+          })
+        ),
+        setPreloadError: assign({
+          preloadError: (_, {data}) => data?.message || String(data),
+        }),
         applyDeployResult: assign((context, {data: {txHash, voting}}) => ({
           ...context,
           txHash,
@@ -911,29 +972,34 @@ export const createNewVotingMachine = (epoch, address) =>
         },
         pollStatus:
           ({txHash}, {data: {from, balance}}) =>
-          (cb) => {
-            let timeoutId
-
-            const fetchStatus = async () => {
-              try {
-                const result = await callRpc('bcn_transaction', txHash)
-                if (result.blockHash !== HASH_IN_MEMPOOL) {
-                  cb({type: 'MINED', from, balance})
-                } else {
-                  timeoutId = setTimeout(fetchStatus, 10 * 1000)
-                }
-              } catch (error) {
-                cb('TX_NULL', {error: error?.message})
-              }
-            }
-
-            timeoutId = setTimeout(fetchStatus, 10 * 1000)
-
-            return () => {
-              clearTimeout(timeoutId)
-            }
-          },
+          (cb) =>
+            pollTransaction(txHash, cb, {
+              mined: {type: 'MINED', from, balance},
+              dropped: {
+                type: 'TX_NULL',
+                data: {
+                  message:
+                    'The voting is not published: the node dropped its transaction. You can publish it again.',
+                },
+              },
+            }),
+        pollStartStatus:
+          ({txHash}) =>
+          (cb) =>
+            pollTransaction(txHash, cb, {
+              dropped: {
+                type: 'TX_NULL',
+                data: {
+                  message:
+                    'The voting is published but not started: the node dropped the transaction that starts it. Start it from its page.',
+                },
+              },
+            }),
         persist: (context) => epochDb('votings').put(context),
+        preload: () =>
+          withNodeTimeout(
+            Promise.all([callRpc('bcn_feePerGas'), fetchNetworkSize()])
+          ),
       },
       guards: {
         shouldStartImmediately: ({
@@ -1385,28 +1451,8 @@ export const createViewVotingMachine = (id, epoch, address) =>
         },
         pollStatus:
           ({txHash}) =>
-          (cb) => {
-            let timeoutId
-
-            const fetchStatus = async () => {
-              try {
-                const result = await callRpc('bcn_transaction', txHash)
-                if (result.blockHash !== HASH_IN_MEMPOOL) {
-                  cb('MINED')
-                } else {
-                  timeoutId = setTimeout(fetchStatus, 10 * 1000)
-                }
-              } catch (error) {
-                cb('TX_NULL', {error: error?.message})
-              }
-            }
-
-            timeoutId = setTimeout(fetchStatus, 10 * 1000)
-
-            return () => {
-              clearTimeout(timeoutId)
-            }
-          },
+          (cb) =>
+            pollTransaction(txHash, cb),
       },
       guards: {
         // eslint-disable-next-line no-use-before-define

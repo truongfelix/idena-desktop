@@ -3,7 +3,12 @@ import dayjs from 'dayjs'
 import {assign} from 'xstate'
 import urlRegex from 'url-regex-safe'
 import {VotingStatus} from '../../shared/types'
-import {callRpc, roundToPrecision, toLocaleDna} from '../../shared/utils/utils'
+import {
+  callRpc,
+  HASH_IN_MEMPOOL,
+  roundToPrecision,
+  toLocaleDna,
+} from '../../shared/utils/utils'
 import {strip} from '../../shared/utils/obj'
 import {ContractRpcMode, VotingListFilter} from './types'
 
@@ -87,6 +92,64 @@ export async function fetchContractBalanceUpdates({
 
 export async function fetchVoting({id, contractHash = id, address}) {
   return callRpc('contract_oracleVoting', contractHash, address)
+}
+
+// Rejects with `message` when `promise` has not settled after `ms`: a node that does not answer ends as an error
+// the page can show instead of a page that waits forever.
+export function withTimeout(promise, ms, message) {
+  let timeoutId
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(message)), ms)
+  })
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId))
+}
+
+export const NODE_ANSWER_TIMEOUT_MS = 30 * 1000
+
+const TX_POLL_INTERVAL_MS = 10 * 1000
+const TX_UNKNOWN_POLLS = 3
+
+/**
+ * Asks the node about the transaction every 10 s. Sends `mined` once it is in a block, and `dropped` once the node
+ * has not known it for 3 polls in a row (dropped from the mempool; a node restart can also lose it). A poll that
+ * fails (the node unreachable for a moment) is repeated, not taken for a drop. Returns the cleanup.
+ */
+export function pollTransaction(
+  txHash,
+  send,
+  {mined = 'MINED', dropped = 'TX_NULL'} = {}
+) {
+  let timeoutId
+  let unknownPolls = 0
+
+  const fetchStatus = async () => {
+    let tx
+    try {
+      tx = await callRpc('bcn_transaction', txHash)
+    } catch {
+      timeoutId = setTimeout(fetchStatus, TX_POLL_INTERVAL_MS)
+      return
+    }
+    if (!tx) {
+      unknownPolls += 1
+      if (unknownPolls >= TX_UNKNOWN_POLLS) {
+        send(dropped)
+        return
+      }
+    } else if (tx.blockHash !== HASH_IN_MEMPOOL) {
+      send(mined)
+      return
+    } else {
+      unknownPolls = 0
+    }
+    timeoutId = setTimeout(fetchStatus, TX_POLL_INTERVAL_MS)
+  }
+
+  timeoutId = setTimeout(fetchStatus, TX_POLL_INTERVAL_MS)
+
+  return () => {
+    clearTimeout(timeoutId)
+  }
 }
 
 export const createContractCaller =
@@ -447,6 +510,30 @@ export function hasLinklessOptions(options) {
   return stripOptions(options).every(({value}) => getUrls(value).length === 0)
 }
 
+// A voting's fact is whatever its author put in the contract. Only its text fields are read, and only with the
+// types the app writes ({title, desc, options: [{id, value}], adCid}): a fact with other contents shows as an
+// untitled voting instead of breaking the page, and cannot stand in for what the node reports (id, status...).
+export function votingFact(fact) {
+  const decoded = hexToObject(fact)
+  const {title, desc, options, adCid} =
+    decoded && typeof decoded === 'object' && !Array.isArray(decoded)
+      ? decoded
+      : {}
+  return {
+    title: typeof title === 'string' ? title : '',
+    desc: typeof desc === 'string' ? desc : '',
+    options: Array.isArray(options)
+      ? options.filter(
+          (option) =>
+            option &&
+            typeof option.value === 'string' &&
+            ['number', 'string'].includes(typeof option.id)
+        )
+      : [],
+    ...(typeof adCid === 'string' && {adCid}),
+  }
+}
+
 export const mapVoting = ({
   contractAddress,
   author,
@@ -473,7 +560,7 @@ export const mapVoting = ({
   finishCountingDate: estimatedPublicVotingFinishTime || publicVotingFinishTime,
   votingMinPayment: minPayment,
   rewardsFund: oracleRewardFund || 0,
-  ...hexToObject(fact),
+  ...votingFact(fact),
 })
 
 export function mapVotingStatus(status) {
@@ -482,6 +569,13 @@ export function mapVotingStatus(status) {
   if (areSameCaseInsensitive(status, VotingStatus.Voted)) return 'Voting'
   return status
 }
+
+// Whether the node gave an amount (a finished voting's totalReward is missing when the node did not see it end).
+export const isKnownAmount = (value) =>
+  value !== undefined &&
+  value !== null &&
+  value !== '' &&
+  Number.isFinite(Number(value))
 
 export const effectiveBalance = ({balance, ownerFee}) =>
   roundToPrecision(4, balance * (1 - (ownerFee || 0) / 100))
