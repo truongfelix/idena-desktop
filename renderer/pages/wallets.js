@@ -6,7 +6,7 @@ import {IconButton2} from '../shared/components/button'
 import Layout from '../shared/components/layout'
 import {useChainState} from '../shared/providers/chain-context'
 import {
-  ExternalLink,
+  TextLink,
   Page,
   PageTitle,
   VDivider,
@@ -91,11 +91,9 @@ export default function WalletsPage() {
               >
                 {t('Recent transactions')}
               </Heading>
-              <ExternalLink
-                href={`https://scan.idena.io/address/${address}#rewards`}
-              >
-                {t('See Explorer for rewards and penalties')}
-              </ExternalLink>
+              <TextLink href="/history" fontWeight={500}>
+                {t('Rewards and penalties in your history')}
+              </TextLink>
             </Stack>
             <Box>
               <WalletTransactionList txs={txs} />

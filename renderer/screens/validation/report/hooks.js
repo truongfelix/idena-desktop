@@ -12,7 +12,8 @@ export function useTotalValidationScore() {
     : undefined
 }
 
-export function useValidationReportSummary() {
+// The report of the last ceremony, or of reportEpoch's.
+export function useValidationReportSummary(reportEpoch) {
   const [identity] = useIdentity()
 
   const epoch = useEpochState()
@@ -24,10 +25,10 @@ export function useValidationReportSummary() {
   React.useEffect(() => {
     if (epoch && identity?.address)
       send('FETCH', {
-        epochNumber: epoch.epoch - 1,
+        epochNumber: reportEpoch ?? epoch.epoch - 1,
         identity,
       })
-  }, [epoch, identity, send])
+  }, [epoch, identity, reportEpoch, send])
 
   return {
     ...current.context,
