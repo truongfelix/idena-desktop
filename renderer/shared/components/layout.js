@@ -89,8 +89,6 @@ export default function Layout({
   skipHardForkScreen = false,
   ...props
 }) {
-  const {t} = useTranslation()
-
   const debouncedSyncing = useDebounce(syncing, AVAILABLE_TIMEOUT)
   const debouncedOffline = useDebounce(offline, AVAILABLE_TIMEOUT)
 
@@ -156,10 +154,6 @@ export default function Layout({
 
   const {onOpen: onOpenSignInDialog, ...dnaSignInDisclosure} = useDisclosure()
 
-  const handleReceiveDnaSignInLink = React.useCallback(() => {
-    if (isNotOffline) onOpenSignInDialog()
-  }, [isNotOffline, onOpenSignInDialog])
-
   const {
     params: {
       nonce_endpoint: nonceEndpoint,
@@ -168,31 +162,17 @@ export default function Layout({
       ...dnaSignInParams
     },
   } = useDnaLinkMethod(DnaLinkMethod.SignIn, {
-    onReceive: handleReceiveDnaSignInLink,
-    onInvalidLink: () => {
-      failToast({
-        title: t('Invalid DNA link'),
-        description: t(`You must provide valid URL including protocol version`),
-      })
-    },
+    enabled: isNotOffline,
+    onReceive: onOpenSignInDialog,
   })
 
   const {onOpen: onOpenSignDialog, ...dnaSignDisclosure} = useDisclosure()
 
-  const handleReceiveDnaSignLink = React.useCallback(() => {
-    if (isNotOffline) onOpenSignDialog()
-  }, [isNotOffline, onOpenSignDialog])
-
   const {
     params: {message: dnaSignMessage, ...dnaSignParams},
   } = useDnaLinkMethod(DnaLinkMethod.Sign, {
-    onReceive: handleReceiveDnaSignLink,
-    onInvalidLink: () => {
-      failToast({
-        title: t('Invalid DNA link'),
-        description: t(`You must provide valid URL including protocol version`),
-      })
-    },
+    enabled: isNotOffline,
+    onReceive: onOpenSignDialog,
   })
 
   return (
@@ -303,42 +283,24 @@ function NormalApp({skipBanner, children}) {
 
   const [dnaSendResponse, setDnaSendResponse] = React.useState()
 
-  const handleInvalidDnaLink = React.useCallback(() => {
-    failToast({
-      title: t('Invalid DNA link'),
-      description: t(`You must provide valid URL including protocol version`),
-    })
-  }, [failToast, t])
-
   const dnaSendDisclosure = useDisclosure()
 
   const {params: dnaSendParams} = useDnaLinkMethod(DnaLinkMethod.Send, {
     onReceive: dnaSendDisclosure.onOpen,
-    onInvalidLink: handleInvalidDnaLink,
   })
 
   const dnaRawTxDisclosure = useDisclosure()
 
   const {params: dnaRawTxParams} = useDnaLinkMethod(DnaLinkMethod.RawTx, {
     onReceive: dnaRawTxDisclosure.onOpen,
-    onInvalidLink: handleInvalidDnaLink,
   })
 
   useDnaLinkRedirect(
     DnaLinkMethod.Invite,
-    ({address}) => `/contacts?new&address=${address}`,
-    {
-      onInvalidLink: handleInvalidDnaLink,
-    }
+    ({address}) => `/contacts?new&address=${address}`
   )
 
-  useDnaLinkRedirect(
-    DnaLinkMethod.Vote,
-    ({address}) => viewVotingHref(address),
-    {
-      onInvalidLink: handleInvalidDnaLink,
-    }
-  )
+  useDnaLinkRedirect(DnaLinkMethod.Vote, ({address}) => viewVotingHref(address))
 
   const ads = useRotatingAds()
   const hasRotatingAds = ads?.length > 0

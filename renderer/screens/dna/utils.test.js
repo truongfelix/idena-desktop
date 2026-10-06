@@ -1,5 +1,13 @@
 import apiClient from '../../shared/api/api-client'
-import {dnaLinkMethod, isValidDnaUrl, signNonce, urlLogContext} from './utils'
+import {
+  dnaLinkMethod,
+  dnaLinkParams,
+  isOpenableDnaUrl,
+  isValidDnaUrl,
+  newerDnaLink,
+  signNonce,
+  urlLogContext,
+} from './utils'
 
 const doubleHashVector = require('./testdata/idena_dna_sign_double_hash.json')
 
@@ -88,5 +96,59 @@ describe('dna link method', () => {
 
   it('reads the method from the path when the host is empty', () => {
     expect(dnaLinkMethod('dna:////send/v1?address=0x1')).toBe('send')
+  })
+})
+
+describe('openable dna links', () => {
+  it.each(['signin', 'send', 'raw', 'vote', 'invite', 'sign'])(
+    'opens a %s link',
+    (method) => {
+      expect(isOpenableDnaUrl(`dna://${method}/v1?address=0x1`)).toBe(true)
+    }
+  )
+
+  it.each([
+    ['an unknown method', 'dna://pay/v1?address=0x1'],
+    ['no protocol version', 'dna://send?address=0x1'],
+    ['a query value that does not decode', 'dna://sign/v1?message=100%25'],
+    ['no link', undefined],
+  ])('does not open a link with %s', (_, url) => {
+    expect(isOpenableDnaUrl(url)).toBe(false)
+  })
+
+  it('splits the callback from the method parameters', () => {
+    expect(
+      dnaLinkParams(
+        'dna://send/v1?address=0x1&amount=2&callback_url=https%3A%2F%2Fexample.org&callback_format=html'
+      )
+    ).toEqual({
+      address: '0x1',
+      amount: '2',
+      callbackUrl: 'https://example.org',
+      callbackFormat: 'html',
+    })
+  })
+})
+
+describe('newer dna link', () => {
+  const first = {id: 1, url: 'dna://send/v1?address=0x1'}
+  const second = {id: 2, url: 'dna://vote/v1?address=0x2'}
+
+  it('takes a link when none waits', () => {
+    expect(newerDnaLink(null, first)).toBe(first)
+  })
+
+  it('keeps the waiting link when nothing new came', () => {
+    expect(newerDnaLink(first, null)).toBe(first)
+    expect(newerDnaLink(null, undefined)).toBeNull()
+  })
+
+  it('keeps the newer of two links in either order', () => {
+    expect(newerDnaLink(first, second)).toBe(second)
+    expect(newerDnaLink(second, first)).toBe(second)
+  })
+
+  it('keeps the waiting copy of the same link', () => {
+    expect(newerDnaLink(first, {...first})).toBe(first)
   })
 })

@@ -66,6 +66,45 @@ export function dnaLinkMethod(dnaUrl) {
   return host || pathname.slice(2).split('/')[0]
 }
 
+export const DnaLinkMethod = {
+  SignIn: 'signin',
+  Send: 'send',
+  RawTx: 'raw',
+  Vote: 'vote',
+  Invite: 'invite',
+  Sign: 'sign',
+}
+
+// A link the app can open: dna://<method>/v<n> with a known method and query values that decode.
+export function isOpenableDnaUrl(url) {
+  if (!isValidDnaUrl(url)) return false
+  if (!Object.values(DnaLinkMethod).includes(dnaLinkMethod(url))) return false
+  try {
+    dnaLinkParams(url)
+    return true
+  } catch {
+    return false
+  }
+}
+
+export function dnaLinkParams(url) {
+  const {
+    callback_url: callbackUrl,
+    callback_format: callbackFormat,
+    ...dnaQueryParams
+  } = extractQueryParams(url)
+
+  return {...dnaQueryParams, callbackUrl, callbackFormat}
+}
+
+// The main process numbers the links it receives: a link pushed while the page asked for the waiting one is the
+// same link or a newer one.
+export function newerDnaLink(current, next) {
+  if (!next) return current
+  if (!current || next.id > current.id) return next
+  return current
+}
+
 export function extractQueryParams(url) {
   const {searchParams} = typeof url === 'string' ? new URL(url) : url
 

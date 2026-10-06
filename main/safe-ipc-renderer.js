@@ -11,6 +11,7 @@ const SEND_CHANNELS = new Set([
   NODE_COMMAND,
   WINDOW_COMMAND,
   'confirm-quit',
+  'DNA_LINK_HANDLED',
   'reload',
   'set-data',
   'showMainWindow',
