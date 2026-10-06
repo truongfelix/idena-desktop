@@ -23,6 +23,7 @@ import {
   FormLabel,
   Input,
   SmallText,
+  TextLink,
   Tooltip,
 } from '../../shared/components/components'
 import {
@@ -69,9 +70,9 @@ export function TotalAmount({address, amount}) {
           {toLocaleDna(i18n.language)(amount)}
         </StatNumber>
       </Stat>
-      <ExternalLink href={`https://scan.idena.io/address/${address}`}>
-        {t('More details in Explorer')}
-      </ExternalLink>
+      <TextLink href="/history?tab=transactions" fontWeight={500}>
+        {t('All transactions in your history')}
+      </TextLink>
     </Stack>
   )
 }

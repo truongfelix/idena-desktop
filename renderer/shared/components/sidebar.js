@@ -303,6 +303,9 @@ function Navbar() {
       <NavItem href="/wallets" icon={WalletIcon}>
         {t('Wallets')}
       </NavItem>
+      <NavItem href="/history" icon={ClockIcon}>
+        {t('History')}
+      </NavItem>
       <NavItem href="/flips/list" icon={GalleryIcon}>
         {t('Flips')}
       </NavItem>

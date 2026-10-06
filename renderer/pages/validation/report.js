@@ -8,7 +8,7 @@ import {
   Text,
   useTheme,
 } from '@chakra-ui/react'
-import router from 'next/router'
+import router, {useRouter} from 'next/router'
 import {useTranslation} from 'react-i18next'
 import {UserInlineCard} from '../../screens/home/components'
 import {
@@ -32,7 +32,6 @@ import {
   ValidationSummaryStatus,
 } from '../../screens/validation/report/types'
 import {
-  ExternalLink,
   ErrorAlert,
   Page,
   PageTitle,
@@ -62,6 +61,14 @@ export default function ValidationReport() {
 
   const {address, state} = identity
 
+  // ?epoch=: a past ceremony's report, opened from the History page.
+  const {query} = useRouter()
+  const queryEpoch = Number.parseInt(query.epoch, 10)
+  const pastEpoch =
+    epoch && queryEpoch >= 0 && queryEpoch < epoch.epoch
+      ? queryEpoch
+      : undefined
+
   const {
     status,
     epochNumber: reportEpoch,
@@ -89,7 +96,7 @@ export default function ValidationReport() {
     candidateReward,
     missedCandidateReward,
     isLoading,
-  } = useValidationReportSummary()
+  } = useValidationReportSummary(pastEpoch)
 
   const {
     short: {score: shortScore, ...shortResults},
@@ -121,7 +128,11 @@ export default function ValidationReport() {
           <PageTitle m={0}>
             {t('Epoch #{{epochNumber}} validation report', {epochNumber})}
           </PageTitle>
-          <CloseButton onClick={() => router.push('/home')} />
+          <CloseButton
+            onClick={() =>
+              router.push(pastEpoch === undefined ? '/home' : '/history')
+            }
+          />
         </Flex>
         <Stack spacing={6} w="full">
           <Box>
@@ -360,13 +371,9 @@ export default function ValidationReport() {
                   <Heading color="brandGray.500" fontSize="lg" fontWeight={500}>
                     {t('Earnings summary')}
                   </Heading>
-                  <ExternalLink
-                    href={`https://scan.idena.io/identity/${address}/epoch/${epochNumber}/${
-                      isValidated ? 'rewards' : 'validation'
-                    }`}
-                  >
-                    {t('See the full report in blockchain explorer')}
-                  </ExternalLink>
+                  <TextLink href="/history" fontWeight={500}>
+                    {t('All your validations in your history')}
+                  </TextLink>
                 </Box>
                 <Table fontWeight={500}>
                   <thead>

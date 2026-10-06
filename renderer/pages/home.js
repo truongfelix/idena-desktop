@@ -387,11 +387,13 @@ export default function ProfilePage() {
                         <UserStatLabel>{t('Address')}</UserStatLabel>
                         <UserStatValue>
                           {address}
-                          <ExternalLink
-                            href={`https://scan.idena.io/address/${address}`}
+                          <TextLink
+                            href="/history"
+                            fontWeight={500}
+                            display="block"
                           >
-                            {t('Open in blockchain explorer')}
-                          </ExternalLink>
+                            {t('Open your history')}
+                          </TextLink>
                         </UserStatValue>
                       </UserStat>
 
