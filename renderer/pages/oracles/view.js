@@ -289,17 +289,7 @@ export default function ViewVotingPage() {
                     bg="gray.300"
                     color="muted"
                     fontSize="md"
-                    cursor="pointer"
                     pl="0.5"
-                    transition="color 0.2s ease"
-                    _hover={{
-                      color: 'gray.500',
-                    }}
-                    onClick={() => {
-                      global.openExternal(
-                        `https://scan.idena.io/contract/${contractHash}`
-                      )
-                    }}
                   >
                     <Stack isInline spacing={1} align="center">
                       <Avatar w={5} h={5} address={contractHash} />
