@@ -105,7 +105,8 @@ function getBinaryHelp(binaryPath) {
       output += data.toString()
     })
     help.on('error', () => resolve(''))
-    help.on('exit', () => resolve(output))
+    // 'close', not 'exit': at 'exit' the output can still be unread (the node's flags would look unsupported).
+    help.on('close', () => resolve(output))
   })
 }
 
@@ -613,6 +614,7 @@ function getLastLogs() {
 
 module.exports = {
   downloadNode,
+  getBinaryHelp,
   getCurrentVersion,
   getRemoteRelease,
   startNode,

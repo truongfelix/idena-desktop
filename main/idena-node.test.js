@@ -17,7 +17,12 @@ jest.mock('child_process', () => ({
 const fs = require('fs-extra')
 const {spawn} = require('child_process')
 const logger = require('./logger')
-const {getCurrentVersion, getNodeFile, updateNode} = require('./idena-node')
+const {
+  getBinaryHelp,
+  getCurrentVersion,
+  getNodeFile,
+  updateNode,
+} = require('./idena-node')
 
 function scriptedChild() {
   const child = new EventEmitter()
@@ -99,6 +104,27 @@ describe('node version', () => {
     child.emit('close', 0, null)
     await expect(version).resolves.toBe('1.2.0')
     expect(path.basename(spawn.mock.calls[0][0])).toMatch(/^new-idena-go/)
+  })
+})
+
+describe('node help', () => {
+  afterEach(() => jest.clearAllMocks())
+
+  it('reads the output that comes after the exit', async () => {
+    const child = spawnChild()
+    const help = getBinaryHelp('/node')
+    child.stdout.emit('data', Buffer.from('--datadir value\n'))
+    child.emit('exit', 0, null)
+    child.stdout.emit('data', Buffer.from('--dbwritebuffer value\n'))
+    child.emit('close', 0, null)
+    await expect(help).resolves.toContain('--dbwritebuffer')
+  })
+
+  it('answers empty for a binary that cannot start', async () => {
+    const child = spawnChild()
+    const help = getBinaryHelp('/node')
+    child.emit('error', new Error('spawn ENOENT'))
+    await expect(help).resolves.toBe('')
   })
 })
 
