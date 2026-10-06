@@ -34,6 +34,7 @@ import {
   appendTxHash,
   handleCallbackUrl,
   appendParam,
+  dnaCallbackSite,
   urlLogContext,
 } from './utils'
 import {
@@ -78,14 +79,9 @@ export function DnaSignInDialog({
 
   const {address} = useIdentityState()
 
-  const callbackUrlObject = React.useMemo(
-    () => new URL(callbackUrl),
-    [callbackUrl]
-  )
-
-  const callbackFaviconUrl = React.useMemo(
-    () => faviconUrl || new URL('favicon.ico', callbackUrlObject.origin),
-    [callbackUrlObject.origin, faviconUrl]
+  const {host: callbackHost, favicon: callbackFaviconUrl} = dnaCallbackSite(
+    callbackUrl,
+    faviconUrl
   )
 
   return (
@@ -103,10 +99,7 @@ export function DnaSignInDialog({
             )}
           </Text>
           <Stack spacing="px" borderRadius="lg" overflow="hidden">
-            <MediaDnaDialogStat
-              label={t('Website')}
-              value={callbackUrlObject.hostname || callbackUrl}
-            >
+            <MediaDnaDialogStat label={t('Website')} value={callbackHost}>
               {callbackFaviconUrl ? (
                 <Image
                   src={callbackFaviconUrl}
@@ -181,16 +174,9 @@ export function DnaSignDialog({
 
   const isValidCallbackUrl = isValidUrl(callbackUrl)
 
-  const callbackUrlObject = React.useMemo(
-    () => isValidCallbackUrl && new URL(callbackUrl),
-    [callbackUrl, isValidCallbackUrl]
-  )
-
-  const callbackFaviconUrl = React.useMemo(
-    () =>
-      faviconUrl ||
-      (callbackUrlObject && new URL('favicon.ico', callbackUrlObject.origin)),
-    [callbackUrlObject, faviconUrl]
+  const {host: callbackHost, favicon: callbackFaviconUrl} = dnaCallbackSite(
+    callbackUrl,
+    faviconUrl
   )
 
   return (
@@ -204,10 +190,7 @@ export function DnaSignDialog({
         <Stack spacing={5}>
           <Text>{t('Please confirm that you want to sign the message')}</Text>
           <Stack spacing="px" borderRadius="lg" overflow="hidden">
-            <MediaDnaDialogStat
-              label={t('Website')}
-              value={callbackUrlObject.hostname || callbackUrl}
-            >
+            <MediaDnaDialogStat label={t('Website')} value={callbackHost}>
               {callbackFaviconUrl ? (
                 <Image
                   src={callbackFaviconUrl}

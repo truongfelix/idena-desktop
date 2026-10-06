@@ -66,6 +66,84 @@ export function dnaLinkMethod(dnaUrl) {
   return host || pathname.slice(2).split('/')[0]
 }
 
+export const DnaLinkMethod = {
+  SignIn: 'signin',
+  Send: 'send',
+  RawTx: 'raw',
+  Vote: 'vote',
+  Invite: 'invite',
+  Sign: 'sign',
+}
+
+const hasProtocol = (value, protocols) => {
+  try {
+    return protocols.includes(new URL(value).protocol)
+  } catch {
+    return false
+  }
+}
+
+// A sign-in posts to both endpoints, then opens the callback (the same protocols as isValidUrl).
+function hasRequiredParams(method, params) {
+  if (method === DnaLinkMethod.SignIn) {
+    return (
+      Boolean(params.token) &&
+      hasProtocol(params.callbackUrl, ['https:', 'http:', 'dna:']) &&
+      hasProtocol(params.nonce_endpoint, ['https:', 'http:']) &&
+      hasProtocol(params.authentication_endpoint, ['https:', 'http:'])
+    )
+  }
+  return true
+}
+
+// A link the app can open: dna://<method>/v<n> with a known method, query values that decode and the parameters
+// its dialog needs.
+export function isOpenableDnaUrl(url) {
+  if (!isValidDnaUrl(url)) return false
+  const method = dnaLinkMethod(url)
+  if (!Object.values(DnaLinkMethod).includes(method)) return false
+  try {
+    return hasRequiredParams(method, dnaLinkParams(url))
+  } catch {
+    return false
+  }
+}
+
+// The website a sign-in or sign dialog names: the callback's host and icon (the link's favicon_url, else
+// favicon.ico of an http(s) callback; a dna: callback has no origin to take it from).
+export function dnaCallbackSite(callbackUrl, faviconUrl) {
+  try {
+    const {protocol, hostname, origin} = new URL(callbackUrl)
+    const isWebsite = ['https:', 'http:'].includes(protocol)
+    return {
+      host: hostname || callbackUrl,
+      favicon:
+        faviconUrl ||
+        (isWebsite ? new URL('favicon.ico', origin).href : undefined),
+    }
+  } catch {
+    return {host: callbackUrl, favicon: faviconUrl}
+  }
+}
+
+export function dnaLinkParams(url) {
+  const {
+    callback_url: callbackUrl,
+    callback_format: callbackFormat,
+    ...dnaQueryParams
+  } = extractQueryParams(url)
+
+  return {...dnaQueryParams, callbackUrl, callbackFormat}
+}
+
+// The main process numbers the links it receives: a link pushed while the page asked for the waiting one is the
+// same link or a newer one.
+export function newerDnaLink(current, next) {
+  if (!next) return current
+  if (!current || next.id > current.id) return next
+  return current
+}
+
 export function extractQueryParams(url) {
   const {searchParams} = typeof url === 'string' ? new URL(url) : url
 

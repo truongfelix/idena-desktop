@@ -1,93 +1,114 @@
+/* eslint-disable react/prop-types */
 import {useRouter} from 'next/router'
 import * as React from 'react'
+import {useTranslation} from 'react-i18next'
 import {areSameCaseInsensitive} from '../oracles/utils'
+import {useFailToast} from '../../shared/hooks/use-toast'
 import {
+  DnaLinkMethod,
   dnaLinkMethod,
-  extractQueryParams,
-  isValidDnaUrl,
+  dnaLinkParams,
+  isOpenableDnaUrl,
+  newerDnaLink,
   urlLogContext,
 } from './utils'
 
-export const DnaLinkMethod = {
-  SignIn: 'signin',
-  Send: 'send',
-  RawTx: 'raw',
-  Vote: 'vote',
-  Invite: 'invite',
-  Sign: 'sign',
+export {DnaLinkMethod}
+
+const DnaLinkContext = React.createContext()
+
+function useLatest(value) {
+  const ref = React.useRef(value)
+  React.useEffect(() => {
+    ref.current = value
+  })
+  return ref
 }
 
-export function useDnaLink({onInvalidLink}) {
-  const [url, setUrl] = React.useState()
+// Holds the link that waits for its dialog: the dialogs mount at different times (send, raw and vote only once the
+// node is synced), and a link can come before any of them.
+export function DnaLinkProvider({children}) {
+  const {t} = useTranslation()
+  const failToast = useFailToast()
+  const failToastRef = useLatest(failToast)
+
+  const [link, setLink] = React.useState(null)
+  const takenIds = React.useRef(new Set())
 
   React.useEffect(() => {
-    if (!sessionStorage.getItem('didCheckDnaLink')) {
-      global.ipcRenderer.invoke('CHECK_DNA_LINK').then(setUrl)
-      sessionStorage.setItem('didCheckDnaLink', 1)
-    }
+    const receive = (_, next) =>
+      setLink((current) => newerDnaLink(current, next))
+
+    const removeListener = global.ipcRenderer.on('DNA_LINK', receive)
+    // A link that came before this listener (it started the app, or came during startup) waits in the main process
+    global.ipcRenderer
+      .invoke('CHECK_DNA_LINK')
+      .then((pending) => receive(undefined, pending))
+      .catch((error) =>
+        global.logger.error('Cannot read the waiting dna link', error?.message)
+      )
+
+    return removeListener
+  }, [])
+
+  const take = React.useCallback((id) => {
+    if (takenIds.current.has(id)) return false
+    takenIds.current.add(id)
+    global.ipcRenderer.send('DNA_LINK_HANDLED', id)
+    setLink((current) => (current?.id === id ? null : current))
+    return true
   }, [])
 
   React.useEffect(() => {
-    const handleDnaLink = (_, e) => setUrl(e)
-
-    return global.ipcRenderer.on('DNA_LINK', handleDnaLink)
-  }, [])
-
-  const [method, setMethod] = React.useState()
-
-  const [params, setParams] = React.useState({})
-
-  React.useEffect(() => {
-    if (isValidDnaUrl(url)) {
-      setMethod(dnaLinkMethod(url))
-
-      const {
-        callback_url: callbackUrl,
-        callback_format: callbackFormat,
-        ...dnaQueryParams
-      } = extractQueryParams(url)
-
-      setParams({
-        ...dnaQueryParams,
-        callbackUrl,
-        callbackFormat,
+    if (link && !isOpenableDnaUrl(link.url) && take(link.id)) {
+      global.logger.error('Received invalid dna url', urlLogContext(link.url))
+      failToastRef.current({
+        title: t('Invalid DNA link'),
+        description: t(`You must provide valid URL including protocol version`),
       })
     }
-  }, [url])
+  }, [failToastRef, link, t, take])
 
-  React.useEffect(() => {
-    if (url && !isValidDnaUrl(url)) {
-      global.logger.error('Receieved invalid dna url', urlLogContext(url))
-      if (onInvalidLink) onInvalidLink(url)
-    }
-  }, [onInvalidLink, url])
+  const value = React.useMemo(() => ({link, take}), [link, take])
 
-  return {url, method, params}
+  return (
+    <DnaLinkContext.Provider value={value}>{children}</DnaLinkContext.Provider>
+  )
 }
 
-export function useDnaLinkMethod(method, {onReceive, onInvalidLink}) {
-  const dnaLink = useDnaLink({onInvalidLink})
-  const {url, method: currentMethod} = dnaLink
+// Opens the waiting link of this method once `enabled`, then keeps its url and params for the dialog.
+export function useDnaLinkMethod(method, {enabled = true, onReceive} = {}) {
+  const {link, take} = React.useContext(DnaLinkContext)
+  const onReceiveRef = useLatest(onReceive)
+
+  const [received, setReceived] = React.useState({params: {}})
 
   React.useEffect(() => {
-    if (currentMethod === method) {
-      if (onReceive) onReceive(url)
+    if (
+      enabled &&
+      link &&
+      isOpenableDnaUrl(link.url) &&
+      dnaLinkMethod(link.url) === method &&
+      take(link.id)
+    ) {
+      const params = dnaLinkParams(link.url)
+      setReceived({url: link.url, params})
+      if (onReceiveRef.current) onReceiveRef.current(link.url, params)
     }
-  }, [currentMethod, method, onReceive, url])
+  }, [enabled, link, method, onReceiveRef, take])
 
-  return dnaLink
+  return received
 }
 
-export function useDnaLinkRedirect(method, url, {onInvalidLink}) {
+export function useDnaLinkRedirect(method, url) {
   const router = useRouter()
 
-  const {params} = useDnaLinkMethod(method, {
-    onReceive: () => {
+  useDnaLinkMethod(method, {
+    onReceive: (_, params) => {
       const targetUrl = typeof url === 'function' ? url(params) : url
       if (!areSameCaseInsensitive(router.asPath, targetUrl)) {
         router.push(targetUrl)
       }
     },
-    onInvalidLink,
   })
 }

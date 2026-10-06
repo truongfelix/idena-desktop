@@ -990,11 +990,11 @@ export const createViewVotingMachine = (id, epoch, address) =>
             src: 'loadVoting',
             onDone: {
               target: 'loadOwnerDeposit',
-              actions: ['applyVoting', log()],
+              actions: ['applyVoting', 'clearLoadError', log()],
             },
             onError: {
               target: 'invalid',
-              actions: [log()],
+              actions: ['setLoadError', log()],
             },
           },
         },
@@ -1189,6 +1189,13 @@ export const createViewVotingMachine = (id, epoch, address) =>
         setInvalid: assign({
           status: VotingStatus.Invalid,
           errorMessage: (_, {error}) => error?.message,
+        }),
+        // The voting could not be read (the node has no oracle voting at this address, or did not answer)
+        setLoadError: assign({
+          loadError: (_, {data}) => data?.message || String(data),
+        }),
+        clearLoadError: assign({
+          loadError: () => undefined,
         }),
         restorePrevStatus: assign({
           status: ({prevStatus}) => prevStatus,

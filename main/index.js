@@ -29,6 +29,7 @@ const {
   registerRendererScheme,
 } = require('./renderer-protocol')
 const {applyPrivateFileCreationMask} = require('./private-files')
+const {createDnaLinkInbox} = require('./dna-link-inbox')
 
 applyPrivateFileCreationMask()
 registerRendererScheme(protocol)
@@ -129,11 +130,16 @@ function finishE2ESmoke(ok, detail) {
   setTimeout(() => app.exit(ok ? 0 : 1), 100)
 }
 
-let dnaUrl
+const dnaLinks = createDnaLinkInbox()
 
 const isFirstInstance = app.requestSingleInstanceLock()
 
 const extractDnaUrl = (argv) => argv.find((item) => item.startsWith('dna://'))
+
+// Protocol handler for win32 and linux: a link that starts the app is in its arguments
+if (isFirstInstance && (isWin || isLinux)) {
+  dnaLinks.receive(extractDnaUrl(process.argv))
+}
 
 function isAppNavigationUrl(url) {
   try {
@@ -267,12 +273,6 @@ const createMainWindow = () => {
 
   loadRoute(mainWindow, 'home')
 
-  // Protocol handler for win32 and linux
-  // eslint-disable-next-line no-cond-assign
-  if (isWin || isLinux) {
-    dnaUrl = extractDnaUrl(process.argv)
-  }
-
   mainWindow.once('ready-to-show', () => {
     mainWindow.show()
   })
@@ -306,8 +306,8 @@ function restoreWindow(window = mainWindow) {
 }
 
 function handleDnaLink(url) {
-  if (!url) return
-  sendMainWindowMsg('DNA_LINK', url)
+  const link = dnaLinks.receive(url)
+  if (link) sendMainWindowMsg('DNA_LINK', link)
 }
 
 const createMenu = () => {
@@ -525,11 +525,8 @@ app.on('will-finish-launching', () => {
   // Protocol handler for osx
   app.on('open-url', (event, url) => {
     event.preventDefault()
-    dnaUrl = url
-    if (dnaUrl && mainWindow) {
-      handleDnaLink(dnaUrl)
-      restoreWindow(mainWindow)
-    }
+    handleDnaLink(url)
+    restoreWindow(mainWindow)
   })
 })
 
@@ -585,9 +582,14 @@ app.on('window-all-closed', () => {
   }
 })
 
-ipcMain.handleOnce('CHECK_DNA_LINK', (event) => {
+ipcMain.handle('CHECK_DNA_LINK', (event) => {
   requireIpcSender(event)
-  return dnaUrl
+  return dnaLinks.pending()
+})
+
+ipcMain.on('DNA_LINK_HANDLED', (event, id) => {
+  if (!acceptIpcSender(event)) return
+  dnaLinks.markHandled(id)
 })
 
 ipcMain.on(NODE_COMMAND, async (event, command, data) => {
