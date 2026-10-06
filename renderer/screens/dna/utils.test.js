@@ -1,5 +1,5 @@
 import apiClient from '../../shared/api/api-client'
-import {signNonce, urlLogContext} from './utils'
+import {dnaLinkMethod, isValidDnaUrl, signNonce, urlLogContext} from './utils'
 
 const doubleHashVector = require('./testdata/idena_dna_sign_double_hash.json')
 
@@ -73,5 +73,20 @@ describe('dna URL logging', () => {
       type: 'invalid',
       length: 28,
     })
+  })
+})
+
+describe('dna link method', () => {
+  it.each(['signin', 'send', 'raw', 'vote', 'invite', 'sign'])(
+    'reads %s from the link host',
+    (method) => {
+      const url = `dna://${method}/v1?address=0x1&callback_url=https%3A%2F%2Fexample.org`
+      expect(isValidDnaUrl(url)).toBe(true)
+      expect(dnaLinkMethod(url)).toBe(method)
+    }
+  )
+
+  it('reads the method from the path when the host is empty', () => {
+    expect(dnaLinkMethod('dna:////send/v1?address=0x1')).toBe('send')
   })
 })
