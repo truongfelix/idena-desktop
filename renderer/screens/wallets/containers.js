@@ -19,7 +19,6 @@ import {
   Drawer,
   DrawerBody,
   DrawerFooter,
-  ExternalLink,
   FormLabel,
   Input,
   SmallText,
@@ -51,6 +50,10 @@ import {
 } from '../../shared/components/icons'
 import {useTrackTx} from '../ads/hooks'
 import {useFormatDna} from '../../shared/hooks/hooks'
+import {useIdentityState} from '../../shared/providers/identity-context'
+import {txTypeName} from '../history/utils'
+import {useTransactionDetails} from './hooks'
+import {TxStatus, hasPayload} from './utils'
 
 export function TotalAmount({address, amount}) {
   const {t, i18n} = useTranslation()
@@ -325,7 +328,270 @@ export function ReceiveDnaDrawer({address, ...props}) {
   )
 }
 
-export function WalletTransactionList({txs = []}) {
+const txStatusColors = {
+  [TxStatus.Mining]: 'orange.500',
+  [TxStatus.Confirmed]: 'green.500',
+  [TxStatus.Failed]: 'red.500',
+  [TxStatus.Unknown]: 'muted',
+}
+
+function TransactionStatusText({status}) {
+  const {t} = useTranslation()
+
+  const texts = {
+    [TxStatus.Mining]: t('Mining...'),
+    [TxStatus.Confirmed]: t('Confirmed'),
+    [TxStatus.Failed]: t('Smart contract failed'),
+    [TxStatus.Unknown]: t('Not found'),
+  }
+
+  return (
+    <Text color={txStatusColors[status]} fontWeight={500}>
+      {texts[status]}
+    </Text>
+  )
+}
+
+function TransactionDetail({label, action, children, ...props}) {
+  return (
+    <Stack spacing={1} {...props}>
+      <Flex align="center" justify="space-between">
+        <Text color="muted">{label}</Text>
+        {action}
+      </Flex>
+      <Box fontWeight={500} wordBreak="break-all">
+        {children}
+      </Box>
+    </Stack>
+  )
+}
+
+// Opens the address's History page (onClick closes the drawer: on the History page only the query changes).
+function TransactionAddress({address, onClick}) {
+  const {t} = useTranslation()
+  const {address: ownAddress} = useIdentityState()
+
+  return (
+    <Stack spacing={0}>
+      <TextLink
+        href={`/history?address=${address}`}
+        fontFamily="mono"
+        onClick={onClick}
+      >
+        {address}
+      </TextLink>
+      {address?.toLowerCase() === ownAddress?.toLowerCase() && (
+        <SmallText>{t('Your address')}</SmallText>
+      )}
+    </Stack>
+  )
+}
+
+function CopyButton({value}) {
+  const {t} = useTranslation()
+  const {hasCopied, onCopy} = useClipboard(value)
+
+  return (
+    <Button
+      variant="link"
+      colorScheme="blue"
+      fontWeight={500}
+      _hover={null}
+      _active={null}
+      onClick={onCopy}
+    >
+      {hasCopied ? t('Copied') : t('Copy')}
+    </Button>
+  )
+}
+
+// A transaction as the own node knows it, for the transaction lists (wallets, history) and the dna:// send result.
+export function TransactionDetailsDrawer({hash, ...props}) {
+  const {t, i18n} = useTranslation()
+
+  const {address: ownAddress} = useIdentityState()
+
+  const {tx, block, receipt, status, isLoading, isError, error} =
+    useTransactionDetails(hash, {enabled: props.isOpen})
+
+  const formatDna = toLocaleDna(i18n.language)
+
+  const isSent = tx?.from?.toLowerCase() === ownAddress?.toLowerCase()
+  const isMining = status === TxStatus.Mining
+
+  return (
+    <Drawer {...props}>
+      <WalletDrawerHeader title={tx ? t(txTypeName(tx)) : t('Transaction')}>
+        <WalletDrawerHeaderIconBox colorScheme={isSent ? 'red' : 'blue'}>
+          {isSent ? (
+            <SendOutIcon color="red.500" />
+          ) : (
+            <ReceiveIcon color="blue.500" />
+          )}
+        </WalletDrawerHeaderIconBox>
+      </WalletDrawerHeader>
+      <DrawerBody>
+        <Stack spacing={5} mt={2} pb={6}>
+          {/* eslint-disable-next-line no-nested-ternary */}
+          {isLoading ? (
+            <Text color="muted">{t('Loading...')}</Text>
+          ) : isError ? (
+            <Text color="red.500">{error?.message}</Text>
+          ) : (
+            status && <TransactionStatusText status={status} />
+          )}
+
+          {status === TxStatus.Unknown && (
+            <Text color="muted">
+              {t(
+                'Your node has no transaction with this hash. A transaction that was never mined leaves the mempool after a while.'
+              )}
+            </Text>
+          )}
+
+          <TransactionDetail
+            label={t('Tx hash')}
+            action={<CopyButton value={hash} />}
+          >
+            <Text fontFamily="mono">{hash}</Text>
+          </TransactionDetail>
+
+          {tx && (
+            <>
+              {!isMining && (
+                <TransactionDetail label={t('Date')}>
+                  {tx.timestamp
+                    ? new Date(tx.timestamp * 1000).toLocaleString(
+                        i18n.language,
+                        {dateStyle: 'medium', timeStyle: 'medium'}
+                      )
+                    : '\u2013'}
+                </TransactionDetail>
+              )}
+              {!isMining && (
+                <TransactionDetail label={t('Block')}>
+                  {block ? (
+                    `#${block.height}`
+                  ) : (
+                    <Text fontFamily="mono">{tx.blockHash}</Text>
+                  )}
+                </TransactionDetail>
+              )}
+              <TransactionDetail label={t('Epoch')}>
+                #{tx.epoch}
+              </TransactionDetail>
+              <TransactionDetail label={t('From')}>
+                <TransactionAddress address={tx.from} onClick={props.onClose} />
+              </TransactionDetail>
+              {tx.to && (
+                <TransactionDetail label={t('To')}>
+                  <TransactionAddress address={tx.to} onClick={props.onClose} />
+                </TransactionDetail>
+              )}
+              <TransactionDetail label={t('Amount')}>
+                {formatDna(tx.amount)}
+              </TransactionDetail>
+              {Number(tx.tips) > 0 && (
+                <TransactionDetail label={t('Tips')}>
+                  {formatDna(tx.tips)}
+                </TransactionDetail>
+              )}
+              {isMining ? (
+                <TransactionDetail label={t('Fee limit')}>
+                  {formatDna(tx.maxFee)}
+                </TransactionDetail>
+              ) : (
+                <TransactionDetail label={t('Fee')}>
+                  {formatDna(tx.usedFee)}
+                </TransactionDetail>
+              )}
+              <TransactionDetail label={t('Nonce')}>
+                {tx.nonce}
+              </TransactionDetail>
+              {tx.type === 'kill' && (
+                <Text color="muted">
+                  {t(
+                    'The stake moved to the balance, except its locked part, which was burnt.'
+                  )}
+                </Text>
+              )}
+            </>
+          )}
+
+          {receipt && (
+            <>
+              {receipt.contract && receipt.contract !== tx?.to && (
+                <TransactionDetail label={t('Smart contract')}>
+                  <TransactionAddress
+                    address={receipt.contract}
+                    onClick={props.onClose}
+                  />
+                </TransactionDetail>
+              )}
+              {receipt.method && (
+                <TransactionDetail label={t('Method')}>
+                  {receipt.method}
+                </TransactionDetail>
+              )}
+              <TransactionDetail label={t('Gas used')}>
+                {receipt.gasUsed}
+              </TransactionDetail>
+              {receipt.error && (
+                <TransactionDetail label={t('Error')}>
+                  <Text color="red.500">{receipt.error}</Text>
+                </TransactionDetail>
+              )}
+            </>
+          )}
+
+          {hasPayload(tx?.payload) && (
+            <TransactionDetail
+              label={t('Payload')}
+              action={<CopyButton value={tx.payload} />}
+            >
+              <Text
+                fontFamily="mono"
+                fontSize="sm"
+                fontWeight="normal"
+                maxH={24}
+                overflowY="auto"
+              >
+                {tx.payload}
+              </Text>
+            </TransactionDetail>
+          )}
+        </Stack>
+      </DrawerBody>
+    </Drawer>
+  )
+}
+
+// A link-styled button that opens a transaction's details drawer (shows the hash unless given a text).
+export function TransactionDetailsLink({
+  hash,
+  w,
+  isTruncated,
+  children,
+  ...props
+}) {
+  return (
+    <Button
+      variant="link"
+      colorScheme="brandBlue"
+      fontWeight={500}
+      alignSelf="flex-start"
+      _hover={{background: 'transparent'}}
+      _focus={{outline: 'none'}}
+      {...props}
+    >
+      <Text as="span" width={w} isTruncated={isTruncated}>
+        {children || hash}
+      </Text>
+    </Button>
+  )
+}
+
+export function WalletTransactionList({txs = [], onOpenTransaction}) {
   const {t} = useTranslation(['translation', 'error'])
 
   const formatDna = useFormatDna({maximumFractionDigits: 5})
@@ -386,7 +652,7 @@ export function WalletTransactionList({txs = []}) {
               >
                 {/* eslint-disable-next-line no-nested-ternary */}
                 {tx.type === 'kill'
-                  ? t('See in Explorer...')
+                  ? t('Stake moved to balance')
                   : // eslint-disable-next-line no-nested-ternary
                   Number(tx.amount) === 0
                   ? '\u2013'
@@ -424,14 +690,13 @@ export function WalletTransactionList({txs = []}) {
               </Text>
               <SmallText>
                 {t('Transaction')}:
-                <ExternalLink
-                  href={`https://scan.idena.io/transaction/${tx.hash}`}
+                <TransactionDetailsLink
+                  hash={tx.hash}
                   fontSize="sm"
                   isTruncated
                   w="24"
-                >
-                  {tx.hash}
-                </ExternalLink>
+                  onClick={() => onOpenTransaction(tx.hash)}
+                />
               </SmallText>
             </TableCol>
           </TableRow>
