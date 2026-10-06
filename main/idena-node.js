@@ -36,6 +36,9 @@ const pinnedNodeVersion = '1.1.2'
 const idenaNodeReleasesUrl =
   'https://api.github.com/repos/truongfelix/idena-go/releases/latest'
 const idenaChainDbFolder = 'idenachain.db'
+const VERSION_TIMEOUT_MS = 30 * 1000
+const REPLACE_ATTEMPTS = 5
+const REPLACE_RETRY_DELAY_MS = 1000
 
 const getBinarySuffix = () => (process.platform === 'win32' ? '.exe' : '')
 
@@ -102,14 +105,34 @@ function getBinaryHelp(binaryPath) {
       output += data.toString()
     })
     help.on('error', () => resolve(''))
-    help.on('exit', () => resolve(output))
+    // 'close', not 'exit': at 'exit' the output can still be unread (the node's flags would look unsupported).
+    help.on('close', () => resolve(output))
   })
 }
 
-function getBinaryVersion(binaryPath) {
+// The version a node binary prints for --version. It settles once the binary has exited and its output is read,
+// on a spawn error, or after `timeoutMs` (the binary is killed): a binary that hangs, dies on a signal or prints
+// no version rejects instead of leaving the caller waiting.
+function getBinaryVersion(binaryPath, timeoutMs = VERSION_TIMEOUT_MS) {
   return new Promise((resolve, reject) => {
-    const nodeVersion = spawn(binaryPath, ['--version'])
+    let nodeVersion
+    try {
+      nodeVersion = spawn(binaryPath, ['--version'])
+    } catch (e) {
+      reject(e)
+      return
+    }
     let output = ''
+    const timer = setTimeout(() => {
+      nodeVersion.kill()
+      reject(
+        new Error(`cannot resolve node version, no answer in ${timeoutMs} ms`)
+      )
+    }, timeoutMs)
+    const fail = (err) => {
+      clearTimeout(timer)
+      reject(err)
+    }
 
     nodeVersion.stdout.on('data', (data) => {
       output += data.toString()
@@ -117,19 +140,27 @@ function getBinaryVersion(binaryPath) {
     nodeVersion.stderr.on('data', (data) => {
       output += data.toString()
     })
-    nodeVersion.on('error', (err) => reject(err))
-    nodeVersion.on('exit', (code) => {
-      if (code) {
-        reject(new Error(`cannot resolve node version, exit code ${code}`))
+    nodeVersion.on('error', fail)
+    // 'close', not 'exit': at 'exit' the output can still be unread.
+    nodeVersion.on('close', (code, signal) => {
+      if (code !== 0) {
+        fail(
+          new Error(
+            `cannot resolve node version, exit code ${code}${
+              signal ? ` (${signal})` : ''
+            }`
+          )
+        )
         return
       }
 
       const coerced = semver.coerce(output)
       if (!coerced || !semver.valid(coerced.version)) {
-        reject(new Error(`cannot resolve node version, output: ${output}`))
+        fail(new Error(`cannot resolve node version, output: ${output}`))
         return
       }
 
+      clearTimeout(timer)
       resolve(coerced.version)
     })
   })
@@ -462,75 +493,47 @@ async function startNode(
 }
 
 function getCurrentVersion(tempNode) {
-  return new Promise((resolve, reject) => {
-    const node = tempNode ? getTempNodeFile() : getNodeFile()
-
-    try {
-      const nodeVersion = spawn(node, ['--version'])
-      nodeVersion.stdout.on('data', (data) => {
-        const {version} = semver.coerce(data.toString())
-        return semver.valid(version)
-          ? resolve(version)
-          : reject(
-              new Error(
-                `cannot resolve node version, stdout: ${data.toString()}`
-              )
-            )
-      })
-
-      nodeVersion.stderr.on('data', (data) =>
-        reject(
-          new Error(`cannot resolve node version, stderr: ${data.toString()}`)
-        )
-      )
-
-      nodeVersion.on('exit', (code) => {
-        if (code) {
-          return reject(
-            new Error(`cannot resolve node version, exit code ${code}`)
-          )
-        }
-      })
-
-      nodeVersion.on('error', (err) => reject(err))
-    } catch (e) {
-      reject(e)
-    }
-  })
+  return getBinaryVersion(tempNode ? getTempNodeFile() : getNodeFile())
 }
 
-function updateNode() {
-  return new Promise((resolve, reject) => {
-    try {
-      const currentNode = getNodeFile()
-      const tempNode = getTempNodeFile()
-      let num = 5
-      let done = false
-      while (num > 0) {
-        try {
-          if (fs.existsSync(currentNode)) {
-            fs.unlinkSync(currentNode)
-          }
-          done = true
-        } catch (e) {
-          console.error('error checking current node')
-        } finally {
-          num -= 1
-        }
-      }
-      if (!done) {
-        reject(new Error('cannot remove old idena-go file'))
-      }
+/**
+ * Moves the new node (the temp file) over the installed one. Windows can keep the old binary locked for a moment
+ * after its process exits, so a failed attempt is retried after a pause. Without a new node nothing is touched.
+ */
+async function updateNode({
+  attempts = REPLACE_ATTEMPTS,
+  retryDelayMs = REPLACE_RETRY_DELAY_MS,
+} = {}) {
+  const currentNode = getNodeFile()
+  const tempNode = getTempNodeFile()
+  if (!(await fs.pathExists(tempNode))) {
+    throw new Error('no new idena-go file to install')
+  }
 
-      fs.renameSync(tempNode, currentNode)
-      if (process.platform !== 'win32') {
-        fs.chmodSync(currentNode, '755')
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      if (await fs.pathExists(currentNode)) {
+        await fs.unlink(currentNode)
       }
-      resolve()
+      await fs.rename(tempNode, currentNode)
+      break
     } catch (e) {
-      reject(e)
+      if (attempt >= attempts) {
+        throw new Error(`cannot replace the idena-go file: ${e.message}`)
+      }
+      logger.warn('cannot replace the idena-go file yet', {
+        attempt,
+        error: e.toString(),
+      })
+      await new Promise((resolve) => {
+        setTimeout(resolve, retryDelayMs)
+      })
     }
-  })
+  }
+
+  if (process.platform !== 'win32') {
+    await fs.chmod(currentNode, '755')
+  }
 }
 
 let installingBundledNode = null
@@ -611,6 +614,7 @@ function getLastLogs() {
 
 module.exports = {
   downloadNode,
+  getBinaryHelp,
   getCurrentVersion,
   getRemoteRelease,
   startNode,
