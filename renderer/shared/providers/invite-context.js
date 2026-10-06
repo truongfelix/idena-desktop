@@ -7,7 +7,7 @@ import {IdentityStatus} from '../types'
 import {fetchIdentity, killInvitee, sendInvite} from '../api/dna'
 import {useFailToast} from '../hooks/use-toast'
 import {strip} from '../utils/obj'
-import {canKill} from '../../screens/contacts/utils'
+import {canKill, loadInvites, savedContacts} from '../../screens/contacts/utils'
 
 const db = global.invitesDb || {}
 
@@ -15,7 +15,10 @@ const InviteStateContext = React.createContext()
 const InviteDispatchContext = React.createContext()
 
 export function InviteProvider({children}) {
-  const [invites, setInvites] = React.useState([])
+  // The saved contacts show at once; what the node knows about them follows (loadInvites).
+  const [invites, setInvites] = React.useState(() =>
+    savedContacts(db.getInvites())
+  )
   const [activationTx, setActivationTx] = React.useState()
 
   const {address, invitees} = useIdentityState()
@@ -23,96 +26,22 @@ export function InviteProvider({children}) {
   React.useEffect(() => {
     let ignore = false
 
-    async function fetchData(savedInvites) {
-      const txs = (
-        await Promise.all(
-          savedInvites
-            .filter(({activated, deletedAt}) => !activated && !deletedAt)
-            .map(({hash}) => callRpc('bcn_transaction', hash).catch(() => null))
-        )
-      ).filter(Boolean)
-
-      const persistedInvitedIdentities = await Promise.all(
-        savedInvites
-          .filter(({deletedAt}) => !deletedAt)
-          .map(({receiver}) => fetchIdentity(receiver))
-      )
-
-      const knownInvitedIdentities = await Promise.all(
-        (invitees ?? []).map(({Address}) => fetchIdentity(Address))
-      )
-
-      const terminateTxs = await Promise.all(
-        savedInvites
-          .filter(({terminateHash, deletedAt}) => terminateHash && !deletedAt)
-          .map(({terminateHash}) =>
-            callRpc('bcn_transaction', terminateHash).then((tx) => ({
-              hash: terminateHash,
-              ...tx,
-            }))
-          )
-      )
-
-      const nextInvites = savedInvites.map((invite) => {
-        // find out mining invite status
-        const tx = txs.find(({hash}) => hash === invite.hash)
-
-        // find invitee to kill
-        const invitee = invitees?.find(({TxHash}) => TxHash === invite.hash)
-
-        // find all identities/invites
-        const invitedIdentity =
-          knownInvitedIdentities?.find(
-            (identity) => identity.address === invitee?.Address
-          ) ||
-          persistedInvitedIdentities.find(
-            (identity) => identity.address === invite.receiver
-          )
-
-        // becomes activated once invitee is found
-        const isNewInviteActivated = !!invitee
-
-        const isMining =
-          tx && tx.result && tx.result.blockHash === HASH_IN_MEMPOOL
-
-        const terminateTx =
-          terminateTxs &&
-          terminateTxs.find(({hash}) => hash === invite.terminateHash)
-
-        const isTerminating =
-          terminateTx &&
-          terminateTx.result &&
-          terminateTx.result.blockHash === HASH_IN_MEMPOOL
-
-        const nextInvite = {
-          ...invite,
-          activated: invite.activated || isNewInviteActivated,
-          canKill: canKill(invitee, invitedIdentity),
-          receiver: isNewInviteActivated ? invitee.Address : invite.receiver,
-        }
-
-        if (isNewInviteActivated) {
-          // save changes once invitee is found
-          db.updateInvite(invite.id, nextInvite)
-        }
-
-        return {
-          ...nextInvite,
-          dbkey: invite.id,
-          mining: isMining,
-          terminating: isTerminating,
-          identity: invitedIdentity,
+    loadInvites(db.getInvites(), invitees, {
+      callRpc,
+      fetchIdentity,
+      saveInvite: (id, invite) => db.updateInvite(id, invite),
+    })
+      .then((nextInvites) => {
+        if (!ignore) {
+          setInvites(nextInvites)
         }
       })
-
-      if (!ignore) {
-        setInvites(nextInvites)
-      }
-    }
-
-    fetchData(db.getInvites()).catch((e) => {
-      global.logger.error('An error occured while fetching identity', e.message)
-    })
+      .catch((e) => {
+        global.logger.error(
+          'An error occured while fetching identity',
+          e.message
+        )
+      })
 
     setActivationTx(db.getActivationTx())
 

@@ -48,8 +48,8 @@ import {
 } from './components'
 import {useSuccessToast} from '../../shared/hooks/use-toast'
 import {IdentityStatus} from '../../shared/types'
-import {VotingSkeleton} from '../oracles/components'
 import {useInviteScore} from '../home/hooks'
+import {contactListView} from './utils'
 import {
   BasketIcon,
   ChevronDownIcon,
@@ -165,23 +165,12 @@ function ContactList({filter, selectedContactId, onSelectContact}) {
 
   const {invites} = useInviteState()
 
-  const [filteredInvites, setFilteredInvites] = React.useState([])
+  const {contacts, status} = React.useMemo(
+    () => contactListView(invites, filter),
+    [invites, filter]
+  )
 
-  React.useEffect(() => {
-    if (filter && filter.length > 0) {
-      // eslint-disable-next-line no-shadow
-      const nextInvite = invites.filter(({firstName, lastName, receiver}) =>
-        [firstName, lastName, receiver].some((x) =>
-          x?.toLowerCase().includes(filter.toLowerCase())
-        )
-      )
-      setFilteredInvites(nextInvite)
-    } else {
-      setFilteredInvites(invites)
-    }
-  }, [invites, filter])
-
-  if (filter && filteredInvites.length === 0) {
+  if (status === 'notFound') {
     return <Text p={4}>{t('No contacts found...')}</Text>
   }
 
@@ -190,27 +179,23 @@ function ContactList({filter, selectedContactId, onSelectContact}) {
       <Box color="muted" fontWeight={500} px={3} py={2}>
         {t('Contacts')}
       </Box>
-      {filteredInvites.length === 0 && (
-        <Stack px={4}>
-          {[...Array(10)].map((_, idx) => (
-            <VotingSkeleton key={idx} h={6} />
-          ))}
-        </Stack>
+      {status === 'empty' && (
+        <Text color="muted" px={3}>
+          {t('No contacts yet')}
+        </Text>
       )}
-      {filteredInvites
-        .filter((invite) => !invite.deletedAt)
-        .map((invite) => (
-          <ContactListItem
-            key={invite.id}
-            isActive={(invite.dbkey || invite.id) === selectedContactId}
-            id={invite.dbkey || invite.id}
-            {...invite}
-            state={invite.identity?.state}
-            onClick={() => {
-              onSelectContact(invite)
-            }}
-          />
-        ))}
+      {contacts.map((invite) => (
+        <ContactListItem
+          key={invite.id}
+          isActive={(invite.dbkey || invite.id) === selectedContactId}
+          id={invite.dbkey || invite.id}
+          {...invite}
+          state={invite.identity?.state}
+          onClick={() => {
+            onSelectContact(invite)
+          }}
+        />
+      ))}
     </Box>
   )
 }
