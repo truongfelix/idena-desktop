@@ -16,8 +16,10 @@ import {
   SendDnaDrawer,
   TotalAmount,
   WalletCard,
+  TransactionDetailsDrawer,
   WalletTransactionList,
 } from '../screens/wallets/containers'
+import {useTransactionDetailsDrawer} from '../screens/wallets/hooks'
 import {useFailToast} from '../shared/hooks/use-toast'
 import {useIdentityState} from '../shared/providers/identity-context'
 import {areSameCaseInsensitive} from '../screens/oracles/utils'
@@ -41,6 +43,9 @@ export default function WalletsPage() {
     onOpen: onOpenReceiveDnaDrawer,
     onClose: onCloseReceiveDnaDrawer,
   } = useDisclosure()
+
+  const {open: openTransaction, drawerProps: transactionDrawerProps} =
+    useTransactionDetailsDrawer()
 
   const failToast = useFailToast()
 
@@ -96,7 +101,10 @@ export default function WalletsPage() {
               </TextLink>
             </Stack>
             <Box>
-              <WalletTransactionList txs={txs} />
+              <WalletTransactionList
+                txs={txs}
+                onOpenTransaction={openTransaction}
+              />
               {txs?.length === 0 && (
                 <FillPlaceholder mt={24}>
                   {t(`You don't have any transactions yet`)}
@@ -122,6 +130,8 @@ export default function WalletsPage() {
           isOpen={isOpenReceiveDnaDrawer}
           onClose={onCloseReceiveDnaDrawer}
         />
+
+        <TransactionDetailsDrawer {...transactionDrawerProps} />
       </Page>
     </Layout>
   )

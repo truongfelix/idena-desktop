@@ -14,6 +14,11 @@ import {mapToFriendlyStatus} from '../../shared/providers/identity-context'
 import {toLocaleDna} from '../../shared/utils/utils'
 import {useTransactionPages} from './hooks'
 import {
+  TransactionDetailsDrawer,
+  TransactionDetailsLink,
+} from '../wallets/containers'
+import {useTransactionDetailsDrawer} from '../wallets/hooks'
+import {
   CeremonyResult,
   ceremonyRows,
   counterParty,
@@ -316,6 +321,8 @@ export function TransactionsTab({address, isOwn}) {
     isFetchingNextPage,
   } = useTransactionPages(address, {enabled: isOwn})
 
+  const {open: openDetails, drawerProps} = useTransactionDetailsDrawer()
+
   const txs = React.useMemo(
     () => (data?.pages ?? []).flatMap((page) => page?.transactions ?? []),
     [data]
@@ -363,9 +370,14 @@ export function TransactionsTab({address, isOwn}) {
                 <TableCol>
                   <Stack spacing={0}>
                     <Text>{t(txTypeName(tx))}</Text>
-                    <SmallText fontFamily="mono" isTruncated maxW={32}>
-                      {tx.hash}
-                    </SmallText>
+                    <TransactionDetailsLink
+                      hash={tx.hash}
+                      fontFamily="mono"
+                      fontSize="sm"
+                      isTruncated
+                      w={32}
+                      onClick={() => openDetails(tx.hash)}
+                    />
                   </Stack>
                 </TableCol>
                 <TableCol>
@@ -403,6 +415,7 @@ export function TransactionsTab({address, isOwn}) {
           </OutlineButton>
         </Flex>
       )}
+      <TransactionDetailsDrawer {...drawerProps} />
     </Stack>
   )
 }

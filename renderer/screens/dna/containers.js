@@ -9,6 +9,7 @@ import {
   Image,
   Stack,
   Text,
+  useDisclosure,
 } from '@chakra-ui/react'
 import {useIdentityState} from '../../shared/providers/identity-context'
 import {SecondaryButton, PrimaryButton} from '../../shared/components/button'
@@ -39,7 +40,6 @@ import {
   Dialog,
   DialogBody,
   DialogFooter,
-  ExternalLink,
   Input,
   Tooltip,
   FormControlWithLabel,
@@ -51,6 +51,10 @@ import {bufferToHex} from '../../shared/utils/string'
 import {useFormatDna} from '../../shared/hooks/hooks'
 import {TxType} from '../../shared/types'
 import {Transaction} from '../../shared/models/transaction'
+import {
+  TransactionDetailsDrawer,
+  TransactionDetailsLink,
+} from '../wallets/containers'
 import {
   DeleteIcon,
   ExclamationMarkIcon,
@@ -695,54 +699,58 @@ export function DnaRawDialog({
 
 export function DnaSendSucceededDialog({hash, url, ...props}) {
   const {t} = useTranslation()
+  const detailsDisclosure = useDisclosure()
   return (
-    <Dialog closeOnOverlayClick={false} closeOnEsc={false} {...props}>
-      <DialogBody color="brandGray.500">
-        <Stack spacing={5}>
-          <Alert
-            status="success"
-            bg="green.010"
-            borderRadius="lg"
-            flexDirection="column"
-            justifyContent="center"
-            height={132}
-          >
-            <Stack spacing={2} align="center">
-              <InfoIcon boxSize={8} mr={0} />
-              <AlertTitle fontSize="lg" fontWeight={500}>
-                {t('Successfully sent')}
-              </AlertTitle>
+    <>
+      <Dialog closeOnOverlayClick={false} closeOnEsc={false} {...props}>
+        <DialogBody color="brandGray.500">
+          <Stack spacing={5}>
+            <Alert
+              status="success"
+              bg="green.010"
+              borderRadius="lg"
+              flexDirection="column"
+              justifyContent="center"
+              height={132}
+            >
+              <Stack spacing={2} align="center">
+                <InfoIcon boxSize={8} mr={0} />
+                <AlertTitle fontSize="lg" fontWeight={500}>
+                  {t('Successfully sent')}
+                </AlertTitle>
+              </Stack>
+            </Alert>
+            <Stack spacing={1}>
+              <Stack spacing={1} py={2}>
+                <Box color="muted">{t('Tx hash')}</Box>
+                <Box wordBreak="break-all" fontWeight={500}>
+                  {hash}
+                </Box>
+              </Stack>
+              <TransactionDetailsLink onClick={detailsDisclosure.onOpen}>
+                {t('Show transaction details')}
+              </TransactionDetailsLink>
             </Stack>
-          </Alert>
-          <Stack spacing={1}>
-            <Stack spacing={1} py={2}>
-              <Box color="muted">{t('Tx hash')}</Box>
-              <Box wordBreak="break-all" fontWeight={500}>
-                {hash}
-              </Box>
-            </Stack>
-            <ExternalLink href={`https://scan.idena.io/transaction/${hash}`}>
-              {t('Open in blockchain explorer')}
-            </ExternalLink>
           </Stack>
-        </Stack>
-      </DialogBody>
-      <DialogFooter>
-        {url ? (
-          <PrimaryButton
-            onClick={() => {
-              global.openExternal(url)
-              props.onClose()
-            }}
-          >
-            {t('Continue')}
-          </PrimaryButton>
-        ) : (
-          // eslint-disable-next-line react/destructuring-assignment
-          <PrimaryButton onClick={props.onClose}>{t('Close')}</PrimaryButton>
-        )}
-      </DialogFooter>
-    </Dialog>
+        </DialogBody>
+        <DialogFooter>
+          {url ? (
+            <PrimaryButton
+              onClick={() => {
+                global.openExternal(url)
+                props.onClose()
+              }}
+            >
+              {t('Continue')}
+            </PrimaryButton>
+          ) : (
+            // eslint-disable-next-line react/destructuring-assignment
+            <PrimaryButton onClick={props.onClose}>{t('Close')}</PrimaryButton>
+          )}
+        </DialogFooter>
+      </Dialog>
+      <TransactionDetailsDrawer hash={hash} {...detailsDisclosure} />
+    </>
   )
 }
 
