@@ -7,13 +7,12 @@ import {
   areSameCaseInsensitive,
   callRpc,
   HASH_IN_MEMPOOL,
-  hexToObject,
   prependHex,
 } from '../../shared/utils/utils'
 import {isValidUrl} from '../dna/utils'
 import {AdVotingOption, AdVotingOptionId} from './types'
 import {resizeImageToArrayBuffer} from '../../shared/utils/image-canvas'
-import {minOwnerDeposit} from '../oracles/utils'
+import {minOwnerDeposit, votingFact} from '../oracles/utils'
 
 export const OS = {
   Windows: 'windows',
@@ -123,9 +122,10 @@ async function fetchAdVoting(address) {
         ? VotingStatus.Terminated
         : mapToVotingStatus(state)
 
+    // The fact gives the texts only; status and result are the contract's.
     return {
+      ...votingFact(fact.value),
       status,
-      ...hexToObject(fact.value),
       result: result.value,
       isFetched: true,
     }
@@ -224,17 +224,17 @@ export const isRejectedVoting = (voting) =>
 const isFinalVoting = (voting) =>
   [VotingStatus.Archived, VotingStatus.Terminated].includes(voting?.status)
 
-const isApprovedAd = (voting) =>
-  isValidAdOption(
-    voting?.options?.find((option) => option?.id === voting?.result),
-    AdVotingOption.Approve
+// The option the voting ended on. Ad votings saved by older versions can hold options that are not a list.
+const resultOption = (voting) =>
+  (Array.isArray(voting?.options) ? voting.options : []).find(
+    (option) => option?.id === voting?.result
   )
 
+const isApprovedAd = (voting) =>
+  isValidAdOption(resultOption(voting), AdVotingOption.Approve)
+
 const isRejectedAd = (voting) =>
-  isValidAdOption(
-    voting?.options?.find((option) => option?.id === voting?.result),
-    AdVotingOption.Reject
-  )
+  isValidAdOption(resultOption(voting), AdVotingOption.Reject)
 
 export const isValidAdOption = (option, targetValue) =>
   option?.id === AdVotingOptionId[targetValue] && option?.value === targetValue
