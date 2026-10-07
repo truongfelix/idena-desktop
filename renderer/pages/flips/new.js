@@ -39,6 +39,10 @@ import {
 } from '../../screens/flips/utils'
 import {Step} from '../../screens/flips/types'
 import {
+  ImageSearchConsentDialog,
+  useAdversarialSearch,
+} from '../../screens/flips/components/image-search'
+import {
   IconButton2,
   SecondaryButton,
   PrimaryButton,
@@ -74,6 +78,11 @@ export default function NewFlipPage() {
       onError: () => {},
     },
   })
+
+  const {loadAdversarial, consent: imageSearchConsent} = useAdversarialSearch(
+    currentSearch,
+    sendSearch
+  )
 
   const [current, send] = useMachine(flipMasterMachine, {
     context: {
@@ -115,17 +124,7 @@ export default function NewFlipPage() {
         return {keywordPairId, availableKeywords, didShowBadFlip}
       },
       protectFlip: async (flip) => protectFlip(flip),
-      loadAdversarial: async (flip) => {
-        if (
-          !flip.adversarialImages.some((x) => x) &&
-          !eitherState(currentSearch, 'searching')
-        ) {
-          sendSearch('SEARCH', {
-            query: `${flip.keywords.words[0]?.name} ${flip.keywords.words[1]?.name}`,
-          })
-        }
-        return Promise.resolve()
-      },
+      loadAdversarial,
       shuffleAdversarial: async (flip) =>
         shuffleAdversarial(flip, setDidShowShuffleAdversarial),
       submitFlip: async (flip) => publishFlip(flip),
@@ -476,6 +475,8 @@ export default function NewFlipPage() {
             onCloseBadFlipDialog()
           }}
         />
+
+        <ImageSearchConsentDialog {...imageSearchConsent} />
 
         <PublishFlipDrawer
           {...publishDrawerDisclosure}

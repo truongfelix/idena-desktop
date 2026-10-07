@@ -37,7 +37,12 @@ import {useTranslation} from 'react-i18next'
 import {useActor} from '@xstate/react'
 import FlipEditor from './components/flip-editor'
 import {Step} from './types'
-import {formatKeywords, getAdversarialImage, protectFlipImage} from './utils'
+import {
+  adversarialSources,
+  formatKeywords,
+  getAdversarialImage,
+  protectFlipImage,
+} from './utils'
 import {resizeImageToDataUrl} from '../../shared/utils/image-canvas'
 import {
   PrimaryButton,
@@ -741,7 +746,9 @@ export function FlipProtectStep({
       let advImageScr
       let imageSrc
       if (originalOrder[currentIndex] === adversarialImageId) {
-        advImageScr = await getAdversarialImage(adversarialImages)
+        advImageScr = await getAdversarialImage(
+          await adversarialSources(adversarialImages, images)
+        )
         imageSrc = advImageScr.slice()
       } else {
         imageSrc = images[originalOrder[currentIndex]]

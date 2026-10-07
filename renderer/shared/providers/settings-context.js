@@ -15,6 +15,7 @@ const SET_INTERNAL_KEY = 'SET_INTERNAL_KEY'
 const SET_CONNECTION_DETAILS = 'SET_CONNECTION_DETAILS'
 const TOGGLE_AUTO_ACTIVATE_MINING = 'TOGGLE_AUTO_ACTIVATE_MINING'
 const SET_NODE_OPTIONS = 'SET_NODE_OPTIONS'
+const SET_IMAGE_SEARCH = 'SET_IMAGE_SEARCH'
 
 const CHANGE_LANGUAGE = 'CHANGE_LANGUAGE'
 
@@ -105,6 +106,13 @@ function settingsReducer(state, action) {
         ...action.data,
       }
     }
+    // imageSearch: the user's answer about the web picture search (flips); absent until asked.
+    case SET_IMAGE_SEARCH: {
+      return {
+        ...state,
+        imageSearch: action.allowed,
+      }
+    }
     default:
       return state
   }
@@ -193,6 +201,11 @@ export function SettingsProvider({children}) {
     [dispatch]
   )
 
+  const setImageSearch = useCallback(
+    (allowed) => dispatch({type: SET_IMAGE_SEARCH, allowed}),
+    [dispatch]
+  )
+
   const setConnectionDetails = useCallback(
     ({url, apiKey}) => {
       dispatch({type: SET_CONNECTION_DETAILS, url, apiKey})
@@ -211,10 +224,12 @@ export function SettingsProvider({children}) {
             setConnectionDetails,
             toggleAutoActivateMining,
             setNodeOptions,
+            setImageSearch,
           }),
           [
             changeLanguage,
             setConnectionDetails,
+            setImageSearch,
             setNodeOptions,
             toggleAutoActivateMining,
             toggleRunInternalNode,

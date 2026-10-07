@@ -954,5 +954,14 @@
   "Confirm signature": "Confirm signature",
   "Please confirm that you want to sign the message": "Please confirm that you want to sign the message",
   "Message": "Message",
-  "Talk with the Idena community": "Talk with the Idena community"
+  "Talk with the Idena community": "Talk with the Idena community",
+  "The search sends your words to DuckDuckGo, Openverse and Wikimedia from this computer, so they see its internet address and the words searched.": "The search sends your words to DuckDuckGo, Openverse and Wikimedia from this computer, so they see its internet address and the words searched.",
+  "The pictures found also make the nonsense anti-AI picture. Without the search, it is made from your own pictures.": "The pictures found also make the nonsense anti-AI picture. Without the search, it is made from your own pictures.",
+  "You can change this in Settings.": "You can change this in Settings.",
+  "Search pictures on the web?": "Search pictures on the web?",
+  "Don't search": "Don't search",
+  "Allow search": "Allow search",
+  "Picture search is off": "Picture search is off",
+  "Turn on": "Turn on",
+  "Search pictures on the web": "Search pictures on the web"
 }

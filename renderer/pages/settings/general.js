@@ -1,9 +1,20 @@
 /* eslint-disable react/prop-types */
 import React from 'react'
 import {useTranslation} from 'react-i18next'
-import {Box, Flex, Stack, Text, useDisclosure, useToast} from '@chakra-ui/react'
+import {
+  Box,
+  Flex,
+  Stack,
+  Switch,
+  Text,
+  useDisclosure,
+  useToast,
+} from '@chakra-ui/react'
 import SettingsLayout from '../../screens/settings/layout'
-import {useSettingsState} from '../../shared/providers/settings-context'
+import {
+  useSettingsDispatch,
+  useSettingsState,
+} from '../../shared/providers/settings-context'
 import {archiveFlips} from '../../screens/flips/utils'
 import {
   SettingsSection,
@@ -38,7 +49,8 @@ function Settings() {
       render: () => <Toast title={title} />,
     })
 
-  const {runInternalNode, useExternalNode} = useSettingsState()
+  const {runInternalNode, useExternalNode, imageSearch} = useSettingsState()
+  const {setImageSearch} = useSettingsDispatch()
 
   const {
     isOpen: isOpenExportPk,
@@ -62,6 +74,25 @@ function Settings() {
             </FormLabel>
             <LocaleSwitcher />
           </Flex>
+        </SettingsSection>
+
+        <SettingsSection title={t('Flips')}>
+          <Stack isInline spacing={3} align="center">
+            <Box>
+              <Switch
+                isChecked={imageSearch === true}
+                onChange={(e) => setImageSearch(e.target.checked)}
+              />
+            </Box>
+            <Box>
+              <Text fontWeight={500}>{t('Search pictures on the web')}</Text>
+              <Text color="muted">
+                {t(
+                  'The search sends your words to DuckDuckGo, Openverse and Wikimedia from this computer, so they see its internet address and the words searched.'
+                )}
+              </Text>
+            </Box>
+          </Stack>
         </SettingsSection>
 
         <SettingsSection title={t('Private key')}>

@@ -891,8 +891,10 @@ export async function protectFlip({
       let adversarialImageSrc
       if (adversarialImage) {
         adversarialImageSrc = adversarialImage
-      } else if (adversarialImages.some((x) => x)) {
-        adversarialImageSrc = await getAdversarialImage(adversarialImages)
+      } else {
+        adversarialImageSrc = await getAdversarialImage(
+          await adversarialSources(adversarialImages, images)
+        )
         adversarialImg = adversarialImageSrc?.slice()
       }
       if (adversarialImageSrc) {
@@ -945,27 +947,58 @@ export async function prepareAdversarialImages(images, send) {
   )
 }
 
+/**
+ * Four of `images` for the nonsense picture, at random: four different slots, never an empty one; none when
+ * fewer than four are set. The same picture may be in two slots.
+ */
+export function pickAdversarialSources(images) {
+  const loaded = (images ?? []).filter(Boolean)
+  if (loaded.length < 4) {
+    return []
+  }
+  return shuffle(loaded).slice(0, 4)
+}
+
+/** `src` mirrored left to right, as a data URL. */
+async function mirrorImage(src) {
+  const image = new Image()
+  image.src = src
+  // eslint-disable-next-line no-promise-executor-return
+  await new Promise((resolve) => (image.onload = resolve))
+  const canvas = document.createElement('canvas')
+  canvas.width = image.width
+  canvas.height = image.height
+  const context = canvas.getContext('2d')
+  context.scale(-1, 1)
+  context.drawImage(image, -image.width, 0)
+  return canvas.toDataURL()
+}
+
+/**
+ * The pictures the nonsense picture is made from: the web search's, or when it found fewer than four (search
+ * off, no results, no connection) those plus the story pictures, mirrored copies making up four (as the
+ * Android app does).
+ */
+export async function adversarialSources(adversarialImages, storyImages) {
+  const found = (adversarialImages ?? []).filter(Boolean)
+  if (found.length >= 4) {
+    return found
+  }
+  const story = (storyImages ?? []).filter(Boolean)
+  const sources = found.concat(story)
+  for (let i = 0; story.length && sources.length < 4; i++) {
+    sources.push(await mirrorImage(story[i % story.length]))
+  }
+  return sources
+}
+
 export async function getAdversarialImage(images) {
   const ING_WIDTH = 440
   const IMG_HEIGHT = 330
 
-  let loadedImagesLength = 0
-  for (let i = 0; i < images.length; i++) {
-    if (images[i]) {
-      // eslint-disable-next-line no-plusplus
-      loadedImagesLength++
-    }
-  }
-  if (loadedImagesLength < 4) {
+  const selectedImages = pickAdversarialSources(images)
+  if (!selectedImages.length) {
     return ''
-  }
-
-  const selectedImages = []
-  while (selectedImages.length < 4) {
-    const rand = Math.floor(Math.random() * images.length)
-    if (!selectedImages.includes(images[rand])) {
-      selectedImages.push(images[rand])
-    }
   }
 
   const imagesImageData = await Promise.all(

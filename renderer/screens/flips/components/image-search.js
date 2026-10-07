@@ -24,9 +24,99 @@ import {eitherState} from '../../../shared/utils/utils'
 import {FillCenter} from '../../oracles/components'
 import {SearchIcon} from '../../../shared/components/icons'
 import {imageSearchMachine} from '../machines'
+import {
+  useSettingsDispatch,
+  useSettingsState,
+} from '../../../shared/providers/settings-context'
+
+/** What the web picture search sends where, and what making a flip does without it. */
+function ImageSearchConsentText() {
+  const {t} = useTranslation()
+  return (
+    <Stack spacing={3}>
+      <Text>
+        {t(
+          'The search sends your words to DuckDuckGo, Openverse and Wikimedia from this computer, so they see its internet address and the words searched.'
+        )}
+      </Text>
+      <Text>
+        {t(
+          'The pictures found also make the nonsense anti-AI picture. Without the search, it is made from your own pictures.'
+        )}
+      </Text>
+      <Text color="muted">{t('You can change this in Settings.')}</Text>
+    </Stack>
+  )
+}
+
+/**
+ * The web search for the nonsense picture's sources when a flip's pictures step opens (`loadAdversarial`):
+ * it runs if the user allowed the search, waits for the answer to `consent` (the question's dialog) if never
+ * asked, and is skipped if the search is off.
+ */
+export function useAdversarialSearch(currentSearch, sendSearch) {
+  const {imageSearch} = useSettingsState()
+  const {setImageSearch} = useSettingsDispatch()
+  const [pendingQuery, setPendingQuery] = React.useState(null)
+
+  const loadAdversarial = async (flip) => {
+    if (
+      flip.adversarialImages.some((x) => x) ||
+      eitherState(currentSearch, 'searching')
+    ) {
+      return
+    }
+    const query = `${flip.keywords.words[0]?.name} ${flip.keywords.words[1]?.name}`
+    if (imageSearch === true) {
+      sendSearch('SEARCH', {query})
+    } else if (imageSearch === undefined) {
+      setPendingQuery(query)
+    }
+  }
+
+  return {
+    loadAdversarial,
+    consent: {
+      isOpen: pendingQuery !== null,
+      onClose: () => setPendingQuery(null),
+      onAnswer: (allowed) => {
+        setImageSearch(allowed)
+        if (allowed) sendSearch('SEARCH', {query: pendingQuery})
+        setPendingQuery(null)
+      },
+    },
+  }
+}
+
+/** Asks once whether pictures may be searched on the web; `onAnswer(allowed)`. */
+export function ImageSearchConsentDialog({onAnswer, ...props}) {
+  const {t} = useTranslation()
+  return (
+    <Dialog
+      title={t('Search pictures on the web?')}
+      closeOnOverlayClick={false}
+      {...props}
+    >
+      <DialogBody>
+        <ImageSearchConsentText />
+      </DialogBody>
+      <DialogFooter>
+        <SecondaryButton onClick={() => onAnswer(false)}>
+          {t("Don't search")}
+        </SecondaryButton>
+        <PrimaryButton onClick={() => onAnswer(true)}>
+          {t('Allow search')}
+        </PrimaryButton>
+      </DialogFooter>
+    </Dialog>
+  )
+}
 
 export function ImageSearchDialog({onPick, onClose, onError, ...props}) {
   const {t} = useTranslation()
+
+  const {imageSearch} = useSettingsState()
+  const {setImageSearch} = useSettingsDispatch()
 
   const searchInputRef = React.useRef()
 
@@ -37,6 +127,39 @@ export function ImageSearchDialog({onPick, onClose, onError, ...props}) {
   })
 
   const {images, query, selectedImage} = current.context
+
+  if (imageSearch !== true) {
+    const wasAsked = imageSearch === false
+    return (
+      <Dialog
+        title={
+          wasAsked
+            ? t('Picture search is off')
+            : t('Search pictures on the web?')
+        }
+        closeOnOverlayClick={false}
+        onClose={onClose}
+        {...props}
+      >
+        <DialogBody>
+          <ImageSearchConsentText />
+        </DialogBody>
+        <DialogFooter>
+          <SecondaryButton
+            onClick={() => {
+              if (!wasAsked) setImageSearch(false)
+              onClose()
+            }}
+          >
+            {wasAsked ? t('Cancel') : t("Don't search")}
+          </SecondaryButton>
+          <PrimaryButton onClick={() => setImageSearch(true)}>
+            {wasAsked ? t('Turn on') : t('Allow search')}
+          </PrimaryButton>
+        </DialogFooter>
+      </Dialog>
+    )
+  }
 
   return (
     <Dialog
@@ -72,7 +195,7 @@ export function ImageSearchDialog({onPick, onClose, onError, ...props}) {
                 }}
               />
             </InputGroup>
-            <PrimaryButton type="submit">Search</PrimaryButton>
+            <PrimaryButton type="submit">{t('Search')}</PrimaryButton>
           </Stack>
 
           {eitherState(current, 'idle') && (
