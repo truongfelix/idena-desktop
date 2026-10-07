@@ -22,22 +22,34 @@ function isNotFoundError(error) {
   return error?.response?.status === 404
 }
 
+// The page's zoom range, also Ctrl+wheel's (renderer/shared/components/layout.js).
+const MIN_ZOOM_LEVEL = -5
+const MAX_ZOOM_LEVEL = 5
+
+// Sets the window's zoom level within the range and saves it. A menu item's click handler gets no window
+// when none has the focus (on macOS the menu stays with the main window hidden): nothing to zoom then.
+function setZoomLevel(window, nextLevel) {
+  const contents = window && window.webContents
+  if (!contents || contents.isDestroyed()) return
+  const level = Math.min(
+    Math.max(MIN_ZOOM_LEVEL, nextLevel(contents.zoomLevel)),
+    MAX_ZOOM_LEVEL
+  )
+  contents.zoomLevel = level
+  persistZoomLevel(level)
+}
+
 module.exports = {
   promiseTimeout,
   sleep,
   isNotFoundError,
   zoomIn(window) {
-    const nextLevel = window.webContents.zoomLevel + 1
-    window.webContents.zoomLevel = nextLevel
-    persistZoomLevel(nextLevel)
+    setZoomLevel(window, (level) => level + 1)
   },
   zoomOut(window) {
-    const nextLevel = window.webContents.zoomLevel - 1
-    window.webContents.zoomLevel = nextLevel
-    persistZoomLevel(nextLevel)
+    setZoomLevel(window, (level) => level - 1)
   },
   resetZoom(window) {
-    window.webContents.zoomLevel = 0
-    persistZoomLevel(0)
+    setZoomLevel(window, () => 0)
   },
 }

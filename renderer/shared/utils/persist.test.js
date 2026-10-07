@@ -60,3 +60,55 @@ describe('persistent storage logging', () => {
     expect(logged).not.toContain(SECRET_STATE_VALUE)
   })
 })
+
+describe('keys other code writes to the same file', () => {
+  function loadPersistModuleWithSaved(saved) {
+    jest.resetModules()
+    global.persistentState = {getState: jest.fn(() => saved)}
+    // eslint-disable-next-line global-require
+    return require('./persist')
+  }
+
+  afterEach(() => {
+    delete global.persistentState
+    jest.resetModules()
+  })
+
+  it('writes the saved value instead of the state one', () => {
+    const {withSavedKeys} = loadPersistModuleWithSaved({
+      lng: 'en',
+      zoomLevel: 1.5,
+    })
+
+    expect(
+      withSavedKeys('settings', {lng: 'fr', zoomLevel: 0}, ['zoomLevel'])
+    ).toEqual({lng: 'fr', zoomLevel: 1.5})
+    expect(global.persistentState.getState).toHaveBeenCalledWith('settings')
+  })
+
+  it('adds a saved value the state does not have', () => {
+    const {withSavedKeys} = loadPersistModuleWithSaved({zoomLevel: -2})
+
+    expect(withSavedKeys('settings', {lng: 'fr'}, ['zoomLevel'])).toEqual({
+      lng: 'fr',
+      zoomLevel: -2,
+    })
+  })
+
+  it('leaves out a key that is not saved', () => {
+    const {withSavedKeys} = loadPersistModuleWithSaved({})
+
+    expect(
+      withSavedKeys('settings', {lng: 'fr', zoomLevel: 3}, ['zoomLevel'])
+    ).toEqual({lng: 'fr'})
+  })
+
+  it('writes the state as it is without such keys', () => {
+    const {withSavedKeys} = loadPersistModuleWithSaved({zoomLevel: 1})
+    const state = {lng: 'fr', zoomLevel: 0}
+
+    expect(withSavedKeys('settings', state)).toBe(state)
+    expect(withSavedKeys('settings', state, [])).toBe(state)
+    expect(global.persistentState.getState).not.toHaveBeenCalled()
+  })
+})

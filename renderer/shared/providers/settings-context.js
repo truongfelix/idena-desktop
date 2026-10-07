@@ -110,6 +110,16 @@ function settingsReducer(state, action) {
   }
 }
 
+// Written by the View menu and the page's Ctrl+wheel zoom (main/utils.js, components/layout.js): the settings
+// state leaves it out, and its writes keep the saved value.
+const SAVED_ELSEWHERE = ['zoomLevel']
+
+function withoutSavedElsewhere(settings) {
+  const result = {...settings}
+  for (const key of SAVED_ELSEWHERE) delete result[key]
+  return result
+}
+
 const SettingsStateContext = React.createContext()
 const SettingsDispatchContext = React.createContext()
 
@@ -120,10 +130,14 @@ export function SettingsProvider({children}) {
       React.useReducer(settingsReducer, {
         autoActivateMining: initialState.autoActivateMining,
         ...NODE_OPTION_DEFAULTS,
-        ...(loadPersistentState('settings') || initialState),
+        ...withoutSavedElsewhere(
+          loadPersistentState('settings') || initialState
+        ),
       })
     ),
-    'settings'
+    'settings',
+    undefined,
+    SAVED_ELSEWHERE
   )
 
   useEffect(() => {
