@@ -8,7 +8,8 @@ import {
   validTipAmount,
 } from './calls'
 import {MAX_INLINE_MEDIA} from './contract'
-import {a, call, hex} from './test-helpers'
+import {postIds} from './feed'
+import {a, b, call, hex} from './test-helpers'
 import {SOCIAL_VERSIONS} from './versions'
 
 // Ported from the phone app's SocialTest.kt: both apps read idena.social the same way.
@@ -81,6 +82,24 @@ describe('reading the calls', () => {
     expect(tips.map((t) => t.postId)).toEqual(['1'])
   })
 
+  it('leaves out the calls the node marks as refused', () => {
+    const {posts, tips} = callsToActivity([
+      call('{"message":"accepted"}', {success: true}),
+      call('{"message":"refused"}', {success: false}),
+      call('{"message":"from a node without the mark"}'),
+      call('{"postId":"1","tipAmount":"2"}', {
+        method: 'sendTip',
+        amount: '2',
+        success: false,
+      }),
+    ])
+    expect(posts.map((p) => p.message)).toEqual([
+      'accepted',
+      'from a node without the mark',
+    ])
+    expect(tips).toEqual([])
+  })
+
   it('fetches only plain IPFS ids', () => {
     expect(
       ipfsCid(
@@ -126,6 +145,7 @@ describe('the contract map', () => {
 
 describe('the older contract versions', () => {
   const v1 = SOCIAL_VERSIONS.find(({name}) => name === 'v1')
+  const v5 = SOCIAL_VERSIONS.find(({name}) => name === 'v5')
   const v9 = SOCIAL_VERSIONS.find(({name}) => name === 'v9')
   const v11 = SOCIAL_VERSIONS.find(({name}) => name === 'v11')
 
@@ -193,5 +213,75 @@ describe('the older contract versions', () => {
     )
     expect(posts.map(({version}) => version)).toEqual(['v1'])
     expect(tips.map(({postId}) => postId)).toEqual(['1'])
+  })
+
+  it('read the tips paid from the tips balance, in the unit of each version', () => {
+    const fromBalance = (tipAmount, version) =>
+      parseTip(
+        call(`{"postId":"76","tipAmount":"${tipAmount}"}`, {
+          method: 'sendTipFromBalance',
+          amount: '0',
+        }),
+        version
+      )
+    // v1: whole iDNA.
+    const whole = fromBalance('2', v1)
+    expect(whole).toMatchObject({postId: '76', fromBalance: true})
+    expect(whole).not.toHaveProperty('sent')
+    expect(validTipAmount(whole)).toBe(2)
+    // v5: its smallest unit, 10^-18 iDNA.
+    expect(validTipAmount(fromBalance('1200000000000000000', v5))).toBe(1.2)
+    expect(validTipAmount(fromBalance('500000000000000000000', v5))).toBe(500)
+    expect(fromBalance('1', v5).tipAmount).toBe('0.000000000000000001')
+    expect(validTipAmount(fromBalance('0', v5))).toBeNull()
+    expect(fromBalance('1.5', v5)).toBeNull()
+    // Later versions have no such method.
+    expect(fromBalance('1', v9)).toBeNull()
+    expect(fromBalance('1')).toBeNull()
+    expect(
+      callsToActivity(
+        [
+          call('{"postId":"76","tipAmount":"3"}', {
+            method: 'sendTipFromBalance',
+          }),
+        ],
+        v1
+      ).tips.map(validTipAmount)
+    ).toEqual([3])
+  })
+
+  it('leave a refused first try out, so that its retry keeps its number', () => {
+    // As on chain in v1 and v5: a refused post, then the same author's retry.
+    const calls = [
+      call('{"message":"first"}', {hash: 'p1', height: 100, from: a}),
+      call('{"message":"try","replyToPostId":"1"}', {
+        hash: 'try',
+        height: 110,
+        from: b,
+        success: false,
+      }),
+      call('{"message":"retry","replyToPostId":"1"}', {
+        hash: 'p2',
+        height: 120,
+        from: b,
+        success: true,
+      }),
+      call('{"message":"next"}', {hash: 'p3', height: 130, from: b}),
+    ]
+    const authors = {1: a, 2: b, 3: b}
+    const numbered = (list) => [
+      ...postIds(callsToActivity(list, v5).posts, authors, {fromOldest: true}),
+    ]
+    expect(numbered(calls)).toEqual([
+      ['p1', 1],
+      ['p2', 2],
+      ['p3', 3],
+    ])
+    // Without the node's mark, the refused try takes the retry's number and the next post the one after.
+    expect(numbered(calls.map(({success, ...rest}) => rest))).toEqual([
+      ['p1', 1],
+      ['try', 2],
+      ['p2', 3],
+    ])
   })
 })

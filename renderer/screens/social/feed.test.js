@@ -219,16 +219,12 @@ describe('answer targets', () => {
 
 describe('older contract versions', () => {
   it('number their posts from the first one: the posts after the next version are not read', () => {
-    const read = [
-      post('p1', a, 'first', 100),
-      post('x', b, 'refused', 110),
-      post('p2', b, 'second', 120),
-    ]
+    const read = [post('p1', a, 'first', 100), post('p2', b, 'second', 120)]
     // Ids 3 and 4 went to posts made after the next version came: the scan does not read them.
     const authors = {1: a, 2: b, 3: c, 4: c}
     expect([...postIds(read, authors, {fromOldest: true})]).toEqual([
       ['p1', 1],
-      ['x', 2],
+      ['p2', 2],
     ])
     // From the newest, nothing would match.
     expect(postIds(read, authors).size).toBe(0)

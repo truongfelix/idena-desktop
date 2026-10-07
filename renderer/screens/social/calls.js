@@ -1,7 +1,7 @@
 // idena.social (https://idena.social), read from the node: posts are makePost calls of its contracts, whose JSON
-// argument holds the text, and tips are sendTip calls. The rules follow idena.social-ui (getNewPosterAndPost in
-// src/logic/asyncUtils.ts, PostComponent.tsx) and the phone app (Social.kt); each contract version's calls are
-// read in its own format (versions.js).
+// argument holds the text, and tips are sendTip (and, in v1 and v5, sendTipFromBalance) calls. The rules follow
+// idena.social-ui (getNewPosterAndPost in src/logic/asyncUtils.ts, PostComponent.tsx) and the phone app
+// (Social.kt); each contract version's calls are read in its own format (versions.js).
 
 import {LIKE, MAX_INLINE_MEDIA} from './contract'
 
@@ -84,18 +84,38 @@ export function parsePost(
   }
 }
 
+/** iDNA as a decimal text from its smallest unit (10^-18 iDNA) as plain digits, or null. */
+function atomicToIdna(digits) {
+  if (!/^[0-9]{1,40}$/.test(digits)) return null
+  const padded = digits.padStart(19, '0')
+  const whole = padded.slice(0, -18).replace(/^0+(?=.)/, '')
+  const fraction = padded.slice(-18).replace(/0+$/, '')
+  return fraction ? `${whole}.${fraction}` : whole
+}
+
 /**
  * The tip of a sendTip call; the call sends `amount` iDNA. Since v11 its argument is {"postId", "tipAmount"}, the
  * tip in whole iDNA. Before, the tip was all that was sent (`sent`): v9 and v10 take {"postId"}, v1 and v5 the post
- * id as plain text.
+ * id as plain text. A sendTipFromBalance call of v1 or v5 (`fromBalance`) takes {"postId", "tipAmount"} in the
+ * version's `balanceTips` unit; its tipAmount is kept in iDNA.
  */
 export function parseTip(
-  {hash, height, timestamp, index, from, amount, args},
+  {hash, height, timestamp, index, from, amount, method, args},
   version = null
 ) {
   let postId
   let tipAmount = ''
-  if (version?.format === 'v1') {
+  const fromBalance = method === 'sendTipFromBalance'
+  if (fromBalance) {
+    const arg = parseObject(args?.[0])
+    if (!arg || !version?.balanceTips) return null
+    postId = text(arg.postId)
+    tipAmount =
+      version.balanceTips === 'atomic'
+        ? atomicToIdna(text(arg.tipAmount))
+        : text(arg.tipAmount)
+    if (tipAmount === null) return null
+  } else if (version?.format === 'v1') {
     postId = hexToText(args?.[0]).trim()
     if (!/^[0-9]+$/.test(postId)) return null
   } else {
@@ -104,7 +124,8 @@ export function parseTip(
     postId = text(arg.postId)
     tipAmount = text(arg.tipAmount)
   }
-  const sent = version?.format === 'v1' || version?.format === 'v9'
+  const sent =
+    !fromBalance && (version?.format === 'v1' || version?.format === 'v9')
   return {
     ...(version?.prefix ? {version: version.name} : {}),
     hash,
@@ -116,18 +137,28 @@ export function parseTip(
     tipAmount,
     amount: String(amount ?? ''),
     ...(sent ? {sent: true} : {}),
+    ...(fromBalance ? {fromBalance: true} : {}),
   }
 }
 
-/** The posts and tips among contract calls (bcn_contractCalls) of a contract `version`. */
+/**
+ * The posts and tips among contract calls (bcn_contractCalls) of a contract `version`. A call the node marks as
+ * refused by the contract (`success` false) is left out: it has no post id and moved no coins. A node without that
+ * mark lists them all.
+ */
 export function callsToActivity(calls, version = null) {
   const posts = []
   const tips = []
   for (const call of calls) {
+    // eslint-disable-next-line no-continue
+    if (call.success === false) continue
     if (call.method === 'makePost') {
       const post = parsePost(call, version)
       if (post) posts.push(post)
-    } else if (call.method === 'sendTip') {
+    } else if (
+      call.method === 'sendTip' ||
+      call.method === 'sendTipFromBalance'
+    ) {
       const tip = parseTip(call, version)
       if (tip) tips.push(tip)
     }
@@ -157,11 +188,12 @@ function atLeast(a, b) {
 
 /**
  * The tip in iDNA when the contract accepts it (sendTip): a whole number of at least 1 and no more than was
- * sent; null otherwise (such a call fails). Before v11 (`sent`) the tip is what was sent, if anything.
+ * sent; null otherwise (such a call fails). Before v11 (`sent`) the tip is what was sent, if anything; from the
+ * tips balance (`fromBalance`), its tipAmount, if anything (the balance it needs is not known here).
  */
-export function validTipAmount({tipAmount, amount, sent}) {
-  if (sent) {
-    const value = Number(amount)
+export function validTipAmount({tipAmount, amount, sent, fromBalance}) {
+  if (sent || fromBalance) {
+    const value = Number(fromBalance ? tipAmount : amount)
     return Number.isFinite(value) && value > 0 ? value : null
   }
   if (!WHOLE_IDNA.test(tipAmount) || Number(tipAmount) <= 0) return null

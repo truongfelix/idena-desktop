@@ -9,7 +9,9 @@ import {SOCIAL_CONTRACT, SOCIAL_FIRST_BLOCK, isTestContract} from './contract'
  * A contract version: its name, address, the blocks from..to-1 where its calls count (`to` null for the current
  * one), the prefix of its post ids, and the format of its calls: 'v1' (v1 and v5: sendTip takes the post id as
  * plain text and tips what is sent; a reply's target may be written as hex), 'v9' (v9 and v10: sendTip
- * {postId} tips what is sent), 'v12' (v11 and v12: sendTip {postId, tipAmount} in whole iDNA).
+ * {postId} tips what is sent), 'v12' (v11 and v12: sendTip {postId, tipAmount} in whole iDNA). v1 and v5 also
+ * tip from the sender's tips balance (sendTipFromBalance {postId, tipAmount}): `balanceTips` is the unit of that
+ * tipAmount, whole iDNA ('whole', v1) or its smallest unit, 10^-18 iDNA ('atomic', v5).
  */
 export const CURRENT_VERSION = {
   name: 'v12',
@@ -52,6 +54,7 @@ const OLDER_VERSIONS = [
     to: 10604687,
     prefix: 'preV9:',
     format: 'v1',
+    balanceTips: 'atomic',
   },
   {
     name: 'v1',
@@ -60,6 +63,7 @@ const OLDER_VERSIONS = [
     to: 10219188,
     prefix: 'preV5:',
     format: 'v1',
+    balanceTips: 'whole',
   },
 ]
 
