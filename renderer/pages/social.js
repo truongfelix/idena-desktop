@@ -17,6 +17,7 @@ import {StatusDot} from '../screens/social/components/identity'
 import {ConfirmDialog} from '../screens/social/components/send-dialogs'
 import {PostTarget} from '../screens/social/contract'
 import {SocialThread} from '../screens/social/components/thread'
+import {idKey} from '../screens/social/feed'
 import {scanState} from '../screens/social/scan'
 import {TabButton, useNow} from '../screens/social/views/common'
 import {Home} from '../screens/social/views/home'
@@ -75,11 +76,12 @@ export default function SocialPage() {
       ? go({view: View.Profile})
       : go({address: address.toLowerCase()})
 
-  const postId = query.post !== undefined ? Number(query.post) : null
+  // Ids as text: an older contract version's carry its prefix ("preV5:12").
+  const postId = query.post !== undefined ? idKey(query.post) : null
   // Opened from a profile, the inbox or the search: that item is shown and marked.
-  const focusId = query.focus !== undefined ? Number(query.focus) : null
+  const focusId = query.focus !== undefined ? idKey(query.focus) : null
   const thread = React.useMemo(
-    () => (postId === null ? null : feed.find(({id}) => id === postId)),
+    () => (postId === null ? null : feed.find(({id}) => idKey(id) === postId)),
     [feed, postId]
   )
   const profileAddress = isSocialAddress(query.address)

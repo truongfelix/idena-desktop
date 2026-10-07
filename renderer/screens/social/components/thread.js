@@ -2,13 +2,14 @@
 import React from 'react'
 import {useTranslation} from 'react-i18next'
 import {Box, Divider, Flex, Stack, Text} from '@chakra-ui/react'
+import {SmallText} from '../../../shared/components/components'
 import {useSocial} from '../provider'
 import {displayName} from '../people'
 import {ipfsCid} from '../calls'
 import {ActionBar} from './actions'
 import {FullHeader, PostMedia, PostText} from './post'
 import {LINK, MUTED} from './theme'
-import {commentTree, descendants, replyCount} from '../feed'
+import {commentTree, descendants, idKey, replyCount} from '../feed'
 import {timeAgo} from '../format'
 
 const RAIL = '18px'
@@ -40,7 +41,7 @@ function ThreadItem({node, children, depth, now, focusId, onProfile}) {
   const {names} = useSocial()
   const [folded, setFolded] = React.useState(false)
   const ref = React.useRef()
-  const isFocus = node.id === focusId
+  const isFocus = idKey(node.id) === focusId
   React.useEffect(() => {
     if (isFocus) ref.current?.scrollIntoView({block: 'center'})
   }, [isFocus])
@@ -124,14 +125,15 @@ export function SocialThread({node, now, focusId, onProfile}) {
   const {t} = useTranslation()
   const ref = React.useRef()
   React.useEffect(() => {
-    if (focusId === node.id) ref.current?.scrollIntoView({block: 'center'})
+    if (focusId === idKey(node.id))
+      ref.current?.scrollIntoView({block: 'center'})
   }, [focusId, node.id])
   return (
     <Stack spacing={2} w="full">
       <Stack
         ref={ref}
         spacing={2}
-        bg={focusId === node.id ? 'gray.50' : undefined}
+        bg={focusId === idKey(node.id) ? 'gray.50' : undefined}
         rounded="md"
       >
         <FullHeader
@@ -143,6 +145,14 @@ export function SocialThread({node, now, focusId, onProfile}) {
         <PostText message={node.call.message} />
         <PostMedia call={node.call} maxH="360px" />
         <ActionBar node={node} onProfile={onProfile} showAnswers={false} />
+        {node.call.version && (
+          <SmallText>
+            {t(
+              'From an earlier idena.social contract ({{version}}): read only.',
+              {version: node.call.version, nsSeparator: '|'}
+            )}
+          </SmallText>
+        )}
       </Stack>
       <Divider />
       <Text fontWeight={500}>

@@ -1,5 +1,5 @@
 import {validTipAmount} from './calls'
-import {likeCount} from './feed'
+import {idKey, likeCount} from './feed'
 
 /**
  * What an address did on idena.social, newest first: its posts, replies and comments, what it liked, the tips it
@@ -44,10 +44,12 @@ export function socialProfile(feed, address) {
     visit(post, post.id, null, lists.posts)
     for (const reply of post.replies) {
       visit(reply, post.id, post.call, lists.replies)
-      const inReply = new Map(reply.replies.map((node) => [node.id, node]))
+      const inReply = new Map(
+        reply.replies.map((node) => [idKey(node.id), node])
+      )
       for (const comment of reply.replies) {
         // A comment answers another comment of the reply, or else the reply.
-        const answered = inReply.get(Number(comment.call.replyTo))?.call
+        const answered = inReply.get(idKey(comment.call.replyTo))?.call
         visit(comment, post.id, answered || reply.call, lists.comments)
       }
     }
@@ -123,7 +125,7 @@ export function socialActivity(feed, me) {
           // Comments on the reply itself; those answering another comment count for that comment.
           const onReply =
             comment.call.replyTo === '' ||
-            comment.call.replyTo === String(reply.id)
+            idKey(comment.call.replyTo) === idKey(reply.id)
           if (onReply && comment.call.author !== me)
             add(
               ActivityKind.Comment,
@@ -143,7 +145,7 @@ export function socialActivity(feed, me) {
         likesAndTips(mine, post.id)
         for (const comment of reply.replies)
           if (
-            comment.call.replyTo === String(mine.id) &&
+            idKey(comment.call.replyTo) === idKey(mine.id) &&
             comment.call.author !== me
           )
             add(

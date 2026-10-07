@@ -1327,5 +1327,6 @@
   "{{what}} is in a block.": "{{what}} is in a block.",
   "{{what}}: storing the text on IPFS…": "{{what}}: storing the text on IPFS…",
   "{{what}}: storing the image on IPFS…": "{{what}}: storing the image on IPFS…",
-  "{{what}} sent, waiting for a block ({{hash}}…)": "{{what}} sent, waiting for a block ({{hash}}…)"
+  "{{what}} sent, waiting for a block ({{hash}}…)": "{{what}} sent, waiting for a block ({{hash}}…)",
+  "From an earlier idena.social contract ({{version}}): read only.": "From an earlier idena.social contract ({{version}}): read only."
 }
