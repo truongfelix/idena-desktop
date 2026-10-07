@@ -1,6 +1,6 @@
 import {getRpcParams} from '../../shared/api/api-client'
 import {callsToActivity, nextPageToken, postAuthors} from './calls'
-import {SOCIAL_CONTRACT} from './contract'
+import {CURRENT_VERSION} from './versions'
 
 /** The node drops a request after a minute (its HTTP write timeout): the app gives up a little later. */
 const RPC_TIMEOUT = 70 * 1000
@@ -54,9 +54,9 @@ export const isMissingMethod = (error) =>
   /does not exist|not available/i.test(String(error?.message))
 
 /**
- * idena.social through the app's node: bcn_blocksWithAddress picks the blocks with a call of the contract from
- * their headers, bcn_contractCalls reads those calls (sender, method, argument) from the bodies. `call` makes an
- * RPC call; `now` gives the time in ms.
+ * idena.social through the app's node: bcn_blocksWithAddress picks the blocks with a call of a contract version
+ * (versions.js; the current one by default) from their headers, bcn_contractCalls reads those calls (sender,
+ * method, argument) from the bodies. `call` makes an RPC call; `now` gives the time in ms.
  */
 export function nodeSocialSource(call = socialRpc, now = () => Date.now()) {
   let batch = FIRST_BATCH
@@ -65,12 +65,12 @@ export function nodeSocialSource(call = socialRpc, now = () => Date.now()) {
 
     head: async () => (await call('bcn_lastBlock')).height,
 
-    async calls(from, to) {
+    async calls(from, to, version = CURRENT_VERSION) {
       const started = now()
       let heights
       try {
         heights = await call('bcn_blocksWithAddress', [
-          {address: SOCIAL_CONTRACT, from, to},
+          {address: version.address, from, to},
         ])
       } catch (error) {
         if (!isMissingMethod(error))
@@ -87,23 +87,23 @@ export function nodeSocialSource(call = socialRpc, now = () => Date.now()) {
         // eslint-disable-next-line no-await-in-loop
         const calls = await call('bcn_contractCalls', [
           {
-            contract: SOCIAL_CONTRACT,
+            contract: version.address,
             heights: heights.slice(i, i + BLOCKS_PER_CALL),
           },
         ])
         found.push(...(calls || []))
       }
-      return callsToActivity(found)
+      return callsToActivity(found, version)
     },
 
-    async authors() {
+    async authors(version = CURRENT_VERSION) {
       const authors = {}
       const seen = new Set()
       let token = null
       do {
         // eslint-disable-next-line no-await-in-loop
         const page = await call('contract_iterateMap', [
-          SOCIAL_CONTRACT,
+          version.address,
           'p:',
           token,
           'hex',

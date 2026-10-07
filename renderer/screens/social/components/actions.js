@@ -15,7 +15,7 @@ import {TipDialog} from './send-dialogs'
 import {MUTED} from './theme'
 import {LIKE} from '../contract'
 import {likeCount, replyCount, tipTotal} from '../feed'
-import {timeAgo} from '../format'
+import {timeAgo, tipText} from '../format'
 import {displayName} from '../people'
 
 /** A pill of the counters row; a button when it has an action, dimmed when the action is not available now. */
@@ -98,7 +98,7 @@ export function ActionBar({node, onAnswers, onProfile, showAnswers = true}) {
         isDisabled={!canAct || postAuthor === me}
         onClick={() => setIsTipOpen(true)}
       >
-        🪙 {tips > 0 ? tips : t('Tip')}
+        🪙 {tips > 0 ? tipText(tips) : t('Tip')}
       </Pill>
       <Box flex={1} />
       {(likes > 0 || node.tips.length > 0) && (
@@ -173,7 +173,7 @@ function WhoDialog({node, onClose, onProfile}) {
             <Text fontWeight={500} pt={2}>
               🪙{' '}
               {t('{{total}} iDNA in {{count}} tips', {
-                total,
+                total: tipText(total),
                 count: tips.length,
               })}
             </Text>
@@ -182,7 +182,7 @@ function WhoDialog({node, onClose, onProfile}) {
             <WhoLine
               key={tip.hash}
               address={tip.from}
-              extra={`${validTipAmount(tip)} iDNA`}
+              extra={`${tipText(validTipAmount(tip))} iDNA`}
               time={tip.time}
               onProfile={onProfile}
             />

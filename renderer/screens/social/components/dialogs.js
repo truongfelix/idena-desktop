@@ -13,7 +13,7 @@ import {useSocial} from '../provider'
 import {cleanName, person, shortAddress} from '../people'
 import {StatusDot, useScanLabel} from './identity'
 import {MUTED} from './theme'
-import {SOCIAL_FIRST_BLOCK} from '../contract'
+import {HISTORY_START} from '../versions'
 import {historyDone, scannedShare} from '../scan'
 
 /** The dialog to name (or rename) an address, as the phone app's. */
@@ -112,7 +112,7 @@ export function SocialInfoDialog({state, onClose}) {
               {historyDone(cache)
                 ? t(
                     'History complete since block {{first}}, {{count}} posts.',
-                    {first: SOCIAL_FIRST_BLOCK.toLocaleString(), count: posts}
+                    {first: HISTORY_START.toLocaleString(), count: posts}
                   )
                 : t(
                     'History {{percent}}% read, back to block {{low}}, {{count}} posts.',

@@ -1,6 +1,7 @@
 import {SOCIAL_FIRST_BLOCK} from './contract'
 import {
   CACHE_VERSION,
+  cacheFeed,
   checkNewBlocks,
   emptyCache,
   historyDone,
@@ -9,7 +10,8 @@ import {
   scanOlderBlocks,
   scanState,
 } from './scan'
-import {a, post} from './test-helpers'
+import {a, b, post} from './test-helpers'
+import {HISTORY_START, SOCIAL_VERSIONS} from './versions'
 
 // Ported from the phone app's SocialTest.kt: both apps read idena.social the same way.
 
@@ -18,22 +20,24 @@ function scriptedSource(heads, postsAt = {}, batch = 500) {
   let headCalls = 0
   const source = {
     ranges: [],
-    authorReads: 0,
+    versions: [],
+    authorReads: [],
     batchSize: () => batch,
     head: async () => {
       const head = heads[Math.min(headCalls, heads.length - 1)]
       headCalls += 1
       return head
     },
-    calls: async (from, to) => {
+    calls: async (from, to, version) => {
       source.ranges.push([from, to])
+      source.versions.push(version?.name ?? 'v12')
       const posts = []
       for (let h = from; h <= to; h += 1) if (postsAt[h]) posts.push(postsAt[h])
       return {posts, tips: []}
     },
-    authors: async () => {
-      source.authorReads += 1
-      return {1: `0x${source.authorReads}`}
+    authors: async (version) => {
+      source.authorReads.push(version?.name ?? 'v12')
+      return {1: `0x${source.authorReads.length}`}
     },
   }
   return source
@@ -87,7 +91,7 @@ describe('the scan', () => {
       [1501, 2000],
     ])
     expect(cache.high).toBe(2000)
-    expect(source.authorReads).toBe(0)
+    expect(source.authorReads).toEqual([])
     expect(cache.authorsHeight).toBe(1000)
     expect(cache.authors).toEqual({1: a})
   })
@@ -105,21 +109,47 @@ describe('the scan', () => {
     expect(cache.authors).toEqual({1: '0x2'})
   })
 
-  it('stops the history at the contract first block', async () => {
+  it('reads the history down through the older contract versions, one version per batch', async () => {
     let cache = {
       ...emptyCache(SOCIAL_FIRST_BLOCK + 800),
       low: SOCIAL_FIRST_BLOCK + 700,
     }
-    const source = scriptedSource([0])
-    cache = await scanOlderBlocks(cache, source)
-    cache = await scanOlderBlocks(cache, source)
-    cache = await scanOlderBlocks(cache, source)
+    const source = scriptedSource([0], {}, 300000)
+    for (let i = 0; i < 20 && !historyDone(cache); i += 1)
+      // eslint-disable-next-line no-await-in-loop
+      cache = await scanOlderBlocks(cache, source)
     expect(source.ranges).toEqual([
-      [SOCIAL_FIRST_BLOCK + 200, SOCIAL_FIRST_BLOCK + 699],
-      [SOCIAL_FIRST_BLOCK, SOCIAL_FIRST_BLOCK + 199],
+      [SOCIAL_FIRST_BLOCK, SOCIAL_FIRST_BLOCK + 699],
+      [10727655, 10929804],
+      [10627018, 10727654],
+      [10604687, 10627017],
+      [10304687, 10604686],
+      [10219188, 10304686],
+      [10135621, 10219187],
     ])
+    expect(source.versions).toEqual([
+      'v12',
+      'v11',
+      'v10',
+      'v9',
+      'v5',
+      'v5',
+      'v1',
+    ])
+    // Each older version's authors once, with its first batch: they no longer change.
+    expect(source.authorReads).toEqual(['v11', 'v10', 'v9', 'v5', 'v1'])
+    expect(Object.keys(cache.olderAuthors)).toEqual([
+      'v11',
+      'v10',
+      'v9',
+      'v5',
+      'v1',
+    ])
+    expect(cache.low).toBe(HISTORY_START)
     expect(historyDone(cache)).toBe(true)
     expect(scannedShare(cache)).toBe(1)
+    expect(await scanOlderBlocks(cache, source)).toBe(cache)
+    expect(SOCIAL_VERSIONS).toHaveLength(6)
   })
 
   it('keeps nothing of a failed batch', async () => {
@@ -142,8 +172,44 @@ describe('the scan', () => {
     const cache = emptyCache(11000000)
     expect(readCache(JSON.parse(JSON.stringify(cache)))).toEqual(cache)
     expect(readCache({...cache, version: CACHE_VERSION + 1})).toBeNull()
+    // A first version's scan (the current contract only) goes on below its blocks.
+    const {olderAuthors, ...first} = {
+      ...cache,
+      version: 1,
+      low: SOCIAL_FIRST_BLOCK,
+    }
+    expect(olderAuthors).toEqual({})
+    const read = readCache(first)
+    expect(read).toEqual({...first, version: CACHE_VERSION, olderAuthors: {}})
+    expect(historyDone(read)).toBe(false)
     expect(readCache({...cache, contract: '0x0'})).toBeNull()
     expect(readCache(null)).toBeNull()
+  })
+})
+
+describe('the feed of the scan', () => {
+  it('shows an older version once all its blocks are read, after the current posts', () => {
+    const v1 = {...post('old', b, 'from v1', 10135700), version: 'v1'}
+    const current = post('new', a, 'from now', 11000000, {height: 11000000})
+    const cache = {
+      ...emptyCache(11000000),
+      low: 10219188,
+      posts: [v1, current],
+      authors: {1: a},
+      authorsHeight: 11000000,
+      olderAuthors: {v1: {1: b}},
+    }
+    // Not all of v1's blocks read yet: its posts wait (their ids count from its first post).
+    expect(cacheFeed(cache).map(({id}) => id)).toEqual([1])
+    expect(
+      cacheFeed({...cache, low: HISTORY_START}).map(({id, call}) => [
+        id,
+        call.message,
+      ])
+    ).toEqual([
+      [1, 'from now'],
+      ['preV5:1', 'from v1'],
+    ])
   })
 })
 
@@ -151,7 +217,7 @@ describe('the scan state', () => {
   const node = {peers: 5, syncing: false, validation: false}
   const done = {
     ...emptyCache(11000000),
-    low: SOCIAL_FIRST_BLOCK,
+    low: HISTORY_START,
     authorsHeight: 11000000,
   }
 
@@ -177,7 +243,7 @@ describe('the scan state', () => {
     expect(scanState(node, 11000000, null).kind).toBe('starting')
     const half = {
       ...done,
-      low: SOCIAL_FIRST_BLOCK + (11000000 - SOCIAL_FIRST_BLOCK) / 2,
+      low: HISTORY_START + Math.floor((11000000 - HISTORY_START) / 2),
     }
     expect(scanState(node, 11000000, half)).toMatchObject({
       kind: 'history',

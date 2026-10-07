@@ -3,6 +3,9 @@ import {LIKE, PostTarget} from './contract'
 import {
   FeedPeriod,
   FeedSort,
+  commentTree,
+  idKey,
+  withPrefix,
   lastActivityHeight,
   likeCount,
   postIds,
@@ -211,5 +214,62 @@ describe('answer targets', () => {
       3: PostTarget.onComment(2, 3),
       4: PostTarget.onComment(2, 4),
     })
+  })
+})
+
+describe('older contract versions', () => {
+  it('number their posts from the first one: the posts after the next version are not read', () => {
+    const read = [post('p1', a, 'first', 100), post('p2', b, 'second', 120)]
+    // Ids 3 and 4 went to posts made after the next version came: the scan does not read them.
+    const authors = {1: a, 2: b, 3: c, 4: c}
+    expect([...postIds(read, authors, {fromOldest: true})]).toEqual([
+      ['p1', 1],
+      ['p2', 2],
+    ])
+    // From the newest, nothing would match.
+    expect(postIds(read, authors).size).toBe(0)
+  })
+
+  it('carry their version prefix, also on what they answer', () => {
+    const posts = [
+      post('p1', a, 'post', 100),
+      post('p2', b, 'reply', 110, {replyTo: '1'}),
+      post('p3', c, 'comment', 120, {replyTo: '2', channel: 'discuss:2'}),
+      post('p4', a, 'answer to the comment', 130, {
+        replyTo: '3',
+        channel: 'discuss:2',
+      }),
+      post('p5', b, LIKE, 140, {replyTo: '1'}),
+    ]
+    const tips = [tip('t1', c, '1', '', '3', 150)].map((t) => ({
+      ...t,
+      sent: true,
+    }))
+    const [node] = withPrefix(
+      socialFeed(posts, authorsOf(posts), tips, {fromOldest: true}),
+      'preV9:'
+    )
+    expect(node.id).toBe('preV9:1')
+    expect(node.likeCalls.map(({replyTo}) => replyTo)).toEqual(['preV9:1'])
+    expect(tipTotal(node)).toBe(3)
+    const [reply] = node.replies
+    expect(reply.id).toBe('preV9:2')
+    expect(reply.call.replyTo).toBe('preV9:1')
+    expect(reply.replies.map(({id}) => id)).toEqual(['preV9:3', 'preV9:4'])
+    expect(reply.replies[0].call.channel).toBe('discuss:preV9:2')
+    // The comment answering the comment nests under it.
+    const tree = commentTree(reply.id, reply.replies)
+    expect(tree.map(({comment}) => comment.id)).toEqual(['preV9:3'])
+    expect(tree[0].children.map(({comment}) => comment.id)).toEqual(['preV9:4'])
+    // Read only: no answer, like or tip targets.
+    expect(postTargets([node]).size).toBe(0)
+  })
+
+  it('compare ids however they were written', () => {
+    expect(idKey(12)).toBe('12')
+    expect(idKey('012')).toBe('12')
+    expect(idKey('preV5:07')).toBe('preV5:7')
+    expect(idKey('')).toBe('')
+    expect(idKey(undefined)).toBe('')
   })
 })

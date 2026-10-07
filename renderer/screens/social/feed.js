@@ -7,17 +7,20 @@ const byChainOrder = (a, b) => a.height - b.height || a.index - b.index
  * The ids of the posts: the contract numbers the successful makePost calls 1, 2, 3... and keeps each id's author
  * (`authors`, contract map "p:"). Going from the newest call to the oldest, a call gets the next id down when its
  * sender is that id's author; a call that does not match failed and has no id. `posts` and `authors` must cover
- * the same blocks.
+ * the same blocks. With `fromOldest` (an older contract version: its posts after the next version came are not
+ * read, but hold the last ids) it counts up from id 1 instead: `posts` must then hold all of its first posts.
  */
-export function postIds(posts, authors) {
+export function postIds(posts, authors, {fromOldest = false} = {}) {
   const ids = new Map()
-  let id = Math.max(0, ...Object.keys(authors).map(Number))
-  const newestFirst = [...posts].sort(byChainOrder).reverse()
-  for (const post of newestFirst) {
-    if (id < 1) break
+  const last = Math.max(0, ...Object.keys(authors).map(Number))
+  const ordered = [...posts].sort(byChainOrder)
+  if (!fromOldest) ordered.reverse()
+  let id = fromOldest ? 1 : last
+  for (const post of ordered) {
+    if (id < 1 || id > last) break
     if (authors[id] === post.author) {
       ids.set(post.hash, id)
-      id -= 1
+      id += fromOldest ? 1 : -1
     }
   }
   return ids
@@ -36,8 +39,8 @@ const LIKE_LEVEL = 3
  * are left out. A tip counts on the post it names when its amount is valid and it comes after that post.
  * Each node: {id, call, likeCalls, tips, replies}.
  */
-export function socialFeed(posts, authors, tips = []) {
-  const ids = postIds(posts, authors)
+export function socialFeed(posts, authors, tips = [], {fromOldest} = {}) {
+  const ids = postIds(posts, authors, {fromOldest})
   const byId = new Map()
   for (const post of posts) {
     const id = ids.get(post.hash)
@@ -209,19 +212,46 @@ export function sortFeed(
 }
 
 /**
+ * A post id as text, the same however it was written: an id of the current contract ("12", 12, "012"), or an
+ * older one with its version's prefix ("preV5:12").
+ */
+export function idKey(value) {
+  const m = /^([A-Za-z0-9]*:)?([0-9]+)$/.exec(String(value ?? ''))
+  return m ? `${m[1] || ''}${Number(m[2])}` : String(value ?? '')
+}
+
+/**
+ * The feed of an older contract version, with its ids, the posts its answers name and its tips' posts given the
+ * version's prefix, as the web app keeps them apart from the current contract's.
+ */
+export function withPrefix(feed, prefix) {
+  const call = (post) => ({
+    ...post,
+    replyTo: post.replyTo === '' ? '' : `${prefix}${post.replyTo}`,
+    channel: post.channel.replace(/^discuss:/, `discuss:${prefix}`),
+  })
+  const node = ({id, call: post, likeCalls, tips, replies}) => ({
+    id: `${prefix}${id}`,
+    call: call(post),
+    likeCalls: likeCalls.map(call),
+    tips: tips.map((tip) => ({...tip, postId: `${prefix}${tip.postId}`})),
+    replies: replies.map(node),
+  })
+  return feed.map(node)
+}
+
+/**
  * The comments of reply `replyId` as a tree, in their order, as Reddit nests them: a comment answering the reply,
  * or a comment that is not among them (unknown, or not read yet), is at the top; the others under the comment
  * they answer. Each node: {comment, children}.
  */
 export function commentTree(replyId, comments) {
-  const ids = new Set(comments.map(({id}) => id))
+  const ids = new Set(comments.map(({id}) => idKey(id)))
   const parentOf = (comment) => {
-    const parent = /^[0-9]+$/.test(comment.call.replyTo)
-      ? Number(comment.call.replyTo)
-      : null
-    return parent !== null &&
-      parent !== replyId &&
-      parent !== comment.id &&
+    const parent = idKey(comment.call.replyTo)
+    return parent !== '' &&
+      parent !== idKey(replyId) &&
+      parent !== idKey(comment.id) &&
       ids.has(parent)
       ? parent
       : null
@@ -241,7 +271,7 @@ export function commentTree(replyId, comments) {
         placed.add(id)
         return true
       })
-      .map((comment) => ({comment, children: build(comment.id)}))
+      .map((comment) => ({comment, children: build(idKey(comment.id))}))
   const roots = build(null)
   // Comments in a loop (none reachable from the top) still show, at the top.
   const rest = comments
@@ -268,7 +298,8 @@ export const treeContains = (node, id) =>
  */
 export function postTargets(feed) {
   const targets = new Map()
-  for (const post of feed) {
+  // Only the current contract's posts can be answered (an older version's ids carry a prefix).
+  for (const post of feed.filter(({id}) => typeof id === 'number')) {
     targets.set(post.id, PostTarget.onPost(post.id))
     for (const reply of post.replies) {
       targets.set(reply.id, PostTarget.onReply(reply.id))
