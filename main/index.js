@@ -8,6 +8,7 @@ const {
   nativeTheme,
   net,
   protocol,
+  session,
   shell,
   // eslint-disable-next-line import/no-extraneous-dependencies
 } = require('electron')
@@ -29,6 +30,10 @@ const {
   registerRendererScheme,
 } = require('./renderer-protocol')
 const {applyPrivateFileCreationMask} = require('./private-files')
+const {
+  SOURCE_PARTITION,
+  migrateRendererStorage,
+} = require('./renderer-storage-migration')
 const {createDnaLinkInbox} = require('./dna-link-inbox')
 
 applyPrivateFileCreationMask()
@@ -85,6 +90,7 @@ const NodeUpdater = require('./node-updater')
 const {createNodeProcess} = require('./node-process')
 
 let mainWindow
+let didCreateMainWindow = false
 let nodeDownloadPromise = null
 let tray
 let e2eSmokeFinished = false
@@ -237,6 +243,7 @@ if (isFirstInstance) {
 }
 
 const createMainWindow = () => {
+  didCreateMainWindow = true
   mainWindow = new BrowserWindow({
     title: app.name,
     width: 1080,
@@ -469,8 +476,26 @@ const createTray = () => {
   tray.setContextMenu(contextMenu)
 }
 
+function createStorageMigrationWindow(windowSession) {
+  const window = new BrowserWindow({
+    show: false,
+    paintWhenInitiallyHidden: false,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+      webSecurity: true,
+      spellcheck: false,
+      ...(windowSession ? {session: windowSession} : {}),
+    },
+  })
+  window.webContents.setWindowOpenHandler(() => ({action: 'deny'}))
+  window.webContents.on('will-navigate', (event) => event.preventDefault())
+  return window
+}
+
 // Prepare the renderer once the app is ready
-app.on('ready', () => {
+app.on('ready', async () => {
   if (!isDev) {
     try {
       installRendererProtocol({
@@ -483,6 +508,16 @@ app.on('ready', () => {
       app.quit()
       return
     }
+
+    // Before the first page opens: the official app's ad drafts move to this app's origin.
+    await migrateRendererStorage({
+      appPath: app.getAppPath(),
+      userDataPath: app.getPath('userData'),
+      createWindow: createStorageMigrationWindow,
+      getSourceSession: () => session.fromPartition(SOURCE_PARTITION),
+      fs,
+      logger,
+    })
   }
 
   const i18nConfig = getI18nConfig()
@@ -577,7 +612,8 @@ ipcMain.on('confirm-quit', (event) => {
 app.on('activate', showMainWindow)
 
 app.on('window-all-closed', () => {
-  if (!isMac) {
+  // The storage migration's hidden window closes before the main window exists.
+  if (!isMac && didCreateMainWindow) {
     app.quit()
   }
 })
