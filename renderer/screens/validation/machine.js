@@ -30,12 +30,23 @@ import {forEachAsync, wait} from '../../shared/utils/fn'
 import {fetchConfirmedKeywordTranslations} from '../flips/utils'
 import {loadKeyword} from '../../shared/utils/utils'
 
+// The machine's calls to the node that a practice replaces. They stay inline invokes: a saved validation names an
+// inline invoke by its place in the machine, and a named service would change that name, so an app updated in the
+// middle of a submit would not resume it.
+const validationNodeCalls = {
+  submitShortAnswers,
+  submitLongAnswers,
+  // eslint-disable-next-line no-use-before-define
+  fetchKeywords,
+}
+
 export const createValidationMachine = ({
   epoch,
   validationStart,
   shortSessionDuration,
   longSessionDuration,
   locale,
+  nodeCalls = validationNodeCalls,
 }) =>
   createMachine(
     {
@@ -412,7 +423,7 @@ export const createValidationMachine = ({
                           invoke: {
                             // eslint-disable-next-line no-shadow
                             src: ({shortFlips, epoch}) =>
-                              submitShortAnswers(
+                              nodeCalls.submitShortAnswers(
                                 shortFlips.map(
                                   ({option: answer = 0, hash}) => ({
                                     answer,
@@ -685,21 +696,7 @@ export const createValidationMachine = ({
                     fetching: {
                       invoke: {
                         src: ({longFlips}) =>
-                          Promise.all(
-                            filterReadyFlips(longFlips).map(({hash}) =>
-                              fetchWords(hash)
-                                .then(async ({result}) => ({
-                                  hash,
-                                  words: await Promise.all(
-                                    result?.words.map(async (id) => ({
-                                      id,
-                                      ...(await loadKeyword(id)),
-                                    })) ?? []
-                                  ),
-                                }))
-                                .catch(() => ({hash}))
-                            )
-                          ),
+                          nodeCalls.fetchKeywords(longFlips),
                         onDone: {
                           target:
                             '#validation.longSession.fetch.keywords.success',
@@ -931,7 +928,7 @@ export const createValidationMachine = ({
                           invoke: {
                             // eslint-disable-next-line no-shadow
                             src: ({longFlips, bestFlipHashes, epoch}) =>
-                              submitLongAnswers(
+                              nodeCalls.submitLongAnswers(
                                 longFlips.map(
                                   ({option: answer = 0, relevance, hash}) => ({
                                     answer,
@@ -1368,6 +1365,24 @@ async function fetchWords(hash) {
       id: 1,
     })
   ).data
+}
+
+function fetchKeywords(longFlips) {
+  return Promise.all(
+    filterReadyFlips(longFlips).map(({hash}) =>
+      fetchWords(hash)
+        .then(async ({result}) => ({
+          hash,
+          words: await Promise.all(
+            result?.words.map(async (id) => ({
+              id,
+              ...(await loadKeyword(id)),
+            })) ?? []
+          ),
+        }))
+        .catch(() => ({hash}))
+    )
+  )
 }
 
 export function adjustDurationInSeconds(validationStart, duration) {
