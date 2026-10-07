@@ -1,58 +1,28 @@
 /* eslint-disable react/prop-types */
 import React from 'react'
-import {useRouter} from 'next/router'
-import {useTranslation} from 'react-i18next'
 import {useChainState} from '../../shared/providers/chain-context'
 import {useEpochState} from '../../shared/providers/epoch-context'
 import {useIdentityState} from '../../shared/providers/identity-context'
-import {useClosableToast} from '../../shared/hooks/use-toast'
 import {EpochPeriod} from '../../shared/types'
-import {
-  isMissingMethod,
-  loadSocialCache,
-  loadSocialSettings,
-  nodeSocialSource,
-  saveSocialCache,
-  saveSocialSetting,
-  socialRpc,
-} from './node'
-import {
-  peopleFromJson,
-  peopleNames,
-  peopleToJson,
-  displayName,
-  withPerson,
-} from './people'
-import {
-  ActivityKind,
-  NotifyKind,
-  cacheFeed,
-  checkNewBlocks,
-  countNotices,
-  historyDone,
-  newActivity,
-  scanOlderBlocks,
-  socialActivity,
-} from './utils'
-
-/** A new block comes about every 20 seconds. */
-const NEW_BLOCK_MS = 20 * 1000
-const RETRY_MS = 15 * 1000
+import {peopleFromJson, peopleNames, peopleToJson, withPerson} from './people'
+import {newActivity, NotifyKind, socialActivity} from './activity'
+import {postTargets} from './feed'
+import {cacheFeed} from './scan'
+import {useActivityNotices} from './notices'
+import {useSocialScan} from './scan-loop'
+import {useSocialSending} from './sending'
+import {loadSocialCache, loadSocialSettings, saveSocialSetting} from './storage'
 
 const SocialContext = React.createContext(null)
 
 export const useSocial = () => React.useContext(SocialContext)
 
 /**
- * idena.social for the whole app, read from the node as the phone app does. While the Social page is open: the new
- * blocks first (which also reads the post authors), then the history, one batch at a time, then each new block.
- * Elsewhere, once the history is read: only the new blocks, every 20 seconds, for the Inbox and its notices.
- * Nothing is read while the node syncs, is offline, during a validation, or with the scan off. The scan, the
- * contacts and the settings are kept on this computer.
+ * idena.social for the whole app, read from the node as the phone app does (the scan: scan-loop.js) and written
+ * with the node's key (sending.js). Nothing is read while the node syncs, is offline, during a validation, or with
+ * the scan off. The scan, the contacts and the settings are kept on this computer.
  */
 export function SocialProvider({children}) {
-  const {t} = useTranslation()
-  const router = useRouter()
   const {syncing, offline} = useChainState()
   const epoch = useEpochState()
   const identity = useIdentityState()
@@ -63,17 +33,11 @@ export function SocialProvider({children}) {
 
   const [cache, setCache] = React.useState()
   const [settings, setSettings] = React.useState()
-  const [head, setHead] = React.useState(null)
-  const [peers, setPeers] = React.useState(null)
-  const [error, setError] = React.useState(null)
-  const [missingMethod, setMissingMethod] = React.useState(false)
   const [pageOpen, setPageOpen] = React.useState(false)
   const [inboxOpen, setInboxOpen] = React.useState(false)
   const [highlightAfter, setHighlightAfter] = React.useState(null)
 
   const cacheRef = React.useRef()
-  const pageOpenRef = React.useRef(false)
-  const wakeRef = React.useRef(() => {})
 
   React.useEffect(() => {
     let alive = true
@@ -99,91 +63,29 @@ export function SocialProvider({children}) {
     }
   }, [])
 
-  React.useEffect(() => {
-    pageOpenRef.current = pageOpen
-    // The page wants the history now, not after the 20 s wait.
-    if (pageOpen) wakeRef.current()
-  }, [pageOpen])
-
   const loaded = cache !== undefined && settings !== undefined
   const scanOff = settings?.scanOff === true
 
-  React.useEffect(() => {
-    if (!ready || !loaded || missingMethod || scanOff) return undefined
-    const run = {stopped: false}
-    const source = nodeSocialSource()
-    const save = async (next) => {
-      await saveSocialCache(next)
-      cacheRef.current = next
-      if (!run.stopped) setCache(next)
-    }
-    const pause = (ms) =>
-      new Promise((resolve) => {
-        const timer = setTimeout(resolve, ms)
-        wakeRef.current = () => {
-          clearTimeout(timer)
-          resolve()
-        }
-      })
-
-    ;(async () => {
-      while (!run.stopped) {
-        const {current} = cacheRef
-        const onPage = pageOpenRef.current
-        // Away from the page, nothing is read before the history has been read once.
-        if (!onPage && !(current && historyDone(current))) {
-          // eslint-disable-next-line no-await-in-loop
-          await pause(NEW_BLOCK_MS)
-          // eslint-disable-next-line no-continue
-          continue
-        }
-        try {
-          // eslint-disable-next-line no-await-in-loop
-          const [nodeHead, nodePeers] = await Promise.all([
-            source.head(),
-            socialRpc('net_peers').then((list) => (list || []).length),
-          ])
-          if (run.stopped) return
-          setHead(nodeHead)
-          setPeers(nodePeers)
-          if (
-            !current ||
-            current.high < nodeHead ||
-            current.authorsHeight < current.high
-          ) {
-            // eslint-disable-next-line no-await-in-loop
-            await checkNewBlocks(current, source, {
-              keepGoing: () => !run.stopped,
-              save,
-            })
-          } else if (onPage && !historyDone(current)) {
-            // eslint-disable-next-line no-await-in-loop
-            await scanOlderBlocks(current, source, {save})
-          } else {
-            // eslint-disable-next-line no-await-in-loop
-            await pause(NEW_BLOCK_MS)
-          }
-          if (!run.stopped) setError(null)
-        } catch (scanError) {
-          if (run.stopped) return
-          setError(scanError)
-          if (isMissingMethod(scanError)) {
-            setMissingMethod(true)
-            return
-          }
-          // eslint-disable-next-line no-await-in-loop
-          await pause(RETRY_MS)
-        }
-      }
-    })()
-
-    return () => {
-      run.stopped = true
-      wakeRef.current()
-    }
-  }, [loaded, missingMethod, ready, scanOff])
+  const {head, peers, error, missingMethod, readNewBlocks} = useSocialScan({
+    ready,
+    loaded,
+    scanOff,
+    pageOpen,
+    cacheRef,
+    setCache,
+  })
 
   const feed = React.useMemo(() => (cache ? cacheFeed(cache) : []), [cache])
+  const targets = React.useMemo(() => postTargets(feed), [feed])
+  const scannedHashes = React.useMemo(
+    () =>
+      new Set([
+        ...(cache?.posts || []).map(({hash}) => hash),
+        ...(cache?.tips || []).map(({hash}) => hash),
+      ]),
+    [cache]
+  )
+  const sending = useSocialSending({ready, readNewBlocks, scannedHashes})
   const people = React.useMemo(() => settings?.people || {}, [settings])
   const names = React.useMemo(() => peopleNames(people), [people])
   const notifyKinds = React.useMemo(
@@ -224,59 +126,14 @@ export function SocialProvider({children}) {
     [activity, notifyKinds, seenThrough]
   )
 
-  // A notice for each new thing, once, unless the notifications are on screen.
-  const {toast} = useClosableToast()
-  const announcedRef = React.useRef(null)
-  React.useEffect(() => {
-    if (seenThrough === null || !cache) return
-    if (announcedRef.current === null) {
-      announcedRef.current = Math.max(seenThrough, cache.authorsHeight)
-      return
-    }
-    const news = newActivity(
-      activity,
-      Math.max(seenThrough, announcedRef.current),
-      notifyKinds
-    )
-    announcedRef.current = Math.max(announcedRef.current, cache.authorsHeight)
-    if (news.length === 0 || inboxOpen) return
-    let title
-    if (news.length === 1) {
-      const [item] = news
-      const who = displayName(item.actor, names)
-      title = {
-        [ActivityKind.Like]: t('{{who}} liked your post', {who}),
-        [ActivityKind.Reply]: t('{{who}} replied to your post', {who}),
-        [ActivityKind.Comment]: t('{{who}} commented on your post', {who}),
-        [ActivityKind.Tip]: t('{{who}} tipped you {{amount}} iDNA', {
-          who,
-          amount: item.amount,
-        }),
-      }[item.kind]
-    } else {
-      const counts = countNotices(news)
-      title = t(
-        '{{count}} new on your posts ({{likes}} likes, {{comments}} answers, {{tips}} tips)',
-        {count: news.length, ...counts}
-      )
-    }
-    toast({
-      title,
-      actionContent: t('View'),
-      onAction: () =>
-        router.push({pathname: '/social', query: {view: 'inbox'}}),
-    })
-  }, [
+  useActivityNotices({
     activity,
     cache,
-    inboxOpen,
-    names,
-    notifyKinds,
-    router,
     seenThrough,
-    t,
-    toast,
-  ])
+    notifyKinds,
+    names,
+    inboxOpen,
+  })
 
   const markSeen = React.useCallback(() => {
     if (!cache) return
@@ -324,6 +181,9 @@ export function SocialProvider({children}) {
         ),
       scanOff,
       setScanOff: (off) => updateSettings('scanOff', off),
+      ready,
+      targets,
+      sending,
       setPageOpen,
       setInboxOpen,
     }),
@@ -343,10 +203,13 @@ export function SocialProvider({children}) {
       offline,
       peers,
       people,
+      ready,
       scanOff,
+      sending,
       setPeople,
       setPerson,
       syncing,
+      targets,
       unread,
       updateSettings,
       validation,
