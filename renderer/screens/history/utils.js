@@ -167,7 +167,7 @@ export function miningRows(history) {
   return {rows, totals}
 }
 
-const txTypeNames = {
+export const txTypeNames = {
   send: 'Transfer',
   activation: 'Invitation activated',
   invite: 'Invitation issued',

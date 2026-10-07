@@ -62,3 +62,106 @@ describe('translation keys with a colon', () => {
     expect(callsMissingSeparator()).toEqual([])
   })
 })
+
+// A text missing from locales/en/translation.json cannot be translated: every language shows it as written.
+
+const ROOT = path.join(__dirname, '..', '..', '..')
+
+function readJson(file) {
+  return JSON.parse(fs.readFileSync(path.join(ROOT, file), 'utf8'))
+}
+
+/** The keys `source` passes to t() as a quoted text (a template literal without `${…}`) or to <Trans i18nKey>. */
+function writtenKeys(source) {
+  const keys = []
+  for (const match of source.matchAll(
+    /\bt\(\s*(['"`])((?:(?!\1)[^\\]|\\.)*?)\1/gu
+  )) {
+    if (!(match[1] === '`' && match[2].includes('${')))
+      keys.push(match[2].replace(/\\(['"`\\])/gu, '$1'))
+  }
+  for (const match of source.matchAll(/\bi18nKey="([^"]*)"/gu))
+    keys.push(match[1])
+  return keys
+}
+
+function keysMissingFromEnglish() {
+  const translation = readJson('locales/en/translation.json')
+  const error = readJson('locales/en/error.json')
+  const missing = new Set()
+  const visit = (dir) => {
+    for (const entry of fs.readdirSync(dir, {withFileTypes: true})) {
+      const file = path.join(dir, entry.name)
+      if (entry.isDirectory()) {
+        if (!['.next', 'out', 'node_modules'].includes(entry.name)) visit(file)
+      } else if (
+        entry.name.endsWith('.js') &&
+        !entry.name.endsWith('.test.js')
+      ) {
+        const source = fs.readFileSync(file, 'utf8')
+        // useTranslation(['translation', 'error']): t() also finds the keys of the error namespace.
+        const readsErrors = /useTranslation\(\[[^\]]*'error'/u.test(source)
+        for (const key of writtenKeys(source)) {
+          if (!(key in translation) && !(readsErrors && key in error))
+            missing.add(`${path.relative(ROOT, file)}: ${key}`)
+        }
+      }
+    }
+  }
+  visit(path.join(ROOT, 'renderer'))
+  visit(path.join(ROOT, 'main'))
+  return [...missing]
+}
+
+describe('English texts', () => {
+  it('hold every text passed to t() as written', () => {
+    expect(keysMissingFromEnglish()).toEqual([])
+  })
+
+  it('hold the texts the pages pass to t() from their lists', () => {
+    /* eslint-disable global-require */
+    const {
+      DB_WRITE_BUFFERS,
+      IPFS_CONNECTION_CHOICES,
+      IPFS_WRITE_BUFFERS,
+      PEER_LEVEL_CHOICES,
+      restartRisk,
+    } = require('../../screens/settings/advanced-settings')
+    const {txTypeName, txTypeNames} = require('../../screens/history/utils')
+    const {mapVotingStatus} = require('../../screens/oracles/utils')
+    const {mapToFriendlyStatus} = require('../providers/identity-context')
+    const {EpochPeriod, IdentityStatus, VotingStatus} = require('../types')
+    /* eslint-enable global-require */
+    const translation = readJson('locales/en/translation.json')
+
+    // `${mib} MiB`: the values the restart dialog lists (pendingNodeOptions).
+    const texts = [
+      ...DB_WRITE_BUFFERS.flatMap(({mib, label, detail}) => [
+        label,
+        detail,
+        `${mib} MiB`,
+      ]),
+      ...IPFS_WRITE_BUFFERS.flatMap(({mib, label}) => [label, `${mib} MiB`]),
+      ...PEER_LEVEL_CHOICES.flatMap(({label, detail}) => [label, detail]),
+      // A number (an IPFS connection limit) needs no translation.
+      ...IPFS_CONNECTION_CHOICES.map(({label}) => label).filter((label) =>
+        Number.isNaN(Number(label))
+      ),
+      restartRisk(new Date(0), {currentPeriod: EpochPeriod.ShortSession})
+        .message,
+      restartRisk(new Date(0), {
+        currentPeriod: EpochPeriod.None,
+        nextValidation: new Date(60 * 1000).toISOString(),
+      }).message,
+      ...Object.values(txTypeNames),
+      txTypeName({type: 'online', payload: '0x'}),
+      txTypeName({type: 'online', payload: '0x1'}),
+      ...Object.values(VotingStatus).map(mapVotingStatus),
+      ...Object.values(IdentityStatus).map(mapToFriendlyStatus),
+    ]
+
+    expect(
+      [...new Set(texts)].filter((text) => !(text in translation))
+    ).toEqual([])
+  })
+})
