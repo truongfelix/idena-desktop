@@ -13,6 +13,10 @@ dayjs.extend(relativeTime)
 export const HASH_IN_MEMPOOL =
   '0x0000000000000000000000000000000000000000000000000000000000000000'
 
+// How many checks in a row the node may answer `null` for a transaction (it does not know it) before it counts as
+// dropped: gone from the node's mempool, or sent through another node (the app switched nodes).
+export const TX_UNKNOWN_POLLS = 3
+
 export const queryClient = new QueryClient()
 
 export function createRpcCaller({url, key}) {

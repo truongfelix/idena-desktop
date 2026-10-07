@@ -8,6 +8,7 @@ import {
   HASH_IN_MEMPOOL,
   roundToPrecision,
   toLocaleDna,
+  TX_UNKNOWN_POLLS,
 } from '../../shared/utils/utils'
 import {strip} from '../../shared/utils/obj'
 import {ContractRpcMode, VotingListFilter} from './types'
@@ -107,7 +108,6 @@ export function withTimeout(promise, ms, message) {
 export const NODE_ANSWER_TIMEOUT_MS = 30 * 1000
 
 const TX_POLL_INTERVAL_MS = 10 * 1000
-const TX_UNKNOWN_POLLS = 3
 
 /**
  * Asks the node about the transaction every 10 s. Sends `mined` once it is in a block, and `dropped` once the node

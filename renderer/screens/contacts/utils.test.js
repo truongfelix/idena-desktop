@@ -1,6 +1,7 @@
 import {IdentityStatus} from '../../shared/types'
 import {HASH_IN_MEMPOOL} from '../../shared/utils/utils'
 import {
+  checkActivation,
   checkMining,
   checkTerminations,
   contactListView,
@@ -125,6 +126,8 @@ describe('loading the contacts with the node', () => {
 const txIn = (blockHash) => (hash) => ({hash, blockHash, type: 'invite'})
 const inMempool = txIn(HASH_IN_MEMPOOL)
 const inBlock = txIn('0x5e7b')
+// a tx the node does not know (dropped from the mempool, or sent through another node)
+const unknown = () => null
 
 function nodeWithTxs(txs, identities = {}) {
   const calls = []
@@ -209,6 +212,55 @@ describe('invites and terminations in the mempool', () => {
       })
       expect(await checkMining([mining], n)).toBeNull()
     })
+
+    it('ends mining once the node has not known the invite tx for 3 checks in a row', async () => {
+      const notInvited = {address: '0x55', state: IdentityStatus.Undefined}
+      const n = nodeWithTxs({'0xe5': unknown}, {'0x55': notInvited})
+
+      const first = await checkMining([mining, carol], n)
+      expect(first).toEqual([{...mining, unknownPolls: 1}, carol])
+      const second = await checkMining(first, n)
+      expect(second[0]).toEqual({...mining, unknownPolls: 2})
+      const third = await checkMining(second, n)
+
+      // as after a reload: an invite the node never mined reads as expired
+      expect(third).toEqual([
+        {
+          ...mining,
+          mining: false,
+          identity: notInvited,
+          state: IdentityStatus.Undefined,
+          canKill: false,
+        },
+        carol,
+      ])
+      expect(n.calls).toEqual([
+        'bcn_transaction 0xe5',
+        'bcn_transaction 0xe5',
+        'bcn_transaction 0xe5',
+        'dna_identity 0x55',
+      ])
+    })
+
+    it('counts again once the node knows the invite tx again', async () => {
+      const n = nodeWithTxs({'0xe5': inMempool})
+      const invites = await checkMining([{...mining, unknownPolls: 2}], n)
+      expect(invites).toEqual([{...mining, unknownPolls: 0}])
+    })
+
+    it('does not count a failed call as an unknown tx', async () => {
+      const n = nodeWithTxs({})
+      expect(await checkMining([{...mining, unknownPolls: 2}], n)).toBeNull()
+    })
+
+    it('keeps the count when the identity call fails after the third unknown answer', async () => {
+      const n = nodeWithTxs({'0xe5': unknown})
+      n.callRpc.mockImplementation(async (method) => {
+        if (method === 'dna_identity') throw new Error('Failed to fetch')
+        return null
+      })
+      expect(await checkMining([{...mining, unknownPolls: 2}], n)).toBeNull()
+    })
   })
 
   describe('checking the terminations', () => {
@@ -244,6 +296,30 @@ describe('invites and terminations in the mempool', () => {
       expect(await checkTerminations([terminating], n)).toBeNull()
     })
 
+    it('ends a termination the node has not known for 3 checks in a row, and offers it again', async () => {
+      // the termination never made it into a block: the invitation still stands
+      const invited = {address: '0x11', state: IdentityStatus.Invite}
+      const n = nodeWithTxs({'0xb2': unknown}, {'0x11': invited})
+
+      const first = await checkTerminations([terminating, carol], n)
+      expect(first[0]).toEqual({...terminating, unknownPolls: 1})
+      const second = await checkTerminations(first, n)
+      expect(second[0]).toEqual({...terminating, unknownPolls: 2})
+      const invites = await checkTerminations(second, n)
+
+      expect(invites).toEqual([
+        {
+          ...terminating,
+          identity: invited,
+          state: IdentityStatus.Invite,
+          terminating: false,
+          canKill: true,
+        },
+        carol,
+      ])
+      expect(isTerminatedInvite(invites[0])).toBe(false)
+    })
+
     it('ends the terminations that are done and keeps the others', async () => {
       const other = {
         ...carol,
@@ -266,6 +342,42 @@ describe('invites and terminations in the mempool', () => {
       const n = nodeWithTxs({})
       expect(await checkTerminations([alice, carol], n)).toBeNull()
       expect(n.calls).toEqual([])
+    })
+  })
+})
+
+describe('checking the activation tx', () => {
+  it('is mined once the tx is in a block', async () => {
+    const n = nodeWithTxs({'0xa7': inBlock})
+    expect(await checkActivation('0xa7', 2, n)).toEqual({status: 'mined'})
+  })
+
+  it('keeps mining while the tx is in the mempool, and counts again', async () => {
+    const n = nodeWithTxs({'0xa7': inMempool})
+    expect(await checkActivation('0xa7', 2, n)).toEqual({
+      status: 'mining',
+      unknownPolls: 0,
+    })
+  })
+
+  it('is dropped once the node has not known the tx for 3 checks in a row', async () => {
+    const n = nodeWithTxs({'0xa7': unknown})
+    expect(await checkActivation('0xa7', 0, n)).toEqual({
+      status: 'mining',
+      unknownPolls: 1,
+    })
+    expect(await checkActivation('0xa7', 1, n)).toEqual({
+      status: 'mining',
+      unknownPolls: 2,
+    })
+    expect(await checkActivation('0xa7', 2, n)).toEqual({status: 'dropped'})
+  })
+
+  it('keeps mining and the count when the node call fails', async () => {
+    const n = nodeWithTxs({})
+    expect(await checkActivation('0xa7', 2, n)).toEqual({
+      status: 'mining',
+      unknownPolls: 2,
     })
   })
 })

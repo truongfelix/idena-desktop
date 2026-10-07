@@ -1,5 +1,5 @@
 import {IdentityStatus} from '../../shared/types'
-import {HASH_IN_MEMPOOL} from '../../shared/utils/utils'
+import {HASH_IN_MEMPOOL, TX_UNKNOWN_POLLS} from '../../shared/utils/utils'
 
 export const canKill = (knownIdentity, persistedIdentity) =>
   persistedIdentity?.state === IdentityStatus.Invite ||
@@ -116,40 +116,44 @@ export async function loadInvites(
 }
 
 // The contacts marked `flag` whose tx (field `txField`) left the mempool, with the invitee's identity as the node
-// now knows it, no longer marked. A contact whose tx is still in the mempool, or whose node call fails, stays as
-// it is until the next check. Answers null when nothing changed.
+// now knows it, no longer marked. A tx left it when it is in a block, or when the node has not known it for
+// TX_UNKNOWN_POLLS checks in a row (dropped; `unknownPolls` counts them): the contact then shows what a reload
+// would. A contact whose tx is still in the mempool, or whose node call fails, stays marked until the next check.
+// Answers null when nothing changed.
 async function checkSettled(invites, flag, txField, callRpc) {
-  const settled = (
-    await Promise.all(
-      invites
-        .filter((invite) => invite[flag])
-        .map(async (invite) => {
-          try {
-            const tx = await callRpc('bcn_transaction', invite[txField])
-            if (!tx || tx.blockHash === HASH_IN_MEMPOOL) return null
-            const identity = await callRpc('dna_identity', invite.receiver)
-            return identity ? {id: invite.id, identity} : null
-          } catch {
-            return null
+  const nextInvites = await Promise.all(
+    invites.map(async (invite) => {
+      if (!invite[flag]) return invite
+      try {
+        const {unknownPolls = 0, ...rest} = invite
+        const tx = await callRpc('bcn_transaction', invite[txField])
+        const nextUnknownPolls = tx ? 0 : unknownPolls + 1
+        const settled = tx
+          ? tx.blockHash !== HASH_IN_MEMPOOL
+          : nextUnknownPolls >= TX_UNKNOWN_POLLS
+        const identity =
+          settled && (await callRpc('dna_identity', invite.receiver))
+        if (identity) {
+          return {
+            ...rest,
+            [flag]: false,
+            identity,
+            state: identity.state,
+            canKill: canKill(invite, identity),
           }
-        })
-    )
-  ).filter(Boolean)
-
-  if (settled.length === 0) return null
-
-  return invites.map((invite) => {
-    const {identity} = settled.find(({id}) => id === invite.id) ?? {}
-    return identity
-      ? {
-          ...invite,
-          [flag]: false,
-          identity,
-          state: identity.state,
-          canKill: canKill(invite, identity),
         }
-      : invite
-  })
+        return nextUnknownPolls === unknownPolls
+          ? invite
+          : {...invite, unknownPolls: nextUnknownPolls}
+      } catch {
+        return invite
+      }
+    })
+  )
+
+  return nextInvites.some((invite, i) => invite !== invites[i])
+    ? nextInvites
+    : null
 }
 
 /**
@@ -165,6 +169,28 @@ export const checkMining = (invites, {callRpc}) =>
  */
 export const checkTerminations = (invites, {callRpc}) =>
   checkSettled(invites, 'terminating', 'terminateHash', callRpc)
+
+/**
+ * One check of the tx activating an invitation on this account: `mined` once it is in a block, `dropped` once the
+ * node has not known it for TX_UNKNOWN_POLLS checks in a row (`unknownPolls`: the unknown answers so far), else
+ * `mining` with the new count. A failed node call (the node unreachable for a moment) is `mining`, count unchanged.
+ */
+export async function checkActivation(hash, unknownPolls, {callRpc}) {
+  let tx
+  try {
+    tx = await callRpc('bcn_transaction', hash)
+  } catch {
+    return {status: 'mining', unknownPolls}
+  }
+  if (tx) {
+    return tx.blockHash === HASH_IN_MEMPOOL
+      ? {status: 'mining', unknownPolls: 0}
+      : {status: 'mined'}
+  }
+  return unknownPolls + 1 >= TX_UNKNOWN_POLLS
+    ? {status: 'dropped'}
+    : {status: 'mining', unknownPolls: unknownPolls + 1}
+}
 
 /**
  * What the contact list shows: the contacts that are not deleted and whose name or address holds `filter`

@@ -1155,5 +1155,6 @@
   "The review contract of this ad is deployed, but its voting did not start. Send starts it.": "The review contract of this ad is deployed, but its voting did not start. Send starts it.",
   "Start review": "Start review",
   "Burnt, last 24 hours": "Burnt, last 24 hours",
-  "The burned iDNA is destroyed. For 24 hours (4,320 blocks) after a burn, your ad is shown to the identities it targets, ranked against the other ads by the iDNA burned in those 24 hours and by how precisely each ad targets the viewer. Burn again to keep it shown.": "The burned iDNA is destroyed. For 24 hours (4,320 blocks) after a burn, your ad is shown to the identities it targets, ranked against the other ads by the iDNA burned in those 24 hours and by how precisely each ad targets the viewer. Burn again to keep it shown."
+  "The burned iDNA is destroyed. For 24 hours (4,320 blocks) after a burn, your ad is shown to the identities it targets, ranked against the other ads by the iDNA burned in those 24 hours and by how precisely each ad targets the viewer. Burn again to keep it shown.": "The burned iDNA is destroyed. For 24 hours (4,320 blocks) after a burn, your ad is shown to the identities it targets, ranked against the other ads by the iDNA burned in those 24 hours and by how precisely each ad targets the viewer. Burn again to keep it shown.",
+  "The node dropped the activation transaction. You can activate the invitation again.": "The node dropped the activation transaction. You can activate the invitation again."
 }
