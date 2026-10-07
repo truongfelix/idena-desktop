@@ -16,13 +16,13 @@ import {AdRotationStatus, AdStatus} from './types'
 import {fetchNetworkSize} from '../../shared/api/dna'
 import {
   adFallbackSrc,
+  adReviewStatus,
   areCompetingAds,
   buildAdReviewVoting,
   currentOs,
   getAdVoting,
   fetchProfileAds,
   isApprovedVoting,
-  isRejectedVoting,
   isValidImage,
   adReviewDeposit,
   selectProfileHash,
@@ -359,6 +359,7 @@ export function useProfileAds() {
           queryFn: async () => ({
             ...ad,
             cid,
+            contract,
             target,
             status: AdStatus.Published,
           }),
@@ -404,16 +405,7 @@ export function usePersistedAds(options) {
               ? URL.createObjectURL(media)
               : adFallbackSrc,
             contract,
-            status:
-              // eslint-disable-next-line no-nested-ternary
-              voting
-                ? // eslint-disable-next-line no-nested-ternary
-                  isApprovedVoting(voting)
-                  ? AdStatus.Approved
-                  : isRejectedVoting(voting)
-                  ? AdStatus.Rejected
-                  : AdStatus.Reviewing
-                : status,
+            ...(contract ? adReviewStatus(status, voting) : {status}),
           }
         })
       )
@@ -459,7 +451,11 @@ export function useReviewAd({
     onError,
   })
 
-  const {data: startVotingHash, mutate: startVoting} = useStartAdVoting({
+  const {
+    data: startVotingHash,
+    variables: startParams,
+    mutate: startVoting,
+  } = useStartAdVoting({
     rewardsFund,
     onError,
   })
@@ -473,13 +469,24 @@ export function useReviewAd({
 
   useTrackTx(startVotingHash, {
     onMined: React.useCallback(() => {
-      onStartVoting(deployData)
-    }, [deployData, onStartVoting]),
+      onStartVoting(startParams)
+    }, [startParams, onStartVoting]),
     onError,
   })
 
   return {
     submit: mutate,
+    // The contract deployed by `submit` ({cid, contract}): once it exists, a new try only starts its voting.
+    deployed: deployData,
+    // The review of an ad whose contract is deployed but whose voting never started: start that voting only
+    // (its stake is paid).
+    start: React.useCallback(
+      ({cid, contract}) => {
+        onBeforeSubmit()
+        startVoting({cid, contract})
+      },
+      [onBeforeSubmit, startVoting]
+    ),
   }
 }
 

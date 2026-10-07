@@ -1148,5 +1148,12 @@
   "Verified": "Verified",
   "Suspended": "Suspended",
   "Zombie": "Zombie",
-  "Human": "Human"
+  "Human": "Human",
+  "Cannot read the campaigns already in your profile. Nothing was sent, try again later.": "Cannot read the campaigns already in your profile. Nothing was sent, try again later.",
+  "Paid, in the review contract": "Paid, in the review contract",
+  "The deposit comes back when the voting ends, whether the ad is approved or rejected. Half of the stake comes back when the voting is terminated, which anyone can do on its page some days after the review; the other half is burned.": "The deposit comes back when the voting ends, whether the ad is approved or rejected. Half of the stake comes back when the voting is terminated, which anyone can do on its page some days after the review; the other half is burned.",
+  "The review contract of this ad is deployed, but its voting did not start. Send starts it.": "The review contract of this ad is deployed, but its voting did not start. Send starts it.",
+  "Start review": "Start review",
+  "Burnt, last 24 hours": "Burnt, last 24 hours",
+  "The burned iDNA is destroyed. For 24 hours (4,320 blocks) after a burn, your ad is shown to the identities it targets, ranked against the other ads by the iDNA burned in those 24 hours and by how precisely each ad targets the viewer. Burn again to keep it shown.": "The burned iDNA is destroyed. For 24 hours (4,320 blocks) after a burn, your ad is shown to the identities it targets, ranked against the other ads by the iDNA burned in those 24 hours and by how precisely each ad targets the viewer. Burn again to keep it shown."
 }
