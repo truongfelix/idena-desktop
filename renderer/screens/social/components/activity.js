@@ -11,7 +11,7 @@ import {FullHeader, PostMedia, PostText} from './post'
 import {LINK, MUTED} from './theme'
 import {LIKE} from '../contract'
 import {likeCount, replyCount, tipTotal} from '../feed'
-import {timeAgo} from '../format'
+import {timeAgo, tipText} from '../format'
 
 /** A notification of the Inbox: who did what on which post, and the answer. */
 export function ActivityCard({item, now, isNew, onOpen, onProfile}) {
@@ -21,7 +21,7 @@ export function ActivityCard({item, now, isNew, onOpen, onProfile}) {
     [ActivityKind.Reply]: t('replied to your post'),
     [ActivityKind.Comment]: t('commented on your post'),
     [ActivityKind.Tip]: t('tipped you {{amount}} iDNA for your post', {
-      amount: item.amount,
+      amount: tipText(item.amount),
     }),
   }[item.kind]
   return (
@@ -80,7 +80,7 @@ export function ProfileItemCard({item, tab, now, onOpen, onProfile}) {
     })}  ·  ${timeAgo(like.time, now)}`
   else if (tip)
     context = `🪙 ${t('Tipped {{amount}} iDNA to {{name}}', {
-      amount: validTipAmount(tip),
+      amount: tipText(validTipAmount(tip)),
       name: displayName(node.call.author, names),
     })}  ·  ${timeAgo(tip.time, now)}`
   else if (parent)
@@ -119,8 +119,8 @@ export function ProfileItemCard({item, tab, now, onOpen, onProfile}) {
       <PostText message={node.call.message} lines={showHeader ? 6 : 4} />
       {tab === 'media' && <PostMedia call={node.call} maxH="360px" />}
       <SmallText>
-        {`♡ ${likeCount(node)}  ·  💬 ${replyCount(node)}  ·  🪙 ${tipTotal(
-          node
+        {`♡ ${likeCount(node)}  ·  💬 ${replyCount(node)}  ·  🪙 ${tipText(
+          tipTotal(node)
         )}`}
       </SmallText>
     </Stack>

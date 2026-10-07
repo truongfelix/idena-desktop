@@ -17,6 +17,16 @@ export function timeAgo(time, now) {
   return `${Math.floor(s / (365 * 86400))}y`
 }
 
+/**
+ * A tip amount in iDNA as idena.social shows it (getDisplayTipAmount): at most 3 decimals, "0.000" for a tip
+ * below that.
+ */
+export function tipText(amount) {
+  const value = Number(amount) || 0
+  const rounded = Number(value.toFixed(3))
+  return rounded === 0 && value > 0 ? '0.000' : String(rounded)
+}
+
 /** The color of an identity state, as the phone app shows it (light theme); null for no identity. */
 export const IDENTITY_COLORS = {
   Human: '#B8860B',
