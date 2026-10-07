@@ -75,20 +75,18 @@ export function InviteProvider({children}) {
     activationTx ? 1000 * 10 : null
   )
 
+  // One check after the other: each answers the whole list, so two checks side by side would undo each other's
+  // changes.
   useInterval(
     async () => {
-      const nextInvites = await checkMining(invites, {callRpc})
-      if (nextInvites) setInvites(nextInvites)
+      const afterMining = (await checkMining(invites, {callRpc})) ?? invites
+      const nextInvites =
+        (await checkTerminations(afterMining, {callRpc})) ?? afterMining
+      if (nextInvites !== invites) setInvites(nextInvites)
     },
-    invites.filter(({mining}) => mining).length ? 1000 * 10 : null
-  )
-
-  useInterval(
-    async () => {
-      const nextInvites = await checkTerminations(invites, {callRpc})
-      if (nextInvites) setInvites(nextInvites)
-    },
-    invites.filter(({terminating}) => terminating).length ? 1000 * 10 : null
+    invites.some(({mining, terminating}) => mining || terminating)
+      ? 1000 * 10
+      : null
   )
 
   const addInvite = useCallback(
