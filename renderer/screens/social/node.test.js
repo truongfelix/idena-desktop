@@ -7,7 +7,7 @@ import {
   isMissingMethod,
   nodeSocialSource,
 } from './node'
-import {SOCIAL_CONTRACT} from './utils'
+import {SOCIAL_CONTRACT} from './contract'
 
 const hex = (text) => `0x${Buffer.from(text, 'utf8').toString('hex')}`
 

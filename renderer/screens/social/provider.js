@@ -7,15 +7,7 @@ import {useEpochState} from '../../shared/providers/epoch-context'
 import {useIdentityState} from '../../shared/providers/identity-context'
 import {useClosableToast} from '../../shared/hooks/use-toast'
 import {EpochPeriod} from '../../shared/types'
-import {
-  isMissingMethod,
-  loadSocialCache,
-  loadSocialSettings,
-  nodeSocialSource,
-  saveSocialCache,
-  saveSocialSetting,
-  socialRpc,
-} from './node'
+import {isMissingMethod, nodeSocialSource, socialRpc} from './node'
 import {
   peopleFromJson,
   peopleNames,
@@ -25,15 +17,18 @@ import {
 } from './people'
 import {
   ActivityKind,
-  NotifyKind,
-  cacheFeed,
-  checkNewBlocks,
   countNotices,
-  historyDone,
   newActivity,
-  scanOlderBlocks,
+  NotifyKind,
   socialActivity,
-} from './utils'
+} from './activity'
+import {cacheFeed, checkNewBlocks, historyDone, scanOlderBlocks} from './scan'
+import {
+  loadSocialCache,
+  loadSocialSettings,
+  saveSocialCache,
+  saveSocialSetting,
+} from './storage'
 
 /** A new block comes about every 20 seconds. */
 const NEW_BLOCK_MS = 20 * 1000

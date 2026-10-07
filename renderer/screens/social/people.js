@@ -1,4 +1,4 @@
-import {ipfsCid} from './utils'
+import {ipfsCid} from './calls'
 
 // The Social contacts, kept on this computer only: a private name for an address, shown instead of the address in
 // the Social tab, and two marks: Following (their posts in the feed's Following filter) and Message (private

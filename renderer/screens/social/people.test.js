@@ -15,18 +15,14 @@ import {
 } from './people'
 import {
   ActivityKind,
-  LIKE,
-  NotifyKind,
-  commentTree,
   countNotices,
-  descendants,
-  identityColor,
-  identityLabel,
   newActivity,
+  NotifyKind,
   socialActivity,
-  socialFeed,
-  treeContains,
-} from './utils'
+} from './activity'
+import {LIKE} from './contract'
+import {commentTree, descendants, socialFeed, treeContains} from './feed'
+import {identityColor, identityLabel} from './format'
 
 // Ported from the phone app's PeopleTest.kt, SocialTest.kt and ThreadTreeTest.kt.
 
