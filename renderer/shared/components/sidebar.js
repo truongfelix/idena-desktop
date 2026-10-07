@@ -65,6 +65,7 @@ import {
   SettingsIcon,
   SyncIcon,
   TelegramIcon,
+  TestValidationIcon,
   TimerIcon,
   WalletIcon,
 } from './icons'
@@ -508,7 +509,9 @@ function ActionPanel() {
                   </OnboardingPopoverContentIconRow>
                   <OnboardingPopoverContentIconRow icon={GalleryIcon}>
                     <Trans i18nKey="onboardingValidateTest" t={t}>
-                      <OnboardingLinkButton href="https://flips.idena.io/?pass=idena.io">
+                      <OnboardingLinkButton
+                        onClick={() => router.push('/validation/practice')}
+                      >
                         Test yourself
                       </OnboardingLinkButton>{' '}
                       before the validation
@@ -562,6 +565,20 @@ function ActionPanel() {
             >
               <PlusSolidIcon boxSize="5" mr="3" color="blue.500" />
               {t('Add to calendar')}
+            </MenuItem>
+            <MenuItem
+              color="gray.500"
+              fontWeight={500}
+              px="3"
+              py="2"
+              _hover={{bg: 'gray.50'}}
+              _focus={{bg: 'gray.50'}}
+              _selected={{bg: 'gray.50'}}
+              _active={{bg: 'gray.50'}}
+              onClick={() => router.push('/validation/practice')}
+            >
+              <TestValidationIcon boxSize="5" mr="3" color="blue.500" />
+              {t('Practice validation')}
             </MenuItem>
           </MenuList>
         </Menu>
