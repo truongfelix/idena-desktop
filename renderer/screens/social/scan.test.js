@@ -14,7 +14,7 @@ import {a, post} from './test-helpers'
 // Ported from the phone app's SocialTest.kt: both apps read idena.social the same way.
 
 /** A node whose head moves as `heads` says, one value per head() call (the last one repeats). */
-function fakeSource(heads, postsAt = {}, batch = 500) {
+function scriptedSource(heads, postsAt = {}, batch = 500) {
   let headCalls = 0
   const source = {
     ranges: [],
@@ -41,7 +41,7 @@ function fakeSource(heads, postsAt = {}, batch = 500) {
 
 describe('the scan', () => {
   it('starts at the head the first time', async () => {
-    const source = fakeSource([12000000])
+    const source = scriptedSource([12000000])
     const cache = await checkNewBlocks(null, source)
     expect(source.ranges).toEqual([])
     expect(cache.low).toBe(12000001)
@@ -52,7 +52,7 @@ describe('the scan', () => {
 
   it('reads new blocks in batches up to the head', async () => {
     const start = {...emptyCache(11000000), authorsHeight: 11000000}
-    const source = fakeSource([11001200], {
+    const source = scriptedSource([11001200], {
       11000700: post('h', a, 'hi', 1, {height: 11000700}),
     })
     let saves = 0
@@ -74,7 +74,7 @@ describe('the scan', () => {
 
   it('keeps its batches and the old authors when stopped', async () => {
     const start = {...emptyCache(1000), authors: {1: a}, authorsHeight: 1000}
-    const source = fakeSource([2200])
+    const source = scriptedSource([2200])
     let batches = 0
     const cache = await checkNewBlocks(start, source, {
       keepGoing: () => {
@@ -95,7 +95,7 @@ describe('the scan', () => {
   it('takes the authors only at a stable head', async () => {
     const start = {...emptyCache(100), authorsHeight: 100}
     // The head moves from 110 to 111 while the authors are read: the new block is read first.
-    const source = fakeSource([110, 111, 111, 111])
+    const source = scriptedSource([110, 111, 111, 111])
     const cache = await checkNewBlocks(start, source)
     expect(source.ranges).toEqual([
       [101, 110],
@@ -110,7 +110,7 @@ describe('the scan', () => {
       ...emptyCache(SOCIAL_FIRST_BLOCK + 800),
       low: SOCIAL_FIRST_BLOCK + 700,
     }
-    const source = fakeSource([0])
+    const source = scriptedSource([0])
     cache = await scanOlderBlocks(cache, source)
     cache = await scanOlderBlocks(cache, source)
     cache = await scanOlderBlocks(cache, source)
@@ -125,7 +125,7 @@ describe('the scan', () => {
   it('keeps nothing of a failed batch', async () => {
     const start = {...emptyCache(1000), authorsHeight: 1000}
     const source = {
-      ...fakeSource([1600]),
+      ...scriptedSource([1600]),
       calls: async () => {
         throw new Error('the node dropped the request')
       },

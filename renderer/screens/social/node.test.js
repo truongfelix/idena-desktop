@@ -12,7 +12,7 @@ import {SOCIAL_CONTRACT} from './contract'
 const hex = (text) => `0x${Buffer.from(text, 'utf8').toString('hex')}`
 
 /** A node answering by method; `delays` (seconds) moves the clock during bcn_blocksWithAddress. */
-function fakeNode(answers, delays = []) {
+function scriptedNode(answers, delays = []) {
   let clock = 0
   const requests = []
   const call = async (method, params) => {
@@ -39,7 +39,7 @@ const makePost = (height, message) => ({
 describe('the node source', () => {
   it('reads the calls of the blocks the filter finds, a few blocks per call', async () => {
     const heights = Array.from({length: 19}, (_, i) => 100 + i)
-    const node = fakeNode({
+    const node = scriptedNode({
       bcn_blocksWithAddress: heights,
       bcn_contractCalls: ({heights: asked}) =>
         asked.map((h) => makePost(h, `post ${h}`)),
@@ -64,7 +64,7 @@ describe('the node source', () => {
   })
 
   it('asks for no calls without blocks', async () => {
-    const node = fakeNode({bcn_blocksWithAddress: []})
+    const node = scriptedNode({bcn_blocksWithAddress: []})
     expect(await nodeSocialSource(node.call, node.now).calls(1, 2)).toEqual({
       posts: [],
       tips: [],
@@ -75,7 +75,7 @@ describe('the node source', () => {
   })
 
   it('checks more blocks while the node is quick, fewer when it is slow', async () => {
-    const node = fakeNode({bcn_blocksWithAddress: []}, [1, 1, 1, 1, 45, 15])
+    const node = scriptedNode({bcn_blocksWithAddress: []}, [1, 1, 1, 1, 45, 15])
     const source = nodeSocialSource(node.call, node.now)
     expect(source.batchSize()).toBe(FIRST_BATCH)
     await source.calls(1, 2)
@@ -91,7 +91,7 @@ describe('the node source', () => {
   })
 
   it('checks fewer blocks after a failed call, down to a floor', async () => {
-    const node = fakeNode({
+    const node = scriptedNode({
       bcn_blocksWithAddress: () => {
         throw new Error('Failed to fetch')
       },
@@ -109,7 +109,7 @@ describe('the node source', () => {
     )
     expect(isMissingMethod(missing)).toBe(true)
     expect(isMissingMethod(new Error('Failed to fetch'))).toBe(false)
-    const node = fakeNode({
+    const node = scriptedNode({
       bcn_blocksWithAddress: () => {
         throw missing
       },
@@ -134,7 +134,7 @@ describe('the node source', () => {
         continuationToken: '0x',
       },
     }
-    const node = fakeNode({
+    const node = scriptedNode({
       contract_iterateMap: (contract, prefix, token) => {
         expect(contract).toBe(SOCIAL_CONTRACT)
         expect(prefix).toBe('p:')
@@ -148,7 +148,7 @@ describe('the node source', () => {
   })
 
   it('stops when the map pages repeat', async () => {
-    const node = fakeNode({
+    const node = scriptedNode({
       contract_iterateMap: () => ({items: [], continuationToken: '0x01'}),
     })
     await expect(
@@ -157,7 +157,7 @@ describe('the node source', () => {
   })
 
   it('takes the head from the last block', async () => {
-    const node = fakeNode({bcn_lastBlock: {height: 11407000}})
+    const node = scriptedNode({bcn_lastBlock: {height: 11407000}})
     expect(await nodeSocialSource(node.call, node.now).head()).toBe(11407000)
   })
 })

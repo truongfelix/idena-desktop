@@ -2,16 +2,20 @@
 import React from 'react'
 import {useRouter} from 'next/router'
 import {useTranslation} from 'react-i18next'
-import {Button, Flex, HStack, Stack, Text} from '@chakra-ui/react'
+import {Box, Button, Flex, HStack, Stack, Text} from '@chakra-ui/react'
 import Layout from '../shared/components/layout'
 import {SmallText, Page, PageTitle} from '../shared/components/components'
+import {PrimaryButton} from '../shared/components/button'
 import {useSocial} from '../screens/social/provider'
 import {isSocialAddress} from '../screens/social/people'
 import {
   NameDialog,
   SocialInfoDialog,
 } from '../screens/social/components/dialogs'
+import {Editor} from '../screens/social/components/editor'
 import {StatusDot} from '../screens/social/components/identity'
+import {ConfirmDialog} from '../screens/social/components/send-dialogs'
+import {PostTarget} from '../screens/social/contract'
 import {SocialThread} from '../screens/social/components/thread'
 import {scanState} from '../screens/social/scan'
 import {TabButton, useNow} from '../screens/social/views/common'
@@ -42,6 +46,7 @@ export default function SocialPage() {
     unread,
     scanOff,
     setPageOpen,
+    sending,
   } = social
   const [isInfoOpen, setIsInfoOpen] = React.useState(false)
   const [renaming, setRenaming] = React.useState(null)
@@ -86,8 +91,16 @@ export default function SocialPage() {
     ? {health: 'off', kind: 'scanOff'}
     : scanState(node, head, cache)
 
+  const status = sending.status && (
+    <Text fontSize="sm" color={sending.status.error ? 'red.500' : 'muted'}>
+      {sending.status.text}
+    </Text>
+  )
+
   let content
-  if (postId !== null)
+  // The editor takes the page while it is open, as on the phone.
+  if (sending.draft) content = <Editor now={now} status={status} />
+  else if (postId !== null)
     content = thread ? (
       <SocialThread
         node={thread}
@@ -179,43 +192,59 @@ export default function SocialPage() {
                   })}
             </SmallText>
           )}
-          {onPage ? (
-            <Button
-              variant="link"
-              alignSelf="flex-start"
-              onClick={() => router.back()}
-            >
-              ← {t('Back')}
-            </Button>
-          ) : (
-            <HStack spacing={1}>
-              <TabButton
-                isActive={view === View.Home}
-                onClick={() => go({view: View.Home})}
+          {!sending.draft &&
+            (onPage ? (
+              <Button
+                variant="link"
+                alignSelf="flex-start"
+                onClick={() => router.back()}
               >
-                {t('Home')}
-              </TabButton>
-              <TabButton
-                isActive={view === View.Profile}
-                onClick={() => go({view: View.Profile})}
-              >
-                {t('Profile')}
-              </TabButton>
-              <TabButton
-                isActive={view === View.Inbox}
-                badge={unread.length}
-                onClick={() => go({view: View.Inbox})}
-              >
-                {t('Inbox')}
-              </TabButton>
-            </HStack>
-          )}
+                ← {t('Back')}
+              </Button>
+            ) : (
+              <HStack spacing={1}>
+                <TabButton
+                  isActive={view === View.Home}
+                  onClick={() => go({view: View.Home})}
+                >
+                  {t('Home')}
+                </TabButton>
+                <TabButton
+                  isActive={view === View.Profile}
+                  onClick={() => go({view: View.Profile})}
+                >
+                  {t('Profile')}
+                </TabButton>
+                <TabButton
+                  isActive={view === View.Inbox}
+                  badge={unread.length}
+                  onClick={() => go({view: View.Inbox})}
+                >
+                  {t('Inbox')}
+                </TabButton>
+                <Box flex={1} />
+                <PrimaryButton
+                  isDisabled={!sending.canAct}
+                  onClick={() => sending.startDraft(PostTarget.newPost())}
+                >
+                  {t('Post')}
+                </PrimaryButton>
+              </HStack>
+            ))}
+          {!sending.draft && status}
           {content}
         </Stack>
         {isInfoOpen && (
           <SocialInfoDialog
             state={state}
             onClose={() => setIsInfoOpen(false)}
+          />
+        )}
+        {sending.confirm && (
+          <ConfirmDialog
+            pending={sending.confirm}
+            onSend={sending.send}
+            onCancel={sending.cancelConfirm}
           />
         )}
         {renaming && (

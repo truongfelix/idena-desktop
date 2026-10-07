@@ -1,4 +1,5 @@
 import {isLike, validTipAmount} from './calls'
+import {PostTarget} from './contract'
 
 const byChainOrder = (a, b) => a.height - b.height || a.index - b.index
 
@@ -260,3 +261,20 @@ export const descendants = (node) =>
 export const treeContains = (node, id) =>
   node.comment.id === id ||
   node.children.some((child) => treeContains(child, id))
+
+/**
+ * What an answer or a like to each post, reply and comment of the feed answers, by id (PostTarget): a post's
+ * answers are replies, a reply's and its comments' answers are comments in the reply's channel.
+ */
+export function postTargets(feed) {
+  const targets = new Map()
+  for (const post of feed) {
+    targets.set(post.id, PostTarget.onPost(post.id))
+    for (const reply of post.replies) {
+      targets.set(reply.id, PostTarget.onReply(reply.id))
+      for (const comment of reply.replies)
+        targets.set(comment.id, PostTarget.onComment(reply.id, comment.id))
+    }
+  }
+  return targets
+}

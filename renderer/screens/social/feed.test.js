@@ -1,11 +1,12 @@
 import {validTipAmount} from './calls'
-import {LIKE} from './contract'
+import {LIKE, PostTarget} from './contract'
 import {
   FeedPeriod,
   FeedSort,
   lastActivityHeight,
   likeCount,
   postIds,
+  postTargets,
   replyCount,
   socialFeed,
   sortFeed,
@@ -189,5 +190,26 @@ describe('the feed', () => {
         (n) => n.id
       )
     ).toEqual([2, 1])
+  })
+})
+
+describe('answer targets', () => {
+  it('answers a post with a reply and a reply or its comments with a comment', () => {
+    const posts = [
+      post('p1', a, 'post', 100),
+      post('p2', b, 'reply', 110, {replyTo: '1'}),
+      post('p3', c, 'comment', 120, {replyTo: '2', channel: 'discuss:2'}),
+      post('p4', a, 'comment on the comment', 130, {
+        replyTo: '3',
+        channel: 'discuss:2',
+      }),
+    ]
+    const targets = postTargets(socialFeed(posts, authorsOf(posts)))
+    expect(Object.fromEntries(targets)).toEqual({
+      1: PostTarget.onPost(1),
+      2: PostTarget.onReply(2),
+      3: PostTarget.onComment(2, 3),
+      4: PostTarget.onComment(2, 4),
+    })
   })
 })
