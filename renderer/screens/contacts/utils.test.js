@@ -1,6 +1,7 @@
 import {IdentityStatus} from '../../shared/types'
 import {HASH_IN_MEMPOOL} from '../../shared/utils/utils'
 import {
+  checkActivation,
   checkMining,
   checkTerminations,
   contactListView,
@@ -341,6 +342,42 @@ describe('invites and terminations in the mempool', () => {
       const n = nodeWithTxs({})
       expect(await checkTerminations([alice, carol], n)).toBeNull()
       expect(n.calls).toEqual([])
+    })
+  })
+})
+
+describe('checking the activation tx', () => {
+  it('is mined once the tx is in a block', async () => {
+    const n = nodeWithTxs({'0xa7': inBlock})
+    expect(await checkActivation('0xa7', 2, n)).toEqual({status: 'mined'})
+  })
+
+  it('keeps mining while the tx is in the mempool, and counts again', async () => {
+    const n = nodeWithTxs({'0xa7': inMempool})
+    expect(await checkActivation('0xa7', 2, n)).toEqual({
+      status: 'mining',
+      unknownPolls: 0,
+    })
+  })
+
+  it('is dropped once the node has not known the tx for 3 checks in a row', async () => {
+    const n = nodeWithTxs({'0xa7': unknown})
+    expect(await checkActivation('0xa7', 0, n)).toEqual({
+      status: 'mining',
+      unknownPolls: 1,
+    })
+    expect(await checkActivation('0xa7', 1, n)).toEqual({
+      status: 'mining',
+      unknownPolls: 2,
+    })
+    expect(await checkActivation('0xa7', 2, n)).toEqual({status: 'dropped'})
+  })
+
+  it('keeps mining and the count when the node call fails', async () => {
+    const n = nodeWithTxs({})
+    expect(await checkActivation('0xa7', 2, n)).toEqual({
+      status: 'mining',
+      unknownPolls: 2,
     })
   })
 })

@@ -1,13 +1,15 @@
 /* eslint-disable react/prop-types */
 import React, {useCallback, useMemo} from 'react'
+import {useTranslation} from 'react-i18next'
 import {useInterval} from '../hooks/use-interval'
-import {HASH_IN_MEMPOOL, callRpc} from '../utils/utils'
+import {callRpc} from '../utils/utils'
 import {useIdentityState} from './identity-context'
 import {IdentityStatus} from '../types'
 import {fetchIdentity, killInvitee, sendInvite} from '../api/dna'
 import {useFailToast} from '../hooks/use-toast'
 import {strip} from '../utils/obj'
 import {
+  checkActivation,
   checkMining,
   checkTerminations,
   loadInvites,
@@ -57,19 +59,29 @@ export function InviteProvider({children}) {
 
   const failToast = useFailToast()
 
+  const {t} = useTranslation()
+
+  // the unknown answers in a row for the activation tx (checkActivation)
+  const activationUnknownPolls = React.useRef(0)
+
   useInterval(
     async () => {
-      function resetActivation() {
-        setActivationTx('')
-        db.clearActivationTx()
-      }
+      const {status, unknownPolls = 0} = await checkActivation(
+        activationTx,
+        activationUnknownPolls.current,
+        {callRpc}
+      )
+      activationUnknownPolls.current = unknownPolls
+      if (status === 'mining') return
 
-      try {
-        const {blockHash} = await callRpc('bcn_transaction', activationTx)
-        if (blockHash !== HASH_IN_MEMPOOL) resetActivation()
-      } catch (error) {
-        resetActivation()
-        failToast(error?.message ?? 'Activation failed. Tx no longer exists')
+      setActivationTx('')
+      db.clearActivationTx()
+      if (status === 'dropped') {
+        failToast(
+          t(
+            'The node dropped the activation transaction. You can activate the invitation again.'
+          )
+        )
       }
     },
     activationTx ? 1000 * 10 : null

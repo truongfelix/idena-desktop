@@ -171,6 +171,28 @@ export const checkTerminations = (invites, {callRpc}) =>
   checkSettled(invites, 'terminating', 'terminateHash', callRpc)
 
 /**
+ * One check of the tx activating an invitation on this account: `mined` once it is in a block, `dropped` once the
+ * node has not known it for TX_UNKNOWN_POLLS checks in a row (`unknownPolls`: the unknown answers so far), else
+ * `mining` with the new count. A failed node call (the node unreachable for a moment) is `mining`, count unchanged.
+ */
+export async function checkActivation(hash, unknownPolls, {callRpc}) {
+  let tx
+  try {
+    tx = await callRpc('bcn_transaction', hash)
+  } catch {
+    return {status: 'mining', unknownPolls}
+  }
+  if (tx) {
+    return tx.blockHash === HASH_IN_MEMPOOL
+      ? {status: 'mining', unknownPolls: 0}
+      : {status: 'mined'}
+  }
+  return unknownPolls + 1 >= TX_UNKNOWN_POLLS
+    ? {status: 'dropped'}
+    : {status: 'mining', unknownPolls: unknownPolls + 1}
+}
+
+/**
  * What the contact list shows: the contacts that are not deleted and whose name or address holds `filter`
  * (any case), with `status` `list`, or why there are none: `empty` (no contacts) or `notFound` (none matches).
  */
