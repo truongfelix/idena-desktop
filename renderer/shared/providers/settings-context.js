@@ -20,10 +20,11 @@ const SET_IMAGE_SEARCH = 'SET_IMAGE_SEARCH'
 const CHANGE_LANGUAGE = 'CHANGE_LANGUAGE'
 
 // The built-in node's Advanced settings: the write buffers of its chain database and IPFS datastore in MiB
-// (main/node-write-buffer.js), its peer level and IPFS connection limit (main/node-peers.js). Settings saved
-// before one of them existed get its default at load.
+// (main/node-write-buffer.js), its peer level and IPFS connection limit (main/node-peers.js). The defaults
+// are the official Idena node's, as in the phone app. Settings saved before one of them existed get its
+// default at load.
 const NODE_OPTION_DEFAULTS = {
-  dbWriteBufferMiB: 32,
+  dbWriteBufferMiB: 4,
   ipfsWriteBufferMiB: 4,
   peerLevel: 'normal',
   ipfsConnections: 50,

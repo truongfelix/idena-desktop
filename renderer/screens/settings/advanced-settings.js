@@ -4,26 +4,28 @@ import {
   IPFS_WRITE_BUFFER_SIZES,
 } from '../../../main/node-write-buffer'
 import {
+  DEFAULT_IPFS_CONNECTIONS,
+  DEFAULT_PEER_LEVEL,
   IPFS_CONNECTION_LIMITS,
   PEER_LEVELS,
   ipfsConnectionsFor,
   maxPeers,
 } from '../../../main/node-peers'
 
+/** The write buffer size the node runs with unless another is chosen: idena-go's, the phone app's too. */
+export const DEFAULT_WRITE_BUFFER_MIB = 4
+
 /**
- * The write buffer sizes of the Node settings, with what each is for. Figures measured on mainnet blocks
- * replayed at the chain's pace (2026-10-01): at 4 MiB the node rewrites about 16 times the new data.
+ * The write buffer sizes of the Node settings, as the phone app names them. At idena-go's 4 MiB the node
+ * rewrites about 16 times the new data (mainnet blocks replayed at the chain's pace, 2026-10-01).
  */
-export const DB_WRITE_BUFFERS = [
-  {mib: 4, label: 'Idena default', detail: 'most disk writes, least memory'},
-  {mib: 16, label: 'Optimal', detail: 'about 65% fewer writes, +15-30 MB'},
-  {
-    mib: 32,
-    label: 'Phone with 4 GB+ RAM',
-    detail: 'about 75% fewer writes, +60-90 MB',
-  },
-  {mib: 64, label: 'Computer', detail: 'about 85% fewer writes, +200-270 MB'},
-]
+const writeBuffers = (sizes) =>
+  sizes.map((mib) => ({
+    mib,
+    label: mib === DEFAULT_WRITE_BUFFER_MIB ? 'Default' : `${mib} MiB`,
+  }))
+
+export const DB_WRITE_BUFFERS = writeBuffers([4, 16, 32, 64])
 
 if (
   DB_WRITE_BUFFERS.map(({mib}) => mib).join() !== DB_WRITE_BUFFER_SIZES.join()
@@ -31,13 +33,12 @@ if (
   throw new Error('write buffer sizes differ from main/node-write-buffer.js')
 }
 
-/** The IPFS datastore write buffer sizes. It writes the most when nodes outside can reach this computer. */
-export const IPFS_WRITE_BUFFERS = [
-  {mib: 4, label: 'Idena default'},
-  {mib: 16, label: '16 MiB'},
-  {mib: 32, label: '32 MiB'},
-  {mib: 64, label: '64 MiB'},
-]
+/** The IPFS datastore write buffer sizes, the same. */
+export const IPFS_WRITE_BUFFERS = writeBuffers([4, 16, 32, 64])
+
+/** What each write buffer's description ends with. */
+export const WRITE_BUFFER_NOTE =
+  'A bigger buffer needs more RAM but writes less to the disk. The node takes it at its start'
 
 if (
   IPFS_WRITE_BUFFERS.map(({mib}) => mib).join() !==
@@ -48,7 +49,7 @@ if (
   )
 }
 
-/** The peer levels (main/node-peers.js), the same as the phone app's. */
+/** The peer levels (main/node-peers.js), with the phone app's words. */
 export const PEER_LEVEL_CHOICES = [
   {
     value: 'eco',
@@ -56,14 +57,22 @@ export const PEER_LEVEL_CHOICES = [
     detail:
       'Less traffic, but after a network drop the node can take longer to find peers again',
   },
-  {value: 'normal', label: 'Normal', detail: 'Idena default'},
+  {
+    value: 'normal',
+    label: 'Normal',
+    detail: 'The default, as in the official Idena app',
+  },
   {
     value: 'hub',
     label: 'Hub',
     detail:
-      'More room for nodes that connect to this computer: it helps only when its port is open on the router',
+      'More room for nodes that connect to this computer. It helps only when nodes outside can reach it (a port open on the router), and uses more traffic',
   },
-].map((choice) => ({...choice, maxPeers: maxPeers(choice.value)}))
+].map((choice) => ({
+  ...choice,
+  maxPeers: maxPeers(choice.value),
+  isDefault: choice.value === DEFAULT_PEER_LEVEL,
+}))
 
 if (
   PEER_LEVEL_CHOICES.map(({value}) => value).join() !==
@@ -76,6 +85,7 @@ if (
 export const IPFS_CONNECTION_CHOICES = IPFS_CONNECTION_LIMITS.map(({high}) => ({
   high,
   label: high === 0 ? 'No limit' : String(high),
+  isDefault: high === DEFAULT_IPFS_CONNECTIONS,
 }))
 
 /**
@@ -125,14 +135,14 @@ export function pendingNodeOptions({
         ?.label,
     },
     {
-      title: 'Chain database write buffer',
+      title: 'Chain database buffer',
       running: running?.dbWriteBufferMiB,
       chosen: settings.dbWriteBufferMiB,
       supported: supported?.dbWriteBuffer,
       value: `${settings.dbWriteBufferMiB} MiB`,
     },
     {
-      title: 'IPFS database write buffer',
+      title: 'IPFS database buffer',
       running: running?.ipfsWriteBufferMiB,
       chosen: settings.ipfsWriteBufferMiB,
       supported: supported?.ipfsWriteBuffer,

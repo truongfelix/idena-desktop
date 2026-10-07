@@ -125,6 +125,7 @@ describe('English texts', () => {
       IPFS_CONNECTION_CHOICES,
       IPFS_WRITE_BUFFERS,
       PEER_LEVEL_CHOICES,
+      WRITE_BUFFER_NOTE,
       restartRisk,
     } = require('../../screens/settings/advanced-settings')
     const {txTypeName, txTypeNames} = require('../../screens/history/utils')
@@ -136,12 +137,9 @@ describe('English texts', () => {
 
     // `${mib} MiB`: the values the restart dialog lists (pendingNodeOptions).
     const texts = [
-      ...DB_WRITE_BUFFERS.flatMap(({mib, label, detail}) => [
-        label,
-        detail,
-        `${mib} MiB`,
-      ]),
+      ...DB_WRITE_BUFFERS.flatMap(({mib, label}) => [label, `${mib} MiB`]),
       ...IPFS_WRITE_BUFFERS.flatMap(({mib, label}) => [label, `${mib} MiB`]),
+      WRITE_BUFFER_NOTE,
       ...PEER_LEVEL_CHOICES.flatMap(({label, detail}) => [label, detail]),
       // A number (an IPFS connection limit) needs no translation.
       ...IPFS_CONNECTION_CHOICES.map(({label}) => label).filter((label) =>
