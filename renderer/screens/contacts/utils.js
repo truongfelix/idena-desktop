@@ -7,6 +7,13 @@ export const canKill = (knownIdentity, persistedIdentity) =>
     persistedIdentity?.state === IdentityStatus.Candidate)
 
 /**
+ * Whether a contact's invitation was terminated: its termination tx left the mempool and the node deleted the
+ * invitee's identity (it answers `Undefined`). A termination that never made it into a block leaves the identity.
+ */
+export const isTerminatedInvite = ({terminateHash, terminating, state}) =>
+  Boolean(terminateHash) && !terminating && state === IdentityStatus.Undefined
+
+/**
  * The saved contacts as stored, shown before the node answers. Whether an invite can be terminated is the node's
  * to say, so no saved value of it is used.
  */
@@ -77,16 +84,14 @@ export async function loadInvites(
     // becomes activated once invitee is found
     const isNewInviteActivated = !!invitee
 
-    const isMining = tx && tx.result && tx.result.blockHash === HASH_IN_MEMPOOL
+    // callRpc answers the tx itself; a tx still in the mempool has no block yet
+    const isMining = tx?.blockHash === HASH_IN_MEMPOOL
 
     const terminateTx = terminateTxs.find(
       ({hash}) => hash === invite.terminateHash
     )
 
-    const isTerminating =
-      terminateTx &&
-      terminateTx.result &&
-      terminateTx.result.blockHash === HASH_IN_MEMPOOL
+    const isTerminating = terminateTx?.blockHash === HASH_IN_MEMPOOL
 
     const nextInvite = {
       ...invite,
@@ -109,6 +114,57 @@ export async function loadInvites(
     }
   })
 }
+
+// The contacts marked `flag` whose tx (field `txField`) left the mempool, with the invitee's identity as the node
+// now knows it, no longer marked. A contact whose tx is still in the mempool, or whose node call fails, stays as
+// it is until the next check. Answers null when nothing changed.
+async function checkSettled(invites, flag, txField, callRpc) {
+  const settled = (
+    await Promise.all(
+      invites
+        .filter((invite) => invite[flag])
+        .map(async (invite) => {
+          try {
+            const tx = await callRpc('bcn_transaction', invite[txField])
+            if (!tx || tx.blockHash === HASH_IN_MEMPOOL) return null
+            const identity = await callRpc('dna_identity', invite.receiver)
+            return identity ? {id: invite.id, identity} : null
+          } catch {
+            return null
+          }
+        })
+    )
+  ).filter(Boolean)
+
+  if (settled.length === 0) return null
+
+  return invites.map((invite) => {
+    const {identity} = settled.find(({id}) => id === invite.id) ?? {}
+    return identity
+      ? {
+          ...invite,
+          [flag]: false,
+          identity,
+          state: identity.state,
+          canKill: canKill(invite, identity),
+        }
+      : invite
+  })
+}
+
+/**
+ * The contacts whose invite tx left the mempool, no longer mining, with the invitee's identity (`Invite`: the
+ * invitation can be terminated). See checkSettled.
+ */
+export const checkMining = (invites, {callRpc}) =>
+  checkSettled(invites, 'mining', 'hash', callRpc)
+
+/**
+ * The contacts whose termination tx left the mempool, no longer terminating, with the invitee's identity
+ * (`Undefined` once the tx is in a block: the node deletes a terminated identity). See checkSettled.
+ */
+export const checkTerminations = (invites, {callRpc}) =>
+  checkSettled(invites, 'terminating', 'terminateHash', callRpc)
 
 /**
  * What the contact list shows: the contacts that are not deleted and whose name or address holds `filter`

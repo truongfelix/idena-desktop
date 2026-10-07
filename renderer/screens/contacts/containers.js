@@ -49,7 +49,7 @@ import {
 import {useSuccessToast} from '../../shared/hooks/use-toast'
 import {IdentityStatus} from '../../shared/types'
 import {useInviteScore} from '../home/hooks'
-import {contactListView} from './utils'
+import {contactListView, isTerminatedInvite} from './utils'
 import {
   BasketIcon,
   ChevronDownIcon,
@@ -278,6 +278,7 @@ export function ContactCard({
     canKill,
     mining,
     terminating,
+    terminateHash,
     activated,
     identity: {state, stake} = {},
   } = {...contact, ...invitee}
@@ -296,7 +297,10 @@ export function ContactCard({
     state === IdentityStatus.Undefined && !canKill && !mining && !activated
 
   // eslint-disable-next-line no-nested-ternary
-  const status = isInviteExpired
+  const status = isTerminatedInvite({terminateHash, terminating, state})
+    ? t('Terminated')
+    : // eslint-disable-next-line no-nested-ternary
+    isInviteExpired
     ? t('Expired invitation')
     : // eslint-disable-next-line no-nested-ternary
     mining
