@@ -1,5 +1,12 @@
 import {IdentityStatus} from '../../shared/types'
-import {contactListView, loadInvites, savedContacts} from './utils'
+import {HASH_IN_MEMPOOL} from '../../shared/utils/utils'
+import {
+  checkMining,
+  checkTerminations,
+  contactListView,
+  loadInvites,
+  savedContacts,
+} from './utils'
 
 const alice = {
   id: 'a',
@@ -100,8 +107,8 @@ describe('loading the contacts with the node', () => {
         canKill: false,
         dbkey: 'b',
         identity: undefined,
-        mining: undefined,
-        terminating: undefined,
+        mining: false,
+        terminating: false,
       },
     ])
   })
@@ -110,6 +117,155 @@ describe('loading the contacts with the node', () => {
     const n = node()
     await expect(loadInvites([], [], n)).resolves.toEqual([])
     expect(n.calls).toEqual([])
+  })
+})
+
+// The node's bcn_transaction answer (callRpc returns the result): no block yet while the tx is in the mempool.
+const txIn = (blockHash) => (hash) => ({hash, blockHash, type: 'invite'})
+const inMempool = txIn(HASH_IN_MEMPOOL)
+const inBlock = txIn('0x5e7b')
+
+function nodeWithTxs(txs, identities = {}) {
+  const calls = []
+  return {
+    calls,
+    callRpc: jest.fn(async (method, arg) => {
+      calls.push(`${method} ${arg}`)
+      if (method === 'bcn_transaction') {
+        if (!txs[arg]) throw new Error('transaction not found')
+        return txs[arg](arg)
+      }
+      if (method === 'dna_identity') return identities[arg]
+      throw new Error(`unexpected ${method}`)
+    }),
+    fetchIdentity: jest.fn(async (address) => ({
+      address,
+      state: IdentityStatus.Undefined,
+    })),
+    saveInvite: jest.fn(),
+  }
+}
+
+describe('invites and terminations in the mempool', () => {
+  const sent = {id: 's', hash: '0xe5', receiver: '0x55', key: 'k'}
+  const terminated = {...alice, canKill: false}
+
+  it('marks an invite whose tx is in the mempool as mining', async () => {
+    const n = nodeWithTxs({'0xe5': inMempool})
+    const [invite] = await loadInvites([sent], [], n)
+    expect(invite).toMatchObject({mining: true, terminating: false})
+  })
+
+  it('does not mark an invite whose tx is in a block', async () => {
+    const n = nodeWithTxs({'0xe5': inBlock})
+    const [invite] = await loadInvites([sent], [], n)
+    expect(invite.mining).toBe(false)
+  })
+
+  it('marks a contact whose termination tx is in the mempool as terminating', async () => {
+    const n = nodeWithTxs({'0xa1': inBlock, '0xb2': inMempool})
+    const [invite] = await loadInvites([terminated], [], n)
+    expect(invite).toMatchObject({mining: false, terminating: true})
+  })
+
+  it('does not mark a contact whose termination tx is in a block', async () => {
+    const n = nodeWithTxs({'0xa1': inBlock, '0xb2': inBlock})
+    const [invite] = await loadInvites([terminated], [], n)
+    expect(invite.terminating).toBe(false)
+  })
+
+  describe('checking the invites being mined', () => {
+    const mining = {...sent, mining: true, canKill: false}
+    const invited = {address: '0x55', state: IdentityStatus.Invite}
+
+    it('ends mining once the invite tx is in a block, and offers to terminate it', async () => {
+      const n = nodeWithTxs({'0xe5': inBlock}, {'0x55': invited})
+      const invites = await checkMining([mining, carol], n)
+      expect(invites).toEqual([
+        {
+          ...mining,
+          mining: false,
+          identity: invited,
+          state: IdentityStatus.Invite,
+          canKill: true,
+        },
+        carol,
+      ])
+      expect(n.calls).toEqual(['bcn_transaction 0xe5', 'dna_identity 0x55'])
+    })
+
+    it('keeps mining while the invite tx is in the mempool', async () => {
+      const n = nodeWithTxs({'0xe5': inMempool})
+      expect(await checkMining([mining], n)).toBeNull()
+      expect(n.calls).toEqual(['bcn_transaction 0xe5'])
+    })
+
+    it('keeps mining when the identity call fails', async () => {
+      const n = nodeWithTxs({'0xe5': inBlock})
+      n.callRpc.mockImplementation(async (method, arg) => {
+        if (method === 'dna_identity') throw new Error('Failed to fetch')
+        return inBlock(arg)
+      })
+      expect(await checkMining([mining], n)).toBeNull()
+    })
+  })
+
+  describe('checking the terminations', () => {
+    // the node deletes a terminated identity: it answers Undefined
+    const killed = {address: '0x11', state: IdentityStatus.Undefined}
+    const terminating = {...terminated, terminating: true}
+
+    it('ends a termination once its tx is in a block', async () => {
+      const n = nodeWithTxs({'0xb2': inBlock}, {'0x11': killed})
+      const invites = await checkTerminations([terminating, carol], n)
+      expect(invites).toEqual([
+        {
+          ...terminating,
+          identity: killed,
+          state: IdentityStatus.Undefined,
+          terminating: false,
+          canKill: false,
+        },
+        carol,
+      ])
+      // the termination tx, not the invite tx
+      expect(n.calls).toEqual(['bcn_transaction 0xb2', 'dna_identity 0x11'])
+    })
+
+    it('keeps a termination whose tx is still in the mempool', async () => {
+      const n = nodeWithTxs({'0xb2': inMempool})
+      expect(await checkTerminations([terminating, carol], n)).toBeNull()
+      expect(n.calls).toEqual(['bcn_transaction 0xb2'])
+    })
+
+    it('keeps a termination when the node call fails', async () => {
+      const n = nodeWithTxs({})
+      expect(await checkTerminations([terminating], n)).toBeNull()
+    })
+
+    it('ends the terminations that are done and keeps the others', async () => {
+      const other = {
+        ...carol,
+        terminating: true,
+        terminateHash: '0xf6',
+      }
+      const n = nodeWithTxs(
+        {'0xb2': inBlock, '0xf6': inMempool},
+        {'0x11': killed}
+      )
+      const invites = await checkTerminations([terminating, other], n)
+      expect(invites[0]).toMatchObject({
+        terminating: false,
+        state: IdentityStatus.Undefined,
+      })
+      expect(invites[1]).toBe(other)
+    })
+
+    it('asks nothing when no contact is terminating', async () => {
+      const n = nodeWithTxs({})
+      expect(await checkTerminations([alice, carol], n)).toBeNull()
+      expect(n.calls).toEqual([])
+    })
   })
 })
 

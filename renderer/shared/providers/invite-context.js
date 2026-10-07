@@ -7,7 +7,12 @@ import {IdentityStatus} from '../types'
 import {fetchIdentity, killInvitee, sendInvite} from '../api/dna'
 import {useFailToast} from '../hooks/use-toast'
 import {strip} from '../utils/obj'
-import {canKill, loadInvites, savedContacts} from '../../screens/contacts/utils'
+import {
+  checkMining,
+  checkTerminations,
+  loadInvites,
+  savedContacts,
+} from '../../screens/contacts/utils'
 
 const db = global.invitesDb || {}
 
@@ -72,82 +77,16 @@ export function InviteProvider({children}) {
 
   useInterval(
     async () => {
-      const miningInvites = invites.filter(({mining}) => mining)
-
-      const txs = await Promise.all(
-        miningInvites.map(({hash}) =>
-          callRpc('bcn_transaction', hash)
-            .then((tx) => ({
-              hash,
-              mining: tx?.blockHash === HASH_IN_MEMPOOL,
-            }))
-            .catch(() => null)
-        )
-      )
-
-      const identities = await Promise.all(
-        miningInvites.map(async (invite) => {
-          const invitedIdentity = await callRpc('dna_identity', invite.receiver)
-
-          return {
-            hash: invite.hash,
-            identity: invitedIdentity,
-          }
-        })
-      )
-
-      setInvites(
-        invites.map((invite) => {
-          const tx = txs.find((x) => x.hash === invite.hash)
-          const identity = identities.find((x) => x.hash === invite.hash)
-          return {
-            ...invite,
-            ...tx,
-            ...identity,
-          }
-        })
-      )
+      const nextInvites = await checkMining(invites, {callRpc})
+      if (nextInvites) setInvites(nextInvites)
     },
     invites.filter(({mining}) => mining).length ? 1000 * 10 : null
   )
 
   useInterval(
     async () => {
-      const txs = await Promise.all(
-        invites
-          .filter(({terminating}) => terminating)
-          .map(({hash}) =>
-            callRpc('bcn_transaction', hash).then((tx) => ({hash, ...tx}))
-          )
-      )
-
-      setInvites(
-        await Promise.all(
-          invites.map(async (invite) => {
-            const invitedIdentity = await callRpc(
-              'dna_identity',
-              invite.receiver
-            )
-
-            const tx = txs.find(({hash}) => hash === invite.hash)
-
-            const isTerminating =
-              invitedIdentity?.state !== IdentityStatus.Undefined
-
-            return tx
-              ? {
-                  ...invite,
-                  identity: invitedIdentity,
-                  state: isTerminating
-                    ? IdentityStatus.Terminating
-                    : invitedIdentity?.state,
-                  terminating: isTerminating,
-                  canKill: canKill(invite, invitedIdentity),
-                }
-              : invite
-          })
-        )
-      )
+      const nextInvites = await checkTerminations(invites, {callRpc})
+      if (nextInvites) setInvites(nextInvites)
     },
     invites.filter(({terminating}) => terminating).length ? 1000 * 10 : null
   )
@@ -227,6 +166,7 @@ export function InviteProvider({children}) {
             invite.id === id
               ? {
                   ...invite,
+                  terminateHash: result,
                   terminating: true,
                   state: IdentityStatus.Terminating,
                   canKill: false,
