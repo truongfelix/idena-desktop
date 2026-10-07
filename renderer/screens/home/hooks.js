@@ -7,31 +7,29 @@ import {useEpochState} from '../../shared/providers/epoch-context'
 import {useChainState} from '../../shared/providers/chain-context'
 import {apy, fetchNetworkRewards} from './apy'
 
-export function useIdenaBot() {
-  const [connected, setConnected] = useState(true)
+const COMMUNITY_ALERT_CLOSED = 'didCloseCommunityAlert'
+
+/** Whether the user closed Home's community links ([closed, close]); closing is kept for good. */
+export function useCommunityAlert() {
+  const [closed, setClosed] = useState(true)
 
   useEffect(() => {
-    global.ipcRenderer
-      .invoke('get-data', 'idena-bot')
-      .then((data) => {
-        setConnected(
-          data || JSON.parse(localStorage.getItem('connectIdenaBot')) || false
-        )
-      })
-      .catch(() => {})
+    try {
+      setClosed(localStorage.getItem(COMMUNITY_ALERT_CLOSED) === 'true')
+    } catch {
+      setClosed(false)
+    }
   }, [])
 
   return [
-    connected,
-    {
-      persist: () => {
-        localStorage.setItem('connectIdenaBot', true)
-        setConnected(true)
-      },
-      skip: () => {
-        global.ipcRenderer.send('set-data', 'idena-bot', true)
-        setConnected(true)
-      },
+    closed,
+    () => {
+      try {
+        localStorage.setItem(COMMUNITY_ALERT_CLOSED, 'true')
+      } catch {
+        // Not kept: the links show again at the next start.
+      }
+      setClosed(true)
     },
   ]
 }

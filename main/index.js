@@ -958,15 +958,3 @@ ipcMain.handle('search-image', async (event, query) => {
   requireIpcSender(event)
   return searchImages(query, {logger})
 })
-
-const KEY_VALUE = Object.create(null)
-const MEMORY_KEYS = new Set(['idena-bot'])
-
-ipcMain.handle('get-data', async (event, key) => {
-  requireIpcSender(event)
-  return MEMORY_KEYS.has(key) ? KEY_VALUE[key] : undefined
-})
-ipcMain.on('set-data', (event, key, value) => {
-  if (!acceptIpcSender(event) || !MEMORY_KEYS.has(key)) return
-  KEY_VALUE[key] = Boolean(value)
-})
