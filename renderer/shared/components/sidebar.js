@@ -53,9 +53,11 @@ import {
 import {ExternalLink, Tooltip} from './components'
 import {useTimingState} from '../providers/timing-context'
 import {TodoVotingCountBadge} from '../../screens/oracles/components'
+import {useSocial} from '../../screens/social/provider'
 import {
   AdsIcon,
   ClockIcon,
+  CommunityIcon,
   ContactsIcon,
   GalleryIcon,
   MoreIcon,
@@ -295,6 +297,7 @@ function Navbar() {
   const {t} = useTranslation()
 
   const [{todoCount}] = useVotingNotification()
+  const {unread = []} = useSocial() || {}
 
   return (
     <Nav>
@@ -312,6 +315,18 @@ function Navbar() {
       </NavItem>
       <NavItem href="/contacts" icon={ContactsIcon}>
         {t('Contacts')}
+      </NavItem>
+      <NavItem href="/social" icon={CommunityIcon}>
+        {unread.length > 0 ? (
+          <Flex flex={1} align="center" justify="space-between">
+            <Text as="span">{t('Social')}</Text>
+            <TodoVotingCountBadge>
+              {unread.length > 99 ? '99+' : unread.length}
+            </TodoVotingCountBadge>
+          </Flex>
+        ) : (
+          t('Social')
+        )}
       </NavItem>
       <NavItem href="/oracles/list" icon={OracleIcon} display>
         {todoCount > 0 ? (
