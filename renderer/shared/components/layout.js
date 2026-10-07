@@ -81,6 +81,9 @@ import {OfflineBanner} from './layout/offline'
 import {TroubleshootingScreen} from '../../screens/troubleshooting'
 
 const AVAILABLE_TIMEOUT = global.isDev || global.isTest ? 0 : 1000 * 5
+// The page's zoom range, also the View menu's (main/utils.js).
+const MIN_ZOOM_LEVEL = -5
+const MAX_ZOOM_LEVEL = 5
 
 export default function Layout({
   loading,
@@ -92,19 +95,25 @@ export default function Layout({
   const debouncedSyncing = useDebounce(syncing, AVAILABLE_TIMEOUT)
   const debouncedOffline = useDebounce(offline, AVAILABLE_TIMEOUT)
 
-  const [zoomLevel, setZoomLevel] = React.useState(
-    () => loadPersistentStateValue('settings', 'zoomLevel') || 0
-  )
-
+  // The saved zoom level when a page opens; then a Ctrl+wheel step starts from the page's current level,
+  // which the View menu (main/utils.js) changes too. Both save the level they set.
   React.useEffect(() => {
     if (global.isDev) return
+
+    const savedLevel = loadPersistentStateValue('settings', 'zoomLevel') || 0
+    if (Number.isFinite(savedLevel)) global.setZoomLevel(savedLevel)
 
     const handleMouseWheel = (e) => {
       if (e.ctrlKey) {
         e.preventDefault()
-        setZoomLevel((level) =>
-          Math.min(Math.max(-5, level + e.deltaY * -0.01), 5)
+        const level = Math.min(
+          Math.max(MIN_ZOOM_LEVEL, global.getZoomLevel() + e.deltaY * -0.01),
+          MAX_ZOOM_LEVEL
         )
+        if (Number.isFinite(level)) {
+          global.setZoomLevel(level)
+          persistItem('settings', 'zoomLevel', level)
+        }
       }
     }
 
@@ -114,15 +123,6 @@ export default function Layout({
       document.removeEventListener('wheel', handleMouseWheel)
     }
   }, [])
-
-  React.useEffect(() => {
-    if (global.isDev) return
-
-    if (Number.isFinite(zoomLevel)) {
-      global.setZoomLevel(zoomLevel)
-      persistItem('settings', 'zoomLevel', zoomLevel)
-    }
-  }, [zoomLevel])
 
   const failToast = useFailToast()
 

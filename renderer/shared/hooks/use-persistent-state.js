@@ -4,6 +4,7 @@ import {
   persistItem,
   persistState,
   shouldPersist,
+  withSavedKeys,
 } from '../utils/persist'
 
 export function usePersistentState(dbName, key, initialValue) {
@@ -27,8 +28,9 @@ export function usePersistentState(dbName, key, initialValue) {
  * @param {*} useReducer Original useReducer
  * @param {string} name Name of the file to be persisted in
  * @param {(string|string[])} [on] If passed whitelists actions triggering persistence
+ * @param {string[]} [savedElsewhere] Keys other code writes to the same file: their saved values are written
  */
-export function usePersistence([state, dispatch], name, on) {
+export function usePersistence([state, dispatch], name, on, savedElsewhere) {
   const actionRef = useRef()
 
   const newDispatchRef = useRef((action) => {
@@ -39,10 +41,10 @@ export function usePersistence([state, dispatch], name, on) {
   useEffect(() => {
     const action = actionRef.current
     if (action && shouldPersist(on, action)) {
-      persistState(name, state)
+      persistState(name, withSavedKeys(name, state, savedElsewhere))
     }
     // TODO: Do we have something to do with the cleanup? 🤔
-  }, [name, on, state])
+  }, [name, on, savedElsewhere, state])
 
   return [state, newDispatchRef.current]
 }

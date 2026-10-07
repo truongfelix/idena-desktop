@@ -33,6 +33,21 @@ describe('View menu zoom', () => {
     expect(persistZoomLevel.mock.calls).toEqual([[2], [1], [0], [-1], [0]])
   })
 
+  it('stays within the page zoom range', () => {
+    const window = windowAt(4.5)
+
+    zoomIn(window)
+    zoomIn(window)
+    expect(window.webContents.zoomLevel).toBe(5)
+
+    window.webContents.zoomLevel = -4.2
+    zoomOut(window)
+    zoomOut(window)
+    expect(window.webContents.zoomLevel).toBe(-5)
+
+    expect(persistZoomLevel.mock.calls).toEqual([[5], [5], [-5], [-5]])
+  })
+
   // macOS keeps the menu and its shortcuts with the main window hidden: the click gets no window.
   it.each([
     ['no window', undefined],

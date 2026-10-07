@@ -28,6 +28,21 @@ export function persistItem(dbName, key, value) {
   }
 }
 
+// The state with the saved values of `keys` instead of its own: other code writes those keys to the same file.
+export function withSavedKeys(name, state, keys) {
+  if (!keys || keys.length === 0) return state
+  const saved = loadPersistentState(name) || {}
+  const result = {...state}
+  for (const key of keys) {
+    if (key in saved) {
+      result[key] = saved[key]
+    } else {
+      delete result[key]
+    }
+  }
+  return result
+}
+
 export function persistState(name, state) {
   try {
     persistentState.setState(name, state)
