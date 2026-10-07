@@ -22,22 +22,35 @@ function isNotFoundError(error) {
   return error?.response?.status === 404
 }
 
+// A menu item's click handler gets no window when none has the focus: on macOS the menu stays with the
+// main window hidden. Nothing to zoom then.
+function zoomableContents(window) {
+  const contents = window && window.webContents
+  return contents && !contents.isDestroyed() ? contents : null
+}
+
 module.exports = {
   promiseTimeout,
   sleep,
   isNotFoundError,
   zoomIn(window) {
-    const nextLevel = window.webContents.zoomLevel + 1
-    window.webContents.zoomLevel = nextLevel
+    const contents = zoomableContents(window)
+    if (!contents) return
+    const nextLevel = contents.zoomLevel + 1
+    contents.zoomLevel = nextLevel
     persistZoomLevel(nextLevel)
   },
   zoomOut(window) {
-    const nextLevel = window.webContents.zoomLevel - 1
-    window.webContents.zoomLevel = nextLevel
+    const contents = zoomableContents(window)
+    if (!contents) return
+    const nextLevel = contents.zoomLevel - 1
+    contents.zoomLevel = nextLevel
     persistZoomLevel(nextLevel)
   },
   resetZoom(window) {
-    window.webContents.zoomLevel = 0
+    const contents = zoomableContents(window)
+    if (!contents) return
+    contents.zoomLevel = 0
     persistZoomLevel(0)
   },
 }
