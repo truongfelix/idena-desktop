@@ -10,7 +10,7 @@ import {
   prependHex,
 } from '../../shared/utils/utils'
 import {isValidUrl} from '../dna/utils'
-import {AdVotingOption, AdVotingOptionId} from './types'
+import {AdStatus, AdVotingOption, AdVotingOptionId} from './types'
 import {resizeImageToArrayBuffer} from '../../shared/utils/image-canvas'
 import {minOwnerDeposit, votingFact} from '../oracles/utils'
 
@@ -110,8 +110,13 @@ async function fetchAdVoting(address) {
     const fact = findContractData(batchData, 'fact')
     const result = findContractData(batchData, 'result')
 
-    if (Boolean(fact.error) || Boolean(result.error)) {
+    if (fact.error) {
       throw new Error('Voting does not exist')
+    }
+    // A voting gets its result when it finishes with a winner: none while it waits for its start or runs, or
+    // after it ended without a winner.
+    if (result.error && result.error !== 'data is nil') {
+      throw new Error(result.error)
     }
 
     if (Boolean(stateError) && stateError !== 'data is nil')
@@ -126,7 +131,7 @@ async function fetchAdVoting(address) {
     return {
       ...votingFact(fact.value),
       status,
-      result: result.value,
+      result: result.error ? undefined : result.value,
       isFetched: true,
     }
   } catch (e) {
@@ -200,6 +205,10 @@ export function isAdReviewCommittee({committeeSize, ownerDeposit}) {
   )
 }
 
+/**
+ * The ads in the address's profile, none when it has no profile. A failed read throws: publishing writes the
+ * whole list back, and an empty list read by mistake removed the campaigns already in the profile.
+ */
 export async function fetchProfileAds(address) {
   try {
     const {profileHash} = await callRpc('dna_identity', address)
@@ -207,9 +216,43 @@ export async function fetchProfileAds(address) {
     return profileHash
       ? Profile.fromHex(await callRpc('ipfs_get', profileHash)).ads ?? []
       : []
-  } catch {
-    console.error('Error fetching ads for identity', address)
-    return []
+  } catch (error) {
+    console.error('Error fetching ads for identity', address, error?.message)
+    throw new Error(
+      i18n.t(
+        'Cannot read the campaigns already in your profile. Nothing was sent, try again later.'
+      )
+    )
+  }
+}
+
+/**
+ * A saved ad's status from its review voting (`voting`: the contract's, undefined when the contract holds no
+ * voting) and the status saved with it. A voting deployed but never started (its start failed) is no review:
+ * the ad is a draft again, `reviewNotStarted` (the review can be started on that contract, its stake is paid).
+ * A "reviewing" ad whose contract holds no voting (the deployment never got into a block, or a voting never
+ * started was terminated) is a draft again.
+ */
+export function adReviewStatus(savedStatus, voting) {
+  if (!voting) {
+    return {
+      status: savedStatus === AdStatus.Reviewing ? AdStatus.Draft : savedStatus,
+      reviewNotStarted: false,
+    }
+  }
+  if (voting.status === VotingStatus.Pending) {
+    return {status: AdStatus.Draft, reviewNotStarted: true}
+  }
+  // A voting that ended on anything but Approve (Reject, no winner) did not approve the ad.
+  return {
+    status:
+      // eslint-disable-next-line no-nested-ternary
+      isApprovedVoting(voting)
+        ? AdStatus.Approved
+        : isFinalVoting(voting)
+        ? AdStatus.Rejected
+        : AdStatus.Reviewing,
+    reviewNotStarted: false,
   }
 }
 

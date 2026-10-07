@@ -227,7 +227,7 @@ export function AdListItem({
 }) {
   const {id, cid, title, language, age, os, stake, status, contract} = ad
 
-  const {t, i18n} = useTranslation()
+  const {t} = useTranslation()
 
   const formatDna = useFormatDna()
 
@@ -309,13 +309,28 @@ export function AdListItem({
                   {t('Preview')}
                 </MenuItem>
 
-                {eitherStatus(AdStatus.Draft, AdStatus.Rejected) && (
-                  <NextLink href={`/adn/edit?id=${id}`} passHref>
-                    <MenuItem icon={<EditIcon boxSize={5} color="blue.500" />}>
-                      {t('Edit')}
-                    </MenuItem>
-                  </NextLink>
-                )}
+                {eitherStatus(AdStatus.Draft, AdStatus.Rejected) &&
+                  !ad.reviewNotStarted && (
+                    <NextLink href={`/adn/edit?id=${id}`} passHref>
+                      <MenuItem
+                        icon={<EditIcon boxSize={5} color="blue.500" />}
+                      >
+                        {t('Edit')}
+                      </MenuItem>
+                    </NextLink>
+                  )}
+
+                {/* Its stake and deposit come back from the voting's page (finish, terminate). */}
+                {contract &&
+                  eitherStatus(AdStatus.Approved, AdStatus.Published) && (
+                    <NextLink href={viewVotingHref(contract)} passHref>
+                      <MenuItem
+                        icon={<OracleIcon boxSize={5} color="blue.500" />}
+                      >
+                        {t('View voting')}
+                      </MenuItem>
+                    </NextLink>
+                  )}
 
                 <MenuDivider />
 
@@ -344,7 +359,7 @@ export function AdListItem({
 
             {status === AdStatus.Draft && (
               <SecondaryButton onClick={onReview}>
-                {t('Review')}
+                {ad.reviewNotStarted ? t('Start review') : t('Review')}
               </SecondaryButton>
             )}
 
@@ -382,21 +397,17 @@ export function AdListItem({
             {status === AdStatus.Published && (
               <InlineAdStatGroup spacing="2" labelWidth="28" flex={1}>
                 <SmallInlineAdStat
-                  label={t('Burnt, {{time}}', {
-                    time: new Intl.RelativeTimeFormat(i18n.language, {
-                      style: 'short',
-                    }).format(24, 'hour'),
-                  })}
+                  label={t('Burnt, last 24 hours')}
                   value={burnAmount ? formatDna(burnAmount.amount) : '--'}
                   flex={0}
                 />
                 <SmallInlineAdStat
-                  label="Competitors"
+                  label={t('Competitors')}
                   value={String(competitorCount)}
                   flex={0}
                 />
                 <SmallInlineAdStat
-                  label="Max bid"
+                  label={t('Max bid')}
                   value={maxCompetitor ? formatDna(maxCompetitor.amount) : '--'}
                 />
               </InlineAdStatGroup>
@@ -874,7 +885,7 @@ export function ReviewAdDrawer({
 
   const [rewardsFund, setRewardsFund] = React.useState(100)
 
-  const {submit} = useReviewAd({
+  const {submit, start, deployed} = useReviewAd({
     rewardsFund,
     onBeforeSubmit: setIsPendingOn,
     onDeployContract,
@@ -899,6 +910,13 @@ export function ReviewAdDrawer({
   const {data: startAmount} = useStartAdVotingAmount()
 
   const formatDna = useFormatDna({maximumFractionDigits: 5})
+
+  // The ad whose review contract `submit` deployed: the drawer stays mounted from one ad to the next.
+  const [deployedAdId, setDeployedAdId] = React.useState()
+  const deployedHere = deployedAdId === ad.id ? deployed : undefined
+
+  // The ad's review contract exists but its voting did not start (here, or before): Send only starts it.
+  const startOnly = ad.reviewNotStarted || Boolean(deployedHere)
 
   return (
     <AdDrawer
@@ -931,6 +949,13 @@ export function ReviewAdDrawer({
               {t(`Please keep in mind that you will not be able to edit the banner
               after it has been submitted for verification`)}
             </Text>
+            {startOnly && (
+              <Text fontWeight={500}>
+                {t(
+                  'The review contract of this ad is deployed, but its voting did not start. Send starts it.'
+                )}
+              </Text>
+            )}
           </Stack>
           <Stack spacing={6} bg="gray.50" p={6} rounded="lg">
             <Stack isInline spacing={5} align="flex-start">
@@ -961,6 +986,28 @@ export function ReviewAdDrawer({
               isSubmittingRef.current = true
               setIsPendingOn()
 
+              // The contract is deployed (its stake paid) but its voting did not start: start it, nothing else.
+              if (startOnly) {
+                if (!startAmount) {
+                  releaseSubmit()
+                } else if (balance > startAmount + rewardsFund) {
+                  start(deployedHere ?? ad)
+                } else {
+                  releaseSubmit()
+                  failToast(
+                    t(
+                      `Insufficient funds to start reviewing ad. Please deposit at least {{missingAmount}}.`,
+                      {
+                        missingAmount: formatDna(
+                          Math.abs(balance - startAmount - rewardsFund)
+                        ),
+                      }
+                    )
+                  )
+                }
+                return
+              }
+
               const {thumb, media} = await dexieDb.table('ads').get(ad.id)
 
               const errors = validateAd({...ad, thumb, media})
@@ -984,6 +1031,7 @@ export function ReviewAdDrawer({
 
                 if (balance > requiredAmount) {
                   try {
+                    setDeployedAdId(ad.id)
                     submit({
                       ...ad,
                       thumb: new Uint8Array(
@@ -1058,16 +1106,30 @@ export function ReviewAdDrawer({
                   label={t('Refundable deposit')}
                   value={formatDna(startAmount)}
                 />
-                <DrawerFormHelper
-                  label={t('Stake')}
-                  value={formatDna(deployAmount)}
-                />
+                {startOnly ? (
+                  <DrawerFormHelper
+                    label={t('Stake')}
+                    value={t('Paid, in the review contract')}
+                  />
+                ) : (
+                  <DrawerFormHelper
+                    label={t('Stake')}
+                    value={formatDna(deployAmount)}
+                  />
+                )}
                 <DrawerFormHelper
                   mt={6}
                   label={t('Total amount')}
-                  value={formatDna(deployAmount + startAmount + rewardsFund)}
+                  value={formatDna(
+                    (startOnly ? 0 : deployAmount) + startAmount + rewardsFund
+                  )}
                 />
               </FormControl>
+              <Text color="muted" fontSize="sm">
+                {t(
+                  'The deposit comes back when the voting ends, whether the ad is approved or rejected. Half of the stake comes back when the voting is terminated, which anyone can do on its page some days after the review; the other half is burned.'
+                )}
+              </Text>
             </Stack>
           </form>
         </Stack>
@@ -1254,6 +1316,11 @@ export function BurnDrawer({ad, onBurn, ...props}) {
         <Stack spacing="6" color="brandGray.500" fontSize="md" p={6} pt={0}>
           <Stack spacing="3">
             <Text>{t('Burn iDNA to make your ad visible.')}</Text>
+            <Text color="muted">
+              {t(
+                'The burned iDNA is destroyed. For 24 hours (4,320 blocks) after a burn, your ad is shown to the identities it targets, ranked against the other ads by the iDNA burned in those 24 hours and by how precisely each ad targets the viewer. Burn again to keep it shown.'
+              )}
+            </Text>
           </Stack>
 
           <Stack spacing="6" bg="gray.50" p={6} rounded="lg">
