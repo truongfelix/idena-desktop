@@ -25,10 +25,9 @@ describe('safe ipcRenderer bridge', () => {
 
     safeIpcRenderer.send(NODE_COMMAND, 'init-local-node')
     safeIpcRenderer.send(AUTO_UPDATE_COMMAND, 'update-node')
-    safeIpcRenderer.send('set-data', 'idena-bot', true)
     safeIpcRenderer.send('showMainWindow')
 
-    expect(ipcRenderer.send).toHaveBeenCalledTimes(4)
+    expect(ipcRenderer.send).toHaveBeenCalledTimes(3)
   })
 
   it('blocks unexpected send channels and commands', () => {
@@ -40,8 +39,8 @@ describe('safe ipcRenderer bridge', () => {
     expect(() =>
       safeIpcRenderer.send(NODE_COMMAND, 'delete-everything')
     ).toThrow(/Blocked node IPC command/)
-    expect(() => safeIpcRenderer.send('set-data', 'unexpected', true)).toThrow(
-      /Blocked set-data IPC key/
+    expect(() => safeIpcRenderer.send('set-data', 'idena-bot', true)).toThrow(
+      /Blocked IPC send channel/
     )
   })
 
@@ -60,6 +59,9 @@ describe('safe ipcRenderer bridge', () => {
     const safeIpcRenderer = createSafeIpcRenderer(createIpcRendererMock())
 
     expect(() => safeIpcRenderer.invoke('open-file')).toThrow(
+      /Blocked IPC invoke channel/
+    )
+    expect(() => safeIpcRenderer.invoke('get-data', 'idena-bot')).toThrow(
       /Blocked IPC invoke channel/
     )
   })

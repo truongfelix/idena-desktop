@@ -13,11 +13,10 @@ const SEND_CHANNELS = new Set([
   'confirm-quit',
   'DNA_LINK_HANDLED',
   'reload',
-  'set-data',
   'showMainWindow',
 ])
 
-const INVOKE_CHANNELS = new Set(['CHECK_DNA_LINK', 'get-data', 'search-image'])
+const INVOKE_CHANNELS = new Set(['CHECK_DNA_LINK', 'search-image'])
 
 const LISTEN_CHANNELS = new Set([
   AUTO_UPDATE_EVENT,
@@ -65,10 +64,6 @@ function assertAllowedCommand(channel, args) {
 
   if (channel === WINDOW_COMMAND && !WINDOW_COMMANDS.has(command)) {
     throw new Error(`Blocked window IPC command: ${command}`)
-  }
-
-  if (channel === 'set-data' && command !== 'idena-bot') {
-    throw new Error(`Blocked set-data IPC key: ${command}`)
   }
 }
 
