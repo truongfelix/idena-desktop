@@ -377,11 +377,10 @@ function NavItem({href, icon, children}) {
       _focus={{outline: 'none'}}
     >
       <Icon as={icon} boxSize="5" />
-      <NextLink href={href} passHref>
-        <LinkOverlay display="block" w="full">
-          {children}
-        </LinkOverlay>
-      </NextLink>
+      {/* The overlay is the link itself, so the whole item opens the page, not only its text. */}
+      <LinkOverlay as={NextLink} href={href} display="block" w="full">
+        {children}
+      </LinkOverlay>
     </LinkBox>
   )
 }

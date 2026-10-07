@@ -652,9 +652,10 @@ export const IconLink = React.forwardRef(
       {...props}
     >
       {icon}
-      <NextLink ref={ref} href={href} passHref>
-        <LinkOverlay>{children}</LinkOverlay>
-      </NextLink>
+      {/* The overlay is the link itself, so the whole box opens it, not only its text. */}
+      <LinkOverlay as={NextLink} ref={ref} href={href}>
+        {children}
+      </LinkOverlay>
     </LinkBox>
   )
 )
