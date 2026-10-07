@@ -1,5 +1,6 @@
 import {
   DB_WRITE_BUFFERS,
+  DEFAULT_WRITE_BUFFER_MIB,
   IPFS_CONNECTION_CHOICES,
   IPFS_WRITE_BUFFERS,
   PEER_LEVEL_CHOICES,
@@ -16,6 +17,28 @@ describe('advanced node settings', () => {
   it('offers the four sizes for each database', () => {
     expect(DB_WRITE_BUFFERS.map(({mib}) => mib)).toEqual([4, 16, 32, 64])
     expect(IPFS_WRITE_BUFFERS.map(({mib}) => mib)).toEqual([4, 16, 32, 64])
+  })
+
+  it("names the choices as the phone app, with idena-go's defaults", () => {
+    for (const buffers of [DB_WRITE_BUFFERS, IPFS_WRITE_BUFFERS]) {
+      expect(buffers.map(({label}) => label)).toEqual([
+        'Default',
+        '16 MiB',
+        '32 MiB',
+        '64 MiB',
+      ])
+    }
+    expect(DEFAULT_WRITE_BUFFER_MIB).toBe(4)
+    expect(
+      PEER_LEVEL_CHOICES.filter(({isDefault}) => isDefault).map(
+        ({value}) => value
+      )
+    ).toEqual(['normal'])
+    expect(
+      IPFS_CONNECTION_CHOICES.filter(({isDefault}) => isDefault).map(
+        ({high}) => high
+      )
+    ).toEqual([50])
   })
 
   it("offers the phone app's peer levels and IPFS limits", () => {
@@ -131,7 +154,7 @@ describe('advanced node settings', () => {
       })
     ).toEqual([
       {title: 'Peer level', value: 'Hub'},
-      {title: 'Chain database write buffer', value: '32 MiB'},
+      {title: 'Chain database buffer', value: '32 MiB'},
     ])
     expect(
       pendingNodeOptions({nodeStarted: false, running: {}, supported, settings})

@@ -49,9 +49,11 @@ import {useEpochState} from '../../shared/providers/epoch-context'
 import {NODE_COMMAND} from '../../../main/channels'
 import {
   DB_WRITE_BUFFERS,
+  DEFAULT_WRITE_BUFFER_MIB,
   IPFS_CONNECTION_CHOICES,
   IPFS_WRITE_BUFFERS,
   PEER_LEVEL_CHOICES,
+  WRITE_BUFFER_NOTE,
   pendingNodeOptions,
   restartRisk,
 } from './advanced-settings'
@@ -422,14 +424,21 @@ export function AdvancedNodeSettings() {
     settings.ipfsConnections,
     peerLevel.value
   )
+  // A size not offered starts the node without the flag: at idena-go's default.
   const dbBuffer =
     DB_WRITE_BUFFERS.find(({mib}) => mib === settings.dbWriteBufferMiB) ??
-    DB_WRITE_BUFFERS[2]
+    DB_WRITE_BUFFERS[0]
   const ipfsBuffer =
     IPFS_WRITE_BUFFERS.find(({mib}) => mib === settings.ipfsWriteBufferMiB) ??
     IPFS_WRITE_BUFFERS[0]
   const unsupported = (flag) =>
     settings.runInternalNode && supported?.[flag] === false
+  // "Default · 4 MiB", then "16 MiB"...
+  const bufferOption = ({mib, label}) => ({
+    value: mib,
+    label:
+      mib === DEFAULT_WRITE_BUFFER_MIB ? `${t(label)} · ${mib} MiB` : label,
+  })
 
   return (
     <Stack spacing={4}>
@@ -453,10 +462,9 @@ export function AdvancedNodeSettings() {
             ? t('The node in use cannot change it: it runs with Normal', {
                 nsSeparator: '!!',
               })
-            : `${t('How many Idena nodes this node stays connected to')}. ${t(
-                peerLevel.detail,
-                {nsSeparator: '!!'}
-              )}`
+            : `${t(
+                'How many Idena nodes this computer stays connected to. Blocks, votes and transactions come from them'
+              )}. ${t(peerLevel.detail, {nsSeparator: '!!'})}`
         }
         value={peerLevel.value}
         isDisabled={!settings.runInternalNode || unsupported('peerLimits')}
@@ -471,9 +479,11 @@ export function AdvancedNodeSettings() {
         }
         options={PEER_LEVEL_CHOICES.map((choice) => ({
           value: choice.value,
-          label: `${t(choice.label)} · ${t('up to {{count}} peers', {
-            count: choice.maxPeers,
-          })}`,
+          label: `${t(choice.label)} · ${
+            choice.isDefault
+              ? t('up to {{count}} peers, default', {count: choice.maxPeers})
+              : t('up to {{count}} peers', {count: choice.maxPeers})
+          }`,
         }))}
       />
       <NodeOptionRow
@@ -484,7 +494,8 @@ export function AdvancedNodeSettings() {
                 nsSeparator: '!!',
               })
             : t(
-                'Flips and posts travel over them, and the node finds its Idena peers among them. Fewer connections use less traffic'
+                'IPFS connections carry flips, posts and the records that tell which node has them. The node finds its Idena peers among them. Above the limit it closes the least used ones and keeps its Idena peers: fewer connections use less traffic',
+                {nsSeparator: '!!'}
               )
         }
         value={ipfsConnections}
@@ -492,64 +503,61 @@ export function AdvancedNodeSettings() {
         onChange={(value) =>
           save('IPFS connections', {ipfsConnections: Number(value)})
         }
-        options={IPFS_CONNECTION_CHOICES.map(({high, label}) => {
+        options={IPFS_CONNECTION_CHOICES.map(({high, label, isDefault}) => {
           const allowed = ipfsConnectionsFor(high, peerLevel.value) === high
+          let note = null
+          if (!allowed) {
+            note = t('too few for {{level}}', {level: t(peerLevel.label)})
+          } else if (isDefault) {
+            note = t('default')
+          }
           return {
             value: high,
             isDisabled: !allowed,
-            label: allowed
-              ? t(label)
-              : `${t(label)} · ${t('too few for {{level}}', {
-                  level: t(peerLevel.label),
-                })}`,
+            label: note ? `${t(label)} · ${note}` : t(label),
           }
         })}
       />
       <NodeOptionRow
-        title={t('Chain database write buffer')}
+        title={t('Chain database buffer')}
         description={
           unsupported('dbWriteBuffer')
             ? t('The node in use cannot change it: it runs with 4 MiB', {
                 nsSeparator: '!!',
               })
-            : `${t(dbBuffer.detail)}. ${t(
-                'Fewer disk writes for more memory; the node takes it when it starts'
-              )}`
+            : `${t(
+                'The chain database holds the blockchain: the node writes to it at every block',
+                {nsSeparator: '!!'}
+              )}. ${t(WRITE_BUFFER_NOTE)}`
         }
         value={dbBuffer.mib}
         isDisabled={!settings.runInternalNode || unsupported('dbWriteBuffer')}
         onChange={(value) =>
-          save('Chain database write buffer', {
+          save('Chain database buffer', {
             dbWriteBufferMiB: Number(value),
           })
         }
-        options={DB_WRITE_BUFFERS.map(({mib, label}) => ({
-          value: mib,
-          label: `${mib} MiB · ${t(label)}`,
-        }))}
+        options={DB_WRITE_BUFFERS.map(bufferOption)}
       />
       <NodeOptionRow
-        title={t('IPFS database write buffer')}
+        title={t('IPFS database buffer')}
         description={
           unsupported('ipfsWriteBuffer')
             ? t('The node in use cannot change it: it runs with 4 MiB', {
                 nsSeparator: '!!',
               })
-            : t(
-                'It writes the most when nodes outside can reach this computer. Fewer disk writes for more memory'
-              )
+            : `${t(
+                'The IPFS database holds what the network uses to find content (which node has which flip, post or block). When nodes outside can reach this computer (a port open on the router), they store these records on it, and this database writes the most'
+              )}. ${t(WRITE_BUFFER_NOTE)}`
         }
         value={ipfsBuffer.mib}
         isDisabled={!settings.runInternalNode || unsupported('ipfsWriteBuffer')}
         onChange={(value) =>
-          save('IPFS database write buffer', {
+          save('IPFS database buffer', {
             ipfsWriteBufferMiB: Number(value),
           })
         }
-        options={IPFS_WRITE_BUFFERS.map(({mib, label}) => ({
-          value: mib,
-          label: mib === 4 ? `${mib} MiB · ${t(label)}` : t(label),
-        }))}
+        options={IPFS_WRITE_BUFFERS.map(bufferOption)}
       />
       <Dialog
         isOpen={isConfirming}
