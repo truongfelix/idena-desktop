@@ -4,6 +4,7 @@ import {
   checkMining,
   checkTerminations,
   contactListView,
+  isTerminatedInvite,
   loadInvites,
   savedContacts,
 } from './utils'
@@ -266,6 +267,39 @@ describe('invites and terminations in the mempool', () => {
       expect(await checkTerminations([alice, carol], n)).toBeNull()
       expect(n.calls).toEqual([])
     })
+  })
+})
+
+describe('a terminated invitation', () => {
+  const sentTermination = {terminateHash: '0xb2', terminating: false}
+
+  it('is one whose termination left the mempool and whose invitee the node deleted', () => {
+    expect(
+      isTerminatedInvite({...sentTermination, state: IdentityStatus.Undefined})
+    ).toBe(true)
+  })
+
+  it('is not one whose termination is still in the mempool', () => {
+    expect(
+      isTerminatedInvite({
+        ...sentTermination,
+        terminating: true,
+        state: IdentityStatus.Invite,
+      })
+    ).toBe(false)
+  })
+
+  it('is not one whose invitee the node still knows (the termination never made it into a block)', () => {
+    expect(
+      isTerminatedInvite({...sentTermination, state: IdentityStatus.Invite})
+    ).toBe(false)
+  })
+
+  it('is not one without a termination, nor one whose identity is unknown', () => {
+    expect(isTerminatedInvite({state: IdentityStatus.Undefined})).toBe(false)
+    expect(isTerminatedInvite({...sentTermination, state: undefined})).toBe(
+      false
+    )
   })
 })
 

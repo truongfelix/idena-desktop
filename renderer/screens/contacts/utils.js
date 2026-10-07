@@ -7,6 +7,13 @@ export const canKill = (knownIdentity, persistedIdentity) =>
     persistedIdentity?.state === IdentityStatus.Candidate)
 
 /**
+ * Whether a contact's invitation was terminated: its termination tx left the mempool and the node deleted the
+ * invitee's identity (it answers `Undefined`). A termination that never made it into a block leaves the identity.
+ */
+export const isTerminatedInvite = ({terminateHash, terminating, state}) =>
+  Boolean(terminateHash) && !terminating && state === IdentityStatus.Undefined
+
+/**
  * The saved contacts as stored, shown before the node answers. Whether an invite can be terminated is the node's
  * to say, so no saved value of it is used.
  */
