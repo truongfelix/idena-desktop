@@ -55,8 +55,9 @@ import {
 } from '../../shared/components/icons'
 
 /**
- * The screens of a validation session, driven by a validation machine's `state` and `send`. The page above it
- * renders `children` first (alerts, its own dialogs).
+ * The screens of a validation session, driven by a validation machine's `state` and `send`: the validation and its
+ * practice. `children` come first in the scene (alerts, the page's own dialogs), `headerActions` after the full
+ * screen button.
  */
 export function ValidationScreen({
   state,
@@ -66,6 +67,7 @@ export function ValidationScreen({
   longSessionDuration,
   isExceededTooltipOpen,
   onCloseExceededTooltip,
+  headerActions,
   children,
 }) {
   const {t} = useTranslation()
@@ -159,6 +161,7 @@ export function ValidationScreen({
             }}
             onClick={global.toggleFullScreen}
           />
+          {headerActions}
         </Flex>
       </Header>
       <CurrentStep>
