@@ -181,3 +181,23 @@ export function countNotices(news) {
   for (const {kind} of news) counts[notifyKindOf(kind)] += 1
   return counts
 }
+
+/**
+ * The notice of several new things on your posts, as the phone app's: how many, then each kind there is with its
+ * count, "3 new on your posts: 2 likes, 1 reply" (replies and comments count as replies).
+ */
+export function noticesTitle(news, t) {
+  const counts = countNotices(news)
+  const parts = [
+    [counts[NotifyKind.Likes], (count) => t('{{count}} likes', {count})],
+    [counts[NotifyKind.Comments], (count) => t('{{count}} replies', {count})],
+    [counts[NotifyKind.Tips], (count) => t('{{count}} tips', {count})],
+  ]
+    .filter(([count]) => count > 0)
+    .map(([count, text]) => text(count))
+  return t('{{count}} new on your posts: {{parts}}', {
+    count: news.length,
+    parts: parts.join(', '),
+    nsSeparator: '|',
+  })
+}

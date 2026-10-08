@@ -1,4 +1,4 @@
-import {stillWaiting} from './sending'
+import {draftToPutBack, stillWaiting} from './sending'
 
 const sent = (hash, height = null, likeOf = null) => ({
   hash,
@@ -22,5 +22,23 @@ describe('the sent actions', () => {
     const like = sent('0xlike', 11400001, 42)
     const tip = sent('0xtip')
     expect(stillWaiting([post, like, tip], 11400002)).toEqual([post, tip])
+  })
+})
+
+describe('a draft whose send failed', () => {
+  const draft = {text: 'hello', image: {bytes: [1]}, textOnIpfs: true}
+
+  it('goes back to an editor that holds nothing', () => {
+    expect(draftToPutBack(draft, {text: '', image: null})).toBe(draft)
+    expect(draftToPutBack(draft, {text: '  \n', image: null})).toBe(draft)
+  })
+
+  it('leaves an editor that holds a text or an image as it is', () => {
+    expect(draftToPutBack(draft, {text: 'new text', image: null})).toBeNull()
+    expect(draftToPutBack(draft, {text: '', image: {bytes: [2]}})).toBeNull()
+  })
+
+  it('is nothing for a like or a tip', () => {
+    expect(draftToPutBack(null, {text: '', image: null})).toBeNull()
   })
 })
