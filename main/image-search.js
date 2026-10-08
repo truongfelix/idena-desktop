@@ -1,10 +1,15 @@
 const https = require('https')
 const axios = require('axios')
+const {version} = require('../package.json')
 
 const SOURCE_TIMEOUT_MS = 8000
 const HTTP_TIMEOUT_MS = 6500
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 const MAX_QUERY_LENGTH = 160
+// Openverse answers anonymous requests of up to 20 results; above that it wants an account (HTTP 401).
+const OPENVERSE_PAGE_SIZE = 20
+// Wikimedia refuses requests without a client name and a contact (its User-Agent policy, HTTP 403).
+const IMAGE_SEARCH_USER_AGENT = `IdenaDesktop/${version} (https://github.com/truongfelix/idena-desktop)`
 
 function logWarn(logger, message, error) {
   if (logger && typeof logger.warn === 'function') {
@@ -212,13 +217,14 @@ async function searchDuckDuckGoImages(
   }
 }
 
-async function searchOpenverseImages(query, {logger} = {}) {
+async function searchOpenverseImages(query, {logger, get = axios.get} = {}) {
   try {
-    const {data} = await axios.get('https://api.openverse.org/v1/images/', {
+    const {data} = await get('https://api.openverse.org/v1/images/', {
       params: {
         q: query,
-        page_size: 30,
+        page_size: OPENVERSE_PAGE_SIZE,
       },
+      headers: {'user-agent': IMAGE_SEARCH_USER_AGENT},
       timeout: 12000,
     })
 
@@ -240,9 +246,9 @@ async function searchOpenverseImages(query, {logger} = {}) {
   }
 }
 
-async function searchWikimediaImages(query, {logger} = {}) {
+async function searchWikimediaImages(query, {logger, get = axios.get} = {}) {
   try {
-    const {data} = await axios.get('https://commons.wikimedia.org/w/api.php', {
+    const {data} = await get('https://commons.wikimedia.org/w/api.php', {
       params: {
         action: 'query',
         format: 'json',
@@ -255,6 +261,7 @@ async function searchWikimediaImages(query, {logger} = {}) {
         iiurlwidth: 320,
         origin: '*',
       },
+      headers: {'user-agent': IMAGE_SEARCH_USER_AGENT},
       timeout: 12000,
     })
 
@@ -344,5 +351,7 @@ module.exports = {
     normalizeImageSearchResult,
     normalizeImageSearchUrl,
     searchDuckDuckGoImages,
+    searchOpenverseImages,
+    searchWikimediaImages,
   },
 }

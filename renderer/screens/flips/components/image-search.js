@@ -213,6 +213,16 @@ export function ImageSearchDialog({onPick, onClose, onError, ...props}) {
             </FillCenter>
           )}
 
+          {eitherState(current, 'done') && images.length === 0 && (
+            <FillCenter>
+              <Text color="muted" textAlign="center" w="3xs">
+                {t(
+                  'No pictures found. Try other words, or search again in a few minutes.'
+                )}
+              </Text>
+            </FillCenter>
+          )}
+
           {eitherState(current, 'done') && (
             <SimpleGrid
               columns={4}
