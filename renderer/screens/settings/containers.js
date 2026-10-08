@@ -58,6 +58,7 @@ import {
   restartRisk,
 } from './advanced-settings'
 import {ipfsConnectionsFor} from '../../../main/node-peers'
+import {DirectPeersSettings} from './direct-peers'
 import {AVAILABLE_LANGS, isoLangs} from '../../i18n'
 import {EyeIcon, EyeOffIcon} from '../../shared/components/icons'
 
@@ -558,6 +559,20 @@ export function AdvancedNodeSettings() {
           })
         }
         options={IPFS_WRITE_BUFFERS.map(bufferOption)}
+      />
+      <DirectPeersSettings
+        isDisabled={!settings.runInternalNode || unsupported('directPeers')}
+        description={
+          unsupported('directPeers')
+            ? t('The node in use cannot keep direct peers', {
+                nsSeparator: '!!',
+              })
+            : t(
+                "Up to 3 nodes this node keeps as peers on top of its peer level: a friend's computer, your phone. It accepts them even when its slots are full, never drops them to make room, and connects again when the connection drops. Share your node's code and add the other person's: both sides should add each other. One of the two must be reachable (its port open on the router). The node takes the list at its start",
+                {nsSeparator: '!!'}
+              )
+        }
+        onSave={save}
       />
       <Dialog
         isOpen={isConfirming}

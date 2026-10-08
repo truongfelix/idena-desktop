@@ -96,12 +96,14 @@ export function NodeProvider({children}) {
       ipfsWriteBufferMiB: settings.ipfsWriteBufferMiB,
       peerLevel: settings.peerLevel,
       ipfsConnections: settings.ipfsConnections,
+      directPeers: settings.directPeers,
     }),
     [
       settings.dbWriteBufferMiB,
       settings.ipfsWriteBufferMiB,
       settings.peerLevel,
       settings.ipfsConnections,
+      settings.directPeers,
     ]
   )
 

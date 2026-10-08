@@ -11,6 +11,11 @@ import {
   ipfsConnectionsFor,
   maxPeers,
 } from '../../../main/node-peers'
+import {
+  cleanDirectPeers,
+  directPeerIds,
+  shortPeerId,
+} from '../../../main/direct-peers'
 
 /** The write buffer size the node runs with unless another is chosen: idena-go's, the phone app's too. */
 export const DEFAULT_WRITE_BUFFER_MIB = 4
@@ -148,6 +153,17 @@ export function pendingNodeOptions({
       supported: supported?.ipfsWriteBuffer,
       value: `${settings.ipfsWriteBufferMiB} MiB`,
     },
+    // The node takes the ids only, compared sorted: a renamed peer needs no restart.
+    {
+      title: 'Direct peers',
+      running: running?.directPeers?.join(','),
+      chosen: directPeerIds(settings.directPeers).join(','),
+      supported: supported?.directPeers,
+      value:
+        cleanDirectPeers(settings.directPeers)
+          .map((peer) => peer.name || shortPeerId(peer.id))
+          .join(', ') || 'none',
+    },
   ]
   return rows
     .filter((row) => optionPending({nodeStarted, ...row}))
@@ -178,4 +194,17 @@ export function restartRisk(now, epoch) {
     }
   }
   return null
+}
+
+/**
+ * How a direct peer stands, for its row: 'connected' when among the node's peers (`peerIds`, a Set from
+ * net_peers), 'after a restart' when the running node was not given it, 'node stopped' when the node does not
+ * answer (`peerIds` null).
+ */
+export function directPeerState(id, {peerIds, running}) {
+  if (!peerIds) return 'node stopped'
+  if (peerIds.has(id)) return 'connected'
+  if (Array.isArray(running?.directPeers) && !running.directPeers.includes(id))
+    return 'after a restart'
+  return 'not connected'
 }
