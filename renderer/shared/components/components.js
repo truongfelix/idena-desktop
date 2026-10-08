@@ -632,9 +632,10 @@ export function SmallText(props) {
   return <Text color="muted" fontSize="sm" {...props} />
 }
 
+// A disabled IconLink looks like a disabled IconButton2 (Chakra's button: opacity 0.4, not-allowed) and has no link.
 // eslint-disable-next-line react/display-name
 export const IconLink = React.forwardRef(
-  ({href, icon, children, ...props}, ref) => (
+  ({href, icon, isDisabled = false, children, ...props}, ref) => (
     <LinkBox
       as={HStack}
       spacing="2"
@@ -646,16 +647,25 @@ export const IconLink = React.forwardRef(
       h="8"
       px="2"
       py="1.5"
-      _hover={{
-        bg: 'blue.50',
-      }}
+      _hover={isDisabled ? {} : {bg: 'blue.50'}}
+      {...(isDisabled && {
+        opacity: 0.4,
+        cursor: 'not-allowed',
+        'aria-disabled': true,
+      })}
       {...props}
     >
       {icon}
       {/* The overlay is the link itself, so the whole box opens it, not only its text. */}
-      <LinkOverlay as={NextLink} ref={ref} href={href}>
-        {children}
-      </LinkOverlay>
+      {isDisabled ? (
+        <Box as="span" ref={ref}>
+          {children}
+        </Box>
+      ) : (
+        <LinkOverlay as={NextLink} ref={ref} href={href}>
+          {children}
+        </LinkOverlay>
+      )}
     </LinkBox>
   )
 )
