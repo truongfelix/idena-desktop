@@ -89,6 +89,22 @@
       "!.nyc_output/**",
       "!downloads",
       "!downloads/**",
+      "!dist",
+      "!dist/**",
+      "!.vscode",
+      "!.vscode/**",
+      "!.eslintrc.js",
+      "!.eslintignore",
+      "!.prettierrc.js",
+      "!.prettierignore",
+      "!.gitleaks.toml",
+      "!.testcafe-electron-rc",
+      "!.node-version",
+      "!.nvmrc",
+      "!babel.config.js",
+      "!jest.config.js",
+      "!next.config.js",
+      "!i18next-scanner.config.js",
       "!renderer",
       "renderer/out"
     ],
@@ -129,7 +145,7 @@
       "publish": [
         "github"
       ],
-      "icon": "main/static/icons/icon-512@2x.icns",
+      "icon": "main/static/icons/icon-512.png",
       "maintainer": "truongfelix <189600415+truongfelix@users.noreply.github.com> (https://github.com/truongfelix)",
       "extraResources": [
         {

@@ -121,6 +121,8 @@ for (const pattern of [
   '!idena-wasm/**',
   '!idena-wasm-binding',
   '!idena-wasm-binding/**',
+  '!dist',
+  '!dist/**',
   '!renderer',
   'renderer/out',
 ]) {
@@ -143,6 +145,16 @@ for (const platform of ['mac', 'win', 'linux']) {
     `build.${platform}.extraResources must include bundled idena-go node`
   )
 }
+
+// electron-builder makes the Linux icons from this file and cannot read a JPEG 2000 frame from an .icns.
+const linuxIcon =
+  packageJson.build && packageJson.build.linux && packageJson.build.linux.icon
+requireCondition(
+  typeof linuxIcon === 'string' &&
+    linuxIcon.endsWith('.png') &&
+    fs.existsSync(linuxIcon),
+  'build.linux.icon must be an existing PNG file'
+)
 
 if (failures.length > 0) {
   console.error('Release metadata check failed:')
