@@ -2,7 +2,7 @@ import React from 'react'
 import {useRouter} from 'next/router'
 import {useTranslation} from 'react-i18next'
 import {useClosableToast} from '../../shared/hooks/use-toast'
-import {ActivityKind, countNotices, newActivity} from './activity'
+import {ActivityKind, newActivity, noticesTitle} from './activity'
 import {displayName} from './people'
 
 /**
@@ -47,13 +47,7 @@ export function useActivityNotices({
           amount: item.amount,
         }),
       }[item.kind]
-    } else {
-      const counts = countNotices(news)
-      title = t(
-        '{{count}} new on your posts ({{likes}} likes, {{comments}} answers, {{tips}} tips)',
-        {count: news.length, ...counts}
-      )
-    }
+    } else title = noticesTitle(news, t)
     toast({
       title,
       actionContent: t('View'),

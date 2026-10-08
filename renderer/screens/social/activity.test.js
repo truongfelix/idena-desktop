@@ -1,4 +1,6 @@
-import {socialProfile} from './activity'
+import i18next from 'i18next'
+import translation from '../../../locales/en/translation.json'
+import {ActivityKind, noticesTitle, socialProfile} from './activity'
 import {LIKE} from './contract'
 import {socialFeed} from './feed'
 import {identityStatus} from './format'
@@ -78,5 +80,53 @@ describe('a profile', () => {
     expect(identityStatus('Undefined')).toBe('Not validated')
     expect(identityStatus('')).toBe('Not validated')
     expect(identityStatus('Candidate')).toBe('Candidate')
+  })
+})
+
+describe('the notice of several new things', () => {
+  const i18n = i18next.createInstance()
+  i18n.init({
+    resources: {en: {translation}},
+    lng: 'en',
+    keySeparator: false,
+    initImmediate: false,
+    interpolation: {escapeValue: false},
+  })
+  const t = i18n.t.bind(i18n)
+  const news = (...kinds) => kinds.map((kind) => ({kind}))
+
+  it('names each kind there is with its count, as the phone app', () => {
+    expect(
+      noticesTitle(
+        news(
+          ActivityKind.Like,
+          ActivityKind.Like,
+          ActivityKind.Reply,
+          ActivityKind.Tip
+        ),
+        t
+      )
+    ).toBe('4 new on your posts: 2 likes, 1 reply, 1 tip')
+    expect(
+      noticesTitle(
+        news(
+          ActivityKind.Tip,
+          ActivityKind.Comment,
+          ActivityKind.Like,
+          ActivityKind.Reply,
+          ActivityKind.Tip
+        ),
+        t
+      )
+    ).toBe('5 new on your posts: 1 like, 2 replies, 2 tips')
+  })
+
+  it('leaves out the kinds there is none of', () => {
+    expect(noticesTitle(news(ActivityKind.Like, ActivityKind.Like), t)).toBe(
+      '2 new on your posts: 2 likes'
+    )
+    expect(noticesTitle(news(ActivityKind.Comment, ActivityKind.Tip), t)).toBe(
+      '2 new on your posts: 1 reply, 1 tip'
+    )
   })
 })
