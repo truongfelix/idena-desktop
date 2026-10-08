@@ -136,7 +136,7 @@ The built-in node directory structure is the same as for standalone node.
 
 - Node.js `24.18.0` on the Node 24 LTS line
 - npm `11.16.0`
-- Go `1.26.5`
+- Go `1.26.8`
 - A C compiler suitable for the host operating system
 - Git
 
