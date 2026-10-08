@@ -77,15 +77,11 @@ export function SocialProvider({children}) {
 
   const feed = React.useMemo(() => (cache ? cacheFeed(cache) : []), [cache])
   const targets = React.useMemo(() => postTargets(feed), [feed])
-  const scannedHashes = React.useMemo(
-    () =>
-      new Set([
-        ...(cache?.posts || []).map(({hash}) => hash),
-        ...(cache?.tips || []).map(({hash}) => hash),
-      ]),
-    [cache]
-  )
-  const sending = useSocialSending({ready, readNewBlocks, scannedHashes})
+  const sending = useSocialSending({
+    ready,
+    readNewBlocks,
+    scannedThrough: cache?.authorsHeight ?? 0,
+  })
   const people = React.useMemo(() => settings?.people || {}, [settings])
   const names = React.useMemo(() => peopleNames(people), [people])
   const notifyKinds = React.useMemo(

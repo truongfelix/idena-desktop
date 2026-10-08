@@ -247,9 +247,9 @@ export async function sendPrepared(call, pending, {onFile, onStored} = {}) {
 }
 
 /**
- * Waits until the node has the transaction `hash` in a block. Returns 'mined' with the contract's verdict (`error`
- * when it refused the call: the fee is paid, nothing is posted), 'dropped' when the node no longer knows it, or
- * 'stopped'. A failed lookup (the node restarting) is tried again.
+ * Waits until the node has the transaction `hash` in a block. Returns 'mined' with the block's `height` and the
+ * contract's verdict (`error` when it refused the call: the fee is paid, nothing is posted), 'dropped' when the node
+ * no longer knows it, or 'stopped'. A failed lookup (the node restarting) is tried again.
  */
 export async function waitForBlock(call, hash, {pause, isStopped}) {
   let unknown = 0
@@ -264,9 +264,13 @@ export async function waitForBlock(call, hash, {pause, isStopped}) {
         unknown = 0
         if (/[1-9a-f]/i.test(String(tx.blockHash || '').replace(/^0x/, ''))) {
           // eslint-disable-next-line no-await-in-loop
+          const block = await call('bcn_block', [tx.blockHash])
+          if (!block) throw new Error(`block ${tx.blockHash} is missing`)
+          // eslint-disable-next-line no-await-in-loop
           const receipt = await call('bcn_txReceipt', [hash]).catch(() => null)
           return {
             result: 'mined',
+            height: block.height,
             error:
               receipt && receipt.success === false
                 ? receipt.error || 'the contract refused it'
