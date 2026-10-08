@@ -22,6 +22,12 @@ requireCondition(
   'unexpected package name'
 )
 requireCondition(packageJson.productName === 'Idena', 'unexpected product name')
+// Electron announces desktopName (without .desktop) as the window's app id on Linux, and electron-builder writes
+// it as the launcher entry's StartupWMClass: without it the dock cannot match the window to the entry.
+requireCondition(
+  packageJson.desktopName === `${packageJson.name}.desktop`,
+  'desktopName must be the Linux launcher entry, <name>.desktop'
+)
 requireCondition(
   packageJson.engines &&
     packageJson.engines.node === '>=24.18.0 <25' &&
