@@ -354,19 +354,36 @@ describe('waiting for the block', () => {
         lookups += 1
         return {blockHash: lookups < 3 ? `0x${'0'.repeat(64)}` : '0x12ab'}
       },
+      bcn_block: ([blockHash]) => blockHash === '0x12ab' && {height: 11400000},
       bcn_txReceipt: {success: true},
     })
-    expect(outcome).toEqual({result: 'mined', error: null})
+    expect(outcome).toEqual({result: 'mined', height: 11400000, error: null})
     expect(pauses).toEqual([10000, 10000])
+  })
+
+  it('asks again while the node misses the block', async () => {
+    let blocks = 0
+    const {outcome, pauses} = await run({
+      bcn_transaction: {blockHash: '0x12ab'},
+      bcn_block: () => {
+        blocks += 1
+        return blocks > 1 && {height: 11400000}
+      },
+      bcn_txReceipt: null,
+    })
+    expect(outcome).toEqual({result: 'mined', height: 11400000, error: null})
+    expect(pauses).toEqual([10000])
   })
 
   it('tells when the contract refused the mined call', async () => {
     const {outcome} = await run({
       bcn_transaction: {blockHash: '0x12ab'},
+      bcn_block: {height: 11400000},
       bcn_txReceipt: {success: false, error: 'cannot tip more than sent'},
     })
     expect(outcome).toEqual({
       result: 'mined',
+      height: 11400000,
       error: 'cannot tip more than sent',
     })
   })

@@ -23,12 +23,19 @@ export function draftKindOf(target) {
 }
 
 /**
+ * The sent actions still waiting once the feed shows the blocks through `scannedThrough`: those not in a block yet
+ * (`height` null) or in a later block, as the phone's SentList.
+ */
+export const stillWaiting = (waiting, scannedThrough) =>
+  waiting.filter(({height}) => height === null || height > scannedThrough)
+
+/**
  * Writing to idena.social, as the phone app does (SocialModel): the editor's draft, the confirmation with the fees,
  * then the node signs and sends, and the app waits for the block and reads it. One action at a time (`busy`);
- * what was sent stays `waiting` until the scan has read it, so a like is not sent twice. `readNewBlocks` asks the
- * scan for the new blocks; `scannedHashes` are the transactions the scan has read.
+ * what was sent stays `waiting` until the feed shows its block, so a like is not sent twice and its pill stays off.
+ * `readNewBlocks` asks the scan for the new blocks; the feed shows the blocks through `scannedThrough`.
  */
-export function useSocialSending({ready, readNewBlocks, scannedHashes}) {
+export function useSocialSending({ready, readNewBlocks, scannedThrough}) {
   const {t} = useTranslation()
   const [busy, setBusy] = React.useState(false)
   const [status, setStatus] = React.useState(null)
@@ -82,14 +89,11 @@ export function useSocialSending({ready, readNewBlocks, scannedHashes}) {
     [show, t, whatOf]
   )
 
-  // What the scan has read is no longer waiting.
+  // What the feed shows is no longer waiting.
   React.useEffect(() => {
-    setWaiting((current) =>
-      current.some(({hash}) => scannedHashes.has(hash))
-        ? current.filter(({hash}) => !scannedHashes.has(hash))
-        : current
-    )
-  }, [scannedHashes])
+    if (stillWaiting(waiting, scannedThrough).length < waiting.length)
+      setWaiting((current) => stillWaiting(current, scannedThrough))
+  }, [scannedThrough, waiting])
 
   const prepare = async (kind, make, extra = {}) => {
     setBusy(true)
@@ -170,6 +174,11 @@ export function useSocialSending({ready, readNewBlocks, scannedHashes}) {
         {error: true}
       )
     else {
+      setWaiting((current) =>
+        current.map((item) =>
+          item.hash === hash ? {...item, height: outcome.height} : item
+        )
+      )
       show(t('{{what}} is in a block.', {what}), {ms: MINED_MS})
       readNewBlocks()
     }
@@ -212,7 +221,7 @@ export function useSocialSending({ready, readNewBlocks, scannedHashes}) {
     }
     setWaiting((current) => [
       ...current,
-      {hash, kind: pending.kind, likeOf: pending.likeOf ?? null},
+      {hash, kind: pending.kind, likeOf: pending.likeOf ?? null, height: null},
     ])
     show(
       t('{{what}} sent, waiting for a block ({{hash}}…)', {
