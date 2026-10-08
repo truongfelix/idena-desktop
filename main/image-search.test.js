@@ -6,8 +6,13 @@ const {
     normalizeImageSearchResult,
     normalizeImageSearchUrl,
     searchDuckDuckGoImages,
+    searchOpenverseImages,
+    searchWikimediaImages,
   },
 } = require('./image-search')
+
+const USER_AGENT_PATTERN =
+  /^IdenaDesktop\/\S+ \(https:\/\/github\.com\/truongfelix\/idena-desktop\)$/
 
 describe('image search helpers', () => {
   test('extracts current DuckDuckGo vqd token shapes', () => {
@@ -115,5 +120,74 @@ describe('image search helpers', () => {
     expect(apiUrl.searchParams.get('q')).toBe('Idena cryptocurrency')
     expect(apiUrl.searchParams.get('vqd')).toBe('token-123')
     expect(apiOptions.headers.referer).toBe(landingUrl.href)
+  })
+
+  test('asks Openverse for at most 20 pictures, with a client name', async () => {
+    const get = jest.fn().mockResolvedValue({
+      data: {
+        results: [
+          {
+            url: 'https://images.example/full.jpg',
+            thumbnail: 'https://api.openverse.example/thumb/',
+          },
+        ],
+      },
+    })
+
+    await expect(searchOpenverseImages('cat', {get})).resolves.toEqual([
+      {
+        image: 'https://images.example/full.jpg',
+        thumbnail: 'https://api.openverse.example/thumb/',
+      },
+    ])
+
+    const [url, options] = get.mock.calls[0]
+    expect(url).toBe('https://api.openverse.org/v1/images/')
+    expect(options.params).toEqual({q: 'cat', page_size: 20})
+    expect(options.headers['user-agent']).toMatch(USER_AGENT_PATTERN)
+  })
+
+  test('asks Wikimedia with a client name and contact', async () => {
+    const get = jest.fn().mockResolvedValue({
+      data: {
+        query: {
+          pages: {
+            1: {
+              imageinfo: [
+                {
+                  url: 'https://upload.example/cat.jpg',
+                  thumburl: 'https://upload.example/320px-cat.jpg',
+                },
+              ],
+            },
+          },
+        },
+      },
+    })
+
+    await expect(searchWikimediaImages('cat', {get})).resolves.toEqual([
+      {
+        image: 'https://upload.example/cat.jpg',
+        thumbnail: 'https://upload.example/320px-cat.jpg',
+      },
+    ])
+
+    const [url, options] = get.mock.calls[0]
+    expect(url).toBe('https://commons.wikimedia.org/w/api.php')
+    expect(options.params.gsrsearch).toBe('cat')
+    expect(options.headers['user-agent']).toMatch(USER_AGENT_PATTERN)
+  })
+
+  test('a refused source gives no pictures instead of an error', async () => {
+    const get = jest.fn().mockRejectedValue(new Error('HTTP 403'))
+    const logger = {warn: jest.fn()}
+
+    await expect(searchWikimediaImages('cat', {get, logger})).resolves.toEqual(
+      []
+    )
+    await expect(searchOpenverseImages('cat', {get, logger})).resolves.toEqual(
+      []
+    )
+    expect(logger.warn).toHaveBeenCalledTimes(2)
   })
 })
