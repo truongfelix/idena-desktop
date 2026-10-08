@@ -30,6 +30,14 @@ export const stillWaiting = (waiting, scannedThrough) =>
   waiting.filter(({height}) => height === null || height > scannedThrough)
 
 /**
+ * What the editor gets back when a draft it sent (`sent`: {text, image, textOnIpfs}) is dropped by the node or
+ * refused by the contract: the draft, if the editor holds no text and no image (`editor`: {text, image}); null when
+ * it holds something, which stays. The editor does not open: as after Cancel, the next draft starts from it.
+ */
+export const draftToPutBack = (sent, editor) =>
+  sent && editor.text.trim() === '' && editor.image === null ? sent : null
+
+/**
  * Writing to idena.social, as the phone app does (SocialModel): the editor's draft, the confirmation with the fees,
  * then the node signs and sends, and the app waits for the block and reads it. One action at a time (`busy`);
  * what was sent stays `waiting` until the feed shows its block, so a like is not sent twice and its pill stays off.
@@ -46,6 +54,12 @@ export function useSocialSending({ready, readNewBlocks, scannedThrough}) {
   const [textOnIpfs, setTextOnIpfs] = React.useState(false)
   const [waiting, setWaiting] = React.useState([])
   const storedRef = React.useRef(new Set())
+  // The drafts sent from the editor, by transaction hash, until their block; what the editor holds now.
+  const sentDraftsRef = React.useRef(new Map())
+  const editorRef = React.useRef({text: '', image: null})
+  React.useEffect(() => {
+    editorRef.current = {text: draftText, image: draftImage}
+  }, [draftText, draftImage])
   const aliveRef = React.useRef(true)
   React.useEffect(
     () => () => {
@@ -142,7 +156,7 @@ export function useSocialSending({ready, readNewBlocks, scannedThrough}) {
           },
           storedRef.current
         ),
-      {fromEditor: true}
+      {sentDraft: {text: draftText, image: draftImage, textOnIpfs}}
     )
 
   const watch = async (kind, hash) => {
@@ -155,22 +169,43 @@ export function useSocialSending({ready, readNewBlocks, scannedThrough}) {
     })
     if (outcome.result === 'stopped') return
     const what = whatOf[kind]
-    if (outcome.result === 'dropped' || outcome.error)
+    const sentDraft = sentDraftsRef.current.get(hash) ?? null
+    sentDraftsRef.current.delete(hash)
+    const failed = outcome.result === 'dropped' || Boolean(outcome.error)
+    let draftNote = null
+    if (failed) {
       setWaiting((current) => current.filter((item) => item.hash !== hash))
+      const back = draftToPutBack(sentDraft, editorRef.current)
+      if (back) {
+        setDraftText(back.text)
+        setDraftImage(back.image)
+        setTextOnIpfs(back.textOnIpfs)
+        editorRef.current = {text: back.text, image: back.image}
+        draftNote = t('The draft is back in the editor.')
+      } else if (sentDraft)
+        draftNote = t(
+          'The editor holds another draft, so this one was not put back.'
+        )
+    }
     if (outcome.result === 'dropped')
       show(
-        t('{{what}} was not sent: the node no longer has it. Try again.', {
+        `${t('{{what}} was not sent: the node no longer has it.', {
           what,
           nsSeparator: '|',
-        }),
+        })} ${draftNote ?? t('Try again.')}`,
         {error: true}
       )
     else if (outcome.error)
       show(
-        t(
-          '{{what}} is in a block, but the contract refused it ({{message}}): the fee is paid, nothing is posted.',
-          {what, message: outcome.error, nsSeparator: '|'}
-        ),
+        [
+          t(
+            '{{what}} is in a block, but the contract refused it ({{message}}): the fee is paid, nothing is posted.',
+            {what, message: outcome.error, nsSeparator: '|'}
+          ),
+          draftNote,
+        ]
+          .filter(Boolean)
+          .join(' '),
         {error: true}
       )
     else {
@@ -213,7 +248,8 @@ export function useSocialSending({ready, readNewBlocks, scannedThrough}) {
     } finally {
       setBusy(false)
     }
-    if (pending.fromEditor) {
+    if (pending.sentDraft) {
+      sentDraftsRef.current.set(hash, pending.sentDraft)
       setDraft(null)
       setDraftText('')
       setDraftImage(null)
