@@ -80,6 +80,7 @@ const {
   getCurrentVersion,
   cleanNodeState,
   getLastLogs,
+  readNodeLogTail,
   getNodeChainDbFolder,
   getNodeFile,
   getNodeIpfsDir,
@@ -88,6 +89,11 @@ const {
 
 const NodeUpdater = require('./node-updater')
 const {createNodeProcess} = require('./node-process')
+const {createRouterNet} = require('./router-net')
+const {
+  UPKEEP_INTERVAL_MS,
+  createRouterPortService,
+} = require('./router-port-service')
 
 let mainWindow
 let didCreateMainWindow = false
@@ -119,6 +125,28 @@ const nodeProcess = createNodeProcess({
     logger.error(message)
     sendMainWindowMsg(NODE_EVENT, 'node-failed')
   },
+  logger,
+})
+
+// The built-in node's RPC port, API key and IPFS port from its last start: the router port asks the node.
+let nodeConnection = null
+
+// The node's port on the router, opened by the user in the Advanced settings (main/router-port-service.js).
+const routerPort = createRouterPortService({
+  file: () => join(app.getPath('userData'), 'router-port.json'),
+  net: createRouterNet(),
+  async nodeRpc(method) {
+    if (!nodeConnection) throw new Error('the node has not started')
+    const {data} = await axios.post(
+      `http://localhost:${nodeConnection.rpcPort}`,
+      {method, params: [], id: 1, key: nodeConnection.apiKey},
+      {timeout: 5000}
+    )
+    if (data?.error) throw new Error(data.error.message)
+    return data?.result
+  },
+  configuredPort: () => Number(nodeConnection?.ipfsPort) || null,
+  nodeLogTail: () => readNodeLogTail(),
   logger,
 })
 
@@ -679,6 +707,11 @@ ipcMain.on(NODE_COMMAND, async (event, command, data) => {
       break
     }
     case 'start-local-node': {
+      nodeConnection = {
+        rpcPort: data.rpcPort,
+        apiKey: data.apiKey,
+        ipfsPort: data.ipfsPort,
+      }
       nodeProcess
         .start(() =>
           startNode(
@@ -958,3 +991,25 @@ ipcMain.handle('search-image', async (event, query) => {
   requireIpcSender(event)
   return searchImages(query, {logger})
 })
+
+ipcMain.handle('router-port', async (event, command, data) => {
+  requireIpcSender(event)
+  switch (command) {
+    case 'status':
+      return routerPort.status({retry: data?.retry === true})
+    case 'search-again':
+      return routerPort.searchAgain()
+    case 'open':
+      return routerPort.open({endMs: Number(data?.endMs)})
+    case 'close':
+      return routerPort.close()
+    default:
+      throw new Error('unknown router port command')
+  }
+})
+
+setInterval(() => {
+  routerPort
+    .upkeep()
+    .catch((e) => logger.warn('router port upkeep failed', e.toString()))
+}, UPKEEP_INTERVAL_MS)
