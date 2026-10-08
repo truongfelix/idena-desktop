@@ -9,7 +9,7 @@ const {spawnSync} = require('child_process')
 const ROOT = path.join(__dirname, '..')
 const PINNED_NODE_VERSION = '1.1.2'
 const MIN_NODE_BINARY_SIZE = 1024 * 1024
-const DEFAULT_GO_TOOLCHAIN = process.env.IDENA_GO_GOTOOLCHAIN || 'go1.26.5'
+const DEFAULT_GO_TOOLCHAIN = process.env.IDENA_GO_GOTOOLCHAIN || 'go1.26.8'
 
 function readOptionValue(argv, index, option) {
   const value = argv[index + 1]
