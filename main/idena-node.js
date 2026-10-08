@@ -627,6 +627,23 @@ function getLastLogs() {
   })
 }
 
+/** The end of the node's log (its last `bytes`), where it writes the peers that connect; empty when unreadable. */
+function readNodeLogTail(bytes = 512 * 1024) {
+  let fd
+  try {
+    fd = fs.openSync(getNodeLogsFile(), 'r')
+    const {size} = fs.fstatSync(fd)
+    const length = Math.min(size, bytes)
+    const buffer = Buffer.alloc(length)
+    fs.readSync(fd, buffer, 0, length, size - length)
+    return buffer.toString('utf8')
+  } catch {
+    return ''
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd)
+  }
+}
+
 module.exports = {
   downloadNode,
   getBinaryHelp,
@@ -638,6 +655,7 @@ module.exports = {
   cleanNodeState,
   installBundledNodeOverOther,
   getLastLogs,
+  readNodeLogTail,
   getNodeFile,
   getNodeChainDbFolder,
   getNodeIpfsDir,

@@ -131,6 +131,7 @@ describe('English texts', () => {
       restartRisk,
     } = require('../../screens/settings/advanced-settings')
     const {directPeerProblem} = require('../../../main/direct-peers')
+    const {PORT_DURATIONS} = require('../../../main/router-port')
     const {txTypeName, txTypeNames} = require('../../screens/history/utils')
     const {mapVotingStatus} = require('../../screens/oracles/utils')
     const {mapToFriendlyStatus} = require('../providers/identity-context')
@@ -174,6 +175,8 @@ describe('English texts', () => {
         supported: {directPeers: true},
         settings: {directPeers: []},
       }).flatMap(({title, value}) => [title, value]),
+      // The router port's durations (screens/settings/router-port.js).
+      ...PORT_DURATIONS.map(({label}) => label),
       ...Object.values(VotingStatus).map(mapVotingStatus),
       ...Object.values(IdentityStatus).map(mapToFriendlyStatus),
     ]

@@ -16,7 +16,11 @@ const SEND_CHANNELS = new Set([
   'showMainWindow',
 ])
 
-const INVOKE_CHANNELS = new Set(['CHECK_DNA_LINK', 'search-image'])
+const INVOKE_CHANNELS = new Set([
+  'CHECK_DNA_LINK',
+  'search-image',
+  'router-port',
+])
 
 const LISTEN_CHANNELS = new Set([
   AUTO_UPDATE_EVENT,
