@@ -1,6 +1,7 @@
 {
   "name": "idena-desktop",
   "productName": "Idena",
+  "desktopName": "idena-desktop.desktop",
   "version": "0.0.1",
   "description": "Desktop client for the Idena network.",
   "author": "truongfelix (community build)",
