@@ -1388,5 +1388,6 @@
   "3 days": "3 days",
   "Until the validation + 2 h": "Until the validation + 2 h",
   "The app looks for this network's router only when you ask. Some routers announce themselves only every 15 minutes.": "The app looks for this network's router only when you ask. Some routers announce themselves only every 15 minutes.",
-  "Look for the router": "Look for the router"
+  "Look for the router": "Look for the router",
+  "No node from outside has connected for {{minutes}} min. If this computer has a firewall, it must let in TCP port {{port}}.": "No node from outside has connected for {{minutes}} min. If this computer has a firewall, it must let in TCP port {{port}}."
 }

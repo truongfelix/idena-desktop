@@ -1,4 +1,4 @@
-import {openingEnd, routerPortView} from './router-port'
+import {QUIET_HINT_MS, openingEnd, routerPortView} from './router-port'
 
 // Interpolates as i18next does, so that the lines read as the user sees them in English.
 const t = (key, values = {}) =>
@@ -123,6 +123,47 @@ describe('the Router port row', () => {
       line: 'Port 50506 on Livebox goes to another device (192.168.1.30)',
       color: 'muted',
     })
+  })
+
+  it("points at this computer's firewall when no peer came from outside", () => {
+    const quiet = (fields, nowMs, options = {nodeStarted: true}) =>
+      routerPortView(
+        found({
+          owner: 'pc',
+          mapping: {client: '192.168.1.20', leaseSeconds: 3600},
+          opening: {
+            client: '192.168.1.20',
+            port: 50506,
+            endMs: NOW + 6 * 3600000,
+            changedAtMs: NOW,
+          },
+          inbound: 0,
+          ...fields,
+        }),
+        t,
+        nowMs,
+        options
+      ).hint
+    expect(quiet({}, NOW + QUIET_HINT_MS + 30000)).toBe(
+      'No node from outside has connected for 10 min. If this computer has a firewall, it must let in TCP port 50506.'
+    )
+    expect(quiet({}, NOW + QUIET_HINT_MS - 60000)).toBeNull()
+    expect(quiet({inbound: 1}, NOW + QUIET_HINT_MS)).toBeNull()
+    expect(quiet({inbound: null}, NOW + QUIET_HINT_MS)).toBeNull()
+    expect(quiet({}, NOW + QUIET_HINT_MS, {nodeStarted: false})).toBeNull()
+    expect(quiet({}, NOW + QUIET_HINT_MS, {})).toBeNull()
+    expect(
+      quiet(
+        {
+          opening: {
+            client: '192.168.1.19',
+            endMs: NOW + 3600000,
+            changedAtMs: NOW,
+          },
+        },
+        NOW + QUIET_HINT_MS
+      )
+    ).toBeNull()
   })
 
   it("ends at the user's end, else at the router's lease", () => {

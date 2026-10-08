@@ -36,10 +36,18 @@ export function openingEnd(found, nowMs) {
 }
 
 /**
- * What the Router port row says for `status` (main/router-port-service.js) at `nowMs`, in which color, and which
- * button it offers: 'look', 'search-again', 'try-again', 'open', 'close' or none. `t` translates.
+ * How long an opening stays with no peer from outside before the row points at this computer's firewall: the
+ * first peers came in 10-30 s on the phone, in 4 min on a desktop (2026-10-08). Counted from the opening's last
+ * change, as its peers are (the upkeep makes it again once after 5 quiet minutes).
  */
-export function routerPortView(status, t, nowMs) {
+export const QUIET_HINT_MS = 10 * 60 * 1000
+
+/**
+ * What the Router port row says for `status` (main/router-port-service.js) at `nowMs`, in which color, which
+ * button it offers ('look', 'search-again', 'try-again', 'open', 'close' or none) and, for an opening no peer
+ * from outside has used for QUIET_HINT_MS while the node runs (`nodeStarted`), a `hint`. `t` translates.
+ */
+export function routerPortView(status, t, nowMs, {nodeStarted = false} = {}) {
   switch (status.state) {
     case 'idle':
       return {
@@ -100,7 +108,17 @@ export function routerPortView(status, t, nowMs) {
         count: inbound,
       })}`
     }
-    return {line: until + incoming, color: 'muted', action: 'close'}
+    const opening =
+      status.opening?.client === status.pcIp ? status.opening : null
+    const quietMs = opening ? nowMs - opening.changedAtMs : 0
+    const hint =
+      nodeStarted && inbound === 0 && quietMs >= QUIET_HINT_MS
+        ? t(
+            'No node from outside has connected for {{minutes}} min. If this computer has a firewall, it must let in TCP port {{port}}.',
+            {minutes: Math.floor(quietMs / 60000), port}
+          )
+        : null
+    return {line: until + incoming, color: 'muted', action: 'close', hint}
   }
   if (owner === 'pc-before') {
     return {
@@ -173,7 +191,9 @@ export function RouterPortSettings({isDisabled}) {
 
   if (isDisabled || !status) return null
 
-  const {line, color, action} = routerPortView(status, t, Date.now())
+  const {line, color, action, hint} = routerPortView(status, t, Date.now(), {
+    nodeStarted,
+  })
   const button = {
     look: () => run('search-again'),
     'search-again': () => run('search-again'),
@@ -217,6 +237,7 @@ export function RouterPortSettings({isDisabled}) {
           </SecondaryButton>
         )}
       </Stack>
+      {hint && <Text color="orange.500">{hint}</Text>}
       {status.error && (
         <Text color="red.500">
           {t('Router: {{message}}', {message: status.error, nsSeparator: '!!'})}

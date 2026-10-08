@@ -197,7 +197,7 @@ describe('Open and Close', () => {
       state: 'found',
       owner: 'pc',
       port: 50506,
-      opening: {port: 50506, client: PC, endMs},
+      opening: {port: 50506, client: PC, endMs, changedAtMs: NOW},
       inbound: 0,
       error: null,
     })
