@@ -148,6 +148,7 @@ function createRouterPortService({
           port: opening.port,
           client: opening.client,
           endMs: opening.endMs,
+          changedAtMs: opening.changedAtMs,
         },
         inbound: opening ? inboundSince(opening) : null,
         error: actionError,
