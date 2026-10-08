@@ -28,6 +28,11 @@ const {
   nodeSupportsPeerLimits,
   peerLimitArgs,
 } = require('./node-peers')
+const {
+  directPeerArgs,
+  directPeerIds,
+  nodeSupportsDirectPeers,
+} = require('./direct-peers')
 const {shouldReplaceInstalledNode, sha256File} = require('./bundled-node')
 const {fetchHardForkInfo} = require('./hard-fork-info')
 
@@ -401,7 +406,7 @@ async function startNode(
   ipfsPort,
   apiKey,
   autoActivateMining,
-  // The Advanced settings: {dbWriteBufferMiB, ipfsWriteBufferMiB, peerLevel, ipfsConnections}.
+  // The Advanced settings: {dbWriteBufferMiB, ipfsWriteBufferMiB, peerLevel, ipfsConnections, directPeers}.
   nodeOptions,
   // eslint-disable-next-line default-param-last
   useLogging = true,
@@ -436,7 +441,13 @@ async function startNode(
     options.ipfsConnections,
     help
   )
-  parameters.push(...writeBufferArgs, ...ipfsBufferArgs, ...peerArgs)
+  const directArgs = directPeerArgs(options.directPeers, help)
+  parameters.push(
+    ...writeBufferArgs,
+    ...ipfsBufferArgs,
+    ...peerArgs,
+    ...directArgs
+  )
 
   const configFile = getNodeConfigFile()
   if (fs.existsSync(configFile)) {
@@ -473,11 +484,15 @@ async function startNode(
       peerArgs.length > 0
         ? ipfsConnectionsFor(options.ipfsConnections, options.peerLevel)
         : DEFAULT_IPFS_CONNECTIONS,
+    // The peer ids, sorted ([] when none were given).
+    directPeers:
+      directArgs.length > 0 ? directPeerIds(options.directPeers) : [],
   }
   idenaNode.nodeOptionsSupported = {
     dbWriteBuffer: nodeSupportsWriteBuffer(help),
     ipfsWriteBuffer: nodeSupportsIpfsWriteBuffer(help),
     peerLimits: nodeSupportsPeerLimits(help),
+    directPeers: nodeSupportsDirectPeers(help),
   }
 
   idenaNode.on('exit', (code) => {

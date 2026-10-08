@@ -126,8 +126,11 @@ describe('English texts', () => {
       IPFS_WRITE_BUFFERS,
       PEER_LEVEL_CHOICES,
       WRITE_BUFFER_NOTE,
+      directPeerState,
+      pendingNodeOptions,
       restartRisk,
     } = require('../../screens/settings/advanced-settings')
+    const {directPeerProblem} = require('../../../main/direct-peers')
     const {txTypeName, txTypeNames} = require('../../screens/history/utils')
     const {mapVotingStatus} = require('../../screens/oracles/utils')
     const {mapToFriendlyStatus} = require('../providers/identity-context')
@@ -154,6 +157,23 @@ describe('English texts', () => {
       ...Object.values(txTypeNames),
       txTypeName({type: 'online', payload: '0x'}),
       txTypeName({type: 'online', payload: '0x1'}),
+      // The direct peers' row states and list problems (screens/settings/direct-peers.js), and the restart
+      // dialog's title and value for an emptied list.
+      ...[
+        {peerIds: null},
+        {peerIds: new Set(['a'])},
+        {peerIds: new Set(), running: {directPeers: []}},
+        {peerIds: new Set(), running: {directPeers: ['a']}},
+      ].map((state) => directPeerState('a', state)),
+      directPeerProblem({id: 'a'}, [], 'a'),
+      directPeerProblem({id: 'a'}, [{id: 'a'}], null),
+      directPeerProblem({id: 'd'}, [{id: 'a'}, {id: 'b'}, {id: 'c'}], null),
+      ...pendingNodeOptions({
+        nodeStarted: true,
+        running: {directPeers: ['x']},
+        supported: {directPeers: true},
+        settings: {directPeers: []},
+      }).flatMap(({title, value}) => [title, value]),
       ...Object.values(VotingStatus).map(mapVotingStatus),
       ...Object.values(IdentityStatus).map(mapToFriendlyStatus),
     ]

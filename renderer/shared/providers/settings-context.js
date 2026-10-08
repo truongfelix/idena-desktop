@@ -20,14 +20,16 @@ const SET_IMAGE_SEARCH = 'SET_IMAGE_SEARCH'
 const CHANGE_LANGUAGE = 'CHANGE_LANGUAGE'
 
 // The built-in node's Advanced settings: the write buffers of its chain database and IPFS datastore in MiB
-// (main/node-write-buffer.js), its peer level and IPFS connection limit (main/node-peers.js). The defaults
-// are the official Idena node's, as in the phone app. Settings saved before one of them existed get its
-// default at load.
+// (main/node-write-buffer.js), its peer level and IPFS connection limit (main/node-peers.js), its direct peers
+// ({id, name} each) and the name in its own peer code (main/direct-peers.js). The defaults are the official
+// Idena node's, as in the phone app. Settings saved before one of them existed get its default at load.
 const NODE_OPTION_DEFAULTS = {
   dbWriteBufferMiB: 4,
   ipfsWriteBufferMiB: 4,
   peerLevel: 'normal',
   ipfsConnections: 50,
+  directPeers: [],
+  ownPeerName: '',
 }
 
 const initialState = {
@@ -196,7 +198,8 @@ export function SettingsProvider({children}) {
     dispatch({type: TOGGLE_AUTO_ACTIVATE_MINING})
   }, [dispatch])
 
-  // `options`: some of dbWriteBufferMiB, ipfsWriteBufferMiB, peerLevel, ipfsConnections.
+  // `options`: some of dbWriteBufferMiB, ipfsWriteBufferMiB, peerLevel, ipfsConnections, directPeers,
+  // ownPeerName.
   const setNodeOptions = useCallback(
     (options) => dispatch({type: SET_NODE_OPTIONS, data: options}),
     [dispatch]
