@@ -61,8 +61,21 @@ export function routerPortView(status, t, nowMs, {nodeStarted = false} = {}) {
       return {line: t('Shown while the node runs.'), color: 'muted'}
     case 'searching': {
       const minutes = Math.floor((nowMs - status.startedMs) / 60000)
-      return {
-        line:
+      const {heard} = status
+      let line
+      if (heard) {
+        line =
+          minutes > 0
+            ? t(
+                'Looking for the router of this network… {{name}} answered, without port opening (UPnP). Some routers announce themselves only every 15 minutes ({{minutes}} min so far).',
+                {name: heard, minutes}
+              )
+            : t(
+                'Looking for the router of this network… {{name}} answered, without port opening (UPnP). Some routers announce themselves only every 15 minutes.',
+                {name: heard}
+              )
+      } else {
+        line =
           minutes > 0
             ? t(
                 'Looking for the router of this network… Some routers announce themselves only every 15 minutes ({{minutes}} min so far).',
@@ -70,13 +83,18 @@ export function routerPortView(status, t, nowMs, {nodeStarted = false} = {}) {
               )
             : t(
                 'Looking for the router of this network… Some routers announce themselves only every 15 minutes.'
-              ),
-        color: 'muted',
+              )
       }
+      return {line, color: 'muted'}
     }
     case 'not-found':
       return {
-        line: t('No router with UPnP heard on this network'),
+        line: status.heard
+          ? t(
+              "{{name}} offers no port opening (UPnP): it may be turned off in the router's settings",
+              {name: status.heard, nsSeparator: '!!'}
+            )
+          : t('No router with UPnP heard on this network'),
         color: 'muted',
         action: 'search-again',
       }

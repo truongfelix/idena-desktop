@@ -1,14 +1,17 @@
 const dgram = require('dgram')
 const http = require('http')
 const os = require('os')
+const {defaultGateways} = require('./default-gateway')
 const {
   MAX_STANDARD_LEASE_SECONDS,
+  SSDP_ROOT_DEVICE,
   SSDP_SEARCH_TARGETS,
   UPNP_CONFLICT,
   UPNP_NO_SUCH_ENTRY,
   UPNP_ONLY_PERMANENT_LEASES,
   addPortMappingArgs,
   isLocalNetworkHost,
+  parseDeviceName,
   parseGateway,
   parseSoap,
   parseSsdp,
@@ -108,13 +111,16 @@ function homeAddresses() {
 }
 
 /**
- * The router functions over `request` (an HTTP request, as httpRequest) and `createSocket` (dgram's): tests give
- * their own.
+ * The router functions over `request` (an HTTP request, as httpRequest), `createSocket` (dgram's), `addresses`
+ * (this computer's, as homeAddresses), `routers` (the default gateways, as defaultGateways) and how long a search
+ * waits for answers (`searchMs`): tests give their own.
  */
 function createRouterNet({
   request = httpRequest,
   createSocket = dgram.createSocket,
   addresses = homeAddresses,
+  routers = defaultGateways,
+  searchMs = SEARCH_MS,
 } = {}) {
   /** A request to `url`, refused unless it goes to the home network. */
   function ask(url, options) {
@@ -130,12 +136,16 @@ function createRouterNet({
     return request(url, {timeoutMs: TIMEOUT_MS, ...options})
   }
 
+  /** The device description at `location`, or null when the device does not give it. */
+  async function description(location, timeoutMs = TIMEOUT_MS) {
+    const response = await ask(location, {timeoutMs})
+    return response.status === 200 ? response.body : null
+  }
+
   /** The forwarding service in the description at `location`, or null. */
   async function describe(location, timeoutMs = TIMEOUT_MS) {
-    const response = await ask(location, {timeoutMs})
-    return response.status === 200
-      ? parseGateway(location, response.body)
-      : null
+    const xml = await description(location, timeoutMs)
+    return xml == null ? null : parseGateway(location, xml)
   }
 
   /** The router at `location` if it is `udn` (this computer is on its network), else null. */
@@ -160,17 +170,19 @@ function createRouterNet({
 
   /**
    * Reads SSDP datagrams on `sockets` until `ms` passed or one names a router (`accept` picks the datagrams
-   * that count): its gateway, or null.
+   * that count): its gateway, or null. The descriptions still being read at the end get their time.
+   * `onDevice(message, xml)` gets each description read that holds no forwarding service.
    */
-  function firstGateway(sockets, ms, accept) {
+  function firstGateway(sockets, ms, accept, onDevice = () => {}) {
     return new Promise((resolve) => {
       const tried = new Set()
+      const reads = []
+      let closed = false
       let done = false
       let timer = null
-      const finish = (gateway) => {
-        if (done) return
-        done = true
-        clearTimeout(timer)
+      const close = () => {
+        if (closed) return
+        closed = true
         for (const socket of sockets) {
           try {
             socket.close()
@@ -178,21 +190,43 @@ function createRouterNet({
             // already closed
           }
         }
+      }
+      const finish = (gateway) => {
+        if (done) return
+        done = true
+        clearTimeout(timer)
+        close()
         resolve(gateway)
       }
-      timer = setTimeout(() => finish(null), ms)
+      timer = setTimeout(() => {
+        close()
+        Promise.allSettled(reads).then(() => finish(null))
+      }, ms)
+      const onMessage = (data) => {
+        const message = parseSsdp(data.toString('latin1'))
+        if (
+          closed ||
+          !message ||
+          !accept(message) ||
+          tried.has(message.location)
+        )
+          return
+        tried.add(message.location)
+        // A router announces each of its devices and services: one description holds them all.
+        reads.push(
+          description(message.location)
+            .then((xml) => {
+              if (xml == null) return
+              const gateway = parseGateway(message.location, xml)
+              if (gateway) finish(gateway)
+              else onDevice(message, xml)
+            })
+            .catch(() => {})
+        )
+      }
       for (const socket of sockets) {
         socket.on('error', () => {})
-        socket.on('message', (data) => {
-          const message = parseSsdp(data.toString('latin1'))
-          if (!message || !accept(message) || tried.has(message.location))
-            return
-          tried.add(message.location)
-          // A router announces each of its devices and services: one description holds them all.
-          describe(message.location)
-            .then((gateway) => gateway && finish(gateway))
-            .catch(() => {})
-        })
+        socket.on('message', onMessage)
       }
     })
   }
@@ -207,8 +241,18 @@ function createRouterNet({
     })
   }
 
-  /** Sends the searches on each home network interface; the gateway that answers first, or null. */
-  async function search() {
+  /**
+   * Sends the searches on each home network interface; the gateway that answers first, or null. Also searches for
+   * root devices, to name the router (at a default gateway's address, no other device is read for that) when it
+   * offers no forwarding service: `onHeard` gets its name when no gateway was found.
+   */
+  async function search(onHeard = () => {}) {
+    let gateways
+    try {
+      gateways = new Set(await routers())
+    } catch {
+      gateways = new Set()
+    }
     const sockets = []
     for (const address of addresses()) {
       try {
@@ -221,13 +265,38 @@ function createRouterNet({
       }
     }
     if (sockets.length === 0) return null
-    const answer = firstGateway(sockets, SEARCH_MS, (it) => !it.notify)
-    for (const socket of sockets) {
-      for (const target of SSDP_SEARCH_TARGETS) {
-        socket.send(ssdpSearch(target), SSDP_PORT, SSDP_GROUP, () => {})
+    const atRouter = (message) =>
+      gateways.has(new URL(message.location).hostname)
+    let heard = null
+    const answer = firstGateway(
+      sockets,
+      searchMs,
+      (it) =>
+        !it.notify &&
+        (it.type.toLowerCase() !== SSDP_ROOT_DEVICE || atRouter(it)),
+      (message, xml) => {
+        if (heard == null && atRouter(message)) heard = parseDeviceName(xml)
+      }
+    )
+    const send = () => {
+      for (const socket of sockets) {
+        for (const target of [...SSDP_SEARCH_TARGETS, SSDP_ROOT_DEVICE]) {
+          try {
+            socket.send(ssdpSearch(target), SSDP_PORT, SSDP_GROUP, () => {})
+          } catch {
+            // closed: the search ended
+          }
+        }
       }
     }
-    return answer
+    send()
+    // UDP loses a search or an answer now and then (the Speedport's root device answer: 1 search in 17, 2026-10-10):
+    // as UPnP asks of control points, each search goes out twice.
+    const again = setTimeout(send, Math.floor(searchMs / 3))
+    const gateway = await answer
+    clearTimeout(again)
+    if (!gateway && heard) onHeard(heard)
+    return gateway
   }
 
   /** Listens for routers' announcements for up to `ms`; the first gateway announced, or null. */
@@ -260,10 +329,13 @@ function createRouterNet({
   /**
    * Finds the router's forwarding service: first at the addresses of routers found before (`known`), then by a
    * search, then by listening to announcements for up to `listenMs` (some routers, like the Livebox, never
-   * answer a search). Null when none was found.
+   * answer a search). Null when none was found. When the router answered the search without a forwarding
+   * service, `onHeard` gets its name before the listening starts.
    */
-  async function find(known, listenMs = LISTEN_MS) {
-    return (await knownHere(known)) || (await search()) || listen(listenMs)
+  async function find(known, {listenMs = LISTEN_MS, onHeard} = {}) {
+    return (
+      (await knownHere(known)) || (await search(onHeard)) || listen(listenMs)
+    )
   }
 
   /** Sends `action` to the router: {answer, pcIp} (this computer's address as the router sees it). */

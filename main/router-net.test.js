@@ -229,14 +229,158 @@ describe('router search', () => {
     expect(sockets[0].setMulticastInterface).toHaveBeenCalledWith(
       '192.168.1.20'
     )
-    expect(sockets[0].sent).toHaveLength(5)
+    expect(sockets[0].sent).toHaveLength(6)
     expect(sockets[0].sent[0][0]).toMatch(/^M-SEARCH \* HTTP\/1.1\r\n/)
+    expect(sockets[0].sent[5][0]).toMatch(/\r\nST: upnp:rootdevice\r\n/)
     expect(sockets[0].sent[0].slice(1)).toEqual([1900, '239.255.255.250'])
     expect(
       sockets.every((socket) => socket.close.mock.calls.length === 1)
     ).toBe(true)
     // The address outside the home network was never asked.
     expect(request.mock.calls.map(([url]) => url)).toEqual([LOCATION])
+  })
+
+  it('names the router at the default gateway when it offers no port opening', async () => {
+    const speedport = 'http://192.168.2.1:34199/rootDesc.xml'
+    const tv = 'http://192.168.2.50:8080/tv.xml'
+    const request = jest.fn(async (url) => ({
+      status: 200,
+      body:
+        url === speedport
+          ? '<root><device><friendlyName>Speedport Smart 4 Typ B</friendlyName><UDN>uuid:sp</UDN></device></root>'
+          : '<root><device><friendlyName>Living room TV</friendlyName></device></root>',
+      localAddress: '192.168.2.97',
+    }))
+    const rootDevice = (location) =>
+      datagram(
+        `HTTP/1.1 200 OK\r\nST: upnp:rootdevice\r\nLOCATION: ${location}\r\n\r\n`
+      )
+    // A repeater answers the gateway search: read for a forwarding service, never named.
+    const repeater = 'http://192.168.2.60/igd.xml'
+    const {createSocket, sockets} = recordingSockets((socket) => {
+      socket.emit(
+        'message',
+        datagram(
+          `HTTP/1.1 200 OK\r\nST: urn:schemas-upnp-org:device:InternetGatewayDevice:1\r\nLOCATION: ${repeater}\r\n\r\n`
+        )
+      )
+      socket.emit('message', rootDevice(tv))
+      socket.emit('message', rootDevice(speedport))
+    })
+    const onHeard = jest.fn()
+    const net = createRouterNet({
+      request,
+      createSocket,
+      addresses: () => ['192.168.2.97'],
+      routers: async () => ['192.168.2.1'],
+      searchMs: 20,
+    })
+    expect(await net.search(onHeard)).toBeNull()
+    expect(onHeard.mock.calls).toEqual([['Speedport Smart 4 Typ B']])
+    // Each search went out twice: UDP loses some.
+    expect(sockets[0].sent).toHaveLength(12)
+    expect(sockets[0].sent[11][0]).toMatch(/\r\nST: upnp:rootdevice\r\n/)
+    // The other device's root was not read.
+    expect(request.mock.calls.map(([url]) => url)).toEqual([
+      repeater,
+      speedport,
+    ])
+
+    // With no default gateway known, no device is named.
+    const unnamed = jest.fn()
+    expect(
+      await createRouterNet({
+        request,
+        createSocket,
+        addresses: () => ['192.168.2.97'],
+        routers: async () => {
+          throw new Error('no table')
+        },
+        searchMs: 20,
+      }).search(unnamed)
+    ).toBeNull()
+    expect(unnamed).not.toHaveBeenCalled()
+  })
+
+  it('takes a gateway over the name, also one whose description comes at the end', async () => {
+    const speedport = 'http://192.168.1.1:34199/rootDesc.xml'
+    const request = jest.fn(
+      (url) =>
+        new Promise((resolve) => {
+          const answer =
+            url === LOCATION
+              ? {status: 200, body: DESCRIPTION}
+              : {
+                  status: 200,
+                  body: '<root><device><friendlyName>Box</friendlyName></device></root>',
+                }
+          // The gateway's description comes after the search's end.
+          setTimeout(
+            () => resolve({...answer, localAddress: '192.168.1.20'}),
+            url === LOCATION ? 60 : 0
+          )
+        })
+    )
+    const {createSocket, sockets} = recordingSockets((socket) => {
+      socket.emit(
+        'message',
+        datagram(
+          `HTTP/1.1 200 OK\r\nST: upnp:rootdevice\r\nLOCATION: ${speedport}\r\n\r\n`
+        )
+      )
+      socket.emit(
+        'message',
+        datagram(
+          `HTTP/1.1 200 OK\r\nST: ${WANIP1}\r\nLOCATION: ${LOCATION}\r\n\r\n`
+        )
+      )
+    })
+    const onHeard = jest.fn()
+    const net = createRouterNet({
+      request,
+      createSocket,
+      addresses: () => ['192.168.1.20'],
+      routers: async () => ['192.168.1.1'],
+      searchMs: 20,
+    })
+    expect(await net.search(onHeard)).toEqual(GATEWAY)
+    expect(onHeard).not.toHaveBeenCalled()
+    expect(sockets[0].close).toHaveBeenCalledTimes(1)
+  })
+
+  it('names the router before it listens for announcements', async () => {
+    const order = []
+    const request = jest.fn(async () => ({
+      status: 200,
+      body: '<root><device><friendlyName>Speedport</friendlyName></device></root>',
+      localAddress: '192.168.2.97',
+    }))
+    const {createSocket} = recordingSockets((socket) => {
+      if (socket.port === 1900) return
+      socket.emit(
+        'message',
+        datagram(
+          'HTTP/1.1 200 OK\r\nST: upnp:rootdevice\r\nLOCATION: http://192.168.2.1/d.xml\r\n\r\n'
+        )
+      )
+    })
+    const net = createRouterNet({
+      request,
+      createSocket: jest.fn((options) => {
+        order.push(options.reuseAddr ? 'listen' : 'search')
+        return createSocket(options)
+      }),
+      addresses: () => ['192.168.2.97'],
+      routers: async () => ['192.168.2.1'],
+      searchMs: 20,
+    })
+    expect(
+      await net.find([], {
+        listenMs: 20,
+        onHeard: (name) => order.push(`heard ${name}`),
+      })
+    ).toBeNull()
+    expect(order).toEqual(['search', 'heard Speedport', 'listen'])
   })
 
   it('listens for announcements, skipping the ones that leave', async () => {
