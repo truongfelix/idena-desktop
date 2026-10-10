@@ -31,6 +31,30 @@ describe('the Router port row', () => {
     ).toMatch(/\(7 min so far\)\.$/)
   })
 
+  it('names the router that answered without port opening', () => {
+    const heard = 'Speedport Smart 4 Typ B'
+    expect(
+      routerPortView({state: 'searching', startedMs: NOW, heard}, t, NOW)
+    ).toEqual({
+      line: 'Looking for the router of this network… Speedport Smart 4 Typ B answered, without port opening (UPnP). Some routers announce themselves only every 15 minutes.',
+      color: 'muted',
+    })
+    expect(
+      routerPortView(
+        {state: 'searching', startedMs: NOW, heard},
+        t,
+        NOW + 3 * 60000
+      ).line
+    ).toBe(
+      'Looking for the router of this network… Speedport Smart 4 Typ B answered, without port opening (UPnP). Some routers announce themselves only every 15 minutes (3 min so far).'
+    )
+    expect(routerPortView({state: 'not-found', heard}, t, NOW)).toEqual({
+      line: "Speedport Smart 4 Typ B offers no port opening (UPnP): it may be turned off in the router's settings",
+      color: 'muted',
+      action: 'search-again',
+    })
+  })
+
   it('offers to look for the router, and waits for the node', () => {
     expect(routerPortView({state: 'idle'}, t, NOW)).toEqual({
       line: "The app looks for this network's router only when you ask. Some routers announce themselves only every 15 minutes.",

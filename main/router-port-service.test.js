@@ -23,9 +23,10 @@ function routerInMemory() {
     router,
     pcIp: PC,
     find: jest.fn(
-      () =>
+      (known, options) =>
         new Promise((resolve) => {
           resolveFind = resolve
+          net.onHeard = options?.onHeard
         })
     ),
     finish: async (gateway) => {
@@ -152,6 +153,49 @@ describe('the router search', () => {
     expect(env.net.find).toHaveBeenCalledTimes(1)
     expect(env.service.searchAgain().state).toBe('searching')
     expect(env.net.find).toHaveBeenCalledTimes(2)
+  })
+
+  it('names the router that answered without port opening, also after a restart', async () => {
+    const env = setup()
+    env.service.searchAgain()
+    env.net.onHeard('Speedport Smart 4 Typ B')
+    expect(await env.service.status()).toEqual({
+      state: 'searching',
+      startedMs: NOW,
+      heard: 'Speedport Smart 4 Typ B',
+    })
+    await env.net.finish(null)
+    expect(await env.service.status()).toEqual({
+      state: 'not-found',
+      heard: 'Speedport Smart 4 Typ B',
+    })
+    const again = setup({net: env.net, dir: env.folder})
+    expect(await again.service.status()).toEqual({
+      state: 'not-found',
+      heard: 'Speedport Smart 4 Typ B',
+    })
+    // A new search forgets it until the router answers again.
+    expect(again.service.searchAgain()).toEqual({
+      state: 'searching',
+      startedMs: NOW,
+    })
+    expect(env.saved().lastSearchHeard).toBeNull()
+    await env.net.finish(GATEWAY)
+    expect((await again.service.status()).state).toBe('found')
+    expect(env.saved().lastSearchHeard).toBeNull()
+  })
+
+  it('asks each router found before once', async () => {
+    const env = await found()
+    await env.service.open({endMs: NOW + 6 * HOUR})
+    expect(env.saved().opening.gateway).toEqual(GATEWAY)
+    expect(env.saved().gateways).toEqual([GATEWAY])
+    env.net.router.answers = false
+    const again = setup({net: env.net, dir: env.folder})
+    await again.service.status()
+    expect(env.net.knownHere).toHaveBeenLastCalledWith([GATEWAY])
+    again.service.searchAgain()
+    expect(env.net.find).toHaveBeenLastCalledWith([GATEWAY], expect.anything())
   })
 
   it('shows a router that stops answering until the user tries again', async () => {

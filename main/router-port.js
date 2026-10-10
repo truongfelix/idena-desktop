@@ -22,6 +22,15 @@ const SSDP_SEARCH_TARGETS = [
 /** The services that forward ports, the preferred first. */
 const FORWARDING_SERVICES = SSDP_SEARCH_TARGETS.slice(2)
 
+/**
+ * Also searched for: every device's root, to name the router when it offers no forwarding service (its UPnP port
+ * opening is off, or it announces it only from time to time).
+ */
+const SSDP_ROOT_DEVICE = 'upnp:rootdevice'
+
+/** The longest router name the row shows. */
+const DEVICE_NAME_MAX = 60
+
 /** UPnP errors the app handles: no such opening, the port taken by another device, only no-end leases. */
 const UPNP_NO_SUCH_ENTRY = 714
 const UPNP_CONFLICT = 718
@@ -166,6 +175,14 @@ function parseGateway(location, xml) {
     controlUrl: controlUrl.href,
     service: service.type,
   }
+}
+
+/** The name in a device description: its root device's friendly name, else its model; on one line, or null. */
+function parseDeviceName(xml) {
+  const name = ['friendlyName', 'modelName']
+    .map((it) => tag(String(xml), it))
+    .find((it) => it && it.trim())
+  return name ? name.replace(/\s+/g, ' ').slice(0, DEVICE_NAME_MAX) : null
 }
 
 /** A gateway read from a file, or null. */
@@ -365,6 +382,8 @@ module.exports = {
   PORT_MAPPING_DESCRIPTION,
   MAX_STANDARD_LEASE_SECONDS,
   SSDP_SEARCH_TARGETS,
+  SSDP_ROOT_DEVICE,
+  DEVICE_NAME_MAX,
   UPNP_NO_SUCH_ENTRY,
   UPNP_CONFLICT,
   UPNP_ONLY_PERMANENT_LEASES,
@@ -375,6 +394,7 @@ module.exports = {
   isLocalNetworkHost,
   parseSsdp,
   parseGateway,
+  parseDeviceName,
   cleanGateway,
   soapEnvelope,
   parseSoap,

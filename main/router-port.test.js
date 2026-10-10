@@ -2,6 +2,7 @@ const {
   PORT_DURATIONS,
   PORT_MAPPING_DESCRIPTION,
   RETRY_AFTER_MS,
+  SSDP_ROOT_DEVICE,
   addPortMappingArgs,
   cleanOpening,
   durationEnd,
@@ -9,6 +10,7 @@ const {
   ipfsAddressPort,
   isLocalNetworkHost,
   mappingOwner,
+  parseDeviceName,
   parseGateway,
   parseSoap,
   parseSsdp,
@@ -152,6 +154,40 @@ describe('parseGateway', () => {
         description({services: [[WANIP1, '/ctl']]})
       )
     ).toBeNull()
+  })
+})
+
+// A Speedport Smart 4 (2026-10-09) with its UPnP port opening off: it answers the root device search, and its
+// description holds no forwarding service, only its name.
+const SPEEDPORT = `<?xml version="1.0"?>
+<root xmlns="urn:schemas-upnp-org:device-1-0"><specVersion><major>1</major><minor>0</minor></specVersion><URLBase>http://192.168.2.1:55661/status</URLBase><device><deviceType>urn:schemas-upnp-org:device:WLANAccessPointDevice:1</deviceType><friendlyName>Speedport Smart 4 Typ B</friendlyName><manufacturer>Deutsche Telekom AG</manufacturer><manufacturerURL>http://www.telekom.de</manufacturerURL><modelDescription>Speedport Smart 4 Typ B Mesh</modelDescription><modelName>Speedport Smart 4 Typ B</modelName><modelNumber>010146.5.0.001.1</modelNumber><modelURL>http://www.telekom.de</modelURL><serialNumber>000000000000000000000</serialNumber><UDN>uuid:11111111-2222-3333-4444-666666666666</UDN><iconList><icon><mimetype>image/png</mimetype><width>16</width><height>16</height><depth>32</depth><url>http://192.168.2.1/images/icons/logo.png</url></icon></iconList><presentationURL>http://192.168.2.1/</presentationURL></device></root>`
+
+describe('parseDeviceName', () => {
+  it('names a router that offers no port opening', () => {
+    const answer = parseSsdp(
+      'HTTP/1.1 200 OK\r\nCACHE-CONTROL: max-age=1800\r\nST: upnp:rootdevice\r\nLOCATION: http://192.168.2.1:34199/rootDesc.xml\r\nUSN: uuid:x::upnp:rootdevice\r\n\r\n'
+    )
+    expect(answer.type).toBe(SSDP_ROOT_DEVICE)
+    expect(parseGateway(answer.location, SPEEDPORT)).toBeNull()
+    expect(parseDeviceName(SPEEDPORT)).toBe('Speedport Smart 4 Typ B')
+    expect(
+      parseDeviceName(description({services: [[WANIP1, '/ctl/IPConn']]}))
+    ).toBe('Livebox & co')
+  })
+
+  it('keeps the name on one short line', () => {
+    expect(
+      parseDeviceName('<friendlyName>  Box\n  7590 &amp; Co </friendlyName>')
+    ).toBe('Box 7590 & Co')
+    expect(
+      parseDeviceName(
+        '<friendlyName> </friendlyName><modelName>Model only</modelName>'
+      )
+    ).toBe('Model only')
+    expect(
+      parseDeviceName(`<friendlyName>${'x'.repeat(200)}</friendlyName>`)
+    ).toHaveLength(60)
+    expect(parseDeviceName('<root><device></device></root>')).toBeNull()
   })
 })
 

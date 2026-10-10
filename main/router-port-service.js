@@ -1,5 +1,6 @@
 const fs = require('fs')
 const {
+  DEVICE_NAME_MAX,
   cleanGateway,
   cleanOpening,
   inboundPeersSince,
@@ -14,7 +15,7 @@ const {
 // ~16 min; never by itself: on Windows, listening for the router can bring up a firewall prompt); opens or
 // closes the forwarding at the user's request; and keeps the opening while the app runs (`upkeep`, every few
 // minutes). Its file holds the opening the app made, the routers found before (to skip the search next time)
-// and the last search.
+// and the last search (when, and the router that answered it without port opening).
 
 /** The latest end the row accepts: "until the validation + 2 h" is at most an epoch away. */
 const MAX_OPENING_MS = 60 * 24 * 60 * 60 * 1000
@@ -58,8 +59,15 @@ function createRouterPortService({
       lastSearchMs: Number.isFinite(json.lastSearchMs)
         ? json.lastSearchMs
         : null,
+      lastSearchHeard:
+        typeof json.lastSearchHeard === 'string' && json.lastSearchHeard
+          ? json.lastSearchHeard.slice(0, DEVICE_NAME_MAX)
+          : null,
     }
   }
+
+  /** The row's state of a search, with the router that answered without port opening when there is one. */
+  const withHeard = (state, heard) => (heard ? {...state, heard} : state)
 
   function save(changes) {
     const path = file()
@@ -103,17 +111,31 @@ function createRouterPortService({
     }
   }
 
+  /** The routers found before, the opening's first, each once (each one not on this network costs a timeout). */
+  function knownGateways() {
+    const {opening, gateways} = load()
+    return [opening?.gateway, ...gateways]
+      .filter(Boolean)
+      .filter((it, i, all) => all.findIndex((x) => x.udn === it.udn) === i)
+  }
+
   function startSearch() {
     if (search) return
     const startedMs = now()
-    save({lastSearchMs: startedMs})
-    const {opening, gateways} = load()
-    const known = [opening?.gateway, ...gateways].filter(Boolean)
-    search = {startedMs}
+    save({lastSearchMs: startedMs, lastSearchHeard: null})
+    const current = {startedMs, heard: null}
+    search = current
     net
-      .find(known)
+      .find(knownGateways(), {
+        onHeard: (name) => {
+          current.heard = name
+        },
+      })
       .then((found) => {
-        if (!found) return
+        if (!found) {
+          save({lastSearchHeard: current.heard})
+          return
+        }
         gateway = found
         failure = null
         save({
@@ -161,21 +183,29 @@ function createRouterPortService({
     }
   }
 
+  function searchingState() {
+    return withHeard(
+      {state: 'searching', startedMs: search.startedMs},
+      search.heard
+    )
+  }
+
   /**
-   * The row's state: 'found' (see read), 'searching' ({startedMs}), 'not-found', 'failed' ({message}),
-   * 'node-stopped' (no port to read yet) or 'idle' (never looked for). A router that stopped answering stays
-   * 'failed' until `retry` ("Try again").
+   * The row's state: 'found' (see read), 'searching' ({startedMs, heard}), 'not-found' ({heard}), 'failed'
+   * ({message}), 'node-stopped' (no port to read yet) or 'idle' (never looked for); `heard`, when there, names the
+   * router that answered the search without port opening. A router that stopped answering stays 'failed' until
+   * `retry` ("Try again").
    */
   async function status({retry = false} = {}) {
-    if (search) return {state: 'searching', startedMs: search.startedMs}
-    if (!gateway) {
-      const {opening, gateways} = load()
-      gateway = await net.knownHere([opening?.gateway, ...gateways])
-    }
+    if (search) return searchingState()
+    if (!gateway) gateway = await net.knownHere(knownGateways())
     if (gateway) return read(gateway)
     if (retry) failure = null
     if (failure) return {state: 'failed', message: failure}
-    return load().lastSearchMs == null ? {state: 'idle'} : {state: 'not-found'}
+    const {lastSearchMs, lastSearchHeard} = load()
+    return lastSearchMs == null
+      ? {state: 'idle'}
+      : withHeard({state: 'not-found'}, lastSearchHeard)
   }
 
   /** "Look for the router", "Search again": looks for the router now. */
@@ -183,7 +213,7 @@ function createRouterPortService({
     failure = null
     gateway = null
     startSearch()
-    return {state: 'searching', startedMs: search.startedMs}
+    return searchingState()
   }
 
   /** Runs a request of the row on the router found, then reads it again, with the request's error if it failed. */
