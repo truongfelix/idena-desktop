@@ -32,28 +32,42 @@ What it changes for users (October 2026):
   contract refunds only 5,000; the rest went to the oracles. It now sends the 5,000 the contract needs (refunded
   whether the ad is approved or rejected), ad reviews are no longer shown to oracles as malicious, and sending an
   ad to review works again. The same review costs apply in the official app.
-- **Flips**: the Protect step no longer gets stuck, and an empty image-search pick keeps the picture.
+- **Social**: idena.social in the app, read from the app's own node (the posts of the current contract and of
+  the older ones), as on the phone app; like, reply, comment, tip and post from the app.
+- **History and transactions**: the History page and the transaction details come from the node's own records;
+  no scan.idena.io links are left.
+- **Practice validation** in the app: the validation screens with sample flips and their answers; nothing goes to
+  the node.
+- **Flips**: the image editor moves, scales, rotates and crops a picture; the Protect step no longer gets stuck,
+  and an empty image-search pick keeps the picture; the picture search asks before its first use.
+- **Contacts**: the saved contacts show at once; invites and terminations waiting in the mempool show, and a
+  dropped transaction ends the wait.
 - **No api.idena.io**: the clock check, the staking APY (staking and mining, from the node), the robot avatars
   (drawn by the app), the oracle votings, the validation report and the hard-fork screen no longer call api.idena.io
   or robohash.idena.io; the oracle To-Do badge reads every 5 minutes, only for validated identities. Still outside:
   translation.idena.io (flip keyword translations), GitHub (new app and node versions) and, only when you search
   for a picture, DuckDuckGo, Openverse and Wikimedia.
-- **Updates**: the app tells you when a newer version is published here and opens its page; it downloads and
-  installs nothing by itself.
+- **Updates**: the app tells you when a newer version is published here and opens its page (pre-releases are
+  not announced); it downloads and installs nothing by itself. Help > "Report a problem" opens the issues.
 - **New settings**: Settings > Node > Advanced settings, for the built-in node (the phone app has the same):
   - Peer level: Eco (up to 7 peers), Normal (up to 18, Idena default) or Hub (up to 30: twice the incoming
     slots, for nodes that reach this computer through its port open on the router).
   - IPFS connections: 20, 50 (Idena default), 100 or no limit; a limit too low for the peer level is raised
     (20 needs Eco, 50 Eco or Normal).
   - Chain database and IPFS database write buffers (4 to 64 MiB each): fewer disk writes for more memory.
+  - Direct peers: up to 3 nodes kept connected beyond the peer slots, shared as a peer code.
+  - Router port: opens the node's port on the home router (UPnP) for a chosen time, so that outside nodes can
+    connect; the app looks for the router only when asked.
 
   The node takes them at its start; the page offers a restart. A node binary without the flags (an official
   one) keeps idena-go's defaults and the page shows these settings as fixed.
 
 ## Fork status
 
-The renderer remains compatible with the existing Idena RPC and application
-data layout. The bundled node is built from the exact `idena-go` and
+The renderer keeps the official app's data layout. History, Social, the
+validation report and Oracle votings use RPC methods that only this community
+node serves (an official node used as an external node lacks them). The
+bundled node is built from the exact `idena-go` and
 `idena-wasm-binding` commits in `scripts/source-manifest.json`; source setup
 verifies those commits and required files before building.
 
@@ -63,8 +77,9 @@ verifies those commits and required files before building.
   compatible renderer dependencies replace the legacy Node 10-era toolchain.
 - Desktop API keys are generated with a cryptographically secure random source
   and private files are created with user-only permissions.
-- DuckDuckGo image search was restored behind validated, normalized result
-  handling and regression tests.
+- The picture search for flips asks DuckDuckGo, Openverse and Wikimedia, only
+  after the user agrees, behind validated, normalized result handling and
+  regression tests.
 - The obsolete Fabric-based editor and SDK dependency were removed; the flip
   editor now uses a smaller local implementation.
 - Source-built node preparation, artifact checks, privacy checks, Electron
@@ -205,9 +220,10 @@ npm run dist:mac:universal
 npm run dist:linux
 ```
 
-Use `npm run pack` for an unpacked local test build. Release scripts may contain
-publishing flags, but no release is published unless a matching release process
-and credentials are deliberately configured.
+Use `npm run pack` for an unpacked local test build. A `v*` tag makes the release
+workflow build every package (Linux, macOS Apple Silicon and Intel, Windows) and
+one draft release with them and a `SHA256SUMS.txt`; a tag with a hyphen makes a
+pre-release. Publishing the draft stays a manual step.
 
 Pull requests are welcome.
 
