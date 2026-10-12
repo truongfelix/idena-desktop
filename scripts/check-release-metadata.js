@@ -66,6 +66,21 @@ requireCondition(
   'release workflow must prepare the bundled node before packaging'
 )
 requireCondition(
+  /scripts\/build-node-linux-container\.sh/u.test(releaseWorkflow) &&
+    /node scripts\/check-node-glibc\.js build\/node\/current\/idena-go/u.test(
+      releaseWorkflow
+    ),
+  'release workflow must build the Linux node against an older glibc and check it'
+)
+requireCondition(
+  packageJson.build &&
+    packageJson.build.mac &&
+    packageJson.build.mac.identity === '-' &&
+    packageJson.build.mac.hardenedRuntime === false &&
+    /\$\{arch\}/u.test(packageJson.build.mac.artifactName || ''),
+  'macOS builds must be ad-hoc signed, without hardened runtime, with the arch in their file names'
+)
+requireCondition(
   /workflow_dispatch:[\s\S]*inputs:[\s\S]*tag:/u.test(releaseWorkflow),
   'release workflow must require a semver tag input for manual dispatch'
 )
