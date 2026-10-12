@@ -37,8 +37,8 @@ requireCondition(
 requireCondition(fs.existsSync('.node-version'), 'missing .node-version')
 requireCondition(fs.existsSync('.nvmrc'), 'missing .nvmrc')
 requireCondition(
-  /IDENA_GO_GOTOOLCHAIN\s*\|\|\s*['"]go1\.26\.8['"]/.test(buildNodeScript),
-  'bundled node source build must default to Go 1.26.8'
+  /IDENA_GO_GOTOOLCHAIN\s*\|\|\s*['"]go1\.26\.9['"]/.test(buildNodeScript),
+  'bundled node source build must default to Go 1.26.9'
 )
 
 const scripts = packageJson.scripts || {}
