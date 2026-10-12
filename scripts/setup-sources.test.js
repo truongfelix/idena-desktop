@@ -28,7 +28,8 @@ describe('setup sources script', () => {
   })
 
   it('parses check, update, and target root options', () => {
-    const targetRoot = path.join(path.sep, 'tmp', 'idena-sources')
+    // Resolved: on Windows it starts with the current drive (D:\tmp\...), as parseArgs resolves it.
+    const targetRoot = path.resolve(path.sep, 'tmp', 'idena-sources')
 
     expect(
       parseArgs(['--check', '--update', '--target-root', targetRoot])

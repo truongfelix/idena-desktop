@@ -98,7 +98,9 @@ function keysMissingFromEnglish() {
         entry.name.endsWith('.js') &&
         !entry.name.endsWith('.test.js')
       ) {
-        const source = fs.readFileSync(file, 'utf8')
+        // A template literal's line breaks read as \n, also in a CRLF file (a Windows checkout turns every file
+        // into one).
+        const source = fs.readFileSync(file, 'utf8').replace(/\r\n?/gu, '\n')
         // useTranslation(['translation', 'error']): t() also finds the keys of the error namespace.
         const readsErrors = /useTranslation\(\[[^\]]*'error'/u.test(source)
         for (const key of writtenKeys(source)) {

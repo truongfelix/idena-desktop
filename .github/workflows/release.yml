@@ -12,21 +12,36 @@ on:
         type: string
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  release:
+  build:
+    name: Build (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: macos-latest
-            electron_builder_args: --mac --publish always
-          - os: ubuntu-latest
-            electron_builder_args: --linux --publish always
-          - os: windows-latest
-            electron_builder_args: --win --publish always
+          - name: linux-x64
+            os: ubuntu-24.04
+            electron_builder_args: --linux
+            packages: |
+              dist/*.deb
+              dist/latest-linux.yml
+          - name: mac-arm64
+            os: macos-15
+            electron_builder_args: --mac --arm64
+            packages: dist/*.dmg
+          - name: mac-x64
+            os: macos-15-intel
+            electron_builder_args: --mac --x64
+            packages: dist/*.dmg
+          - name: win-x64
+            os: windows-2025
+            electron_builder_args: --win
+            packages: |
+              dist/*.exe
+              dist/latest.yml
     steps:
       - name: Check out
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -73,7 +88,18 @@ jobs:
         run: npm test -- --runInBand
 
       - name: Prepare bundled node
+        if: runner.os != 'Linux'
         run: npm run prepare:node
+
+      # Built against glibc 2.35 (Ubuntu 22.04): a node built on this runner's glibc 2.39 does not start on Ubuntu
+      # 22.04 or Debian 12. The build also runs the node there (its version check).
+      - name: Prepare bundled node (Linux, in an Ubuntu 22.04 container)
+        if: runner.os == 'Linux'
+        run: scripts/build-node-linux-container.sh
+
+      - name: Check the bundled node's glibc
+        if: runner.os == 'Linux'
+        run: node scripts/check-node-glibc.js build/node/current/idena-go
 
       - name: Bump version
         env:
@@ -84,11 +110,72 @@ jobs:
       - name: Build renderer
         run: npm run build
 
-      - name: Build & release
+      - name: Package
         env:
           ELECTRON_BUILDER_ARGS: ${{ matrix.electron_builder_args }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           read -r -a electron_builder_args <<< "${ELECTRON_BUILDER_ARGS}"
-          node scripts/run-electron-builder.js "${electron_builder_args[@]}"
+          node scripts/run-electron-builder.js "${electron_builder_args[@]}" --publish never
+        shell: bash
+
+      - name: Start the packaged app
+        timeout-minutes: 10
+        run: |
+          if [ "${RUNNER_OS}" = Linux ]; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq --no-install-recommends xvfb > /dev/null
+            xvfb-run -a node scripts/smoke-packaged-app.js
+          else
+            node scripts/smoke-packaged-app.js
+          fi
+        shell: bash
+
+      - name: Upload the packages
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-${{ matrix.name }}
+          path: ${{ matrix.packages }}
+          if-no-files-found: error
+
+  # One draft release with every package and their SHA-256 sums; publishing it stays a manual step on GitHub.
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Download the packages
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: release-*
+          path: packages
+          merge-multiple: true
+
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_REF_NAME: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          tag="${RELEASE_REF_NAME#refs/tags/}"
+          existing="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases" --jq ".[] | select(.tag_name == \"${tag}\") | .html_url")"
+          if [ -n "${existing}" ]; then
+            echo "A release for ${tag} exists already (${existing}): delete it to build it again." >&2
+            exit 1
+          fi
+          (cd packages && sha256sum -- * > SHA256SUMS.txt)
+          {
+            cat .github/release-notes.md
+            printf '\n## SHA-256\n\n```\n'
+            cat packages/SHA256SUMS.txt
+            printf '```\n'
+          } > release-notes.md
+          prerelease=()
+          if [[ "${tag}" == *-* ]]; then prerelease=(--prerelease); fi
+          gh release create "${tag}" --draft "${prerelease[@]}" --verify-tag --title "${tag}" \
+            --notes-file release-notes.md packages/*
         shell: bash
