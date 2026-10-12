@@ -2,7 +2,8 @@ const path = require('path')
 const {cleanPaths, resolveCleanPath} = require('./clean-paths')
 
 describe('clean paths script', () => {
-  const cwd = path.join(path.sep, 'tmp', 'idena-desktop')
+  // Resolved: on Windows it starts with the current drive (D:\tmp\...), as the script's own paths do.
+  const cwd = path.resolve(path.sep, 'tmp', 'idena-desktop')
 
   it('resolves relative clean paths inside the project', () => {
     expect(resolveCleanPath('renderer/out', cwd)).toBe(
