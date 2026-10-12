@@ -11,9 +11,9 @@ Built with [Electron](https://www.electronjs.org),
 
 [![Lint and tests](https://github.com/truongfelix/idena-desktop/actions/workflows/lint.yml/badge.svg?branch=master)](https://github.com/truongfelix/idena-desktop/actions/workflows/lint.yml)
 
-> This community-maintained fork has no published or code-signed desktop
-> releases. The upstream Idena release feed does not contain these changes.
-> Build from a reviewed commit before using the app with a valuable identity.
+> Community build: [releases](https://github.com/truongfelix/idena-desktop/releases) for Linux, macOS and Windows,
+> not signed with a publisher certificate (macOS and Windows warn before the first start). Back up your data folder
+> before switching from the official app: see [Install](#install).
 
 ## Community build
 
@@ -33,10 +33,13 @@ What it changes for users (October 2026):
   whether the ad is approved or rejected), ad reviews are no longer shown to oracles as malicious, and sending an
   ad to review works again. The same review costs apply in the official app.
 - **Flips**: the Protect step no longer gets stuck, and an empty image-search pick keeps the picture.
-- **Fewer third-party calls**: the clock check, the staking APY (staking and mining, from the node) and the robot
-  avatars (drawn by the app) no longer call api.idena.io or robohash.idena.io; the oracle To-Do badge reads every 5
-  minutes, only for validated identities. Still on api.idena.io: the oracle votings list, the validation report
-  and the hard-fork screen.
+- **No api.idena.io**: the clock check, the staking APY (staking and mining, from the node), the robot avatars
+  (drawn by the app), the oracle votings, the validation report and the hard-fork screen no longer call api.idena.io
+  or robohash.idena.io; the oracle To-Do badge reads every 5 minutes, only for validated identities. Still outside:
+  translation.idena.io (flip keyword translations), GitHub (new app and node versions) and, only when you search
+  for a picture, DuckDuckGo, Openverse and Wikimedia.
+- **Updates**: the app tells you when a newer version is published here and opens its page; it downloads and
+  installs nothing by itself.
 - **New settings**: Settings > Node > Advanced settings, for the built-in node (the phone app has the same):
   - Peer level: Eco (up to 7 peers), Normal (up to 18, Idena default) or Hub (up to 30: twice the incoming
     slots, for nodes that reach this computer through its port open on the router).
@@ -56,7 +59,7 @@ verifies those commits and required files before building.
 
 ### What was updated
 
-- Node `24.18.0`, npm `11.16.0`, Electron `43.1.0`, Next.js `16.2`, and
+- Node `24.18.0`, npm `11.16.0`, Electron `43.7.7`, Next.js `16.3`, and
   compatible renderer dependencies replace the legacy Node 10-era toolchain.
 - Desktop API keys are generated with a cryptographically secure random source
   and private files are created with user-only permissions.
@@ -79,8 +82,8 @@ verifies those commits and required files before building.
 
 ### Risks and tradeoffs
 
-- This fork is not an official, signed Idena wallet release. Local packages are
-  development artifacts and may trigger operating-system trust warnings.
+- This fork is not an official Idena release, and its packages are not signed
+  with a publisher certificate: operating systems warn before the first start.
 - Electron and Next.js upgrades can expose UI, database, native-module, or
   packaging regressions that unit tests do not reproduce.
 - `npm start` is a development mode. Do not rely on it for an unattended or
@@ -92,9 +95,29 @@ verifies those commits and required files before building.
 
 ## Getting started
 
-There is no fork release download yet. For the official upstream application,
-use the [upstream releases](https://github.com/idena-network/idena-desktop/releases/latest).
-Those binaries do not include this fork's modernization work.
+### Install
+
+Download the package for your system from the
+[releases page](https://github.com/truongfelix/idena-desktop/releases) and check it against the release's
+`SHA256SUMS.txt` (Linux: `sha256sum <file>`; macOS: `shasum -a 256 <file>`; Windows PowerShell:
+`Get-FileHash <file>`).
+
+**Before switching from the official app**, quit it and copy its whole data folder (paths under
+[Configuration](#configuration)). This app takes the folder over (same account, same node key), and its node
+converts the IPFS folder in it to a newer format that the official node does not open: going back needs that copy.
+The folder holds your node key: keep the copy private.
+
+- **Linux** (64-bit; Ubuntu 22.04, Debian 12 or newer): `sudo apt install ./idena-client-linux-<version>.deb`. It
+  replaces the official app's package.
+- **macOS** (`mac-arm64` for Apple Silicon, `mac-x64` for Intel): open the `.dmg` and drag Idena to Applications. On
+  the first start macOS says it cannot verify the app: click Done, open System Settings > Privacy & Security, click
+  "Open Anyway" next to the message about Idena, and confirm. On macOS 14 or older, Control-click the app and choose
+  Open instead.
+- **Windows** (10 or 11, 64-bit): run `idena-client-win-<version>.exe`. If SmartScreen says "Windows protected your
+  PC", click "More info", then "Run anyway". It installs over the official app. With Smart App Control on, Windows
+  blocks apps without a publisher certificate.
+
+Problems: [open an issue](https://github.com/truongfelix/idena-desktop/issues).
 
 ### Get to know Idena
 

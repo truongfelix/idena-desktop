@@ -14,7 +14,6 @@
     "dayjs",
     "dequal",
     "dexie",
-    "electron-updater",
     "extract-colors",
     "framer-motion",
     "fs-extra",

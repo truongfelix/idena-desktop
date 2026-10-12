@@ -12,11 +12,9 @@ const {
   shell,
   // eslint-disable-next-line import/no-extraneous-dependencies
 } = require('electron')
-const {autoUpdater} = require('electron-updater')
 const fs = require('fs-extra')
 const i18next = require('i18next')
 const macosVersion = require('macos-version')
-const semver = require('semver')
 const axios = require('axios')
 const kill = require('tree-kill')
 const {zoomIn, zoomOut, resetZoom, isNotFoundError} = require('./utils')
@@ -24,6 +22,11 @@ const loadRoute = require('./utils/routes')
 const {getI18nConfig} = require('./language')
 const {searchImages} = require('./image-search')
 const {openExternalUrl} = require('./safe-external-url')
+const {
+  LATEST_RELEASE_API,
+  LATEST_RELEASE_PAGE,
+  newerReleaseTag,
+} = require('./app-update-check')
 const {isTrustedIpcSender} = require('./ipc-sender')
 const {
   installRendererProtocol,
@@ -453,6 +456,16 @@ const createMenu = () => {
         },
       },
       {
+        label: i18next.t('Report a problem'),
+        click: () => {
+          openExternalUrl(
+            shell,
+            'https://github.com/truongfelix/idena-desktop/issues',
+            logger
+          )
+        },
+      },
+      {
         type: 'separator',
       },
       {
@@ -879,14 +892,6 @@ nodeUpdater.on('update-downloaded', (info) => {
   sendMainWindowMsg(AUTO_UPDATE_EVENT, 'node-update-ready', info)
 })
 
-autoUpdater.on('download-progress', (info) => {
-  sendMainWindowMsg(AUTO_UPDATE_EVENT, 'ui-download-progress', info)
-})
-
-autoUpdater.on('update-downloaded', (info) => {
-  sendMainWindowMsg(AUTO_UPDATE_EVENT, 'ui-update-ready', info)
-})
-
 ipcMain.on(AUTO_UPDATE_COMMAND, async (event, command, data) => {
   if (!acceptIpcSender(event)) return
   logger.info(`new autoupdate command`, command, data)
@@ -896,16 +901,7 @@ ipcMain.on(AUTO_UPDATE_COMMAND, async (event, command, data) => {
       break
     }
     case 'update-ui': {
-      if (isWin) {
-        didConfirmQuit = true
-        autoUpdater.quitAndInstall()
-      } else {
-        openExternalUrl(
-          shell,
-          'https://github.com/truongfelix/idena-desktop/releases/latest',
-          logger
-        )
-      }
+      openExternalUrl(shell, LATEST_RELEASE_PAGE, logger)
       break
     }
     case 'update-node': {
@@ -928,9 +924,6 @@ ipcMain.on(AUTO_UPDATE_COMMAND, async (event, command, data) => {
   }
 })
 
-const RELEASE_URL =
-  'https://api.github.com/repos/truongfelix/idena-desktop/releases/latest'
-
 function checkForUpdates() {
   if (isDev) {
     return
@@ -938,19 +931,14 @@ function checkForUpdates() {
 
   async function runCheck() {
     try {
-      if (isMac) {
-        const {data} = await axios.get(RELEASE_URL)
-        const {tag_name: tag, prerelease} = data
-
-        if (!prerelease && semver.gt(semver.clean(tag), appVersion)) {
-          setTimeout(() => {
-            sendMainWindowMsg(AUTO_UPDATE_EVENT, 'ui-update-ready', {
-              version: tag,
-            })
-          }, 30000)
-        }
-      } else {
-        await autoUpdater.checkForUpdates()
+      const {data} = await axios.get(LATEST_RELEASE_API)
+      const tag = newerReleaseTag(data, appVersion)
+      if (tag) {
+        setTimeout(() => {
+          sendMainWindowMsg(AUTO_UPDATE_EVENT, 'ui-update-ready', {
+            version: tag,
+          })
+        }, 30000)
       }
     } catch (e) {
       if (isNotFoundError(e)) {

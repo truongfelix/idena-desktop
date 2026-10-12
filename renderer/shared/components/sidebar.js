@@ -1,5 +1,5 @@
 /* eslint-disable react/prop-types */
-import React, {useState} from 'react'
+import React from 'react'
 import NextLink from 'next/link'
 import {useRouter} from 'next/router'
 import {Trans, useTranslation} from 'react-i18next'
@@ -816,8 +816,6 @@ export function Version({
     {updateClient, updateNode},
   ] = useAutoUpdate()
 
-  const [clientUpdating, setClientUpdating] = useState(false)
-
   return (
     <Stack spacing="2">
       <Stack spacing="px" mx="2">
@@ -835,19 +833,14 @@ export function Version({
         </VersionText>
       </Stack>
       <Stack>
-        {!canUpdateNode && !clientUpdating && canUpdateClient && (
-          <UpdateButton
-            version={uiRemoteVersion}
-            onClick={() => {
-              setClientUpdating(!global.isMac)
-              updateClient()
-            }}
-          >
+        {!canUpdateNode && canUpdateClient && (
+          // Opens the release page: the app installs nothing by itself.
+          <UpdateButton version={uiRemoteVersion} onClick={updateClient}>
             {t('Update Client Version')}
           </UpdateButton>
         )}
 
-        {(nodeUpdating || clientUpdating) && (
+        {nodeUpdating && (
           <Text color="xwhite.050" mx={2}>
             {t('Updating...')}
           </Text>

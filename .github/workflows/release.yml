@@ -25,9 +25,7 @@ jobs:
           - name: linux-x64
             os: ubuntu-24.04
             electron_builder_args: --linux
-            packages: |
-              dist/*.deb
-              dist/latest-linux.yml
+            packages: dist/*.deb
           - name: mac-arm64
             os: macos-15
             electron_builder_args: --mac --arm64
@@ -39,9 +37,7 @@ jobs:
           - name: win-x64
             os: windows-2025
             electron_builder_args: --win
-            packages: |
-              dist/*.exe
-              dist/latest.yml
+            packages: dist/*.exe
     steps:
       - name: Check out
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7

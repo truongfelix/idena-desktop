@@ -2,7 +2,7 @@
   "name": "idena-desktop",
   "productName": "Idena",
   "desktopName": "idena-desktop.desktop",
-  "version": "0.0.1",
+  "version": "0.40.0",
   "description": "Desktop client for the Idena network.",
   "author": "truongfelix (community build)",
   "main": "main/index.js",
@@ -51,6 +51,7 @@
   },
   "build": {
     "appId": "io.idena",
+    "publish": null,
     "artifactName": "idena-client-${os}-${version}.${ext}",
     "npmRebuild": false,
     "files": [
@@ -116,9 +117,6 @@
       ]
     },
     "win": {
-      "publish": [
-        "github"
-      ],
       "icon": "main/static/icons/icon_512_2x.ico",
       "extraResources": [
         {
@@ -134,9 +132,6 @@
       "artifactName": "idena-client-${os}-${arch}-${version}.${ext}",
       "identity": "-",
       "hardenedRuntime": false,
-      "publish": [
-        "github"
-      ],
       "icon": "main/static/icons/icon-512@2x.icns",
       "extraResources": [
         {
@@ -148,9 +143,6 @@
     "linux": {
       "target": [
         "deb"
-      ],
-      "publish": [
-        "github"
       ],
       "icon": "main/static/icons/icon-512.png",
       "maintainer": "truongfelix <189600415+truongfelix@users.noreply.github.com> (https://github.com/truongfelix)",
@@ -188,7 +180,6 @@
     "dayjs": "^1.9.6",
     "dequal": "^1.0.0",
     "dexie": "^3.2.2",
-    "electron-updater": "^6.8.3",
     "extract-colors": "^1.1.22",
     "framer-motion": "^4.0.0",
     "fs-extra": "^8.1.0",
