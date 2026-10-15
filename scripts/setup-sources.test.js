@@ -22,7 +22,7 @@ describe('setup sources script', () => {
         sourceManifest.sources.map(({name, commit}) => [name, commit])
       )
     ).toEqual({
-      'idena-go': 'a992397ee4a28da1a4e1f82802d3d9cc300d7525',
+      'idena-go': '32b787cfec53fca8b11f24955dceece984938a39',
       'idena-wasm-binding': '01ccca5cc3c94917725964541954a9f20e3412e9',
     })
   })
