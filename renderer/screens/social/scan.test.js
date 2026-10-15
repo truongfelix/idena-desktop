@@ -5,13 +5,16 @@ import {
   checkNewBlocks,
   emptyCache,
   historyDone,
+  messagesPending,
   readCache,
+  scanOlderMessages,
+  withMessages,
   scannedShare,
   scanOlderBlocks,
   scanState,
 } from './scan'
 import {a, b, post} from './test-helpers'
-import {HISTORY_START, SOCIAL_VERSIONS} from './versions'
+import {CURRENT_VERSION, HISTORY_START, SOCIAL_VERSIONS} from './versions'
 
 // Ported from the phone app's SocialTest.kt: both apps read idena.social the same way.
 
@@ -249,5 +252,93 @@ describe('the scan state', () => {
       kind: 'history',
       share: expect.closeTo(0.5, 2),
     })
+  })
+})
+
+const messageAt = (height) => ({
+  hash: `0xm${height}`,
+  height,
+  time: height * 20,
+  index: 0,
+  from: a,
+  parts: ['p0', 'p1'],
+  messageHash: '0'.repeat(64),
+})
+
+/** A node with a message at each height of `messagesAt`. */
+function messageSource(messagesAt, batch = 1000) {
+  const source = {
+    ranges: [],
+    batchSize: () => batch,
+    calls: async (from, to) => {
+      source.ranges.push([from, to])
+      return {
+        posts: [],
+        tips: [],
+        messages: messagesAt.filter((h) => h >= from && h <= to).map(messageAt),
+        keys: {[a]: `04${'ab'.repeat(64)}`},
+      }
+    },
+  }
+  return source
+}
+
+describe('the private messages of the scan', () => {
+  it('are read once from the blocks a scan read before them', async () => {
+    const {from} = CURRENT_VERSION
+    // A version 2 scan: the whole history read, no message.
+    let cache = readCache({
+      ...emptyCache(from + 2500),
+      version: 2,
+      low: HISTORY_START,
+      authorsHeight: from + 2500,
+      messages: undefined,
+      messagesLow: undefined,
+      keys: undefined,
+    })
+    expect(cache.version).toBe(CACHE_VERSION)
+    expect(messagesPending(cache)).toBe(true)
+    expect(cache.messagesLow).toBe(from + 2501)
+
+    const source = messageSource([from + 10, from + 1500, from + 2400])
+    while (messagesPending(cache))
+      // eslint-disable-next-line no-await-in-loop
+      cache = await scanOlderMessages(cache, source)
+    // The current contract's blocks only, newest first.
+    expect(source.ranges).toEqual([
+      [from + 1501, from + 2500],
+      [from + 501, from + 1500],
+      [from, from + 500],
+    ])
+    expect(cache.messages.map(({height}) => height)).toEqual([
+      from + 10,
+      from + 1500,
+      from + 2400,
+    ])
+    expect(cache.keys[a]).toBe(`04${'ab'.repeat(64)}`)
+    expect(readCache(JSON.parse(JSON.stringify(cache)))).toEqual(cache)
+  })
+
+  it('are read with every block of a new scan', async () => {
+    const start = {...emptyCache(12000000), authorsHeight: 12000000}
+    expect(messagesPending(start)).toBe(false)
+    const source = {
+      ...messageSource([12000005]),
+      head: async () => 12000010,
+      authors: async () => ({}),
+    }
+    const cache = await checkNewBlocks(start, source)
+    expect(cache.messages.map(({height}) => height)).toEqual([12000005])
+    // Each message once.
+    expect(withMessages(cache.messages, [messageAt(12000005)])).toHaveLength(1)
+    // The history below reads them too, and leaves nothing pending.
+    const older = await scanOlderBlocks(cache, {
+      ...messageSource([11999500]),
+      authors: async () => ({}),
+    })
+    expect(older.messages.map(({height}) => height)).toEqual([
+      11999500, 12000005,
+    ])
+    expect(messagesPending(older)).toBe(false)
   })
 })

@@ -54,6 +54,89 @@ export const isMissingMethod = (error) =>
   /does not exist|not available/i.test(String(error?.message))
 
 /**
+ * Several calls of one node RPC method in one request (a JSON-RPC batch), one params list each: their results in
+ * the same order. Throws when one of them failed.
+ */
+export async function socialRpcBatch(
+  method,
+  paramsList,
+  timeout = RPC_TIMEOUT
+) {
+  if (paramsList.length === 0) return []
+  const {url, key} = getRpcParams()
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeout)
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {Accept: 'application/json', 'Content-Type': 'application/json'},
+      body: JSON.stringify(
+        paramsList.map((params, id) => ({
+          jsonrpc: '2.0',
+          id,
+          method,
+          params,
+          key,
+        }))
+      ),
+      signal: controller.signal,
+    })
+    const answers = await response.json()
+    if (!Array.isArray(answers))
+      throw new Error(
+        answers?.error?.message || `${method}: not a batch answer`
+      )
+    const byId = new Map(answers.map((answer) => [answer.id, answer]))
+    // A call that failed fails them all: what it asked is asked again later, never taken for "nothing".
+    const failed = answers.find((answer) => answer?.error)
+    if (failed) throw new Error(failed.error.message || `${method}: failed`)
+    return paramsList.map((_, id) => byId.get(id)?.result ?? null)
+  } catch (error) {
+    if (!controller.signal.aborted) throw error
+    const timedOut = new Error(
+      `${method}: no answer within ${timeout / 1000} s`
+    )
+    timedOut.timeout = true
+    throw timedOut
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/**
+ * The private messages through the node's key, which never leaves it (idena-go's social namespace): `decrypt`
+ * tries a list of message calls ({indexes, message} or null each), `encrypt` gives the parts of a plain message for
+ * the node's account then each public key (hex), `identityKey` an address's identity key (dna_identity, "" when
+ * none), `keysAt` the callers' keys of one block's contract calls.
+ */
+export function nodeMessages(call = socialRpc, batch = socialRpcBatch) {
+  return {
+    decrypt: (calls) =>
+      batch(
+        'social_decrypt',
+        calls.map(({parts}) => [{parts}])
+      ),
+
+    encrypt: (publicKeys, message) =>
+      call(
+        'social_encrypt',
+        [{publicKeys: publicKeys.map((key) => `0x${key}`), message}],
+        30 * 1000
+      ),
+
+    identityKey: async (address) =>
+      String((await call('dna_identity', [address]))?.pubkey ?? ''),
+
+    keysAt: async (height) =>
+      callsToActivity(
+        (await call('bcn_contractCalls', [
+          {contract: CURRENT_VERSION.address, heights: [height]},
+        ])) || []
+      ).keys,
+  }
+}
+
+/**
  * idena.social through the app's node: bcn_blocksWithAddress picks the blocks with a call of a contract version
  * (versions.js; the current one by default) from their headers, bcn_contractCalls reads those calls (sender,
  * method, argument) from the bodies. `call` makes an RPC call; `now` gives the time in ms.

@@ -68,6 +68,8 @@ describe('the node source', () => {
     expect(await nodeSocialSource(node.call, node.now).calls(1, 2)).toEqual({
       posts: [],
       tips: [],
+      messages: [],
+      keys: {},
     })
     expect(node.requests.map(({method}) => method)).toEqual([
       'bcn_blocksWithAddress',

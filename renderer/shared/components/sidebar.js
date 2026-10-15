@@ -297,7 +297,8 @@ function Navbar() {
   const {t} = useTranslation()
 
   const [{todoCount}] = useVotingNotification()
-  const {unread = []} = useSocial() || {}
+  const {unread = [], unreadConversations = 0} = useSocial() || {}
+  const socialNews = unread.length + unreadConversations
 
   return (
     <Nav>
@@ -317,11 +318,11 @@ function Navbar() {
         {t('Contacts')}
       </NavItem>
       <NavItem href="/social" icon={CommunityIcon}>
-        {unread.length > 0 ? (
+        {socialNews > 0 ? (
           <Flex flex={1} align="center" justify="space-between">
             <Text as="span">{t('Social')}</Text>
             <TodoVotingCountBadge>
-              {unread.length > 99 ? '99+' : unread.length}
+              {socialNews > 99 ? '99+' : socialNews}
             </TodoVotingCountBadge>
           </Flex>
         ) : (

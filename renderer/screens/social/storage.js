@@ -1,6 +1,7 @@
 import {requestDb, subDb} from '../../shared/utils/db'
 import {readCache} from './scan'
 import {cleanTopics} from './topics'
+import {readChatStore} from './messages'
 
 function socialDb() {
   return subDb(requestDb(), 'social', {valueEncoding: 'json'})
@@ -53,4 +54,13 @@ export async function loadSocialSettings(db = socialDb()) {
 
 export function saveSocialSetting(key, value, db = socialDb()) {
   return db.put(key, value)
+}
+
+/** The private messages of `address` (lowercase) kept on this computer: those of another account are not shown. */
+export async function loadChatStore(address, db = socialDb()) {
+  return readChatStore(await getOr(db, `messages-${address}`, null))
+}
+
+export function saveChatStore(address, store, db = socialDb()) {
+  return db.put(`messages-${address}`, store)
 }

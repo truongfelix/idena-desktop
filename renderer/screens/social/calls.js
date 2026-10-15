@@ -4,6 +4,7 @@
 // (Social.kt); each contract version's calls are read in its own format (versions.js).
 
 import {LIKE, MAX_INLINE_MEDIA} from './contract'
+import {parseMessageCall, publicKeyHex} from './messages'
 
 const textDecoder = new TextDecoder()
 
@@ -142,14 +143,19 @@ export function parseTip(
 }
 
 /**
- * The posts and tips among contract calls (bcn_contractCalls) of a contract `version`. A call the node marks as
- * refused by the contract (`success` false) is left out: it has no post id and moved no coins. A node without that
- * mark lists them all.
+ * The posts, tips and private messages among contract calls (bcn_contractCalls) of a contract `version` (messages:
+ * the current contract only), and the senders' public keys (`keys`, by lowercase address, from the node's
+ * senderPubKey). A call the node marks as refused by the contract (`success` false) is left out: it has no post id
+ * and moved no coins; its key still counts (it signed it). A node without that mark lists them all.
  */
 export function callsToActivity(calls, version = null) {
   const posts = []
   const tips = []
+  const messages = []
+  const keys = {}
   for (const call of calls) {
+    const key = publicKeyHex(call.senderPubKey)
+    if (key) keys[String(call.from).toLowerCase()] = key
     // eslint-disable-next-line no-continue
     if (call.success === false) continue
     if (call.method === 'makePost') {
@@ -161,9 +167,12 @@ export function callsToActivity(calls, version = null) {
     ) {
       const tip = parseTip(call, version)
       if (tip) tips.push(tip)
+    } else if (call.method === 'sendMessage' && !version?.prefix) {
+      const message = parseMessageCall(call)
+      if (message) messages.push(message)
     }
   }
-  return {posts, tips}
+  return {posts, tips, messages, keys}
 }
 
 export const isLike = ({message, replyTo}) => message === LIKE && replyTo !== ''

@@ -25,6 +25,7 @@ import {Inbox, InboxView} from '../screens/social/views/inbox'
 import {ProfileView} from '../screens/social/views/profile'
 import {TopicView} from '../screens/social/views/topic'
 import {FollowingView} from '../screens/social/views/following'
+import {ChatView} from '../screens/social/views/messages'
 import {OpenTopicContext} from '../screens/social/components/topic'
 import {topicOf, topicChannel} from '../screens/social/topics'
 
@@ -55,6 +56,7 @@ export default function SocialPage() {
     node,
     me,
     unread,
+    unreadConversations,
     scanOff,
     setPageOpen,
     sending,
@@ -71,7 +73,14 @@ export default function SocialPage() {
   const pageRef = React.useRef()
   React.useEffect(() => {
     pageRef.current?.scrollTo(0, 0)
-  }, [query.view, query.inbox, query.post, query.address, query.topic])
+  }, [
+    query.view,
+    query.inbox,
+    query.post,
+    query.address,
+    query.topic,
+    query.chat,
+  ])
 
   const view = Object.values(View).includes(query.view) ? query.view : View.Home
   const inboxView = Object.values(InboxView).includes(query.inbox)
@@ -106,7 +115,15 @@ export default function SocialPage() {
       }),
     [router]
   )
+  // A conversation by its key: its participants, lowercase, sorted, joined by "-".
+  const chatKey =
+    typeof query.chat === 'string' &&
+    /^0x[0-9a-f]{40}(-0x[0-9a-f]{40})*$/.test(query.chat)
+      ? query.chat
+      : null
+  const openChat = (key) => go({chat: key})
   const onPage =
+    chatKey !== null ||
     postId !== null ||
     profileAddress !== null ||
     topic !== null ||
@@ -136,6 +153,8 @@ export default function SocialPage() {
     ) : (
       <SmallText>{t('This post is not in the blocks read so far.')}</SmallText>
     )
+  else if (chatKey !== null)
+    content = <ChatView chatKey={chatKey} now={now} openProfile={openProfile} />
   else if (topic !== null)
     content = (
       <TopicView
@@ -153,6 +172,7 @@ export default function SocialPage() {
         openThread={openThread}
         openProfile={openProfile}
         onRename={setRenaming}
+        openChat={openChat}
       />
     )
   else if (view === View.Profile)
@@ -183,6 +203,7 @@ export default function SocialPage() {
         now={now}
         openThread={openThread}
         openProfile={openProfile}
+        openChat={openChat}
       />
     )
   else
@@ -260,7 +281,7 @@ export default function SocialPage() {
                   </TabButton>
                   <TabButton
                     isActive={view === View.Inbox}
-                    badge={unread.length}
+                    badge={unread.length + unreadConversations}
                     onClick={() => go({view: View.Inbox})}
                   >
                     {t('Inbox')}

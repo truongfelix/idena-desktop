@@ -1,9 +1,12 @@
 import React from 'react'
 import {useTranslation} from 'react-i18next'
 import {LIKE, SocialCall, makePostArgument} from './contract'
+import {keccak256Hex} from './keccak'
+import {MESSAGE_AMOUNT, plainMessage, sendMessageArgument} from './messages'
 import {topicChannel, typedTopic} from './topics'
 import {socialRpc} from './node'
 import {
+  estimateCall,
   prepareCall,
   prepareDraft as prepareDraftCall,
   sendPrepared,
@@ -39,6 +42,8 @@ export function draftTarget(target, topic) {
   return {...target, channel: topicChannel(name)}
 }
 
+const recipientCount = (recipients) => Math.max(recipients.length, 1)
+
 /**
  * The sent actions still waiting once the feed shows the blocks through `scannedThrough`: those not in a block yet
  * (`height` null) or in a later block, as the phone's SentList.
@@ -71,6 +76,8 @@ export function useSocialSending({ready, readNewBlocks, scannedThrough}) {
   const [textOnIpfs, setTextOnIpfs] = React.useState(false)
   const [draftTopic, setDraftTopic] = React.useState('')
   const [waiting, setWaiting] = React.useState([])
+  // Counts the private messages sent: the conversation's box empties then.
+  const [messagesSent, setMessagesSent] = React.useState(0)
   const storedRef = React.useRef(new Set())
   // The drafts sent from the editor, by transaction hash, until their block; what the editor holds now.
   const sentDraftsRef = React.useRef(new Map())
@@ -93,6 +100,7 @@ export function useSocialSending({ready, readNewBlocks, scannedThrough}) {
       comment: t('Comment'),
       like: t('Like'),
       tip: t('Tip'),
+      message: t('Message'),
     }),
     [t]
   )
@@ -156,6 +164,45 @@ export function useSocialSending({ready, readNewBlocks, scannedThrough}) {
         detail: t('Tip {{amount}} iDNA to {{name}} for this post', {
           amount,
           name,
+        }),
+      }
+    )
+
+  /**
+   * A private message `text` to `recipients` (lowercase, the account left out), with their public `keys` in the same
+   * order (findPublicKey): the plain message in idena.social's format, encrypted by the node for the account and each
+   * recipient (social_encrypt), then sendMessage with the website's 0.00002 iDNA.
+   */
+  const prepareMessage = (recipients, keys, text, encrypt) =>
+    prepare(
+      'message',
+      async () => {
+        const from = String(
+          await socialRpc('dna_getCoinbaseAddr')
+        ).toLowerCase()
+        let others = recipients.filter((address) => address !== from)
+        if (others.length === 0) others = [from]
+        if (keys.length !== others.length)
+          throw new Error('no public key for every person of the conversation')
+        const plain = plainMessage(from, others, text)
+        const parts = await encrypt(keys, plain)
+        if (!Array.isArray(parts) || parts.length !== others.length + 1)
+          throw new Error(
+            `the node encrypted ${parts?.length} parts for ${
+              others.length + 1
+            } participants`
+          )
+        const socialCall = {
+          method: 'sendMessage',
+          argument: sendMessageArgument(parts, keccak256Hex(plain)),
+          amount: MESSAGE_AMOUNT,
+        }
+        const fee = await estimateCall(socialRpc, from, socialCall)
+        return {from, socialCall, fee, files: []}
+      },
+      {
+        detail: t('A private message to {{count}} people', {
+          count: recipientCount(recipients),
         }),
       }
     )
@@ -274,6 +321,7 @@ export function useSocialSending({ready, readNewBlocks, scannedThrough}) {
     } finally {
       setBusy(false)
     }
+    if (pending.kind === 'message') setMessagesSent((n) => n + 1)
     if (pending.sentDraft) {
       sentDraftsRef.current.set(hash, pending.sentDraft)
       setDraft(null)
@@ -312,6 +360,8 @@ export function useSocialSending({ready, readNewBlocks, scannedThrough}) {
     send,
     prepareLike,
     prepareTip,
+    prepareMessage,
+    messagesSent,
     pendingLikes,
     draft,
     // A new post opened from a topic's page starts in that topic.

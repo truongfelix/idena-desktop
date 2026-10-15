@@ -14,8 +14,9 @@ import {NotifyKind} from '../activity'
 import {ActivityCard, notifyKindLabels} from '../components/activity'
 import {Chip} from '../components/chips'
 import {PAGE_SIZE, ShowMore} from './common'
+import {MessagesList} from './messages'
 
-export const InboxView = {Notifications: 'notifications'}
+export const InboxView = {Notifications: 'notifications', Messages: 'messages'}
 
 function Notifications({now, openThread, openProfile}) {
   const {t} = useTranslation()
@@ -109,9 +110,9 @@ function Notifications({now, openThread, openProfile}) {
   )
 }
 
-export function Inbox({view, setView, now, openThread, openProfile}) {
+export function Inbox({view, setView, now, openThread, openProfile, openChat}) {
   const {t} = useTranslation()
-  const {unread} = useSocial()
+  const {unread, unreadConversations} = useSocial()
   return (
     <Stack spacing={3} w="full">
       <HStack spacing={2}>
@@ -123,13 +124,25 @@ export function Inbox({view, setView, now, openThread, openProfile}) {
             ? t('Notifications · {{count}} new', {count: unread.length})
             : t('Notifications')}
         </Chip>
+        <Chip
+          isSelected={view === InboxView.Messages}
+          onClick={() => setView(InboxView.Messages)}
+        >
+          {unreadConversations > 0
+            ? t('Messages · {{count}} new', {count: unreadConversations})
+            : t('Messages')}
+        </Chip>
       </HStack>
       <Divider />
-      <Notifications
-        now={now}
-        openThread={openThread}
-        openProfile={openProfile}
-      />
+      {view === InboxView.Messages ? (
+        <MessagesList now={now} openChat={openChat} />
+      ) : (
+        <Notifications
+          now={now}
+          openThread={openThread}
+          openProfile={openProfile}
+        />
+      )}
     </Stack>
   )
 }
