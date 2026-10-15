@@ -6,7 +6,7 @@
       "path": "idena-go",
       "url": "https://github.com/truongfelix/idena-go.git",
       "ref": "master",
-      "commit": "bf7bf88178144a4d30326dc3f58f07199d32f601",
+      "commit": "97c5378f33439b9a8ad960d29379a7bb63cd58a5",
       "requiredFiles": ["go.mod", "main.go"]
     },
     {
