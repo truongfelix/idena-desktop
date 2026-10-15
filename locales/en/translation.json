@@ -1393,5 +1393,16 @@
   "Until the validation + 2 h": "Until the validation + 2 h",
   "The app looks for this network's router only when you ask. Some routers announce themselves only every 15 minutes.": "The app looks for this network's router only when you ask. Some routers announce themselves only every 15 minutes.",
   "Look for the router": "Look for the router",
-  "No node from outside has connected for {{minutes}} min. If this computer has a firewall, it must let in TCP port {{port}}.": "No node from outside has connected for {{minutes}} min. If this computer has a firewall, it must let in TCP port {{port}}."
+  "No node from outside has connected for {{minutes}} min. If this computer has a firewall, it must let in TCP port {{port}}.": "No node from outside has connected for {{minutes}} min. If this computer has a firewall, it must let in TCP port {{port}}.",
+  "Downloading headers {{percent}}%": "Downloading headers {{percent}}%",
+  "Waiting for the snapshot": "Waiting for the snapshot",
+  "Synchronizing blocks {{percent}}%": "Synchronizing blocks {{percent}}%",
+  "Headers downloaded up to block {{total}}; the chain is at {{done}}": "Headers downloaded up to block {{total}}; the chain is at {{done}}",
+  "{{numHeaders}} headers left": "{{numHeaders}} headers left",
+  "Under a minute left": "Under a minute left",
+  "About {{minutes}} min left": "About {{minutes}} min left",
+  "About {{hours}} h {{minutes}} min left": "About {{hours}} h {{minutes}} min left",
+  "Headers: {{done}} out of {{total}}": "Headers: {{done}} out of {{total}}",
+  "The newest block is {{minutes}} min old: looking for peers": "The newest block is {{minutes}} min old: looking for peers",
+  "Behind": "Behind"
 }

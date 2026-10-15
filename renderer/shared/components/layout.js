@@ -57,7 +57,13 @@ import {
   shouldShowUpcomingValidationNotification,
   showWindowNotification,
 } from '../utils/utils'
-import {useChainState} from '../providers/chain-context'
+import {useChainState, useSyncStep} from '../providers/chain-context'
+import {
+  SyncPhase,
+  durationParts,
+  stepPercent,
+  stepRemaining,
+} from '../utils/sync-steps'
 import {useNode} from '../providers/node-context'
 import {useSettings, useSettingsState} from '../providers/settings-context'
 import {useFailToast} from '../hooks/use-toast'
@@ -363,8 +369,8 @@ function NormalApp({skipBanner, children}) {
 function SyncingApp() {
   const {t} = useTranslation()
 
-  const {currentBlock, highestBlock, genesisBlock, wrongTime, message} =
-    useChainState()
+  const {highestBlock, wrongTime, message} = useChainState()
+  const {step, speed} = useSyncStep()
 
   const {address} = useIdentityState()
 
@@ -424,7 +430,7 @@ function SyncingApp() {
           <Flex justify="space-between">
             <Box>
               <Heading fontSize="lg" fontWeight={500}>
-                {t('Synchronizing blocks')}
+                <SyncStepTitle step={step} />
               </Heading>
               <Box
                 fontSize="mdx"
@@ -432,36 +438,13 @@ function SyncingApp() {
                 color="muted"
                 style={{fontVariantNumeric: 'tabular-nums'}}
               >
-                {highestBlock ? (
-                  <>
-                    {t('{{numBlocks}} blocks left', {
-                      numBlocks: Number.isNaN(highestBlock - currentBlock)
-                        ? '...'
-                        : Math.max(
-                            highestBlock - currentBlock,
-                            0
-                          ).toLocaleString(),
-                    })}{' '}
-                    (
-                    {t('{{currentBlock}} out of {{highestBlock}}', {
-                      currentBlock:
-                        currentBlock && currentBlock.toLocaleString(),
-                      highestBlock:
-                        (highestBlock && highestBlock.toLocaleString()) ||
-                        '...',
-                    })}
-                    )
-                  </>
-                ) : (
-                  <>
-                    {t('{{currentBlock}} out of {{highestBlock}}', {
-                      currentBlock:
-                        currentBlock && currentBlock.toLocaleString(),
-                      highestBlock: '...',
-                    })}
-                  </>
-                )}
+                <SyncStepCount step={step} hasTop={Boolean(highestBlock)} />
               </Box>
+              {speed && (
+                <Box fontSize="mdx" color="muted">
+                  <TimeLeft seconds={stepRemaining(step) / speed} />
+                </Box>
+              )}
             </Box>
             <Box>
               <Text as="span" color="muted">
@@ -471,9 +454,10 @@ function SyncingApp() {
             </Box>
           </Flex>
           <Progress
-            value={currentBlock}
-            min={genesisBlock || 0}
-            max={highestBlock || Number.MAX_SAFE_INTEGER}
+            value={step.phase === SyncPhase.Snapshot ? undefined : step.done}
+            isIndeterminate={step.phase === SyncPhase.Snapshot}
+            min={0}
+            max={step.total || Number.MAX_SAFE_INTEGER}
           />
         </Stack>
 
@@ -503,6 +487,54 @@ function SyncingApp() {
       </Stack>
     </FillCenter>
   )
+}
+
+// The sync's step as the phone's status bar names it: headers, the snapshot, then the blocks.
+function SyncStepTitle({step}) {
+  const {t} = useTranslation()
+  const percent = stepPercent(step)
+  switch (step.phase) {
+    case SyncPhase.Headers:
+      return t('Downloading headers {{percent}}%', {percent})
+    case SyncPhase.Snapshot:
+      return t('Waiting for the snapshot')
+    default:
+      return t('Synchronizing blocks {{percent}}%', {percent})
+  }
+}
+
+function SyncStepCount({step, hasTop}) {
+  const {t} = useTranslation()
+  const done = step.done ? step.done.toLocaleString() : '...'
+  const total = hasTop && step.total ? step.total.toLocaleString() : '...'
+  if (step.phase === SyncPhase.Snapshot)
+    return t(
+      'Headers downloaded up to block {{total}}; the chain is at {{done}}',
+      {
+        done,
+        total,
+      }
+    )
+  const outOf = t('{{currentBlock}} out of {{highestBlock}}', {
+    currentBlock: done,
+    highestBlock: total,
+  })
+  if (!hasTop) return outOf
+  const left = stepRemaining(step).toLocaleString()
+  return step.phase === SyncPhase.Headers
+    ? `${t('{{numHeaders}} headers left', {numHeaders: left})} (${outOf})`
+    : `${t('{{numBlocks}} blocks left', {numBlocks: left})} (${outOf})`
+}
+
+function TimeLeft({seconds}) {
+  const {t} = useTranslation()
+  const {hours, minutes} = durationParts(seconds)
+  if (hours === 0 && minutes < 1) return t('Under a minute left')
+  if (hours === 0) return t('About {{minutes}} min left', {minutes})
+  return t('About {{hours}} h {{minutes}} min left', {
+    hours,
+    minutes: String(minutes).padStart(2, '0'),
+  })
 }
 
 function LoadingApp() {
