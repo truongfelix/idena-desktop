@@ -1,4 +1,5 @@
-import {draftToPutBack, stillWaiting} from './sending'
+import {PostTarget} from './contract'
+import {draftTarget, draftToPutBack, stillWaiting} from './sending'
 
 const sent = (hash, height = null, likeOf = null) => ({
   hash,
@@ -40,5 +41,27 @@ describe('a draft whose send failed', () => {
 
   it('is nothing for a like or a tip', () => {
     expect(draftToPutBack(null, {text: '', image: null})).toBeNull()
+  })
+})
+
+describe('draftTarget', () => {
+  it('puts a new post in the topic typed', () => {
+    expect(draftTarget(PostTarget.newPost(), ' R/Idena ')).toEqual({
+      level: null,
+      replyTo: null,
+      channel: 'r/idena',
+    })
+    expect(draftTarget(PostTarget.newPost(), '  ')).toEqual(
+      PostTarget.newPost()
+    )
+    expect(() => draftTarget(PostTarget.newPost(), 'no way')).toThrow(
+      'not a topic name'
+    )
+  })
+
+  it('keeps an answer where it goes', () => {
+    expect(draftTarget(PostTarget.onReply(4), 'idena')).toEqual(
+      PostTarget.onReply(4)
+    )
   })
 })

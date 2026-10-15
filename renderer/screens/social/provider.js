@@ -4,13 +4,21 @@ import {useChainState} from '../../shared/providers/chain-context'
 import {useEpochState} from '../../shared/providers/epoch-context'
 import {useIdentityState} from '../../shared/providers/identity-context'
 import {EpochPeriod} from '../../shared/types'
-import {peopleFromJson, peopleNames, peopleToJson, withPerson} from './people'
+import {
+  peopleFromJson,
+  peopleNames,
+  peopleToJson,
+  person,
+  withPerson,
+} from './people'
 import {newActivity, NotifyKind, socialActivity} from './activity'
 import {postTargets} from './feed'
 import {cacheFeed} from './scan'
 import {useActivityNotices} from './notices'
 import {useSocialScan} from './scan-loop'
 import {useSocialSending} from './sending'
+import {useChats} from './chats'
+import {nodeMessages} from './node'
 import {loadSocialCache, loadSocialSettings, saveSocialSetting} from './storage'
 
 const SocialContext = React.createContext(null)
@@ -45,6 +53,7 @@ export function SocialProvider({children}) {
       loadSocialCache().catch(() => null),
       loadSocialSettings().catch(() => ({
         people: null,
+        topics: [],
         seenThrough: null,
         notifyOff: [],
         scanOff: false,
@@ -95,6 +104,7 @@ export function SocialProvider({children}) {
     () => (me ? socialActivity(feed, me) : []),
     [feed, me]
   )
+  const chats = useChats({me, cache, ready, people})
   const seenThrough = settings?.seenThrough ?? null
 
   const updateSettings = React.useCallback((key, next, saved = next) => {
@@ -146,9 +156,44 @@ export function SocialProvider({children}) {
     [people, updateSettings]
   )
 
+  const followedTopics = React.useMemo(() => settings?.topics || [], [settings])
+
+  const setTopicFollowed = React.useCallback(
+    (name, follow) => {
+      const others = followedTopics.filter((topic) => topic !== name)
+      updateSettings('topics', follow ? [...others, name].sort() : others)
+    },
+    [followedTopics, updateSettings]
+  )
+
   const setPeople = React.useCallback(
     (list) => updateSettings('people', list, peopleToJson(list)),
     [updateSettings]
+  )
+
+  const {messageKeys} = chats
+  // Sends `text` to `others` (lowercase) once each one's public key is known.
+  const sendMessage = React.useCallback(
+    (others, text) => {
+      const keys = others.map((address) => messageKeys[address] || '')
+      if (keys.some((key) => key === '')) return
+      sending.prepareMessage(others, keys, text, nodeMessages().encrypt)
+    },
+    [messageKeys, sending]
+  )
+
+  // Takes a conversation out of Requests: its people are marked to message.
+  const acceptChat = React.useCallback(
+    (conversation) => {
+      let list = people
+      for (const address of conversation.others)
+        list = withPerson(list, {
+          ...(list[address] || person(address)),
+          message: true,
+        })
+      updateSettings('people', list, peopleToJson(list))
+    },
+    [people, updateSettings]
   )
 
   const value = React.useMemo(
@@ -165,6 +210,9 @@ export function SocialProvider({children}) {
       names,
       setPerson,
       setPeople,
+      followedTopics,
+      setTopicFollowed,
+      setFollowedTopics: (list) => updateSettings('topics', list),
       activity,
       unread,
       highlightAfter,
@@ -182,13 +230,19 @@ export function SocialProvider({children}) {
       sending,
       setPageOpen,
       setInboxOpen,
+      ...chats,
+      sendMessage,
+      acceptChat,
     }),
     [
+      acceptChat,
       activity,
       cache,
+      chats,
       epoch,
       error,
       feed,
+      followedTopics,
       head,
       highlightAfter,
       markSeen,
@@ -201,9 +255,11 @@ export function SocialProvider({children}) {
       people,
       ready,
       scanOff,
+      sendMessage,
       sending,
       setPeople,
       setPerson,
+      setTopicFollowed,
       syncing,
       targets,
       unread,

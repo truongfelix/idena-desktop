@@ -82,6 +82,35 @@ describe('reading the calls', () => {
     expect(tips.map((t) => t.postId)).toEqual(['1'])
   })
 
+  it('reads the private messages of the current contract and the senders keys', () => {
+    const key = `04${'cd'.repeat(64)}`
+    const message = `{"message":["AA==","BB=="],"messageHash":"${'1'.repeat(
+      64
+    )}","encrypted":true}`
+    const {messages, keys} = callsToActivity([
+      call(message, {method: 'sendMessage', senderPubKey: `0x${key}`}),
+      call('{"message":"refused, still signed"}', {
+        success: false,
+        from: '0xBBBB000000000000000000000000000000000002',
+        senderPubKey: `0x${key}`,
+      }),
+      call('{"message":"no key"}', {senderPubKey: '0x'}),
+    ])
+    expect(messages.map(({parts}) => parts)).toEqual([['AA==', 'BB==']])
+    expect(keys).toEqual({
+      '0xaaaa000000000000000000000000000000000001': key,
+      '0xbbbb000000000000000000000000000000000002': key,
+    })
+    // An older contract's messages are not read.
+    expect(
+      callsToActivity([call(message, {method: 'sendMessage'})], {
+        name: 'v11',
+        prefix: 'preV12:',
+        format: 'v12',
+      }).messages
+    ).toEqual([])
+  })
+
   it('leaves out the calls the node marks as refused', () => {
     const {posts, tips} = callsToActivity([
       call('{"message":"accepted"}', {success: true}),

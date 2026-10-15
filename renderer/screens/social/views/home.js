@@ -5,6 +5,7 @@ import {
   Button,
   Divider,
   HStack,
+  IconButton,
   Stack,
   Text,
   Menu,
@@ -22,13 +23,15 @@ import {
   searchSocial,
 } from '../people'
 import {Chip} from '../components/chips'
-import {PostRow} from '../components/post'
+import {PostRow, TopicShown} from '../components/post'
+import {TopicRow} from '../components/topic'
 import {FeedPeriod, FeedSort, sortFeed} from '../feed'
+import {TOPIC_PREFIX, topicList} from '../topics'
 import {ContactRow, PAGE_SIZE, Rows, SearchField, ShowMore} from './common'
 
-export function Home({now, openThread, openProfile, onRename}) {
+export function Home({now, openThread, openProfile, onRename, openFollowing}) {
   const {t} = useTranslation()
-  const {feed, people, names, epochStart} = useSocial()
+  const {feed, people, names, epochStart, followedTopics} = useSocial()
   const [query, setQuery] = React.useState('')
   const [searched, setSearched] = React.useState('')
   const [following, setFollowing] = React.useState(false)
@@ -51,22 +54,39 @@ export function Home({now, openThread, openProfile, onRename}) {
   const ranked = ![FeedSort.Newest, FeedSort.Activity].includes(sort)
   const posts = React.useMemo(
     () =>
-      sortFeed(following ? followingFeed(feed, people) : feed, sort, {
-        period,
-        now,
-        epochStart,
-      }),
-    [epochStart, feed, following, now, people, period, sort]
+      sortFeed(
+        following ? followingFeed(feed, people, followedTopics) : feed,
+        sort,
+        {
+          period,
+          now,
+          epochStart,
+        }
+      ),
+    [epochStart, feed, followedTopics, following, now, people, period, sort]
   )
-  const searching = searched.trim().length >= MIN_SEARCH
+  // "r/…" lists the topics whose name holds the rest.
+  const topicSearch = query.trim().startsWith(TOPIC_PREFIX)
+  const searching = !topicSearch && searched.trim().length >= MIN_SEARCH
   const hits = React.useMemo(
     () => (searching ? searchSocial(feed, people, searched) : []),
     [feed, people, searched, searching]
   )
+  const topics = React.useMemo(
+    () => (topicSearch ? topicList(feed, query) : []),
+    [feed, query, topicSearch]
+  )
+  const topicQuery = query.trim().slice(TOPIC_PREFIX.length)
 
   let empty = t('No posts found yet.')
-  if (following && !Object.values(people).some((p) => p.following))
-    empty = t('You follow nobody yet. Open a profile and select Follow.')
+  if (
+    following &&
+    !Object.values(people).some((p) => p.following) &&
+    followedTopics.length === 0
+  )
+    empty = t(
+      'You follow nobody and no topic yet. Open a profile or a topic and select Follow.'
+    )
   else if (sort === FeedSort.Likes) empty = t('No liked post in this period.')
   else if (sort === FeedSort.Comments)
     empty = t('No post with answers in this period.')
@@ -75,7 +95,31 @@ export function Home({now, openThread, openProfile, onRename}) {
   return (
     <Stack spacing={3} w="full">
       <SearchField value={query} onChange={setQuery} />
-      {searching ? (
+      {topicSearch && (
+        <Stack spacing={2}>
+          {topics.length === 0 && (
+            <SmallText>
+              {topicQuery.trim() === ''
+                ? t(
+                    "No posts in a topic yet. Write one: the editor's Topic field puts a post in a topic.",
+                    {nsSeparator: '|'}
+                  )
+                : t('No topic holds "{{query}}" in the posts read so far.', {
+                    query: topicQuery.trim(),
+                  })}
+            </SmallText>
+          )}
+          {topics.map((topic) => (
+            <TopicRow
+              key={topic.name}
+              name={topic.name}
+              summary={topic}
+              now={now}
+            />
+          ))}
+        </Stack>
+      )}
+      {!topicSearch && searching && (
         <Stack spacing={2}>
           {hits.length === 0 && (
             <SmallText>
@@ -129,7 +173,8 @@ export function Home({now, openThread, openProfile, onRename}) {
             )
           })}
         </Stack>
-      ) : (
+      )}
+      {!topicSearch && !searching && (
         <>
           <HStack spacing={2} flexWrap="wrap">
             <Chip isSelected={!following} onClick={() => setFollowing(false)}>
@@ -138,6 +183,14 @@ export function Home({now, openThread, openProfile, onRename}) {
             <Chip isSelected={following} onClick={() => setFollowing(true)}>
               {t('Following')}
             </Chip>
+            <IconButton
+              variant="ghost"
+              size="sm"
+              aria-label={t('People and topics followed')}
+              title={t('People and topics followed')}
+              icon={<Text>⚙</Text>}
+              onClick={openFollowing}
+            />
             <Menu autoSelect={false}>
               <MenuButton
                 as={Button}
@@ -190,6 +243,7 @@ export function Home({now, openThread, openProfile, onRename}) {
                 now={now}
                 onOpen={() => openThread(node.id)}
                 onProfile={openProfile}
+                topicShown={TopicShown.InsteadOfAuthor}
               />
             ))}
           </Rows>

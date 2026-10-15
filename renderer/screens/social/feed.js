@@ -1,5 +1,5 @@
 import {isLike, validTipAmount} from './calls'
-import {PostTarget} from './contract'
+import {PostTarget, topicOf} from './contract'
 
 const byChainOrder = (a, b) => a.height - b.height || a.index - b.index
 
@@ -35,8 +35,9 @@ const LIKE_LEVEL = 3
  * The feed, newest first, as idena.social shows it (PostComponent.tsx): posts in the main channel; under each
  * post its replies; under each reply its comments, in the channel "discuss:<reply id>" (a main-channel answer to
  * a reply or a comment counts as a comment too). A like (a reply made of LIKE) only counts on what it replies to.
- * Each post needs a text or media, an id, and a known, older parent that is not a like; posts in other channels
- * are left out. A tip counts on the post it names when its amount is valid and it comes after that post.
+ * Each post needs a text or media, an id, and a known, older parent that is not a like; a post (not an answer)
+ * may also be in a topic's channel ("r/name", topicOf), posts in other channels are left out. A tip counts on the
+ * post it names when its amount is valid and it comes after that post.
  * Each node: {id, call, likeCalls, tips, replies}.
  */
 export function socialFeed(posts, authors, tips = [], {fromOldest} = {}) {
@@ -63,7 +64,9 @@ export function socialFeed(posts, authors, tips = [], {fromOldest} = {}) {
     // eslint-disable-next-line no-continue
     if (post.message === '' && !post.hasMedia) continue
     let discussId = null
-    if (post.channel !== '') {
+    // A post (not an answer) may also be in a topic's channel (topics.js).
+    const inTopic = post.replyTo === '' && topicOf(post.channel) !== null
+    if (post.channel !== '' && !inTopic) {
       // eslint-disable-next-line no-continue
       if (!post.channel.startsWith('discuss:')) continue
       discussId = toId(post.channel.slice('discuss:'.length))

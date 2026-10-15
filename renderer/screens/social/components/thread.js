@@ -11,6 +11,8 @@ import {FullHeader, PostMedia, PostText} from './post'
 import {LINK, MUTED} from './theme'
 import {commentTree, descendants, idKey, replyCount} from '../feed'
 import {timeAgo} from '../format'
+import {postTopic} from '../topics'
+import {TopicLine} from './topic'
 
 const RAIL = '18px'
 const MAX_INDENT = 6
@@ -36,7 +38,15 @@ function textPreview(message, t) {
 }
 
 /** A reply or comment of a thread, with the comments under it; a click on its header or rails folds it. */
-function ThreadItem({node, children, depth, now, focusId, onProfile}) {
+function ThreadItem({
+  node,
+  children,
+  depth,
+  now,
+  focusId,
+  onProfile,
+  opAuthor,
+}) {
   const {t} = useTranslation()
   const {names} = useSocial()
   const [folded, setFolded] = React.useState(false)
@@ -96,6 +106,7 @@ function ThreadItem({node, children, depth, now, focusId, onProfile}) {
               onProfile={onProfile}
               avatarSize={depth === 0 ? 9 : 7}
               onClick={() => setFolded(true)}
+              isOp={node.call.author === opAuthor}
             />
             <PostText message={node.call.message} />
             <PostMedia call={node.call} maxH="360px" />
@@ -112,6 +123,7 @@ function ThreadItem({node, children, depth, now, focusId, onProfile}) {
             now={now}
             focusId={focusId}
             onProfile={onProfile}
+            opAuthor={opAuthor}
           >
             {child.children}
           </ThreadItem>
@@ -123,6 +135,8 @@ function ThreadItem({node, children, depth, now, focusId, onProfile}) {
 /** A post with its replies, and under each reply its comments as a tree, as the phone app shows a thread. */
 export function SocialThread({node, now, focusId, onProfile}) {
   const {t} = useTranslation()
+  // The topic, then its author (who shows the time).
+  const topic = postTopic(node)
   const ref = React.useRef()
   React.useEffect(() => {
     if (focusId === idKey(node.id))
@@ -136,6 +150,7 @@ export function SocialThread({node, now, focusId, onProfile}) {
         bg={focusId === idKey(node.id) ? 'gray.50' : undefined}
         rounded="md"
       >
+        {topic !== null && <TopicLine name={topic} now={now} large />}
         <FullHeader
           address={node.call.author}
           time={node.call.time}
@@ -166,6 +181,7 @@ export function SocialThread({node, now, focusId, onProfile}) {
           now={now}
           focusId={focusId}
           onProfile={onProfile}
+          opAuthor={node.call.author}
         >
           {commentTree(reply.id, reply.replies)}
         </ThreadItem>

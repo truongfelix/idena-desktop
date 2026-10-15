@@ -23,12 +23,23 @@ import {TabButton, useNow} from '../screens/social/views/common'
 import {Home} from '../screens/social/views/home'
 import {Inbox, InboxView} from '../screens/social/views/inbox'
 import {ProfileView} from '../screens/social/views/profile'
+import {TopicView} from '../screens/social/views/topic'
+import {FollowingView} from '../screens/social/views/following'
+import {ChatView} from '../screens/social/views/messages'
+import {OpenTopicContext} from '../screens/social/components/topic'
+import {topicOf, topicChannel} from '../screens/social/topics'
 
-const View = {Home: 'home', Profile: 'profile', Inbox: 'inbox'}
+const View = {
+  Home: 'home',
+  Profile: 'profile',
+  Inbox: 'inbox',
+  Following: 'following',
+}
 
 /**
  * idena.social, read from the app's own node and laid out as the phone app's Social tab: Home (search, Feed or
- * Following, sorts), Profile (yours), Inbox (notifications and contacts); a thread or another profile opens on top.
+ * Following, sorts; ⚙ the people and topics followed), Profile (yours), Inbox (notifications); a thread, another
+ * profile or a topic opens on top.
  */
 export default function SocialPage() {
   const {t} = useTranslation()
@@ -45,6 +56,7 @@ export default function SocialPage() {
     node,
     me,
     unread,
+    unreadConversations,
     scanOff,
     setPageOpen,
     sending,
@@ -61,7 +73,14 @@ export default function SocialPage() {
   const pageRef = React.useRef()
   React.useEffect(() => {
     pageRef.current?.scrollTo(0, 0)
-  }, [query.view, query.inbox, query.post, query.address])
+  }, [
+    query.view,
+    query.inbox,
+    query.post,
+    query.address,
+    query.topic,
+    query.chat,
+  ])
 
   const view = Object.values(View).includes(query.view) ? query.view : View.Home
   const inboxView = Object.values(InboxView).includes(query.inbox)
@@ -87,7 +106,28 @@ export default function SocialPage() {
   const profileAddress = isSocialAddress(query.address)
     ? String(query.address).toLowerCase()
     : null
-  const onPage = postId !== null || profileAddress !== null
+  const topic =
+    query.topic !== undefined ? topicOf(topicChannel(query.topic)) : null
+  const openTopic = React.useCallback(
+    (name) =>
+      router.push({pathname: '/social', query: {topic: name}}, undefined, {
+        shallow: true,
+      }),
+    [router]
+  )
+  // A conversation by its key: its participants, lowercase, sorted, joined by "-".
+  const chatKey =
+    typeof query.chat === 'string' &&
+    /^0x[0-9a-f]{40}(-0x[0-9a-f]{40})*$/.test(query.chat)
+      ? query.chat
+      : null
+  const openChat = (key) => go({chat: key})
+  const onPage =
+    chatKey !== null ||
+    postId !== null ||
+    profileAddress !== null ||
+    topic !== null ||
+    view === View.Following
 
   const state = scanOff
     ? {health: 'off', kind: 'scanOff'}
@@ -113,6 +153,17 @@ export default function SocialPage() {
     ) : (
       <SmallText>{t('This post is not in the blocks read so far.')}</SmallText>
     )
+  else if (chatKey !== null)
+    content = <ChatView chatKey={chatKey} now={now} openProfile={openProfile} />
+  else if (topic !== null)
+    content = (
+      <TopicView
+        name={topic}
+        now={now}
+        openThread={openThread}
+        openProfile={openProfile}
+      />
+    )
   else if (profileAddress)
     content = (
       <ProfileView
@@ -121,6 +172,7 @@ export default function SocialPage() {
         openThread={openThread}
         openProfile={openProfile}
         onRename={setRenaming}
+        openChat={openChat}
       />
     )
   else if (view === View.Profile)
@@ -135,6 +187,14 @@ export default function SocialPage() {
     ) : (
       <SmallText>{t("Waiting for the node's address…")}</SmallText>
     )
+  else if (view === View.Following)
+    content = (
+      <FollowingView
+        now={now}
+        openProfile={openProfile}
+        onRename={setRenaming}
+      />
+    )
   else if (view === View.Inbox)
     content = (
       <Inbox
@@ -143,7 +203,7 @@ export default function SocialPage() {
         now={now}
         openThread={openThread}
         openProfile={openProfile}
-        onRename={setRenaming}
+        openChat={openChat}
       />
     )
   else
@@ -153,110 +213,113 @@ export default function SocialPage() {
         openThread={openThread}
         openProfile={openProfile}
         onRename={setRenaming}
+        openFollowing={() => go({view: View.Following})}
       />
     )
 
   // The page needs no synced node to show what was read: it stays shown while the node syncs.
   return (
     <Layout>
-      <Page ref={pageRef}>
-        <Stack spacing={4} w="full" maxW="3xl">
-          <Flex align="center" justify="space-between">
-            <PageTitle mb={0}>{t('Social')}</PageTitle>
-            <HStack
-              as="button"
-              spacing={2}
-              onClick={() => setIsInfoOpen(true)}
-              title={t('Details')}
-            >
-              <StatusDot health={state.health} size={3} />
-              {node?.peers > 0 && (
-                <Text fontWeight={500} color="muted">
-                  {node.peers}
-                </Text>
-              )}
-              <Text color="muted">ⓘ</Text>
-            </HStack>
-          </Flex>
-          {missingMethod && (
-            <Text fontSize="sm" color="red.500">
-              {t(
-                'This node cannot read idena.social. It needs a node version with the bcn_contractCalls method, as the one built into this app.'
-              )}
-            </Text>
-          )}
-          {error && !missingMethod && (
-            <SmallText>
-              {error.timeout
-                ? t('The node took too long to answer. Trying again.')
-                : t('The last read failed ({{message}}). Trying again.', {
-                    message: error.message,
-                  })}
-            </SmallText>
-          )}
-          {!sending.draft &&
-            (onPage ? (
-              <Button
-                variant="link"
-                alignSelf="flex-start"
-                onClick={() => router.back()}
+      <OpenTopicContext.Provider value={openTopic}>
+        <Page ref={pageRef}>
+          <Stack spacing={4} w="full" maxW="3xl">
+            <Flex align="center" justify="space-between">
+              <PageTitle mb={0}>{t('Social')}</PageTitle>
+              <HStack
+                as="button"
+                spacing={2}
+                onClick={() => setIsInfoOpen(true)}
+                title={t('Details')}
               >
-                ← {t('Back')}
-              </Button>
-            ) : (
-              <HStack spacing={1}>
-                <TabButton
-                  isActive={view === View.Home}
-                  onClick={() => go({view: View.Home})}
-                >
-                  {t('Home')}
-                </TabButton>
-                <TabButton
-                  isActive={view === View.Profile}
-                  onClick={() => go({view: View.Profile})}
-                >
-                  {t('Profile')}
-                </TabButton>
-                <TabButton
-                  isActive={view === View.Inbox}
-                  badge={unread.length}
-                  onClick={() => go({view: View.Inbox})}
-                >
-                  {t('Inbox')}
-                </TabButton>
-                <Box flex={1} />
-                <PrimaryButton
-                  isDisabled={!sending.canAct}
-                  onClick={() => sending.startDraft(PostTarget.newPost())}
-                >
-                  {t('Post')}
-                </PrimaryButton>
+                <StatusDot health={state.health} size={3} />
+                {node?.peers > 0 && (
+                  <Text fontWeight={500} color="muted">
+                    {node.peers}
+                  </Text>
+                )}
+                <Text color="muted">ⓘ</Text>
               </HStack>
-            ))}
-          {!sending.draft && status}
-          {content}
-        </Stack>
-        {isInfoOpen && (
-          <SocialInfoDialog
-            state={state}
-            onClose={() => setIsInfoOpen(false)}
-          />
-        )}
-        {sending.confirm && (
-          <ConfirmDialog
-            pending={sending.confirm}
-            onSend={sending.send}
-            onCancel={sending.cancelConfirm}
-          />
-        )}
-        {renaming && (
-          <NameDialog
-            key={renaming}
-            address={renaming}
-            onClose={() => setRenaming(null)}
-          />
-        )}
-      </Page>
+            </Flex>
+            {missingMethod && (
+              <Text fontSize="sm" color="red.500">
+                {t(
+                  'This node cannot read idena.social. It needs a node version with the bcn_contractCalls method, as the one built into this app.'
+                )}
+              </Text>
+            )}
+            {error && !missingMethod && (
+              <SmallText>
+                {error.timeout
+                  ? t('The node took too long to answer. Trying again.')
+                  : t('The last read failed ({{message}}). Trying again.', {
+                      message: error.message,
+                    })}
+              </SmallText>
+            )}
+            {!sending.draft &&
+              (onPage ? (
+                <Button
+                  variant="link"
+                  alignSelf="flex-start"
+                  onClick={() => router.back()}
+                >
+                  ← {t('Back')}
+                </Button>
+              ) : (
+                <HStack spacing={1}>
+                  <TabButton
+                    isActive={view === View.Home}
+                    onClick={() => go({view: View.Home})}
+                  >
+                    {t('Home')}
+                  </TabButton>
+                  <TabButton
+                    isActive={view === View.Profile}
+                    onClick={() => go({view: View.Profile})}
+                  >
+                    {t('Profile')}
+                  </TabButton>
+                  <TabButton
+                    isActive={view === View.Inbox}
+                    badge={unread.length + unreadConversations}
+                    onClick={() => go({view: View.Inbox})}
+                  >
+                    {t('Inbox')}
+                  </TabButton>
+                  <Box flex={1} />
+                  <PrimaryButton
+                    isDisabled={!sending.canAct}
+                    onClick={() => sending.startDraft(PostTarget.newPost())}
+                  >
+                    {t('Post')}
+                  </PrimaryButton>
+                </HStack>
+              ))}
+            {!sending.draft && status}
+            {content}
+          </Stack>
+          {isInfoOpen && (
+            <SocialInfoDialog
+              state={state}
+              onClose={() => setIsInfoOpen(false)}
+            />
+          )}
+          {sending.confirm && (
+            <ConfirmDialog
+              pending={sending.confirm}
+              onSend={sending.send}
+              onCancel={sending.cancelConfirm}
+            />
+          )}
+          {renaming && (
+            <NameDialog
+              key={renaming}
+              address={renaming}
+              onClose={() => setRenaming(null)}
+            />
+          )}
+        </Page>
+      </OpenTopicContext.Provider>
     </Layout>
   )
 }

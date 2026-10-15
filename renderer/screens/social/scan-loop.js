@@ -1,6 +1,12 @@
 import React from 'react'
 import {isMissingMethod, nodeSocialSource, socialRpc} from './node'
-import {checkNewBlocks, historyDone, scanOlderBlocks} from './scan'
+import {
+  checkNewBlocks,
+  historyDone,
+  messagesPending,
+  scanOlderBlocks,
+  scanOlderMessages,
+} from './scan'
 import {saveSocialCache} from './storage'
 
 /** A new block comes about every 20 seconds. */
@@ -9,7 +15,8 @@ const RETRY_MS = 15 * 1000
 
 /**
  * The scan of idena.social, as the phone app's. While the Social page is open (`pageOpen`): the new blocks first
- * (which also reads the post authors), then the history, one batch at a time, then each new block. Elsewhere, once
+ * (which also reads the post authors), then the private messages of the blocks a scan read before the app read
+ * them (once), then the history, one batch at a time, then each new block. Elsewhere, once
  * the history is read: only the new blocks, every 20 seconds, for the Inbox and its notices. Nothing is read
  * before the saved scan is `loaded`, while the node is not `ready`, or with the scan off; `readNewBlocks()` reads
  * the new blocks once even then. The scan is kept in `cacheRef` and given to `setCache` after each save.
@@ -83,6 +90,10 @@ export function useSocialScan({
               keepGoing: () => !run.stopped,
               save,
             })
+          } else if (onPage && messagesPending(current)) {
+            // Once, for a scan made before the app read messages: those of the blocks already read.
+            // eslint-disable-next-line no-await-in-loop
+            await scanOlderMessages(current, source, {save})
           } else if (onPage && !historyDone(current)) {
             // eslint-disable-next-line no-await-in-loop
             await scanOlderBlocks(current, source, {save})

@@ -26,6 +26,23 @@ export const MAX_INLINE_MEDIA = 1400000
 /** idena.social sends this amount (iDNA) with each post; the contract passes it on in its event. */
 export const POST_AMOUNT = '0.00001'
 
+/** The channel prefix of a topic. */
+export const TOPIC_PREFIX = 'r/'
+
+/** A topic's name: lower case letters, digits and "_", 3 to 21 characters. */
+export const TOPIC_NAME = /^[a-z0-9_]{3,21}$/
+
+/** The topic of a post in `channel`, or null when the channel is not a topic's. */
+export function topicOf(channel) {
+  const value = String(channel ?? '')
+  if (!value.startsWith(TOPIC_PREFIX)) return null
+  const name = value.slice(TOPIC_PREFIX.length)
+  return TOPIC_NAME.test(name) ? name : null
+}
+
+/** The channel of the posts in topic `name`. */
+export const topicChannel = (name) => `${TOPIC_PREFIX}${name}`
+
 /**
  * What a post, reply, comment or like answers: the fields of its makePost argument, and the level of what it
  * answers. A reply answers a post; a comment answers a reply, or a comment under it, in the reply's channel.

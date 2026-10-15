@@ -14,9 +14,16 @@ import {identityColor, identityStatus} from '../format'
 import {historyDone} from '../scan'
 import {CopyButton, PAGE_SIZE, Rows, ShowMore} from './common'
 
-export function ProfileView({address, now, openThread, openProfile, onRename}) {
+export function ProfileView({
+  address,
+  now,
+  openThread,
+  openProfile,
+  onRename,
+  openChat,
+}) {
   const {t} = useTranslation()
-  const {feed, me, people, cache} = useSocial()
+  const {feed, me, people, cache, chatKey} = useSocial()
   const {data: identity, isError} = useSocialIdentity(address)
   const profile = React.useMemo(
     () => socialProfile(feed, address),
@@ -75,6 +82,16 @@ export function ProfileView({address, now, openThread, openProfile, onRename}) {
               onClick={() => onRename(address)}
             />
             <Box flex={1} />
+            {!isMe && openChat && (
+              <IconButton
+                variant="ghost"
+                size="sm"
+                aria-label={t('Message')}
+                title={t('Message')}
+                icon={<Text>✉</Text>}
+                onClick={() => openChat(chatKey([address]))}
+              />
+            )}
             {!isMe && <FollowChip address={address} />}
           </HStack>
           {name && (

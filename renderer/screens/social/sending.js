@@ -1,8 +1,12 @@
 import React from 'react'
 import {useTranslation} from 'react-i18next'
 import {LIKE, SocialCall, makePostArgument} from './contract'
+import {keccak256Hex} from './keccak'
+import {MESSAGE_AMOUNT, plainMessage, sendMessageArgument} from './messages'
+import {topicChannel, typedTopic} from './topics'
 import {socialRpc} from './node'
 import {
+  estimateCall,
   prepareCall,
   prepareDraft as prepareDraftCall,
   sendPrepared,
@@ -21,6 +25,24 @@ export function draftKindOf(target) {
   if (!target.level) return DraftKind.Post
   return target.level === 'post' ? DraftKind.Reply : DraftKind.Comment
 }
+
+/**
+ * The target of the editor's draft: a new post goes in the topic typed (`topic`, blank for none). Throws when what
+ * is typed is not a topic name.
+ */
+export function draftTarget(target, topic) {
+  if (target.level || String(topic ?? '').trim() === '') return target
+  const name = typedTopic(topic)
+  if (name === null)
+    throw new Error(
+      `"${String(
+        topic
+      ).trim()}" is not a topic name (a-z, 0-9 and _, 3 to 21 characters)`
+    )
+  return {...target, channel: topicChannel(name)}
+}
+
+const recipientCount = (recipients) => Math.max(recipients.length, 1)
 
 /**
  * The sent actions still waiting once the feed shows the blocks through `scannedThrough`: those not in a block yet
@@ -52,7 +74,10 @@ export function useSocialSending({ready, readNewBlocks, scannedThrough}) {
   const [draftText, setDraftText] = React.useState('')
   const [draftImage, setDraftImage] = React.useState(null)
   const [textOnIpfs, setTextOnIpfs] = React.useState(false)
+  const [draftTopic, setDraftTopic] = React.useState('')
   const [waiting, setWaiting] = React.useState([])
+  // Counts the private messages sent: the conversation's box empties then.
+  const [messagesSent, setMessagesSent] = React.useState(0)
   const storedRef = React.useRef(new Set())
   // The drafts sent from the editor, by transaction hash, until their block; what the editor holds now.
   const sentDraftsRef = React.useRef(new Map())
@@ -75,6 +100,7 @@ export function useSocialSending({ready, readNewBlocks, scannedThrough}) {
       comment: t('Comment'),
       like: t('Like'),
       tip: t('Tip'),
+      message: t('Message'),
     }),
     [t]
   )
@@ -142,6 +168,45 @@ export function useSocialSending({ready, readNewBlocks, scannedThrough}) {
       }
     )
 
+  /**
+   * A private message `text` to `recipients` (lowercase, the account left out), with their public `keys` in the same
+   * order (findPublicKey): the plain message in idena.social's format, encrypted by the node for the account and each
+   * recipient (social_encrypt), then sendMessage with the website's 0.00002 iDNA.
+   */
+  const prepareMessage = (recipients, keys, text, encrypt) =>
+    prepare(
+      'message',
+      async () => {
+        const from = String(
+          await socialRpc('dna_getCoinbaseAddr')
+        ).toLowerCase()
+        let others = recipients.filter((address) => address !== from)
+        if (others.length === 0) others = [from]
+        if (keys.length !== others.length)
+          throw new Error('no public key for every person of the conversation')
+        const plain = plainMessage(from, others, text)
+        const parts = await encrypt(keys, plain)
+        if (!Array.isArray(parts) || parts.length !== others.length + 1)
+          throw new Error(
+            `the node encrypted ${parts?.length} parts for ${
+              others.length + 1
+            } participants`
+          )
+        const socialCall = {
+          method: 'sendMessage',
+          argument: sendMessageArgument(parts, keccak256Hex(plain)),
+          amount: MESSAGE_AMOUNT,
+        }
+        const fee = await estimateCall(socialRpc, from, socialCall)
+        return {from, socialCall, fee, files: []}
+      },
+      {
+        detail: t('A private message to {{count}} people', {
+          count: recipientCount(recipients),
+        }),
+      }
+    )
+
   const prepareDraft = () =>
     prepare(
       draft.kind,
@@ -152,11 +217,18 @@ export function useSocialSending({ready, readNewBlocks, scannedThrough}) {
             text: draftText,
             textOnIpfs,
             image: draftImage?.bytes || null,
-            target: draft.target,
+            target: draftTarget(draft.target, draftTopic),
           },
           storedRef.current
         ),
-      {sentDraft: {text: draftText, image: draftImage, textOnIpfs}}
+      {
+        sentDraft: {
+          text: draftText,
+          image: draftImage,
+          textOnIpfs,
+          topic: draft.target.level ? '' : draftTopic,
+        },
+      }
     )
 
   const watch = async (kind, hash) => {
@@ -180,6 +252,7 @@ export function useSocialSending({ready, readNewBlocks, scannedThrough}) {
         setDraftText(back.text)
         setDraftImage(back.image)
         setTextOnIpfs(back.textOnIpfs)
+        setDraftTopic(back.topic ?? '')
         editorRef.current = {text: back.text, image: back.image}
         draftNote = t('The draft is back in the editor.')
       } else if (sentDraft)
@@ -248,12 +321,14 @@ export function useSocialSending({ready, readNewBlocks, scannedThrough}) {
     } finally {
       setBusy(false)
     }
+    if (pending.kind === 'message') setMessagesSent((n) => n + 1)
     if (pending.sentDraft) {
       sentDraftsRef.current.set(hash, pending.sentDraft)
       setDraft(null)
       setDraftText('')
       setDraftImage(null)
       setTextOnIpfs(false)
+      setDraftTopic('')
     }
     setWaiting((current) => [
       ...current,
@@ -285,10 +360,15 @@ export function useSocialSending({ready, readNewBlocks, scannedThrough}) {
     send,
     prepareLike,
     prepareTip,
+    prepareMessage,
+    messagesSent,
     pendingLikes,
     draft,
-    startDraft: (target, answered = null) =>
-      setDraft({kind: draftKindOf(target), target, answered}),
+    // A new post opened from a topic's page starts in that topic.
+    startDraft: (target, answered = null, topic = null) => {
+      if (topic !== null) setDraftTopic(topic)
+      setDraft({kind: draftKindOf(target), target, answered})
+    },
     cancelDraft: () => setDraft(null),
     draftText,
     setDraftText,
@@ -296,6 +376,8 @@ export function useSocialSending({ready, readNewBlocks, scannedThrough}) {
     setDraftImage,
     textOnIpfs,
     setTextOnIpfs,
+    draftTopic,
+    setDraftTopic,
     prepareDraft,
   }
 }

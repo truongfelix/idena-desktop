@@ -1,4 +1,5 @@
 import {ipfsCid} from './calls'
+import {topicOf} from './contract'
 
 // The Social contacts, kept on this computer only: a private name for an address, shown instead of the address in
 // the Social tab, and two marks: Following (their posts in the feed's Following filter) and Message (private
@@ -114,9 +115,13 @@ export const peopleNames = (people) =>
 export const displayName = (address, names) =>
   names[String(address).toLowerCase()] || shortAddress(address)
 
-/** The posts of the feed whose author is followed. */
-export const followingFeed = (feed, people) =>
-  feed.filter(({call}) => people[call.author]?.following === true)
+/** The posts of the feed whose author is followed, or in a followed topic (`topics`, names). */
+export const followingFeed = (feed, people, topics = []) =>
+  feed.filter(
+    ({call}) =>
+      people[call.author]?.following === true ||
+      (topicOf(call.channel) !== null && topics.includes(topicOf(call.channel)))
+  )
 
 /**
  * What a query finds, in this order: the address it is, the contacts whose name (or address) has it, then the

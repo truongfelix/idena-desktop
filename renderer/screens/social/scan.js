@@ -1,14 +1,24 @@
 import {SOCIAL_CONTRACT} from './contract'
 import {socialFeed, withPrefix} from './feed'
-import {HISTORY_START, SOCIAL_VERSIONS, versionAt} from './versions'
+import {
+  CURRENT_VERSION,
+  HISTORY_START,
+  SOCIAL_VERSIONS,
+  versionAt,
+} from './versions'
 
-/** 1: the first desktop scan (from bcn_contractCalls); 2: the older contracts too (`olderAuthors`). */
-export const CACHE_VERSION = 2
+/**
+ * 1: the first desktop scan (from bcn_contractCalls); 2: the older contracts too (`olderAuthors`); 3: the private
+ * messages (still encrypted) and the callers' public keys.
+ */
+export const CACHE_VERSION = 3
 
 /**
  * What the app has scanned, kept so that no block is scanned twice: the blocks low..high (none while high < low),
  * the posts and tips found there (those of an older contract version carry its name), the current contract's post
- * authors as of block authorsHeight, and each older version's authors (they no longer change), by version name.
+ * authors as of block authorsHeight, and each older version's authors (they no longer change), by version name;
+ * the private messages (sendMessage calls, still encrypted) of the blocks messagesLow..high, and the public keys of
+ * the callers seen (lowercase address -> hex key), to encrypt a message for them.
  */
 export const emptyCache = (head) => ({
   contract: SOCIAL_CONTRACT,
@@ -20,6 +30,9 @@ export const emptyCache = (head) => ({
   authors: {},
   authorsHeight: 0,
   olderAuthors: {},
+  messages: [],
+  messagesLow: head + 1,
+  keys: {},
 })
 
 /**
@@ -32,9 +45,43 @@ export function readCache(saved) {
     String(saved.contract).toLowerCase() !== SOCIAL_CONTRACT.toLowerCase()
   )
     return null
-  if (saved.version === 1)
-    return {...saved, version: CACHE_VERSION, olderAuthors: {}}
-  return saved.version === CACHE_VERSION ? saved : null
+  if (saved.version === CACHE_VERSION) return saved
+  if (saved.version !== 1 && saved.version !== 2) return null
+  // An older scan read no messages: those of its blocks are read again once (scanOlderMessages).
+  return {
+    ...saved,
+    version: CACHE_VERSION,
+    olderAuthors: saved.version === 1 ? {} : saved.olderAuthors,
+    messages: [],
+    messagesLow: saved.high + 1,
+    keys: {},
+  }
+}
+
+/**
+ * Whether the current contract has blocks scanned before the app read messages, still to read for them
+ * (scanOlderMessages).
+ */
+export const messagesPending = ({messagesLow, low}) =>
+  messagesLow > Math.max(low, CURRENT_VERSION.from)
+
+/** The messages with `more` added, each once (a backfill may read blocks again), in chain order. */
+export function withMessages(messages, more = []) {
+  if (more.length === 0) return messages
+  const known = new Set(messages.map(({hash}) => hash))
+  return messages
+    .concat(more.filter(({hash}) => !known.has(hash)))
+    .sort((a, b) => a.height - b.height || a.index - b.index)
+}
+
+/** The blocks where `address` (lowercase) called the contract, the newest first: their calls hold its key. */
+export function callHeightsOf({posts, tips, messages}, address) {
+  const heights = new Set([
+    ...posts.filter(({author}) => author === address).map(({height}) => height),
+    ...tips.filter(({from}) => from === address).map(({height}) => height),
+    ...messages.filter(({from}) => from === address).map(({height}) => height),
+  ])
+  return [...heights].sort((a, b) => b - a)
 }
 
 /** Whether the scan reached the first block of idena.social's history. */
@@ -111,6 +158,8 @@ export async function checkNewBlocks(
         high: to,
         posts: next.posts.concat(found.posts),
         tips: next.tips.concat(found.tips),
+        messages: withMessages(next.messages, found.messages),
+        keys: {...next.keys, ...found.keys},
       }
       // eslint-disable-next-line no-await-in-loop
       await save(next)
@@ -150,6 +199,29 @@ export async function scanOlderBlocks(cache, source, {save = () => {}} = {}) {
     posts: older.posts.concat(cache.posts),
     tips: older.tips.concat(cache.tips),
     olderAuthors,
+    messages: withMessages(cache.messages, older.messages),
+    // The messages of these blocks are read, unless older blocks wait for them.
+    messagesLow: messagesPending(cache) ? cache.messagesLow : from,
+    keys: {...older.keys, ...cache.keys},
+  }
+  await save(next)
+  return next
+}
+
+/**
+ * For a scan made before the app read messages (messagesPending): one batch of the current contract's blocks it
+ * read, below messagesLow, read again for their messages and keys, from the newest down.
+ */
+export async function scanOlderMessages(cache, source, {save = () => {}} = {}) {
+  if (!messagesPending(cache)) return cache
+  const bottom = Math.max(cache.low, CURRENT_VERSION.from)
+  const from = Math.max(cache.messagesLow - source.batchSize(), bottom)
+  const read = await source.calls(from, cache.messagesLow - 1)
+  const next = {
+    ...cache,
+    messages: withMessages(cache.messages, read.messages),
+    messagesLow: from,
+    keys: {...read.keys, ...cache.keys},
   }
   await save(next)
   return next

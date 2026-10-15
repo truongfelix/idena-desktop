@@ -15,6 +15,7 @@ import {StatusDot, useScanLabel} from './identity'
 import {MUTED} from './theme'
 import {HISTORY_START} from '../versions'
 import {historyDone, scannedShare} from '../scan'
+import {ListsBackup} from './lists-backup'
 
 /** The dialog to name (or rename) an address, as the phone app's. */
 export function NameDialog({address, onClose}) {
@@ -137,6 +138,8 @@ export function SocialInfoDialog({state, onClose}) {
               'On, the app reads the new blocks, then the older posts once, then each new block (also with this page closed, once the history is read). Off, nothing is read and the posts already read stay.'
             )}
           </SmallText>
+          <Divider />
+          <ListsBackup />
           <Divider />
           {[
             ['good', t('Up to date')],

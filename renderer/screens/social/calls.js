@@ -4,6 +4,7 @@
 // (Social.kt); each contract version's calls are read in its own format (versions.js).
 
 import {LIKE, MAX_INLINE_MEDIA} from './contract'
+import {parseMessageCall, publicKeyHex} from './messages'
 
 const textDecoder = new TextDecoder()
 
@@ -142,14 +143,19 @@ export function parseTip(
 }
 
 /**
- * The posts and tips among contract calls (bcn_contractCalls) of a contract `version`. A call the node marks as
- * refused by the contract (`success` false) is left out: it has no post id and moved no coins. A node without that
- * mark lists them all.
+ * The posts, tips and private messages among contract calls (bcn_contractCalls) of a contract `version` (messages:
+ * the current contract only), and the senders' public keys (`keys`, by lowercase address, from the node's
+ * senderPubKey). A call the node marks as refused by the contract (`success` false) is left out: it has no post id
+ * and moved no coins; its key still counts (it signed it). A node without that mark lists them all.
  */
 export function callsToActivity(calls, version = null) {
   const posts = []
   const tips = []
+  const messages = []
+  const keys = {}
   for (const call of calls) {
+    const key = publicKeyHex(call.senderPubKey)
+    if (key) keys[String(call.from).toLowerCase()] = key
     // eslint-disable-next-line no-continue
     if (call.success === false) continue
     if (call.method === 'makePost') {
@@ -161,9 +167,12 @@ export function callsToActivity(calls, version = null) {
     ) {
       const tip = parseTip(call, version)
       if (tip) tips.push(tip)
+    } else if (call.method === 'sendMessage' && !version?.prefix) {
+      const message = parseMessageCall(call)
+      if (message) messages.push(message)
     }
   }
-  return {posts, tips}
+  return {posts, tips, messages, keys}
 }
 
 export const isLike = ({message, replyTo}) => message === LIKE && replyTo !== ''
@@ -177,7 +186,8 @@ export function ipfsCid(ref) {
   return CID.test(cid) ? cid : null
 }
 
-const WHOLE_IDNA = /^[0-9]{1,15}$/
+// The digits the contract reads from a sendTip tipAmount: those before the first non-digit.
+const LEADING_IDNA = /^[0-9]{1,15}(?![0-9])/
 
 /** Whether the whole number `a` is at least `b` (both plain digit strings, any length). */
 function atLeast(a, b) {
@@ -187,19 +197,22 @@ function atLeast(a, b) {
 }
 
 /**
- * The tip in iDNA when the contract accepts it (sendTip): a whole number of at least 1 and no more than was
- * sent; null otherwise (such a call fails). Before v11 (`sent`) the tip is what was sent, if anything; from the
- * tips balance (`fromBalance`), its tipAmount, if anything (the balance it needs is not known here).
+ * The tip in iDNA when the contract accepts it (sendTip): it reads tipAmount up to its first non-digit ("6.9"
+ * pays 6, "0.5" pays 0), a whole number of at least 1 and no more than was sent; null otherwise (such a call
+ * fails); what was sent beyond the tip stays in the contract. Before v11 (`sent`) the tip is what was sent, if
+ * anything; from the tips balance (`fromBalance`), its tipAmount, if anything (the balance it needs is not known
+ * here).
  */
 export function validTipAmount({tipAmount, amount, sent, fromBalance}) {
   if (sent || fromBalance) {
     const value = Number(fromBalance ? tipAmount : amount)
     return Number.isFinite(value) && value > 0 ? value : null
   }
-  if (!WHOLE_IDNA.test(tipAmount) || Number(tipAmount) <= 0) return null
+  const leading = LEADING_IDNA.exec(String(tipAmount))
+  if (!leading || Number(leading[0]) <= 0) return null
   const paid = /^([0-9]+)(?:\.[0-9]+)?$/.exec(String(amount))
   // The sent amount covers a whole tip exactly when its whole part does.
-  return paid && atLeast(paid[1], tipAmount) ? Number(tipAmount) : null
+  return paid && atLeast(paid[1], leading[0]) ? Number(leading[0]) : null
 }
 
 /**
