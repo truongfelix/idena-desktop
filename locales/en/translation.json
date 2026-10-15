@@ -1437,5 +1437,7 @@
   "Not in your conversations yet.": "Not in your conversations yet.",
   "Accept": "Accept",
   "No message yet.": "No message yet.",
-  "Looking up the keys to encrypt for…": "Looking up the keys to encrypt for…"
+  "Looking up the keys to encrypt for…": "Looking up the keys to encrypt for…",
+  "Private message on idena.social": "Private message on idena.social",
+  "Only the people in the conversation can read it. That you sent a message, when, its size and how many people it goes to are public and stay on the blockchain for good, signed by your identity {{address}}.": "Only the people in the conversation can read it. That you sent a message, when, its size and how many people it goes to are public and stay on the blockchain for good, signed by your identity {{address}}."
 }

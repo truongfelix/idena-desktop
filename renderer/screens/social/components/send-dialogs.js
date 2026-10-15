@@ -32,6 +32,7 @@ export function ConfirmDialog({pending, onSend, onCancel}) {
     comment: t('Comment on idena.social'),
     like: t('Like on idena.social'),
     tip: t('Tip on idena.social'),
+    message: t('Private message on idena.social'),
   }
   const hasFiles = pending.files.length > 0
   return (
@@ -40,10 +41,15 @@ export function ConfirmDialog({pending, onSend, onCancel}) {
         <Stack spacing={3}>
           <Text>
             {pending.detail && `${pending.detail}. `}
-            {t(
-              'It is public and stays on the blockchain for good, signed by your identity {{address}}.',
-              {address: shortAddress(pending.from)}
-            )}
+            {pending.kind === 'message'
+              ? t(
+                  'Only the people in the conversation can read it. That you sent a message, when, its size and how many people it goes to are public and stay on the blockchain for good, signed by your identity {{address}}.',
+                  {address: shortAddress(pending.from)}
+                )
+              : t(
+                  'It is public and stays on the blockchain for good, signed by your identity {{address}}.',
+                  {address: shortAddress(pending.from)}
+                )}
           </Text>
           {pending.files.map((file) => {
             if (file.stored)
