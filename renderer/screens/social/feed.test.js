@@ -117,6 +117,11 @@ describe('the feed', () => {
     expect(validTipAmount(tip('t', a, '1', '5', '0005.0', 10))).toBe(5)
     expect(validTipAmount(tip('t', a, '1', '5', '12', 10))).toBe(5)
     expect(validTipAmount(tip('t', a, '1', '5', 'x', 10))).toBeNull()
+    // The contract reads tipAmount up to its first non-digit: v11 post 150, block 10,790,242, sent 6.9, paid 6.
+    expect(validTipAmount(tip('t', a, '1', '6.9', '6.9', 10))).toBe(6)
+    expect(validTipAmount(tip('t', a, '1', '7abc', '7', 10))).toBe(7)
+    expect(validTipAmount(tip('t', a, '1', '6.9', '5.9', 10))).toBeNull()
+    expect(validTipAmount(tip('t', a, '1', '.5', '1', 10))).toBeNull()
   })
 
   it('counts a tip on its post after it', () => {

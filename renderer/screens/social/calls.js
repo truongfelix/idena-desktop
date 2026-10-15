@@ -177,7 +177,8 @@ export function ipfsCid(ref) {
   return CID.test(cid) ? cid : null
 }
 
-const WHOLE_IDNA = /^[0-9]{1,15}$/
+// The digits the contract reads from a sendTip tipAmount: those before the first non-digit.
+const LEADING_IDNA = /^[0-9]{1,15}(?![0-9])/
 
 /** Whether the whole number `a` is at least `b` (both plain digit strings, any length). */
 function atLeast(a, b) {
@@ -187,19 +188,22 @@ function atLeast(a, b) {
 }
 
 /**
- * The tip in iDNA when the contract accepts it (sendTip): a whole number of at least 1 and no more than was
- * sent; null otherwise (such a call fails). Before v11 (`sent`) the tip is what was sent, if anything; from the
- * tips balance (`fromBalance`), its tipAmount, if anything (the balance it needs is not known here).
+ * The tip in iDNA when the contract accepts it (sendTip): it reads tipAmount up to its first non-digit ("6.9"
+ * pays 6, "0.5" pays 0), a whole number of at least 1 and no more than was sent; null otherwise (such a call
+ * fails); what was sent beyond the tip stays in the contract. Before v11 (`sent`) the tip is what was sent, if
+ * anything; from the tips balance (`fromBalance`), its tipAmount, if anything (the balance it needs is not known
+ * here).
  */
 export function validTipAmount({tipAmount, amount, sent, fromBalance}) {
   if (sent || fromBalance) {
     const value = Number(fromBalance ? tipAmount : amount)
     return Number.isFinite(value) && value > 0 ? value : null
   }
-  if (!WHOLE_IDNA.test(tipAmount) || Number(tipAmount) <= 0) return null
+  const leading = LEADING_IDNA.exec(String(tipAmount))
+  if (!leading || Number(leading[0]) <= 0) return null
   const paid = /^([0-9]+)(?:\.[0-9]+)?$/.exec(String(amount))
   // The sent amount covers a whole tip exactly when its whole part does.
-  return paid && atLeast(paid[1], tipAmount) ? Number(tipAmount) : null
+  return paid && atLeast(paid[1], leading[0]) ? Number(leading[0]) : null
 }
 
 /**
