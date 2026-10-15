@@ -27,7 +27,8 @@ import {
 } from '@chakra-ui/react'
 import {useIdentityState} from '../providers/identity-context'
 import {useEpochState} from '../providers/epoch-context'
-import {useChainState} from '../providers/chain-context'
+import {useChainState, useSyncStep} from '../providers/chain-context'
+import {SyncPhase} from '../utils/sync-steps'
 import {useAutoUpdate} from '../providers/update-context'
 import useRpc from '../hooks/use-rpc'
 import {usePoll} from '../hooks/use-interval'
@@ -209,11 +210,33 @@ const StatusText = React.forwardRef((props, ref) => (
 function ConnectionBandwidth() {
   const {t} = useTranslation()
 
-  const {syncing, currentBlock, highestBlock} = useChainState()
+  const {syncing, chainBlock, currentBlock, headTime} = useChainState()
+  const {step, isBehind} = useSyncStep()
 
   const [{result: peers}] = usePoll(useRpc('net_peers'), 5000)
 
   const peersCount = (peers || []).length
+
+  let blocksLine
+  if (!syncing)
+    blocksLine = t('Current block: {{currentBlock}}', {
+      currentBlock: chainBlock || currentBlock,
+      nsSeparator: '!!',
+    })
+  else if (step.phase === SyncPhase.Headers)
+    blocksLine = t('Headers: {{done}} out of {{total}}', {
+      done: step.done,
+      total: step.total,
+      nsSeparator: '!!',
+    })
+  else if (step.phase === SyncPhase.Snapshot)
+    blocksLine = t('Waiting for the snapshot')
+  else
+    blocksLine = t('Blocks: {{currentBlock}} out of {{highestBlock}}', {
+      currentBlock: step.done,
+      highestBlock: step.total,
+      nsSeparator: '!!',
+    })
 
   return (
     <Tooltip
@@ -225,27 +248,31 @@ function ConnectionBandwidth() {
               nsSeparator: '!!',
             })}
           </Text>
-          <Text>
-            {syncing
-              ? t('Blocks: {{currentBlock}} out of {{highestBlock}}', {
-                  currentBlock,
-                  highestBlock,
-                  nsSeparator: '!!',
-                })
-              : t('Current block: {{currentBlock}}', {
-                  currentBlock,
-                  nsSeparator: '!!',
-                })}
-          </Text>
+          <Text>{blocksLine}</Text>
+          {isBehind && (
+            <Text>
+              {t('The newest block is {{minutes}} min old: looking for peers', {
+                minutes: Math.floor((Date.now() / 1000 - headTime) / 60),
+                nsSeparator: '!!',
+              })}
+            </Text>
+          )}
         </>
       }
       zIndex="tooltip"
     >
       <Stack isInline spacing={1}>
-        <Bandwidth peersCount={(peers || []).length} isSyncing={syncing} />
-        {syncing ? (
+        <Bandwidth
+          peersCount={(peers || []).length}
+          isSyncing={syncing || isBehind}
+        />
+        {syncing && (
           <StatusText color="orange.500">{t('Synchronizing')}</StatusText>
-        ) : (
+        )}
+        {!syncing && isBehind && (
+          <StatusText color="orange.500">{t('Behind')}</StatusText>
+        )}
+        {!syncing && !isBehind && (
           <StatusText color="green.500">{t('Synchronized')}</StatusText>
         )}
       </Stack>

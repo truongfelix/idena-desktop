@@ -1439,5 +1439,16 @@
   "No message yet.": "No message yet.",
   "Looking up the keys to encrypt for…": "Looking up the keys to encrypt for…",
   "Private message on idena.social": "Private message on idena.social",
-  "Only the people in the conversation can read it. That you sent a message, when, its size and how many people it goes to are public and stay on the blockchain for good, signed by your identity {{address}}.": "Only the people in the conversation can read it. That you sent a message, when, its size and how many people it goes to are public and stay on the blockchain for good, signed by your identity {{address}}."
+  "Only the people in the conversation can read it. That you sent a message, when, its size and how many people it goes to are public and stay on the blockchain for good, signed by your identity {{address}}.": "Only the people in the conversation can read it. That you sent a message, when, its size and how many people it goes to are public and stay on the blockchain for good, signed by your identity {{address}}.",
+  "Downloading headers {{percent}}%": "Downloading headers {{percent}}%",
+  "Waiting for the snapshot": "Waiting for the snapshot",
+  "Synchronizing blocks {{percent}}%": "Synchronizing blocks {{percent}}%",
+  "Headers downloaded up to block {{total}}; the chain is at {{done}}": "Headers downloaded up to block {{total}}; the chain is at {{done}}",
+  "{{numHeaders}} headers left": "{{numHeaders}} headers left",
+  "Under a minute left": "Under a minute left",
+  "About {{minutes}} min left": "About {{minutes}} min left",
+  "About {{hours}} h {{minutes}} min left": "About {{hours}} h {{minutes}} min left",
+  "Headers: {{done}} out of {{total}}": "Headers: {{done}} out of {{total}}",
+  "The newest block is {{minutes}} min old: looking for peers": "The newest block is {{minutes}} min old: looking for peers",
+  "Behind": "Behind"
 }
