@@ -7,6 +7,9 @@ import {
   Flex,
   HStack,
   Image,
+  Input,
+  InputGroup,
+  InputLeftAddon,
   Stack,
   Text,
   Textarea,
@@ -20,6 +23,7 @@ import {timeAgo} from '../format'
 import {defaultSide, encodeImage} from '../image'
 import {IMAGE_TYPE, fromWei, storeFeeHint} from '../posting'
 import {DraftKind} from '../sending'
+import {TOPIC_PREFIX, topicChannel, topicList, typedTopic} from '../topics'
 import {Chip} from './chips'
 import {PostText} from './post'
 import {MUTED} from './theme'
@@ -96,6 +100,55 @@ function DraftImage({image, onSide, onRemove}) {
   )
 }
 
+const MAX_OFFERED_TOPICS = 8
+
+/** The Topic field of a new post: blank for none; the topics read that match are offered. */
+function TopicField({value, onChange}) {
+  const {t} = useTranslation()
+  const {feed} = useSocial()
+  const typed = value.trim()
+  const valid = typed === '' || typedTopic(typed) !== null
+  const offered = React.useMemo(
+    () =>
+      topicList(feed, typed)
+        .map(({name}) => name)
+        .filter((name) => name !== typedTopic(typed))
+        .slice(0, MAX_OFFERED_TOPICS),
+    [feed, typed]
+  )
+  return (
+    <Stack spacing={2}>
+      <InputGroup size="sm">
+        <InputLeftAddon>{TOPIC_PREFIX}</InputLeftAddon>
+        <Input
+          value={value}
+          maxLength={40}
+          placeholder={t('Topic (optional)')}
+          isInvalid={!valid}
+          spellCheck={false}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      </InputGroup>
+      <SmallText color={valid ? MUTED : 'red.500'}>
+        {valid
+          ? t(
+              'Shown with the topic in our apps; idena.social does not show posts in a topic.'
+            )
+          : t('a-z, 0-9 and _, 3 to 21 characters')}
+      </SmallText>
+      {offered.length > 0 && (
+        <HStack spacing={2} flexWrap="wrap">
+          {offered.map((name) => (
+            <Chip key={name} onClick={() => onChange(name)}>
+              {topicChannel(name)}
+            </Chip>
+          ))}
+        </HStack>
+      )}
+    </Stack>
+  )
+}
+
 /**
  * The editor of a post, a reply or a comment, as the phone app's: the text, one image (WebP, size to choose), the
  * text on IPFS if wanted, and Post, which shows the fees before anything is sent. Cancel keeps the text and the
@@ -112,6 +165,8 @@ export function Editor({now, status}) {
     setDraftImage,
     textOnIpfs,
     setTextOnIpfs,
+    draftTopic,
+    setDraftTopic,
   } = sending
   const [preparing, setPreparing] = React.useState(false)
   const [imageNote, setImageNote] = React.useState(null)
@@ -122,8 +177,12 @@ export function Editor({now, status}) {
     [DraftKind.Reply]: t('Reply'),
     [DraftKind.Comment]: t('Comment'),
   }
+  const isPost = draft.kind === DraftKind.Post
+  const topicValid =
+    !isPost || draftTopic.trim() === '' || typedTopic(draftTopic) !== null
   const canPost =
     sending.canAct &&
+    topicValid &&
     (draftText.trim() !== '' || draftImage !== null) &&
     imageNote === null &&
     !preparing
@@ -173,13 +232,12 @@ export function Editor({now, status}) {
           <PostText message={answered.message} lines={3} />
         </Box>
       )}
+      {isPost && <TopicField value={draftTopic} onChange={setDraftTopic} />}
       <Textarea
         autoFocus
         value={draftText}
         minH="120px"
-        placeholder={
-          draft.kind === DraftKind.Post ? t("What's new?") : t('Your answer')
-        }
+        placeholder={isPost ? t("What's new?") : t('Your answer')}
         onChange={(e) => setDraftText(e.target.value)}
       />
       {draftImage && (

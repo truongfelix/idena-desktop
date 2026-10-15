@@ -1,5 +1,6 @@
 import {requestDb, subDb} from '../../shared/utils/db'
 import {readCache} from './scan'
+import {cleanTopics} from './topics'
 
 function socialDb() {
   return subDb(requestDb(), 'social', {valueEncoding: 'json'})
@@ -29,18 +30,21 @@ async function getOr(db, key, fallback) {
 }
 
 /**
- * The Social settings kept on this computer: the contacts (the phone's people.json format), the block through
- * which the notifications were seen, the kinds switched off, and whether the scan is off.
+ * The Social settings kept on this computer: the contacts (the phone's people.json format), the topics followed
+ * (names), the block through which the notifications were seen, the kinds switched off, and whether the scan is
+ * off.
  */
 export async function loadSocialSettings(db = socialDb()) {
-  const [people, seenThrough, notifyOff, scanOff] = await Promise.all([
+  const [people, topics, seenThrough, notifyOff, scanOff] = await Promise.all([
     getOr(db, 'people', null),
+    getOr(db, 'topics', []),
     getOr(db, 'seenThrough', null),
     getOr(db, 'notifyOff', []),
     getOr(db, 'scanOff', false),
   ])
   return {
     people,
+    topics: cleanTopics(topics),
     seenThrough: Number.isFinite(seenThrough) ? seenThrough : null,
     notifyOff: Array.isArray(notifyOff) ? notifyOff : [],
     scanOff: scanOff === true,

@@ -45,6 +45,7 @@ export function SocialProvider({children}) {
       loadSocialCache().catch(() => null),
       loadSocialSettings().catch(() => ({
         people: null,
+        topics: [],
         seenThrough: null,
         notifyOff: [],
         scanOff: false,
@@ -146,6 +147,16 @@ export function SocialProvider({children}) {
     [people, updateSettings]
   )
 
+  const followedTopics = React.useMemo(() => settings?.topics || [], [settings])
+
+  const setTopicFollowed = React.useCallback(
+    (name, follow) => {
+      const others = followedTopics.filter((topic) => topic !== name)
+      updateSettings('topics', follow ? [...others, name].sort() : others)
+    },
+    [followedTopics, updateSettings]
+  )
+
   const setPeople = React.useCallback(
     (list) => updateSettings('people', list, peopleToJson(list)),
     [updateSettings]
@@ -165,6 +176,9 @@ export function SocialProvider({children}) {
       names,
       setPerson,
       setPeople,
+      followedTopics,
+      setTopicFollowed,
+      setFollowedTopics: (list) => updateSettings('topics', list),
       activity,
       unread,
       highlightAfter,
@@ -189,6 +203,7 @@ export function SocialProvider({children}) {
       epoch,
       error,
       feed,
+      followedTopics,
       head,
       highlightAfter,
       markSeen,
@@ -204,6 +219,7 @@ export function SocialProvider({children}) {
       sending,
       setPeople,
       setPerson,
+      setTopicFollowed,
       syncing,
       targets,
       unread,

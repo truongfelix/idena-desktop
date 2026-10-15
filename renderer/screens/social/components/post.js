@@ -9,6 +9,8 @@ import {ActionBar} from './actions'
 import {IdentityLabel, NameLink} from './identity'
 import {MUTED} from './theme'
 import {timeAgo} from '../format'
+import {postTopic} from '../topics'
+import {TopicLine, TopicTag} from './topic'
 
 const textDecoder = new TextDecoder()
 
@@ -135,38 +137,56 @@ export function PostMedia({call: {hasMedia, media, mediaType}, maxH}) {
   )
 }
 
+/** How a post row shows the post's topic: as a tag under the author, in the author's place (Home), or not (the topic's page). */
+export const TopicShown = {Tag: 'tag', InsteadOfAuthor: 'author', Not: 'not'}
+
 /**
- * A post of the feed, as the phone app's rows: avatar, name, identity state in its color, time ago on one line,
- * the text on 3 lines, the image, then the counters. A click opens the thread.
+ * A post of the feed, as the phone app's rows: avatar, name, identity state in its color, time ago on one line
+ * (or the post's topic in their place, `topicShown`), the text on 3 lines, the image, then the counters. A click
+ * opens the thread.
  */
-export function PostRow({node, now, onOpen, onProfile}) {
+export function PostRow({
+  node,
+  now,
+  onOpen,
+  onProfile,
+  topicShown = TopicShown.Tag,
+}) {
   const {call} = node
+  const topic = topicShown === TopicShown.Not ? null : postTopic(node)
   return (
     <Stack spacing={1.5} py={3} w="full">
       <Stack spacing={1} cursor="pointer" onClick={onOpen}>
-        <HStack spacing={2} align="center">
-          <Avatar
-            address={call.author}
-            boxSize={6}
-            rounded="md"
-            cursor="pointer"
-            onClick={(e) => {
-              e.stopPropagation()
-              onProfile(call.author)
-            }}
-          />
-          <Text fontSize="sm" noOfLines={1}>
-            <NameLink address={call.author} onProfile={onProfile} />
-            <Text as="span" color={MUTED}>
-              {'  ·  '}
+        {topic !== null && topicShown === TopicShown.InsteadOfAuthor ? (
+          <TopicLine name={topic} time={call.time} now={now} />
+        ) : (
+          <HStack spacing={2} align="center">
+            <Avatar
+              address={call.author}
+              boxSize={6}
+              rounded="md"
+              cursor="pointer"
+              onClick={(e) => {
+                e.stopPropagation()
+                onProfile(call.author)
+              }}
+            />
+            <Text fontSize="sm" noOfLines={1}>
+              <NameLink address={call.author} onProfile={onProfile} />
+              <Text as="span" color={MUTED}>
+                {'  ·  '}
+              </Text>
+              <IdentityLabel address={call.author} fontSize="sm" />
+              <Text as="span" color={MUTED}>{`  ·  ${timeAgo(
+                call.time,
+                now
+              )}`}</Text>
             </Text>
-            <IdentityLabel address={call.author} fontSize="sm" />
-            <Text as="span" color={MUTED}>{`  ·  ${timeAgo(
-              call.time,
-              now
-            )}`}</Text>
-          </Text>
-        </HStack>
+          </HStack>
+        )}
+        {topic !== null && topicShown === TopicShown.Tag && (
+          <TopicTag name={topic} />
+        )}
         <PostText message={call.message} lines={3} />
         <PostMedia call={call} maxH="220px" />
       </Stack>
@@ -175,7 +195,13 @@ export function PostRow({node, now, onOpen, onProfile}) {
   )
 }
 
-/** The header of a thread item or a profile card: avatar, name and time, then the identity with its age. */
+/** The color of "OP", Reddit's blue. */
+const OP_BLUE = '#0079D3'
+
+/**
+ * The header of a thread item or a profile card: avatar, name and time, then the identity with its age. `isOp`:
+ * the post's author on their replies and comments, "OP" after the name.
+ */
 export function FullHeader({
   address,
   time,
@@ -183,6 +209,7 @@ export function FullHeader({
   onProfile,
   avatarSize = 9,
   onClick,
+  isOp = false,
 }) {
   return (
     <HStack
@@ -203,7 +230,20 @@ export function FullHeader({
       />
       <Stack spacing={0} flex={1} minW={0}>
         <HStack spacing={2} justify="space-between">
-          <NameLink address={address} onProfile={onProfile} noOfLines={1} />
+          <HStack spacing={2} minW={0}>
+            <NameLink address={address} onProfile={onProfile} noOfLines={1} />
+            {isOp && (
+              <Text
+                as="span"
+                fontSize="sm"
+                fontWeight={700}
+                color={OP_BLUE}
+                flexShrink={0}
+              >
+                OP
+              </Text>
+            )}
+          </HStack>
           <SmallText flexShrink={0}>{timeAgo(time, now)}</SmallText>
         </HStack>
         <IdentityLabel address={address} withAge fontSize="sm" />

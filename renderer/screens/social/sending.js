@@ -1,6 +1,7 @@
 import React from 'react'
 import {useTranslation} from 'react-i18next'
 import {LIKE, SocialCall, makePostArgument} from './contract'
+import {topicChannel, typedTopic} from './topics'
 import {socialRpc} from './node'
 import {
   prepareCall,
@@ -20,6 +21,22 @@ export const DraftKind = {Post: 'post', Reply: 'reply', Comment: 'comment'}
 export function draftKindOf(target) {
   if (!target.level) return DraftKind.Post
   return target.level === 'post' ? DraftKind.Reply : DraftKind.Comment
+}
+
+/**
+ * The target of the editor's draft: a new post goes in the topic typed (`topic`, blank for none). Throws when what
+ * is typed is not a topic name.
+ */
+export function draftTarget(target, topic) {
+  if (target.level || String(topic ?? '').trim() === '') return target
+  const name = typedTopic(topic)
+  if (name === null)
+    throw new Error(
+      `"${String(
+        topic
+      ).trim()}" is not a topic name (a-z, 0-9 and _, 3 to 21 characters)`
+    )
+  return {...target, channel: topicChannel(name)}
 }
 
 /**
@@ -52,6 +69,7 @@ export function useSocialSending({ready, readNewBlocks, scannedThrough}) {
   const [draftText, setDraftText] = React.useState('')
   const [draftImage, setDraftImage] = React.useState(null)
   const [textOnIpfs, setTextOnIpfs] = React.useState(false)
+  const [draftTopic, setDraftTopic] = React.useState('')
   const [waiting, setWaiting] = React.useState([])
   const storedRef = React.useRef(new Set())
   // The drafts sent from the editor, by transaction hash, until their block; what the editor holds now.
@@ -152,11 +170,18 @@ export function useSocialSending({ready, readNewBlocks, scannedThrough}) {
             text: draftText,
             textOnIpfs,
             image: draftImage?.bytes || null,
-            target: draft.target,
+            target: draftTarget(draft.target, draftTopic),
           },
           storedRef.current
         ),
-      {sentDraft: {text: draftText, image: draftImage, textOnIpfs}}
+      {
+        sentDraft: {
+          text: draftText,
+          image: draftImage,
+          textOnIpfs,
+          topic: draft.target.level ? '' : draftTopic,
+        },
+      }
     )
 
   const watch = async (kind, hash) => {
@@ -180,6 +205,7 @@ export function useSocialSending({ready, readNewBlocks, scannedThrough}) {
         setDraftText(back.text)
         setDraftImage(back.image)
         setTextOnIpfs(back.textOnIpfs)
+        setDraftTopic(back.topic ?? '')
         editorRef.current = {text: back.text, image: back.image}
         draftNote = t('The draft is back in the editor.')
       } else if (sentDraft)
@@ -254,6 +280,7 @@ export function useSocialSending({ready, readNewBlocks, scannedThrough}) {
       setDraftText('')
       setDraftImage(null)
       setTextOnIpfs(false)
+      setDraftTopic('')
     }
     setWaiting((current) => [
       ...current,
@@ -287,8 +314,11 @@ export function useSocialSending({ready, readNewBlocks, scannedThrough}) {
     prepareTip,
     pendingLikes,
     draft,
-    startDraft: (target, answered = null) =>
-      setDraft({kind: draftKindOf(target), target, answered}),
+    // A new post opened from a topic's page starts in that topic.
+    startDraft: (target, answered = null, topic = null) => {
+      if (topic !== null) setDraftTopic(topic)
+      setDraft({kind: draftKindOf(target), target, answered})
+    },
     cancelDraft: () => setDraft(null),
     draftText,
     setDraftText,
@@ -296,6 +326,8 @@ export function useSocialSending({ready, readNewBlocks, scannedThrough}) {
     setDraftImage,
     textOnIpfs,
     setTextOnIpfs,
+    draftTopic,
+    setDraftTopic,
     prepareDraft,
   }
 }
