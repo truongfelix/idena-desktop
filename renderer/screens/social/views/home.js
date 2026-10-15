@@ -5,6 +5,7 @@ import {
   Button,
   Divider,
   HStack,
+  IconButton,
   Stack,
   Text,
   Menu,
@@ -28,7 +29,7 @@ import {FeedPeriod, FeedSort, sortFeed} from '../feed'
 import {TOPIC_PREFIX, topicList} from '../topics'
 import {ContactRow, PAGE_SIZE, Rows, SearchField, ShowMore} from './common'
 
-export function Home({now, openThread, openProfile, onRename}) {
+export function Home({now, openThread, openProfile, onRename, openFollowing}) {
   const {t} = useTranslation()
   const {feed, people, names, epochStart, followedTopics} = useSocial()
   const [query, setQuery] = React.useState('')
@@ -182,6 +183,14 @@ export function Home({now, openThread, openProfile, onRename}) {
             <Chip isSelected={following} onClick={() => setFollowing(true)}>
               {t('Following')}
             </Chip>
+            <IconButton
+              variant="ghost"
+              size="sm"
+              aria-label={t('People and topics followed')}
+              title={t('People and topics followed')}
+              icon={<Text>⚙</Text>}
+              onClick={openFollowing}
+            />
             <Menu autoSelect={false}>
               <MenuButton
                 as={Button}

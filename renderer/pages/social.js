@@ -24,14 +24,21 @@ import {Home} from '../screens/social/views/home'
 import {Inbox, InboxView} from '../screens/social/views/inbox'
 import {ProfileView} from '../screens/social/views/profile'
 import {TopicView} from '../screens/social/views/topic'
+import {FollowingView} from '../screens/social/views/following'
 import {OpenTopicContext} from '../screens/social/components/topic'
 import {topicOf, topicChannel} from '../screens/social/topics'
 
-const View = {Home: 'home', Profile: 'profile', Inbox: 'inbox'}
+const View = {
+  Home: 'home',
+  Profile: 'profile',
+  Inbox: 'inbox',
+  Following: 'following',
+}
 
 /**
  * idena.social, read from the app's own node and laid out as the phone app's Social tab: Home (search, Feed or
- * Following, sorts), Profile (yours), Inbox (notifications and contacts); a thread or another profile opens on top.
+ * Following, sorts; ⚙ the people and topics followed), Profile (yours), Inbox (notifications); a thread, another
+ * profile or a topic opens on top.
  */
 export default function SocialPage() {
   const {t} = useTranslation()
@@ -99,7 +106,11 @@ export default function SocialPage() {
       }),
     [router]
   )
-  const onPage = postId !== null || profileAddress !== null || topic !== null
+  const onPage =
+    postId !== null ||
+    profileAddress !== null ||
+    topic !== null ||
+    view === View.Following
 
   const state = scanOff
     ? {health: 'off', kind: 'scanOff'}
@@ -156,6 +167,14 @@ export default function SocialPage() {
     ) : (
       <SmallText>{t("Waiting for the node's address…")}</SmallText>
     )
+  else if (view === View.Following)
+    content = (
+      <FollowingView
+        now={now}
+        openProfile={openProfile}
+        onRename={setRenaming}
+      />
+    )
   else if (view === View.Inbox)
     content = (
       <Inbox
@@ -164,7 +183,6 @@ export default function SocialPage() {
         now={now}
         openThread={openThread}
         openProfile={openProfile}
-        onRename={setRenaming}
       />
     )
   else
@@ -174,6 +192,7 @@ export default function SocialPage() {
         openThread={openThread}
         openProfile={openProfile}
         onRename={setRenaming}
+        openFollowing={() => go({view: View.Following})}
       />
     )
 

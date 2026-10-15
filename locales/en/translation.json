@@ -1406,5 +1406,15 @@
   "{{count}} posts in the posts read so far. Anyone can write in any topic; idena.social does not show topic posts.": "{{count}} post in the posts read so far. Anyone can write in any topic; idena.social does not show topic posts.",
   "{{count}} posts in the posts read so far. Anyone can write in any topic; idena.social does not show topic posts._plural": "{{count}} posts in the posts read so far. Anyone can write in any topic; idena.social does not show topic posts.",
   "Post in {{topic}}": "Post in {{topic}}",
-  "No posts in this topic yet.": "No posts in this topic yet."
+  "No posts in this topic yet.": "No posts in this topic yet.",
+  "this is not an exported list": "this is not an exported list",
+  "Imported: {{added}} people added, {{changed}} changed, {{topics}} topics added.": "Imported: {{added}} people added, {{changed}} changed, {{topics}} topics added.",
+  "Your lists": "Your lists",
+  "The names you gave, the people and the topics you follow: kept on this computer only. Export saves them to a file; Import adds a file (from this computer or the phone app) without removing anything.": "The names you gave, the people and the topics you follow: kept on this computer only. Export saves them to a file; Import adds a file (from this computer or the phone app) without removing anything.",
+  "People {{count}}": "People {{count}}",
+  "Topics {{count}}": "Topics {{count}}",
+  "Their posts make your Following feed. Private: kept on this computer, never published.": "Their posts make your Following feed. Private: kept on this computer, never published.",
+  "You follow nobody yet: open a profile and select Follow.": "You follow nobody yet: open a profile and select Follow.",
+  "You follow no topic yet: type r/ in the search, open a topic and select Follow.": "You follow no topic yet: type r/ in the search, open a topic and select Follow.",
+  "People and topics followed": "People and topics followed"
 }
