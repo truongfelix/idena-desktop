@@ -1524,7 +1524,7 @@
   "has an identity now: End frees your slot": "has an identity now: End frees your slot",
   "Remove from your profile?": "Remove from your profile?",
   "The campaign leaves your profile: no app shows it any more. The iDNA already burned for it stays burned.": "The campaign leaves your profile: no app shows it any more. The iDNA already burned for it stays burned.",
-  "Network fee: {{fee}} iDNA": "Network fee: {{fee}} iDNA",
+  "Network fee: {{fee}}": "Network fee: {{fee}}",
   "Estimating the network fee…": "Estimating the network fee…",
   "Waiting for the transaction to be mined…": "Waiting for the transaction to be mined…",
   "Network fees": "Network fees",

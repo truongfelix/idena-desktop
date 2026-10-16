@@ -7,6 +7,7 @@ import {
   DialogFooter,
 } from '../../shared/components/components'
 import {PrimaryButton, SecondaryButton} from '../../shared/components/button'
+import {useFormatDna} from '../../shared/hooks/hooks'
 import {callRpc} from '../../shared/utils/utils'
 import {useCoinbase, useTrackTx} from './hooks'
 import {planAdRemoval, sendAdRemoval} from './remove-ad'
@@ -22,6 +23,8 @@ export function RemoveAdDialog({ad, isOpen, onClose, onDone, onError}) {
   const {t} = useTranslation()
 
   const coinbase = useCoinbase()
+
+  const formatDna = useFormatDna({maximumFractionDigits: 5})
 
   const [plan, setPlan] = React.useState(null)
   const [problem, setProblem] = React.useState(null)
@@ -69,8 +72,8 @@ export function RemoveAdDialog({ad, isOpen, onClose, onDone, onError}) {
           {!problem && (
             <Text color="muted">
               {plan
-                ? t('Network fee: {{fee}} iDNA', {
-                    fee: plan.fee,
+                ? t('Network fee: {{fee}}', {
+                    fee: formatDna(Number(plan.fee)),
                     nsSeparator: '!!',
                   })
                 : t('Estimating the network fee…')}
