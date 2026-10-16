@@ -157,7 +157,13 @@ export default function SocialPage() {
         onProfile={openProfile}
       />
     ) : (
-      <SmallText>{t('This post is not in the blocks read so far.')}</SmallText>
+      <SmallText>
+        {feed.some(({id}) => idKey(id) === postId)
+          ? t(
+              'Its author is blocked. Unblock them in Social settings to see it.'
+            )
+          : t('This post is not in the blocks read so far.')}
+      </SmallText>
     )
   else if (chatKey !== null)
     content = <ChatView chatKey={chatKey} now={now} openProfile={openProfile} />

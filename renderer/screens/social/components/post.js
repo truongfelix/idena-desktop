@@ -152,8 +152,9 @@ export function PostBody({call, lines, maxH, media = true}) {
   const {data} = useIpfsContent(cid)
   const own = call.author === me
   const byUser = !own && hidden.posts.has(String(call.hash).toLowerCase())
-  let text = call.message
-  if (cid) text = data ? textDecoder.decode(data) : ''
+  // A text on IPFS is checked once fetched; an invalid reference is no text.
+  let text = call.message.startsWith('ipfs://') ? '' : call.message
+  if (cid && data) text = textDecoder.decode(data)
   const byWord = !own && hidden.words.matches(text)
   if (!shown && (byUser || byWord))
     return <HiddenLine byUser={byUser} onShow={() => setShown(true)} />

@@ -1562,5 +1562,6 @@
   "Hidden words {{count}}": "Hidden words {{count}}",
   "Hidden posts {{count}}": "Hidden posts {{count}}",
   "Blocked topics {{count}}": "Blocked topics {{count}}",
-  "Blocked: its posts are hidden on this computer.": "Blocked: its posts are hidden on this computer."
+  "Blocked: its posts are hidden on this computer.": "Blocked: its posts are hidden on this computer.",
+  "Its author is blocked. Unblock them in Social settings to see it.": "Its author is blocked. Unblock them in Social settings to see it."
 }
