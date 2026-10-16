@@ -1,7 +1,7 @@
 /* eslint-disable react/prop-types */
 import React from 'react'
 import {useTranslation} from 'react-i18next'
-import {Heading, HStack, Stack} from '@chakra-ui/react'
+import {Heading, HStack, Stack, Text} from '@chakra-ui/react'
 import {SmallText} from '../../../shared/components/components'
 import {SecondaryButton} from '../../../shared/components/button'
 import {useSocial} from '../provider'
@@ -9,16 +9,18 @@ import {PostTarget} from '../contract'
 import {topicChannel, topicFeed} from '../topics'
 import {PostRow, TopicShown} from '../components/post'
 import {FollowTopicChip, TopicAvatar} from '../components/topic'
+import {Chip} from '../components/chips'
 import {PAGE_SIZE, Rows, ShowMore} from './common'
 import {TrustButton, TrustLine} from '../components/profile-public'
 
 /**
- * The page of a topic, as the phone app's: its Trust, Follow (its posts join the Following feed), Trust, "Post in
- * r/name", then its posts, newest first, without their topic.
+ * The page of a topic, as the phone app's: its Trust, Follow (its posts join the Following feed), Trust, Block (its
+ * posts hidden on this computer; then Unblock), "Post in r/name", then its posts, newest first, without their topic.
  */
 export function TopicView({name, now, openThread, openProfile}) {
   const {t} = useTranslation()
-  const {feed, sending} = useSocial()
+  const {shownFeed: feed, sending, blockedTopics, setTopicBlocked} = useSocial()
+  const isBlocked = blockedTopics.includes(name)
   const [shown, setShown] = React.useState(PAGE_SIZE)
   const posts = React.useMemo(() => topicFeed(feed, name), [feed, name])
   return (
@@ -36,9 +38,19 @@ export function TopicView({name, now, openThread, openProfile}) {
         )}
       </SmallText>
       <TrustLine target={topicChannel(name)} onProfile={openProfile} />
+      {isBlocked && (
+        <Text color="red.500">
+          {t('Blocked: its posts are hidden on this computer.', {
+            nsSeparator: '|',
+          })}
+        </Text>
+      )}
       <HStack spacing={2}>
-        <FollowTopicChip name={name} />
+        {!isBlocked && <FollowTopicChip name={name} />}
         <TrustButton target={topicChannel(name)} />
+        <Chip onClick={() => setTopicBlocked(name, !isBlocked)}>
+          {isBlocked ? t('Unblock') : t('Block')}
+        </Chip>
         <SecondaryButton
           isDisabled={!sending.canAct}
           onClick={() => sending.startDraft(PostTarget.newPost(), null, name)}

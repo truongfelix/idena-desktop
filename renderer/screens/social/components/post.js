@@ -1,10 +1,12 @@
 /* eslint-disable react/prop-types */
 import React from 'react'
 import {useTranslation} from 'react-i18next'
-import {Button, HStack, Image, Stack, Text} from '@chakra-ui/react'
+import {Box, Button, HStack, Image, Stack, Text} from '@chakra-ui/react'
 import {SmallText} from '../../../shared/components/components'
 import {useIpfsContent} from '../hooks'
 import {ipfsCid} from '../calls'
+import {useSocial} from '../provider'
+import {HiddenLine, PostMenu} from './hide-menu'
 import {ActionBar} from './actions'
 import {IdentityLabel, NameLink} from './identity'
 import {MUTED} from './theme'
@@ -138,6 +140,31 @@ export function PostMedia({call: {hasMedia, media, mediaType}, maxH}) {
   )
 }
 
+/**
+ * A post's text (`lines` clamps it) and, with `media`, its first media; a text hidden (by the user, or with a hidden
+ * word: a text on IPFS once fetched) shows as one line instead, a click shows it. Never one's own.
+ */
+export function PostBody({call, lines, maxH, media = true}) {
+  const {me, hidden} = useSocial()
+  const [shown, setShown] = React.useState(false)
+  const cid = ipfsCid(call.message)
+  // The same query as PostText's: fetched once.
+  const {data} = useIpfsContent(cid)
+  const own = call.author === me
+  const byUser = !own && hidden.posts.has(String(call.hash).toLowerCase())
+  let text = call.message
+  if (cid) text = data ? textDecoder.decode(data) : ''
+  const byWord = !own && hidden.words.matches(text)
+  if (!shown && (byUser || byWord))
+    return <HiddenLine byUser={byUser} onShow={() => setShown(true)} />
+  return (
+    <>
+      <PostText message={call.message} lines={lines} />
+      {media && <PostMedia call={call} maxH={maxH} />}
+    </>
+  )
+}
+
 /** How a post row shows the post's topic: as a tag under the author, in the author's place (Home), or not (the topic's page). */
 export const TopicShown = {Tag: 'tag', InsteadOfAuthor: 'author', Not: 'not'}
 
@@ -158,38 +185,41 @@ export function PostRow({
   return (
     <Stack spacing={1.5} py={3} w="full">
       <Stack spacing={1} cursor="pointer" onClick={onOpen}>
-        {topic !== null && topicShown === TopicShown.InsteadOfAuthor ? (
-          <TopicLine name={topic} time={call.time} now={now} />
-        ) : (
-          <HStack spacing={2} align="center">
-            <PersonAvatar
-              address={call.author}
-              boxSize={6}
-              rounded="md"
-              cursor="pointer"
-              onClick={(e) => {
-                e.stopPropagation()
-                onProfile(call.author)
-              }}
-            />
-            <Text fontSize="sm" noOfLines={1}>
-              <NameLink address={call.author} onProfile={onProfile} />
-              <Text as="span" color={MUTED}>
-                {'  ·  '}
+        <HStack spacing={2} align="center">
+          {topic !== null && topicShown === TopicShown.InsteadOfAuthor ? (
+            <TopicLine name={topic} time={call.time} now={now} />
+          ) : (
+            <HStack spacing={2} align="center" minW={0}>
+              <PersonAvatar
+                address={call.author}
+                boxSize={6}
+                rounded="md"
+                cursor="pointer"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onProfile(call.author)
+                }}
+              />
+              <Text fontSize="sm" noOfLines={1}>
+                <NameLink address={call.author} onProfile={onProfile} />
+                <Text as="span" color={MUTED}>
+                  {'  ·  '}
+                </Text>
+                <IdentityLabel address={call.author} fontSize="sm" />
+                <Text as="span" color={MUTED}>{`  ·  ${timeAgo(
+                  call.time,
+                  now
+                )}`}</Text>
               </Text>
-              <IdentityLabel address={call.author} fontSize="sm" />
-              <Text as="span" color={MUTED}>{`  ·  ${timeAgo(
-                call.time,
-                now
-              )}`}</Text>
-            </Text>
-          </HStack>
-        )}
+            </HStack>
+          )}
+          <Box flex={1} />
+          <PostMenu call={call} />
+        </HStack>
         {topic !== null && topicShown === TopicShown.Tag && (
           <TopicTag name={topic} />
         )}
-        <PostText message={call.message} lines={3} />
-        <PostMedia call={call} maxH="220px" />
+        <PostBody call={call} lines={3} maxH="220px" />
       </Stack>
       <ActionBar node={node} onAnswers={onOpen} onProfile={onProfile} />
     </Stack>
@@ -201,7 +231,7 @@ const OP_BLUE = '#0079D3'
 
 /**
  * The header of a thread item or a profile card: avatar, name and time, then the identity with its age. `isOp`:
- * the post's author on their replies and comments, "OP" after the name.
+ * the post's author on their replies and comments, "OP" after the name. With `call`, ⋯ after the time (PostMenu).
  */
 export function FullHeader({
   address,
@@ -211,6 +241,7 @@ export function FullHeader({
   avatarSize = 9,
   onClick,
   isOp = false,
+  call = null,
 }) {
   return (
     <HStack
@@ -245,7 +276,10 @@ export function FullHeader({
               </Text>
             )}
           </HStack>
-          <SmallText flexShrink={0}>{timeAgo(time, now)}</SmallText>
+          <HStack spacing={1} flexShrink={0}>
+            <SmallText>{timeAgo(time, now)}</SmallText>
+            {call && <PostMenu call={call} />}
+          </HStack>
         </HStack>
         <IdentityLabel address={address} withAge fontSize="sm" />
       </Stack>

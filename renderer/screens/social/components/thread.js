@@ -7,11 +7,12 @@ import {useSocial} from '../provider'
 import {displayName} from '../people'
 import {ipfsCid} from '../calls'
 import {ActionBar} from './actions'
-import {FullHeader, PostMedia, PostText} from './post'
+import {FullHeader, PostBody} from './post'
 import {LINK, MUTED} from './theme'
 import {commentTree, descendants, idKey, replyCount} from '../feed'
 import {timeAgo} from '../format'
 import {postTopic} from '../topics'
+import {hidesText} from '../hiding'
 import {TopicLine} from './topic'
 
 const RAIL = '18px'
@@ -48,7 +49,7 @@ function ThreadItem({
   opAuthor,
 }) {
   const {t} = useTranslation()
-  const {names} = useSocial()
+  const {names, hidden: hiding, me} = useSocial()
   const [folded, setFolded] = React.useState(false)
   const ref = React.useRef()
   const isFocus = idKey(node.id) === focusId
@@ -60,6 +61,9 @@ function ThreadItem({
     0
   )
   const rails = Math.min(depth, MAX_INDENT) + 1
+  let preview = textPreview(node.call.message, t)
+  if (hidesText(hiding, node.call, me)) preview = t('Hidden')
+  else if (node.call.hasMedia && !node.call.message) preview = t('🖼 Media')
   return (
     <Stack spacing={0}>
       <Flex ref={ref} pt={depth === 0 ? 2 : 1}>
@@ -81,9 +85,7 @@ function ThreadItem({
               node.call.time,
               now
             )}  ·  `}</Text>
-            {node.call.hasMedia && !node.call.message
-              ? t('🖼 Media')
-              : textPreview(node.call.message, t)}
+            {preview}
             {hidden > 0 && (
               <Text as="span" color={LINK} fontWeight={500}>
                 {`  +${hidden}`}
@@ -107,9 +109,9 @@ function ThreadItem({
               avatarSize={depth === 0 ? 9 : 7}
               onClick={() => setFolded(true)}
               isOp={node.call.author === opAuthor}
+              call={node.call}
             />
-            <PostText message={node.call.message} />
-            <PostMedia call={node.call} maxH="360px" />
+            <PostBody call={node.call} maxH="360px" />
             <ActionBar node={node} onProfile={onProfile} showAnswers={false} />
           </Stack>
         )}
@@ -156,9 +158,9 @@ export function SocialThread({node, now, focusId, onProfile}) {
           time={node.call.time}
           now={now}
           onProfile={onProfile}
+          call={node.call}
         />
-        <PostText message={node.call.message} />
-        <PostMedia call={node.call} maxH="360px" />
+        <PostBody call={node.call} maxH="360px" />
         <ActionBar node={node} onProfile={onProfile} showAnswers={false} />
         {node.call.version && (
           <SmallText>

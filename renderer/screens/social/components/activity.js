@@ -7,7 +7,7 @@ import {displayName} from '../people'
 import {ActivityKind, NotifyKind} from '../activity'
 import {validTipAmount} from '../calls'
 import {NameLink} from './identity'
-import {FullHeader, PostMedia, PostText} from './post'
+import {FullHeader, PostBody, PostText} from './post'
 import {LINK, MUTED} from './theme'
 import {LIKE} from '../contract'
 import {likeCount, replyCount, tipTotal} from '../feed'
@@ -56,7 +56,7 @@ export function ActivityCard({item, now, isNew, onOpen, onProfile}) {
       {item.answer && (
         <>
           <Divider />
-          <PostText message={item.answer.message} lines={4} />
+          <PostBody call={item.answer} lines={4} media={false} />
         </>
       )}
     </Stack>
@@ -104,7 +104,7 @@ export function ProfileItemCard({item, tab, now, onOpen, onProfile}) {
       {parent && showHeader && (
         <>
           <Box color={MUTED}>
-            <PostText message={parent.message} lines={2} />
+            <PostBody call={parent} lines={2} media={false} />
           </Box>
           <Divider />
         </>
@@ -117,8 +117,12 @@ export function ProfileItemCard({item, tab, now, onOpen, onProfile}) {
           onProfile={onProfile}
         />
       )}
-      <PostText message={node.call.message} lines={showHeader ? 6 : 4} />
-      {tab === 'media' && <PostMedia call={node.call} maxH="360px" />}
+      <PostBody
+        call={node.call}
+        lines={showHeader ? 6 : 4}
+        maxH="360px"
+        media={tab === 'media'}
+      />
       <SmallText>
         {`♡ ${likeCount(node)}  ·  💬 ${replyCount(node)}  ·  🪙 ${tipText(
           tipTotal(node)
