@@ -34,6 +34,7 @@ import {
 } from '@chakra-ui/react'
 import {useRouter} from 'next/router'
 import {useTranslation} from 'react-i18next'
+import {useQuery} from 'react-query'
 import {
   Avatar,
   Drawer,
@@ -111,7 +112,7 @@ import {
   adImageThumbSrc,
   calculateTargetScore,
   calculateTotalAdScore,
-  compressAdImage,
+  AD_MEDIA_SIZE,
   isValidImage,
   OS,
   validateAd,
@@ -121,8 +122,13 @@ import {viewVotingHref} from '../oracles/utils'
 import {AdTarget} from '../../shared/models/adKey'
 import {AdBurnKey} from '../../shared/models/adBurnKey'
 import {useIdentity} from '../../shared/providers/identity-context'
-import {pick} from '../../shared/utils/utils'
+import {callRpc, pick} from '../../shared/utils/utils'
 import {dexieDb} from '../../shared/utils/dexieDb'
+import {
+  compressAdPictures,
+  estimateReviewFees,
+  reviewAdHex,
+} from './review-fees'
 import {DnaInput} from '../oracles/components'
 import {useFormatDna} from '../../shared/hooks/hooks'
 
@@ -224,6 +230,7 @@ export function AdListItem({
   onBurn,
   onRemove,
   onPreview,
+  onEditAsDraft,
 }) {
   const {id, cid, title, language, age, os, stake, status, contract} = ad
 
@@ -274,7 +281,8 @@ export function AdListItem({
             {eitherStatus(
               AdStatus.Reviewing,
               AdStatus.Approved,
-              AdStatus.Published
+              AdStatus.Published,
+              AdStatus.Rejected
             ) ? (
               <Text
                 color="gray.500"
@@ -309,16 +317,23 @@ export function AdListItem({
                   {t('Preview')}
                 </MenuItem>
 
-                {eitherStatus(AdStatus.Draft, AdStatus.Rejected) &&
-                  !ad.reviewNotStarted && (
-                    <NextLink href={`/adn/edit?id=${id}`} passHref>
-                      <MenuItem
-                        icon={<EditIcon boxSize={5} color="blue.500" />}
-                      >
-                        {t('Edit')}
-                      </MenuItem>
-                    </NextLink>
-                  )}
+                {status === AdStatus.Draft && !ad.reviewNotStarted && (
+                  <NextLink href={`/adn/edit?id=${id}`} passHref>
+                    <MenuItem icon={<EditIcon boxSize={5} color="blue.500" />}>
+                      {t('Edit')}
+                    </MenuItem>
+                  </NextLink>
+                )}
+
+                {/* Its review's content and voting stay with it: the changes go to a new draft. */}
+                {status === AdStatus.Rejected && id && (
+                  <MenuItem
+                    icon={<EditIcon boxSize={5} color="blue.500" />}
+                    onClick={() => onEditAsDraft?.(ad)}
+                  >
+                    {t('Edit as a new draft')}
+                  </MenuItem>
+                )}
 
                 {/* Its stake and deposit come back from the voting's page (finish, terminate). */}
                 {contract &&
@@ -708,7 +723,12 @@ export const AdForm = React.forwardRef(({ad, onSubmit, ...props}, ref) => {
                 name="media"
                 value={media}
                 label={t('Upload media')}
-                description={t('640x640px, no more than 1 Mb')}
+                description={t(
+                  'Stored as {{size}}x{{size}}px, no more than 1 Mb',
+                  {
+                    size: AD_MEDIA_SIZE,
+                  }
+                )}
                 fallbackSrc="/static/upload-cover-icn.svg"
                 maybeError={fieldErrors.media}
                 onChange={setMedia}
@@ -911,12 +931,39 @@ export function ReviewAdDrawer({
 
   const formatDna = useFormatDna({maximumFractionDigits: 5})
 
+  const {encodeAd} = useProtoProfileEncoder()
+
   // The ad whose review contract `submit` deployed: the drawer stays mounted from one ad to the next.
   const [deployedAdId, setDeployedAdId] = React.useState()
   const deployedHere = deployedAdId === ad.id ? deployed : undefined
 
   // The ad's review contract exists but its voting did not start (here, or before): Send only starts it.
   const startOnly = ad.reviewNotStarted || Boolean(deployedHere)
+
+  // Storing the ad and deploying its contract, estimated on the pictures and voting Send would use.
+  const {data: networkFees, isError: networkFeesUnknown} = useQuery(
+    ['adReviewFees', ad.id, ad.title, deployAmount],
+    async () => {
+      const stored = await dexieDb.table('ads').get(ad.id)
+      const pictures = await compressAdPictures(stored)
+      return estimateReviewFees(
+        (method, params) => callRpc(method, ...params),
+        {
+          from: coinbase,
+          adHex: reviewAdHex({...ad, ...pictures}, encodeAd),
+          title: ad.title,
+          stake: deployAmount,
+        }
+      )
+    },
+    {
+      enabled:
+        Boolean(props.isOpen && ad.id && coinbase && deployAmount) &&
+        !startOnly,
+      retry: false,
+      staleTime: 60 * 1000,
+    }
+  )
 
   return (
     <AdDrawer
@@ -1034,22 +1081,7 @@ export function ReviewAdDrawer({
                     setDeployedAdId(ad.id)
                     submit({
                       ...ad,
-                      thumb: new Uint8Array(
-                        await compressAdImage(await thumb.arrayBuffer(), {
-                          width: 80,
-                          height: 80,
-                          type: thumb.type,
-                        })
-                      ),
-                      media: new Uint8Array(
-                        await compressAdImage(await media.arrayBuffer(), {
-                          width: 320,
-                          height: 320,
-                          // Its own type: with the thumbnail's, a PNG thumbnail made the photo a PNG,
-                          // several times larger and so dearer to store (25-70 iDNA more).
-                          type: media.type,
-                        })
-                      ),
+                      ...(await compressAdPictures({thumb, media})),
                     })
                   } catch (error) {
                     releaseSubmit()
@@ -1117,17 +1149,39 @@ export function ReviewAdDrawer({
                     value={formatDna(deployAmount)}
                   />
                 )}
+                {!startOnly && (
+                  <DrawerFormHelper
+                    label={t('Network fees')}
+                    value={
+                      // eslint-disable-next-line no-nested-ternary
+                      networkFees
+                        ? t('about {{fee}}', {
+                            fee: formatDna(Number(networkFees.total)),
+                          })
+                        : networkFeesUnknown
+                        ? t('Not estimated')
+                        : t('Estimating…')
+                    }
+                  />
+                )}
                 <DrawerFormHelper
                   mt={6}
                   label={t('Total amount')}
                   value={formatDna(
-                    (startOnly ? 0 : deployAmount) + startAmount + rewardsFund
+                    (startOnly
+                      ? 0
+                      : deployAmount + Number(networkFees?.total ?? 0)) +
+                      startAmount +
+                      rewardsFund
                   )}
                 />
               </FormControl>
               <Text color="muted" fontSize="sm">
                 {t(
                   'The deposit comes back when the voting ends, whether the ad is approved or rejected. Half of the stake comes back when the voting is terminated, which anyone can do on its page some days after the review; the other half is burned.'
+                )}{' '}
+                {t(
+                  'The network fees store the ad and deploy its voting; starting the voting costs a small fee more.'
                 )}
               </Text>
             </Stack>

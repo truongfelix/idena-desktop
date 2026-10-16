@@ -53,20 +53,6 @@ export const isTargetedAd = (targetA, targetB) =>
     (stakeA, stakeB) => Number(stakeB) >= Number(stakeA)
   )
 
-export const areCompetingAds = (targetA, targetB) =>
-  compareNullish(targetA.language, targetB.language, areSameCaseInsensitive) ||
-  compareNullish(targetA.os, targetB.os, areSameCaseInsensitive) ||
-  compareNullish(
-    targetA.age,
-    targetB.age,
-    (ageA, ageB) => Number(ageB) >= Number(ageA)
-  ) ||
-  compareNullish(
-    targetA.stake,
-    targetB.stake,
-    (stakeA, stakeB) => Number(stakeB) >= Number(stakeA)
-  )
-
 export const compareNullish = (field, targetField, condition) =>
   field ? condition(field, targetField) : true
 
@@ -286,6 +272,9 @@ export const adImageThumbSrc = (ad) =>
   typeof ad.thumb === 'string'
     ? ad.thumb
     : ad.thumb && URL.createObjectURL(ad.thumb)
+
+// The side of an ad's picture as the app stores it (a square), whatever was uploaded.
+export const AD_MEDIA_SIZE = 320
 
 export async function compressAdImage(
   // eslint-disable-next-line no-shadow

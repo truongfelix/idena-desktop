@@ -17,7 +17,6 @@ import {fetchNetworkSize} from '../../shared/api/dna'
 import {
   adFallbackSrc,
   adReviewStatus,
-  areCompetingAds,
   buildAdReviewVoting,
   currentOs,
   getAdVoting,
@@ -42,6 +41,8 @@ import {
 import {ChangeProfileAttachment} from '../../shared/models/changeProfileAttachment'
 import {BurnAttachment} from '../../shared/models/burnAttachment'
 import {AdBurnKey} from '../../shared/models/adBurnKey'
+import {competingBurns} from './competitors'
+import {reviewAdHex} from './review-fees'
 import {useLanguage} from '../../shared/hooks/use-language'
 import {dexieDb} from '../../shared/utils/dexieDb'
 import {ContractRpcMode} from '../oracles/types'
@@ -235,14 +236,7 @@ export function useCompetingAds(cid, target) {
 
   return React.useMemo(() => {
     if (Boolean(cid) && Boolean(target)) {
-      return approvedBurntCoins?.filter((burn) => {
-        const key = AdBurnKey.fromHex(burn.key)
-        return (
-          cid !== key.cid &&
-          target.toHex() !== key.target &&
-          areCompetingAds(decodeAdTarget(key.target), target)
-        )
-      })
+      return competingBurns(approvedBurntCoins, cid, target, decodeAdTarget)
     }
   }, [approvedBurntCoins, cid, decodeAdTarget, target])
 }
@@ -499,18 +493,10 @@ function useDeployAdContract({onBeforeSubmit, onSubmit, onError}) {
 
   return useMutation(
     async (ad) => {
-      const unpublishedVoting = buildAdReviewVoting({title: ad.title})
-
-      const {cid} = await sendToIpfs(
-        encodeAd({
-          ...ad,
-          version: 0,
-          votingParams: unpublishedVoting,
-        })
-      )
+      const {cid} = await sendToIpfs(reviewAdHex(ad, encodeAd))
 
       const voting = {
-        ...unpublishedVoting,
+        ...buildAdReviewVoting({title: ad.title}),
         adCid: cid,
       }
 
