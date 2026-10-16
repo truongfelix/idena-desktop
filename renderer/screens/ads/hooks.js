@@ -42,6 +42,7 @@ import {ChangeProfileAttachment} from '../../shared/models/changeProfileAttachme
 import {BurnAttachment} from '../../shared/models/burnAttachment'
 import {AdBurnKey} from '../../shared/models/adBurnKey'
 import {competingBurns} from './competitors'
+import {reviewAdHex} from './review-fees'
 import {useLanguage} from '../../shared/hooks/use-language'
 import {dexieDb} from '../../shared/utils/dexieDb'
 import {ContractRpcMode} from '../oracles/types'
@@ -492,18 +493,10 @@ function useDeployAdContract({onBeforeSubmit, onSubmit, onError}) {
 
   return useMutation(
     async (ad) => {
-      const unpublishedVoting = buildAdReviewVoting({title: ad.title})
-
-      const {cid} = await sendToIpfs(
-        encodeAd({
-          ...ad,
-          version: 0,
-          votingParams: unpublishedVoting,
-        })
-      )
+      const {cid} = await sendToIpfs(reviewAdHex(ad, encodeAd))
 
       const voting = {
-        ...unpublishedVoting,
+        ...buildAdReviewVoting({title: ad.title}),
         adCid: cid,
       }
 
