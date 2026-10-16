@@ -150,37 +150,55 @@ export async function holderOf(settled, name) {
 }
 
 /**
- * The givers of Trust to `target` (an address, or "r/<topic>"), each {address, epoch, vouched}, from the contract
- * map "t:<target>:" (contract_iterateMap, 100 a page).
+ * Every entry of the contract map whose keys start with `prefix`, the prefix cut from each key: [{key, value}], 100 a
+ * page (contract_iterateMap, strings).
  */
-export async function trustGivers(call, target, contract = PROFILE_CONTRACT) {
-  const givers = []
+export async function iterateEntries(
+  call,
+  prefix,
+  contract = PROFILE_CONTRACT
+) {
+  const entries = []
   const seen = new Set()
   let token = null
   do {
     // eslint-disable-next-line no-await-in-loop
     const page = await call('contract_iterateMap', [
       contract,
-      `t:${String(target).toLowerCase()}:`,
+      prefix,
       token,
       'string',
       'string',
       100,
     ])
-    for (const {key, value} of page?.items || []) {
-      const [epoch, mark] = String(value).split(':')
-      givers.push({
-        address: String(key).toLowerCase(),
-        epoch: Number(epoch),
-        vouched: mark === 'v',
-      })
-    }
+    for (const {key, value} of page?.items || [])
+      entries.push({key: String(key), value: String(value)})
     token = nextPageToken(page?.continuationToken)
     if (token !== null && seen.has(token))
       throw new Error('contract_iterateMap repeats its pages')
     if (token !== null) seen.add(token)
   } while (token !== null)
-  return givers
+  return entries
+}
+
+/**
+ * The givers of Trust to `target` (an address, or "r/<topic>"), each {address, epoch, vouched}, from the contract
+ * map "t:<target>:".
+ */
+export async function trustGivers(call, target, contract = PROFILE_CONTRACT) {
+  const entries = await iterateEntries(
+    call,
+    `t:${String(target).toLowerCase()}:`,
+    contract
+  )
+  return entries.map(({key, value}) => {
+    const [epoch, mark] = value.split(':')
+    return {
+      address: key.toLowerCase(),
+      epoch: Number(epoch),
+      vouched: mark === 'v',
+    }
+  })
 }
 
 /**
@@ -231,7 +249,17 @@ export const ProfileCall = {
   setProfile: (bio, picture) => profileCall('setProfile', {bio, picture}),
   trust: (target) => profileCall('trust', {target}),
   untrust: (target) => profileCall('untrust', {target}),
+  challengeName: (name) => profileCall('challengeName', {name}),
+  vouch: (member) => profileCall('vouch', {member}),
+  acceptVouch: (voucher) => profileCall('acceptVouch', {voucher}),
+  declineOffer: (voucher) => profileCall('declineOffer', {voucher}),
+  cancelOffer: (member) => profileCall('cancelOffer', {member}),
+  // The member ends its own vouch with an empty `member`.
+  endVouch: (member = '') => profileCall('endVouch', {member}),
 }
+
+/** A profile call sending `amount` (iDNA, a string): what a vouched member adds, burned by the contract. */
+export const withAmount = (call, amount) => ({...call, amount})
 
 function profileCall(method, arg, amount = '0') {
   return {

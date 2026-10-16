@@ -28,6 +28,7 @@ import {displayName} from '../people'
 import {IMAGE_TYPE} from '../posting'
 import {encodePicture} from '../image'
 import {Chip} from './chips'
+import {MyVouching, VouchPanel} from './profile-vouch'
 
 /** The image of an "ipfs://" picture, as a URL; null while it loads or when no node has it. */
 function usePictureUrl(picture) {
@@ -230,6 +231,11 @@ export function PublicProfile({
         <TrustLine target={address} onProfile={onProfile} />
         {!isMe && <TrustButton target={address} />}
       </HStack>
+      {isMe ? (
+        <MyVouching profile={profile} />
+      ) : (
+        <VouchPanel address={address} profile={profile} />
+      )}
       {isMe && (
         <Box>
           <Button size="sm" variant="outline" onClick={() => setEditing(true)}>

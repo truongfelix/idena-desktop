@@ -2,6 +2,7 @@ import {useQuery, useQueryClient} from 'react-query'
 import React from 'react'
 import {socialRpc, socialRpcSettled} from './node'
 import {profilesEnabled, readProfiles, readTrust} from './profiles'
+import {readChallenge, readMembers, readOffer, readOffersTo} from './vouching'
 
 /** How long a read profile or Trust count is shown before it is read again. */
 const PROFILE_STALE_MS = 10 * 60 * 1000
@@ -72,4 +73,46 @@ export function useRefreshProfiles() {
     client.invalidateQueries('profile')
     client.invalidateQueries('trust')
   }, [client])
+}
+
+/** The vouches offered to `member` (readOffersTo). */
+export function useOffersTo(member) {
+  return useQuery(
+    ['profile', 'offers-to', member],
+    () => readOffersTo(socialRpc, member),
+    {enabled: profilesEnabled && Boolean(member), staleTime: PROFILE_STALE_MS}
+  )
+}
+
+/** The members `voucher` vouches for (readMembers). */
+export function useMembers(voucher) {
+  return useQuery(
+    ['profile', 'members', voucher],
+    () => readMembers(socialRpc, voucher),
+    {enabled: profilesEnabled && Boolean(voucher), staleTime: PROFILE_STALE_MS}
+  )
+}
+
+/** Whether `voucher` offered to vouch for `member` (readOffer: its epoch, or null). */
+export function useOffer(member, voucher) {
+  return useQuery(
+    ['profile', 'offer', member, voucher],
+    () => readOffer(socialRpcSettled, member, voucher),
+    {
+      enabled: profilesEnabled && Boolean(member) && Boolean(voucher),
+      staleTime: PROFILE_STALE_MS,
+    }
+  )
+}
+
+/** The challenge of `challenger` on `name` (readChallenge). */
+export function useChallenge(name, challenger) {
+  return useQuery(
+    ['profile', 'challenge', name, challenger],
+    () => readChallenge(socialRpcSettled, name, challenger),
+    {
+      enabled: profilesEnabled && Boolean(name) && Boolean(challenger),
+      staleTime: PROFILE_STALE_MS,
+    }
+  )
 }

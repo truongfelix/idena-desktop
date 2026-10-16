@@ -4,8 +4,14 @@ import {LIKE, SocialCall, makePostArgument} from './contract'
 import {keccak256Hex} from './keccak'
 import {MESSAGE_AMOUNT, plainMessage, sendMessageArgument} from './messages'
 import {topicChannel, typedTopic} from './topics'
-import {socialRpc} from './node'
-import {callbackGas, withCallbackGas} from './profiles'
+import {socialRpc, socialRpcSettled} from './node'
+import {
+  callbackGas,
+  readProfiles,
+  withAmount,
+  withCallbackGas,
+} from './profiles'
+import {isActingMember, vouchedExtra} from './vouching'
 import {
   prepareFile,
   estimateCall,
@@ -74,7 +80,16 @@ const PROFILE_KINDS = new Set([
   'profile',
   'trust',
   'untrust',
+  'challenge',
+  'vouch',
+  'acceptVouch',
+  'declineOffer',
+  'cancelOffer',
+  'endVouch',
 ])
+
+/** The profile calls a vouched member pays for with an extra amount, burned (payIfVouched in the contract). */
+const MEMBER_PAYS = new Set(['name', 'profile', 'trust', 'challenge'])
 
 export function useSocialSending({
   ready,
@@ -122,6 +137,12 @@ export function useSocialSending({
       profile: t('Profile'),
       trust: t('Trust'),
       untrust: t('Untrust'),
+      challenge: t('Challenge'),
+      vouch: t('Vouch'),
+      acceptVouch: t('Accept the vouch'),
+      declineOffer: t('Decline the vouch'),
+      cancelOffer: t('Withdraw the offer'),
+      endVouch: t('End the vouch'),
     }),
     [t]
   )
@@ -250,6 +271,17 @@ export function useSocialSending({
             ]
           : []
         let profileCall = makeCall(files[0] ? `ipfs://${files[0].cid}` : null)
+        // A vouched member adds about one more call's fee, burned by the contract.
+        let extra = null
+        if (MEMBER_PAYS.has(kind)) {
+          const mine = (await readProfiles(socialRpcSettled, [from]))[
+            String(from).toLowerCase()
+          ]
+          if (isActingMember(mine)) {
+            extra = vouchedExtra(await socialRpc('bcn_feePerGas'))
+            profileCall = withAmount(profileCall, extra)
+          }
+        }
         let estimate = await estimateCall(socialRpc, from, profileCall)
         // A second dry run with the callback's gas sized from the first: the max fee then reserves less.
         const gas = callbackGas(estimate.receipt)
@@ -258,7 +290,13 @@ export function useSocialSending({
           estimate = await estimateCall(socialRpc, from, profileCall)
         }
         const {fee, maxFee} = estimate
-        return {from, socialCall: profileCall, fee: {fee, maxFee}, files}
+        return {
+          from,
+          socialCall: profileCall,
+          fee: {fee, maxFee},
+          files,
+          memberExtra: extra,
+        }
       },
       {detail}
     )

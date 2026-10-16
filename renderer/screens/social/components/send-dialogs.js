@@ -16,7 +16,19 @@ import {fromWei, toWei, totalFee} from '../posting'
 import {MUTED} from './theme'
 
 /** The kinds written to the profiles contract. */
-const PROFILE_TITLES = ['name', 'dropName', 'profile', 'trust', 'untrust']
+const PROFILE_TITLES = [
+  'name',
+  'dropName',
+  'profile',
+  'trust',
+  'untrust',
+  'challenge',
+  'vouch',
+  'acceptVouch',
+  'declineOffer',
+  'cancelOffer',
+  'endVouch',
+]
 
 /** A fee as the phone app shows it: 2 places, rounded up. */
 const fee = (wei) => fromWei(wei, 2, true)
@@ -41,6 +53,12 @@ export function ConfirmDialog({pending, onSend, onCancel}) {
     profile: t('Your public profile'),
     trust: t('Trust'),
     untrust: t('Take your Trust back'),
+    challenge: t('Challenge a name'),
+    vouch: t('Offer to vouch'),
+    acceptVouch: t('Accept the vouch'),
+    declineOffer: t('Decline the vouch'),
+    cancelOffer: t('Withdraw your offer'),
+    endVouch: t('End the vouch'),
   }
   const isProfile = PROFILE_TITLES.includes(pending.kind)
   const hasFiles = pending.files.length > 0
@@ -118,6 +136,14 @@ export function ConfirmDialog({pending, onSend, onCancel}) {
                 nsSeparator: '|',
               })}
           </Text>
+          {pending.memberExtra && (
+            <Text>
+              {t(
+                'As a vouched member, you also send {{amount}} iDNA, burned by the contract (about one more fee).',
+                {amount: pending.memberExtra}
+              )}
+            </Text>
+          )}
           {hasFiles && (
             <Text fontWeight={500}>
               {t('Total: about {{total}} iDNA.', {
