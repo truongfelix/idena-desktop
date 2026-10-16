@@ -14,6 +14,7 @@ import {identityColor, identityStatus} from '../format'
 import {historyDone} from '../scan'
 import {CopyButton, PAGE_SIZE, Rows, ShowMore} from './common'
 import {useProfile} from '../profile-hooks'
+import {isActingMember} from '../vouching'
 import {ProfilePicture, PublicProfile} from '../components/profile-public'
 
 export function ProfileView({
@@ -42,7 +43,10 @@ export function ProfileView({
       ? `@${publicProfile.name}`
       : null)
   const isMe = address === me
-  const status = identityStatus(identity?.state)
+  // An account without an identity acts through its voucher while that one is validated.
+  const status = isActingMember(publicProfile)
+    ? 'Vouched member'
+    : identityStatus(identity?.state)
   const tabs = [
     ['posts', t('Posts')],
     ['replies', t('Replies')],

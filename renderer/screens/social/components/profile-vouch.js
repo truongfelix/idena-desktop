@@ -95,7 +95,7 @@ export function VouchPanel({address, profile}) {
                 () => ProfileCall.vouch(address),
                 {
                   detail: t(
-                    'They become a member once they accept. You vouch for at most {{cap}} members at a time.',
+                    'They become a member once they accept; you vouch for at most {{cap}} members at a time',
                     {cap: vouchCap(mine.state)}
                   ),
                 }
@@ -233,7 +233,7 @@ export function MyVouching({profile}) {
                 () => ProfileCall.acceptVouch(voucher),
                 {
                   detail: t(
-                    'You may then hold a name, write a profile and give Trust while {{name}} is validated.',
+                    'You may then hold a name, write a profile and give Trust while {{name}} is validated',
                     {name: displayName(voucher, names)}
                   ),
                 }

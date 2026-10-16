@@ -1487,7 +1487,7 @@
   "Vouched for by {{name}}": "Vouched for by {{name}}",
   "(their voucher is not validated now)": "(their voucher is not validated now)",
   "End the vouch": "End the vouch",
-  "They become a member once they accept. You vouch for at most {{cap}} members at a time.": "They become a member once they accept. You vouch for at most {{cap}} members at a time.",
+  "They become a member once they accept; you vouch for at most {{cap}} members at a time": "They become a member once they accept; you vouch for at most {{cap}} members at a time",
   "Vouch for them": "Vouch for them",
   "Your offer waits for them to accept it.": "Your offer waits for them to accept it.",
   "Withdraw the offer": "Withdraw the offer",
@@ -1501,7 +1501,7 @@
   "(not active now)": "(not active now)",
   "As a vouched member, a name, a profile or a Trust costs about one more fee, burned.": "As a vouched member, a name, a profile or a Trust costs about one more fee, burned.",
   "{{name}} offers to vouch for you.": "{{name}} offers to vouch for you.",
-  "You may then hold a name, write a profile and give Trust while {{name}} is validated.": "You may then hold a name, write a profile and give Trust while {{name}} is validated.",
+  "You may then hold a name, write a profile and give Trust while {{name}} is validated": "You may then hold a name, write a profile and give Trust while {{name}} is validated",
   "Decline": "Decline",
   "You vouch for {{count}} of at most {{cap}}": "You vouch for {{count}} of at most {{cap}}",
   "End": "End",
@@ -1517,5 +1517,6 @@
   "Looking up @{{name}}…": "Looking up @{{name}}…",
   "The node did not answer for @{{name}}.": "The node did not answer for @{{name}}.",
   "Nobody holds @{{name}}.": "Nobody holds @{{name}}.",
-  "The holder of @{{name}} is neither validated nor vouched for: the name is hidden and may change hands. Send to an address.": "The holder of @{{name}} is neither validated nor vouched for: the name is hidden and may change hands. Send to an address."
+  "The holder of @{{name}} is neither validated nor vouched for: the name is hidden and may change hands. Send to an address.": "The holder of @{{name}} is neither validated nor vouched for: the name is hidden and may change hands. Send to an address.",
+  "Vouched member": "Vouched member"
 }
