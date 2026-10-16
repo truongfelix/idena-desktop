@@ -2,7 +2,7 @@
 import React from 'react'
 import {useTranslation} from 'react-i18next'
 import {Box, HStack, Stack, Text, IconButton} from '@chakra-ui/react'
-import {Avatar, SmallText} from '../../../shared/components/components'
+import {SmallText} from '../../../shared/components/components'
 import {useSocial} from '../provider'
 import {useSocialIdentity} from '../hooks'
 import {shortAddress} from '../people'
@@ -13,6 +13,9 @@ import {PostRow} from '../components/post'
 import {identityColor, identityStatus} from '../format'
 import {historyDone} from '../scan'
 import {CopyButton, PAGE_SIZE, Rows, ShowMore} from './common'
+import {useProfile} from '../profile-hooks'
+import {isActingMember} from '../vouching'
+import {ProfilePicture, PublicProfile} from '../components/profile-public'
 
 export function ProfileView({
   address,
@@ -32,9 +35,18 @@ export function ProfileView({
   const [tab, setTab] = React.useState('posts')
   const [shown, setShown] = React.useState(PAGE_SIZE)
   React.useEffect(() => setShown(PAGE_SIZE), [tab, address])
-  const name = people[address]?.name
+  const {data: publicProfile} = useProfile(address)
+  // A private name wins; then the claimed one, while its holder is in good standing.
+  const name =
+    people[address]?.name ||
+    (publicProfile?.inStanding && publicProfile.name
+      ? `@${publicProfile.name}`
+      : null)
   const isMe = address === me
-  const status = identityStatus(identity?.state)
+  // An account without an identity acts through its voucher while that one is validated.
+  const status = isActingMember(publicProfile)
+    ? 'Vouched member'
+    : identityStatus(identity?.state)
   const tabs = [
     ['posts', t('Posts')],
     ['replies', t('Replies')],
@@ -65,7 +77,11 @@ export function ProfileView({
   return (
     <Stack spacing={3} w="full">
       <HStack spacing={3} align="center">
-        <Avatar address={address} boxSize={16} rounded="lg" />
+        <ProfilePicture
+          address={address}
+          profile={publicProfile}
+          boxSize={16}
+        />
         <Stack spacing={0.5} flex={1} minW={0}>
           <HStack spacing={1}>
             <Text fontSize="lg" fontWeight={500} noOfLines={1}>
@@ -111,6 +127,13 @@ export function ProfileView({
           </Text>
         </Stack>
       </HStack>
+      <PublicProfile
+        address={address}
+        isMe={isMe}
+        profile={publicProfile}
+        privateName={Boolean(people[address]?.name)}
+        onProfile={openProfile}
+      />
       <Stack spacing={0.5} fontSize="md">
         <Text>
           {`❤️ ${t('{{received}} received · {{given}} given', {

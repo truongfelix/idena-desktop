@@ -20,6 +20,8 @@ import {useSocialSending} from './sending'
 import {useChats} from './chats'
 import {nodeMessages} from './node'
 import {loadSocialCache, loadSocialSettings, saveSocialSetting} from './storage'
+import {feedAddresses, useProfiles, useRefreshProfiles} from './profile-hooks'
+import {shownNames} from './profiles'
 
 const SocialContext = React.createContext(null)
 
@@ -86,13 +88,30 @@ export function SocialProvider({children}) {
 
   const feed = React.useMemo(() => (cache ? cacheFeed(cache) : []), [cache])
   const targets = React.useMemo(() => postTargets(feed), [feed])
+  const refreshProfiles = useRefreshProfiles()
   const sending = useSocialSending({
     ready,
     readNewBlocks,
     scannedThrough: cache?.authorsHeight ?? 0,
+    onProfileChange: refreshProfiles,
   })
   const people = React.useMemo(() => settings?.people || {}, [settings])
-  const names = React.useMemo(() => peopleNames(people), [people])
+  const chats = useChats({me, cache, ready, people})
+  // The profiles of everyone shown: their claimed names, then the private ones given here, which win.
+  const shownAddresses = React.useMemo(() => {
+    const addresses = feedAddresses(feed)
+    Object.keys(people).forEach((a) => addresses.add(a))
+    chats.conversations.forEach(({others}) =>
+      others.forEach((a) => addresses.add(a))
+    )
+    if (me) addresses.add(me)
+    return addresses
+  }, [chats.conversations, feed, me, people])
+  const profiles = useProfiles(shownAddresses)
+  const names = React.useMemo(
+    () => ({...shownNames(profiles), ...peopleNames(people)}),
+    [people, profiles]
+  )
   const notifyKinds = React.useMemo(
     () =>
       Object.values(NotifyKind).filter(
@@ -104,7 +123,6 @@ export function SocialProvider({children}) {
     () => (me ? socialActivity(feed, me) : []),
     [feed, me]
   )
-  const chats = useChats({me, cache, ready, people})
   const seenThrough = settings?.seenThrough ?? null
 
   const updateSettings = React.useCallback((key, next, saved = next) => {
@@ -208,6 +226,7 @@ export function SocialProvider({children}) {
       me,
       people,
       names,
+      profiles,
       setPerson,
       setPeople,
       followedTopics,
@@ -253,6 +272,7 @@ export function SocialProvider({children}) {
       offline,
       peers,
       people,
+      profiles,
       ready,
       scanOff,
       sendMessage,

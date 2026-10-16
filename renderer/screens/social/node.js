@@ -62,6 +62,39 @@ export async function socialRpcBatch(
   paramsList,
   timeout = RPC_TIMEOUT
 ) {
+  const answers = await socialRpcSettled(method, paramsList, timeout)
+  // A call that failed fails them all: what it asked is asked again later, never taken for "nothing".
+  const failed = answers.find((answer) => answer.error)
+  if (failed) throw failed.error
+  return answers.map((answer) => answer.result)
+}
+
+/** The largest batch one request carries: a longer list goes in several requests, one after the other. */
+const SETTLED_BATCH = 200
+
+/**
+ * Several calls of one node RPC method (JSON-RPC batches), one params list each: for each, in the same order,
+ * {result} or {error} (an Error with the node's message). Throws only when a request itself fails.
+ */
+export async function socialRpcSettled(
+  method,
+  paramsList,
+  timeout = RPC_TIMEOUT
+) {
+  const answers = []
+  for (let i = 0; i < paramsList.length; i += SETTLED_BATCH)
+    // eslint-disable-next-line no-await-in-loop
+    answers.push(
+      ...(await rpcBatchRequest(
+        method,
+        paramsList.slice(i, i + SETTLED_BATCH),
+        timeout
+      ))
+    )
+  return answers
+}
+
+async function rpcBatchRequest(method, paramsList, timeout) {
   if (paramsList.length === 0) return []
   const {url, key} = getRpcParams()
   const controller = new AbortController()
@@ -87,10 +120,14 @@ export async function socialRpcBatch(
         answers?.error?.message || `${method}: not a batch answer`
       )
     const byId = new Map(answers.map((answer) => [answer.id, answer]))
-    // A call that failed fails them all: what it asked is asked again later, never taken for "nothing".
-    const failed = answers.find((answer) => answer?.error)
-    if (failed) throw new Error(failed.error.message || `${method}: failed`)
-    return paramsList.map((_, id) => byId.get(id)?.result ?? null)
+    return paramsList.map((_, id) => {
+      const answer = byId.get(id)
+      if (!answer)
+        return {error: new Error(`${method}: no answer in the batch`)}
+      if (answer.error)
+        return {error: new Error(answer.error.message || `${method}: failed`)}
+      return {result: answer.result ?? null}
+    })
   } catch (error) {
     if (!controller.signal.aborted) throw error
     const timedOut = new Error(

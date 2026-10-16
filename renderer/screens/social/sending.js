@@ -4,8 +4,17 @@ import {LIKE, SocialCall, makePostArgument} from './contract'
 import {keccak256Hex} from './keccak'
 import {MESSAGE_AMOUNT, plainMessage, sendMessageArgument} from './messages'
 import {topicChannel, typedTopic} from './topics'
-import {socialRpc} from './node'
+import {socialRpc, socialRpcSettled} from './node'
 import {
+  callbackGas,
+  keepStateGas,
+  readProfiles,
+  withAmount,
+  withCallbackGas,
+} from './profiles'
+import {isActingMember, vouchedExtra} from './vouching'
+import {
+  prepareFile,
   estimateCall,
   prepareCall,
   prepareDraft as prepareDraftCall,
@@ -65,7 +74,30 @@ export const draftToPutBack = (sent, editor) =>
  * what was sent stays `waiting` until the feed shows its block, so a like is not sent twice and its pill stays off.
  * `readNewBlocks` asks the scan for the new blocks; the feed shows the blocks through `scannedThrough`.
  */
-export function useSocialSending({ready, readNewBlocks, scannedThrough}) {
+/** The kinds of action written to the profiles contract (prepareProfile). */
+const PROFILE_KINDS = new Set([
+  'name',
+  'dropName',
+  'profile',
+  'trust',
+  'untrust',
+  'challenge',
+  'vouch',
+  'acceptVouch',
+  'declineOffer',
+  'cancelOffer',
+  'endVouch',
+])
+
+/** The profile calls a vouched member pays for with an extra amount, burned (payIfVouched in the contract). */
+const MEMBER_PAYS = new Set(['name', 'profile', 'trust', 'challenge'])
+
+export function useSocialSending({
+  ready,
+  readNewBlocks,
+  scannedThrough,
+  onProfileChange,
+}) {
   const {t} = useTranslation()
   const [busy, setBusy] = React.useState(false)
   const [status, setStatus] = React.useState(null)
@@ -101,6 +133,17 @@ export function useSocialSending({ready, readNewBlocks, scannedThrough}) {
       like: t('Like'),
       tip: t('Tip'),
       message: t('Message'),
+      name: t('Name'),
+      dropName: t('Drop the name'),
+      profile: t('Profile'),
+      trust: t('Trust'),
+      untrust: t('Untrust'),
+      challenge: t('Challenge'),
+      vouch: t('Vouch'),
+      acceptVouch: t('Accept the vouch'),
+      declineOffer: t('Decline the vouch'),
+      cancelOffer: t('Withdraw the offer'),
+      endVouch: t('End the vouch'),
     }),
     [t]
   )
@@ -207,6 +250,59 @@ export function useSocialSending({ready, readNewBlocks, scannedThrough}) {
       }
     )
 
+  /**
+   * A call to the profiles contract (`kind`: name, dropName, profile, trust, untrust): `makeCall(picture)` gives it,
+   * with the "ipfs://" reference of `image` (bytes) once its CID is known; the image is stored on IPFS first, with
+   * its own fee, as a post's.
+   */
+  const prepareProfile = (kind, makeCall, {detail = null, image = null} = {}) =>
+    prepare(
+      kind,
+      async () => {
+        const from = await socialRpc('dna_getCoinbaseAddr')
+        const files = image
+          ? [
+              await prepareFile(
+                socialRpc,
+                from,
+                'image',
+                image,
+                storedRef.current
+              ),
+            ]
+          : []
+        let profileCall = makeCall(files[0] ? `ipfs://${files[0].cid}` : null)
+        // A vouched member adds about one more call's fee, burned by the contract.
+        let extra = null
+        if (MEMBER_PAYS.has(kind)) {
+          const mine = (await readProfiles(socialRpcSettled, [from]))[
+            String(from).toLowerCase()
+          ]
+          if (isActingMember(mine)) {
+            extra = vouchedExtra(await socialRpc('bcn_feePerGas'))
+            profileCall = withAmount(profileCall, extra)
+          }
+        }
+        let estimate = await estimateCall(socialRpc, from, profileCall)
+        // A second dry run with the callback's gas sized from the first: the max fee then reserves less.
+        const gas = callbackGas(estimate.receipt)
+        const keepGas = keepStateGas(estimate.receipt)
+        if (gas !== null || keepGas !== null) {
+          profileCall = withCallbackGas(profileCall, gas, keepGas)
+          estimate = await estimateCall(socialRpc, from, profileCall)
+        }
+        const {fee, maxFee} = estimate
+        return {
+          from,
+          socialCall: profileCall,
+          fee: {fee, maxFee},
+          files,
+          memberExtra: extra,
+        }
+      },
+      {detail}
+    )
+
   const prepareDraft = () =>
     prepare(
       draft.kind,
@@ -288,7 +384,8 @@ export function useSocialSending({ready, readNewBlocks, scannedThrough}) {
         )
       )
       show(t('{{what}} is in a block.', {what}), {ms: MINED_MS})
-      readNewBlocks()
+      if (PROFILE_KINDS.has(kind)) onProfileChange?.()
+      else readNewBlocks()
     }
   }
 
@@ -361,6 +458,7 @@ export function useSocialSending({ready, readNewBlocks, scannedThrough}) {
     prepareLike,
     prepareTip,
     prepareMessage,
+    prepareProfile,
     messagesSent,
     pendingLikes,
     draft,

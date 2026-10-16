@@ -15,6 +15,21 @@ import {shortAddress} from '../people'
 import {fromWei, toWei, totalFee} from '../posting'
 import {MUTED} from './theme'
 
+/** The kinds written to the profiles contract. */
+const PROFILE_TITLES = [
+  'name',
+  'dropName',
+  'profile',
+  'trust',
+  'untrust',
+  'challenge',
+  'vouch',
+  'acceptVouch',
+  'declineOffer',
+  'cancelOffer',
+  'endVouch',
+]
+
 /** A fee as the phone app shows it: 2 places, rounded up. */
 const fee = (wei) => fromWei(wei, 2, true)
 
@@ -33,7 +48,19 @@ export function ConfirmDialog({pending, onSend, onCancel}) {
     like: t('Like on idena.social'),
     tip: t('Tip on idena.social'),
     message: t('Private message on idena.social'),
+    name: t('Your public name'),
+    dropName: t('Drop your public name'),
+    profile: t('Your public profile'),
+    trust: t('Trust'),
+    untrust: t('Take your Trust back'),
+    challenge: t('Challenge a name'),
+    vouch: t('Offer to vouch'),
+    acceptVouch: t('Accept the vouch'),
+    declineOffer: t('Decline the vouch'),
+    cancelOffer: t('Withdraw your offer'),
+    endVouch: t('End the vouch'),
   }
+  const isProfile = PROFILE_TITLES.includes(pending.kind)
   const hasFiles = pending.files.length > 0
   return (
     <Dialog title={titles[pending.kind]} isOpen onClose={onCancel}>
@@ -41,12 +68,18 @@ export function ConfirmDialog({pending, onSend, onCancel}) {
         <Stack spacing={3}>
           <Text>
             {pending.detail && `${pending.detail}. `}
-            {pending.kind === 'message'
+            {isProfile &&
+              t(
+                'It is public: anyone can read it, and every version stays in the blockchain history for good, signed by your identity {{address}}.',
+                {address: shortAddress(pending.from), nsSeparator: '|'}
+              )}
+            {!isProfile && pending.kind === 'message'
               ? t(
                   'Only the people in the conversation can read it. That you sent a message, when, its size and how many people it goes to are public and stay on the blockchain for good, signed by your identity {{address}}.',
                   {address: shortAddress(pending.from)}
                 )
-              : t(
+              : !isProfile &&
+                t(
                   'It is public and stays on the blockchain for good, signed by your identity {{address}}.',
                   {address: shortAddress(pending.from)}
                 )}
@@ -84,18 +117,33 @@ export function ConfirmDialog({pending, onSend, onCancel}) {
             )
           })}
           <Text fontWeight={500}>
-            {hasFiles
-              ? t('The post: about {{fee}} iDNA (at most {{most}}).', {
+            {hasFiles && isProfile
+              ? t('The profile: about {{fee}} iDNA (at most {{most}}).', {
                   fee: fee(pending.fee.fee),
                   most: fee(pending.fee.maxFee),
                   nsSeparator: '|',
                 })
-              : t('Fee: about {{fee}} iDNA (at most {{most}}).', {
+              : hasFiles &&
+                t('The post: about {{fee}} iDNA (at most {{most}}).', {
                   fee: fee(pending.fee.fee),
                   most: fee(pending.fee.maxFee),
                   nsSeparator: '|',
                 })}
+            {!hasFiles &&
+              t('Fee: about {{fee}} iDNA (at most {{most}}).', {
+                fee: fee(pending.fee.fee),
+                most: fee(pending.fee.maxFee),
+                nsSeparator: '|',
+              })}
           </Text>
+          {pending.memberExtra && (
+            <Text>
+              {t(
+                'As a vouched member, you also send {{amount}} iDNA, burned by the contract (about one more fee).',
+                {amount: pending.memberExtra}
+              )}
+            </Text>
+          )}
           {hasFiles && (
             <Text fontWeight={500}>
               {t('Total: about {{total}} iDNA.', {

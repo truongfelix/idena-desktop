@@ -10,7 +10,7 @@ import {
   Text,
   Textarea,
 } from '@chakra-ui/react'
-import {Avatar, SmallText} from '../../../shared/components/components'
+import {SmallText} from '../../../shared/components/components'
 import {PrimaryButton, SecondaryButton} from '../../../shared/components/button'
 import {useSocial} from '../provider'
 import {displayName} from '../people'
@@ -20,6 +20,7 @@ import {useIpfsContent} from '../hooks'
 import {decryptIpfsText, unreadCount} from '../messages'
 import {messagesPending} from '../scan'
 import {MUTED} from '../components/theme'
+import {PersonAvatar} from '../components/profile-public'
 
 /** The most characters of a message written here (the fee grows with the text). */
 const MAX_MESSAGE = 2000
@@ -111,7 +112,7 @@ export function MessagesList({now, openChat}) {
             onClick={() => openChat(conversation.key)}
           >
             <Box position="relative">
-              <Avatar
+              <PersonAvatar
                 address={conversation.others[0]}
                 boxSize={10}
                 rounded="md"
@@ -291,7 +292,7 @@ export function ChatView({chatKey, now, openProfile}) {
   return (
     <Stack spacing={3} w="full">
       <HStack spacing={3}>
-        <Avatar
+        <PersonAvatar
           address={others[0]}
           boxSize={10}
           rounded="md"

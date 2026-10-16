@@ -4,6 +4,7 @@ import {
   Box,
   Button,
   Flex,
+  HStack,
   Stack,
   Stat,
   StatLabel,
@@ -34,6 +35,10 @@ import {
   WalletDrawerHeaderIconBox,
 } from './components'
 import {callRpc, isAddress, toLocaleDna} from '../../shared/utils/utils'
+import {useRecipient} from '../social/profile-hooks'
+import {useShownName} from '../social/components/profile-public'
+import {profilesEnabled} from '../social/profiles'
+import {identityStatus} from '../social/format'
 import {
   Table,
   TableCol,
@@ -149,6 +154,8 @@ export function WalletCard({
 
 export function SendDnaDrawer({address, onSend, onFail, ...props}) {
   const {t} = useTranslation()
+  const [toText, setToText] = React.useState('')
+  const recipient = useRecipient(toText)
 
   const [state, dispatch] = React.useReducer(
     (prevState, action) => {
@@ -218,13 +225,13 @@ export function SendDnaDrawer({address, onSend, onFail, ...props}) {
 
               dispatch('submit')
 
-              const {from, to, amount} = Object.fromEntries(
-                new FormData(e.target)
-              )
+              const {from, amount} = Object.fromEntries(new FormData(e.target))
+              // "@name" sends to its holder, as shown under the field; an address as typed.
+              const to = recipient.address
 
               try {
-                if (!isAddress(to)) {
-                  throw new Error(`Incorrect 'To' address: ${to}`)
+                if (!to || !isAddress(to)) {
+                  throw new Error(`Incorrect 'To' address: ${toText}`)
                 }
 
                 if (amount <= 0) {
@@ -251,7 +258,17 @@ export function SendDnaDrawer({address, onSend, onFail, ...props}) {
                 <Input name="from" defaultValue={address} isReadOnly />
               </WalletDrawerFormControl>
               <WalletDrawerFormControl label={t('To')}>
-                <Input name="to" placeholder={t('Enter address')} />
+                <Input
+                  name="to"
+                  value={toText}
+                  onChange={(e) => setToText(e.target.value)}
+                  placeholder={
+                    profilesEnabled
+                      ? t('Enter an address or @name')
+                      : t('Enter address')
+                  }
+                />
+                <RecipientLine {...recipient} />
               </WalletDrawerFormControl>
               <WalletDrawerFormControl label={t('Amount, iDNA')}>
                 <Input
@@ -277,6 +294,55 @@ export function SendDnaDrawer({address, onSend, onFail, ...props}) {
         </PrimaryButton>
       </DrawerFooter>
     </WalletDrawer>
+  )
+}
+
+/** Who a transaction's other side is: one of the account's wallets, a contract, a person's name, or an address. */
+function CounterpartyKind({tx}) {
+  const {t} = useTranslation()
+  const name = useShownName(tx.receipt ? null : tx.counterParty)
+  if (tx.counterPartyWallet)
+    return `${t('wallet')} ${tx.counterPartyWallet.name}`
+  if (tx.receipt) return t('smart contract')
+  return name || t('address')
+}
+
+/**
+ * Under the "To" field, for "@name": whom it sends to (the robot, the whole address and the identity state), or why
+ * it cannot (nobody holds the name, or its holder is out of good standing: a hidden name can change hands).
+ */
+function RecipientLine({recipient, resolved, isLoading, isError}) {
+  const {t} = useTranslation()
+  if (recipient.kind !== 'name') return null
+  let text
+  if (isLoading) text = t('Looking up @{{name}}…', {name: recipient.name})
+  else if (isError)
+    text = t('The node did not answer for @{{name}}.', {name: recipient.name})
+  else if (!resolved?.holder)
+    text = t('Nobody holds @{{name}}.', {name: recipient.name})
+  else if (!resolved.profile?.inStanding)
+    text = t(
+      'The holder of @{{name}} is neither validated nor vouched for: the name is hidden and may change hands. Send to an address.',
+      {name: recipient.name, nsSeparator: '|'}
+    )
+  if (text)
+    return (
+      <Text mt={2} fontSize="sm" color={isLoading ? 'muted' : 'red.500'}>
+        {text}
+      </Text>
+    )
+  return (
+    <HStack mt={2} spacing={2} align="center">
+      <Avatar address={resolved.holder} boxSize={8} />
+      <Box minW={0}>
+        <Text fontSize="sm" fontFamily="mono" wordBreak="break-all">
+          {resolved.holder}
+        </Text>
+        <Text fontSize="sm" color="muted">
+          {t(identityStatus(resolved.profile.state))}
+        </Text>
+      </Box>
+    </HStack>
   )
 }
 
@@ -629,12 +695,7 @@ export function WalletTransactionList({txs = [], onOpenTransaction}) {
                   <Box w="48">
                     <Text fontWeight={500} whiteSpace="nowrap">
                       {tx.direction === 'Sent' ? t('To') : t('From')}{' '}
-                      {/* eslint-disable-next-line no-nested-ternary */}
-                      {tx.counterPartyWallet
-                        ? `${t('wallet')} ${tx.counterPartyWallet.name}`
-                        : tx.receipt
-                        ? t('smart contract')
-                        : t('address')}
+                      <CounterpartyKind tx={tx} />
                     </Text>
                     <SmallText fontWeight={500} isTruncated>
                       {tx.counterParty}

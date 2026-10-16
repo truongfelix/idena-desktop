@@ -2,7 +2,7 @@
 import React from 'react'
 import {useTranslation} from 'react-i18next'
 import {Button, HStack, Image, Stack, Text} from '@chakra-ui/react'
-import {Avatar, SmallText} from '../../../shared/components/components'
+import {SmallText} from '../../../shared/components/components'
 import {useIpfsContent} from '../hooks'
 import {ipfsCid} from '../calls'
 import {ActionBar} from './actions'
@@ -11,6 +11,7 @@ import {MUTED} from './theme'
 import {timeAgo} from '../format'
 import {postTopic} from '../topics'
 import {TopicLine, TopicTag} from './topic'
+import {PersonAvatar} from './profile-public'
 
 const textDecoder = new TextDecoder()
 
@@ -161,7 +162,7 @@ export function PostRow({
           <TopicLine name={topic} time={call.time} now={now} />
         ) : (
           <HStack spacing={2} align="center">
-            <Avatar
+            <PersonAvatar
               address={call.author}
               boxSize={6}
               rounded="md"
@@ -218,7 +219,7 @@ export function FullHeader({
       onClick={onClick}
       cursor={onClick ? 'pointer' : undefined}
     >
-      <Avatar
+      <PersonAvatar
         address={address}
         boxSize={avatarSize}
         rounded="md"

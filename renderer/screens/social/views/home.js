@@ -13,7 +13,7 @@ import {
   MenuItem,
   MenuList,
 } from '@chakra-ui/react'
-import {Avatar, SmallText} from '../../../shared/components/components'
+import {SmallText} from '../../../shared/components/components'
 import {useSocial} from '../provider'
 import {
   displayName,
@@ -28,6 +28,7 @@ import {TopicRow} from '../components/topic'
 import {FeedPeriod, FeedSort, sortFeed} from '../feed'
 import {TOPIC_PREFIX, topicList} from '../topics'
 import {ContactRow, PAGE_SIZE, Rows, SearchField, ShowMore} from './common'
+import {PersonAvatar} from '../components/profile-public'
 
 export function Home({now, openThread, openProfile, onRename, openFollowing}) {
   const {t} = useTranslation()
@@ -139,7 +140,11 @@ export function Home({now, openThread, openProfile, onRename, openFollowing}) {
                   cursor="pointer"
                   onClick={() => openProfile(hit.address)}
                 >
-                  <Avatar address={hit.address} boxSize={10} rounded="md" />
+                  <PersonAvatar
+                    address={hit.address}
+                    boxSize={10}
+                    rounded="md"
+                  />
                   <Stack spacing={0}>
                     <Text fontWeight={500}>
                       {t('Open the profile of {{name}}', {
