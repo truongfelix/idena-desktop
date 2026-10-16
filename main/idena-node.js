@@ -171,7 +171,9 @@ function getBinaryVersion(binaryPath, timeoutMs = VERSION_TIMEOUT_MS) {
   })
 }
 
-async function copyBundledNode(tempNodeFile, onProgress) {
+// Copies the bundled node to `tempNodeFile`; null when there is none, or when it is older than `minVersion` (the
+// version an update asks for).
+async function copyBundledNode(tempNodeFile, onProgress, minVersion) {
   const bundledNodeFile = await findBundledNodeFile()
 
   if (!bundledNodeFile) {
@@ -185,6 +187,14 @@ async function copyBundledNode(tempNodeFile, onProgress) {
       bundledNodeFile,
       version,
       expected: pinnedNodeVersion,
+    })
+    return null
+  }
+
+  if (minVersion && semver.lt(version, minVersion)) {
+    logger.info('the bundled node is older than the update', {
+      version,
+      wanted: minVersion,
     })
     return null
   }
@@ -314,7 +324,9 @@ const getRemoteRelease = async () => {
     : null
 }
 
-async function downloadNode(onProgress) {
+// Puts a node in the temp file: the bundled one when it is there (and at least `minVersion`, the version an update
+// asks for), else the latest release's, checked against its checksum and version. Resolves to its version.
+async function downloadNode(onProgress, {minVersion} = {}) {
   // eslint-disable-next-line no-async-promise-executor
   return new Promise(async (resolve, reject) => {
     try {
@@ -322,7 +334,8 @@ async function downloadNode(onProgress) {
 
       const bundledVersion = await copyBundledNode(
         getTempNodeFile(),
-        onProgress
+        onProgress,
+        minVersion
       )
       if (bundledVersion) {
         resolve(bundledVersion)
