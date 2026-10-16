@@ -29,6 +29,7 @@ import {
 } from '../../screens/ads/hooks'
 import {AdStatus} from '../../screens/ads/types'
 import {copyAdAsDraft} from '../../screens/ads/drafts'
+import {RemoveAdDialog} from '../../screens/ads/remove-ad-dialog'
 import {
   Debug,
   Drawer,
@@ -199,14 +200,30 @@ export default function AdListPage() {
     [coinbase, refetchPersistedAds, selectedAd]
   )
 
+  // This computer's copies of an ad: by its id, or (an ad read from the profile) by its content and voting.
+  const removeStoredAd = React.useCallback(async (ad) => {
+    if (ad.id) {
+      await dexieDb.table('ads').delete(ad.id)
+    } else {
+      await dexieDb
+        .table('ads')
+        .filter((x) => x.cid === ad.cid && x.contract === ad.contract)
+        .delete()
+    }
+  }, [])
+
+  const removeAdDisclosure = useDisclosure()
+
   const handleRemoveAd = React.useCallback(
     async (ad) => {
+      // A campaign is in the profile: it goes once the profile changes (RemoveAdDialog), else it comes back.
+      if (ad.status === AdStatus.Published) {
+        setSelectedAd(ad)
+        removeAdDisclosure.onOpen()
+        return
+      }
       try {
-        if (ad.id) {
-          await dexieDb.table('ads').delete(ad.id)
-        } else {
-          await dexieDb.table('ads').where({cid: ad.cid}).delete()
-        }
+        await removeStoredAd(ad)
       } catch {
         console.error({ad}, 'failed to delete ad')
         failToast('Failed to delete ad')
@@ -214,7 +231,15 @@ export default function AdListPage() {
         refetchPersistedAds()
       }
     },
-    [failToast, refetchPersistedAds]
+    [failToast, refetchPersistedAds, removeAdDisclosure, removeStoredAd]
+  )
+
+  const handleAdRemovedFromProfile = React.useCallback(
+    async (ad) => {
+      await removeStoredAd(ad).catch(() => {})
+      refetchAds()
+    },
+    [refetchAds, removeStoredAd]
   )
 
   const handleEditAsDraft = React.useCallback(
@@ -352,6 +377,14 @@ export default function AdListPage() {
         />
 
         <BurnDrawer ad={selectedAd} onBurn={handleBurn} {...burnDisclosure} />
+
+        <RemoveAdDialog
+          ad={selectedAd}
+          isOpen={removeAdDisclosure.isOpen}
+          onClose={removeAdDisclosure.onClose}
+          onDone={handleAdRemovedFromProfile}
+          onError={(error) => failToast(error?.message)}
+        />
 
         <AdPreview ad={selectedAd} {...previewAdDisclosure} />
 
