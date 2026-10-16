@@ -127,6 +127,7 @@ export function ProfileView({
         address={address}
         isMe={isMe}
         profile={publicProfile}
+        privateName={Boolean(people[address]?.name)}
         onProfile={openProfile}
       />
       <Stack spacing={0.5} fontSize="md">

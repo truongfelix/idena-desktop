@@ -173,16 +173,24 @@ function TrustGiversDialog({givers, onProfile, onClose}) {
 
 /**
  * The public profile of `address` from the profiles contract: its name, its bio, its Trust and, on the account's
- * own profile, the button that edits them. Out of good standing it shows nothing, except to its owner.
+ * own profile, the button that edits them. Out of good standing it shows nothing, except to its owner. The name
+ * line shows only when the title does not: a private name there (`privateName`), or the name hidden.
  */
-export function PublicProfile({address, isMe, profile, onProfile}) {
+export function PublicProfile({
+  address,
+  isMe,
+  profile,
+  privateName = false,
+  onProfile,
+}) {
   const {t} = useTranslation()
   const [editing, setEditing] = React.useState(false)
   if (!profilesEnabled) return null
   const shown = profile?.inStanding || isMe
   return (
     <Stack spacing={1} fontSize="md">
-      {shown && profile?.name && (
+      {/* The title shows the claimed name, unless a private name replaces it there. */}
+      {shown && profile?.name && (privateName || !profile.inStanding) && (
         <Text fontWeight={500}>
           {`@${profile.name}`}
           {!profile.inStanding &&
