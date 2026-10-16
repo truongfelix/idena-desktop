@@ -8,6 +8,7 @@ import {
   unreadCount,
 } from './messages'
 import {nodeMessages} from './node'
+import {visibleConversations} from './hiding'
 import {callHeightsOf} from './scan'
 import {loadChatStore, saveChatStore} from './storage'
 
@@ -15,9 +16,10 @@ import {loadChatStore, saveChatStore} from './storage'
  * The private messages of the node's account `me`, as the phone app's SocialChats: the scan keeps every sendMessage
  * call still encrypted (cache.messages); each new one is tried once with the node's key (social_decrypt), and those
  * for the account are kept on this computer, per account, with how far each conversation was read. Nothing is tried
- * while the node is not `ready`. `people` sets which conversations wait in Requests.
+ * while the node is not `ready`. `people` sets which conversations wait in Requests; those with an account of
+ * `blocked` are not shown.
  */
-export function useChats({me, cache, ready, people}) {
+export function useChats({me, cache, ready, people, blocked = new Set()}) {
   const [store, setStore] = React.useState(emptyChatStore)
   const [account, setAccount] = React.useState(null)
   const storeRef = React.useRef(store)
@@ -80,8 +82,14 @@ export function useChats({me, cache, ready, people}) {
   }, [scannedKeys])
 
   const conversations = React.useMemo(
-    () => (me ? listConversations(store.messages, me, people) : []),
-    [me, people, store.messages]
+    () =>
+      me
+        ? visibleConversations(
+            listConversations(store.messages, me, people),
+            blocked
+          )
+        : [],
+    [blocked, me, people, store.messages]
   )
 
   const unreadConversations = React.useMemo(

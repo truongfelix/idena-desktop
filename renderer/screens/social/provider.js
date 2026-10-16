@@ -5,12 +5,14 @@ import {useEpochState} from '../../shared/providers/epoch-context'
 import {useIdentityState} from '../../shared/providers/identity-context'
 import {EpochPeriod} from '../../shared/types'
 import {
+  blockedAddresses,
   peopleFromJson,
   peopleNames,
   peopleToJson,
   person,
   withPerson,
 } from './people'
+import {hiding, visibleActivity, visibleFeed, wordFilter} from './hiding'
 import {newActivity, NotifyKind, socialActivity} from './activity'
 import {postTargets} from './feed'
 import {cacheFeed} from './scan'
@@ -59,6 +61,9 @@ export function SocialProvider({children}) {
         seenThrough: null,
         notifyOff: [],
         scanOff: false,
+        hiddenWords: [],
+        hiddenPosts: [],
+        blockedTopics: [],
       })),
     ]).then(([saved, savedSettings]) => {
       if (!alive) return
@@ -96,7 +101,35 @@ export function SocialProvider({children}) {
     onProfileChange: refreshProfiles,
   })
   const people = React.useMemo(() => settings?.people || {}, [settings])
-  const chats = useChats({me, cache, ready, people})
+  const blocked = React.useMemo(() => blockedAddresses(people), [people])
+  const hiddenWords = React.useMemo(
+    () => settings?.hiddenWords || [],
+    [settings]
+  )
+  const hiddenPosts = React.useMemo(
+    () => settings?.hiddenPosts || [],
+    [settings]
+  )
+  const blockedTopics = React.useMemo(
+    () => settings?.blockedTopics || [],
+    [settings]
+  )
+  // Everything hidden on this computer (hiding.js), and the feed as shown with it.
+  const hidden = React.useMemo(
+    () =>
+      hiding({
+        blocked,
+        words: wordFilter(hiddenWords),
+        posts: new Set(hiddenPosts),
+        topics: new Set(blockedTopics),
+      }),
+    [blocked, blockedTopics, hiddenPosts, hiddenWords]
+  )
+  const shownFeed = React.useMemo(
+    () => visibleFeed(feed, hidden, me),
+    [feed, hidden, me]
+  )
+  const chats = useChats({me, cache, ready, people, blocked})
   // The profiles of everyone shown: their claimed names, then the private ones given here, which win.
   const shownAddresses = React.useMemo(() => {
     const addresses = feedAddresses(feed)
@@ -119,9 +152,10 @@ export function SocialProvider({children}) {
       ),
     [settings]
   )
+  // What others did on your posts, without what is hidden.
   const activity = React.useMemo(
-    () => (me ? socialActivity(feed, me) : []),
-    [feed, me]
+    () => (me ? visibleActivity(socialActivity(feed, me), hidden, me) : []),
+    [feed, hidden, me]
   )
   const seenThrough = settings?.seenThrough ?? null
 
@@ -189,6 +223,26 @@ export function SocialProvider({children}) {
     [updateSettings]
   )
 
+  // Hides one post, reply or comment by its transaction hash, or shows it again.
+  const setPostHidden = React.useCallback(
+    (hash, hide) => {
+      const key = String(hash).toLowerCase()
+      const others = hiddenPosts.filter((one) => one !== key)
+      updateSettings('hiddenPosts', hide ? [...others, key].sort() : others)
+    },
+    [hiddenPosts, updateSettings]
+  )
+
+  // Blocks a topic (no longer followed), or unblocks it.
+  const setTopicBlocked = React.useCallback(
+    (name, block) => {
+      const others = blockedTopics.filter((topic) => topic !== name)
+      updateSettings('blockedTopics', block ? [...others, name].sort() : others)
+      if (block && followedTopics.includes(name)) setTopicFollowed(name, false)
+    },
+    [blockedTopics, followedTopics, setTopicFollowed, updateSettings]
+  )
+
   const {messageKeys} = chats
   // Sends `text` to `others` (lowercase) once each one's public key is known.
   const sendMessage = React.useCallback(
@@ -232,6 +286,16 @@ export function SocialProvider({children}) {
       followedTopics,
       setTopicFollowed,
       setFollowedTopics: (list) => updateSettings('topics', list),
+      shownFeed,
+      hidden,
+      hiddenWords,
+      setHiddenWords: (list) => updateSettings('hiddenWords', list),
+      hiddenPosts,
+      setPostHidden,
+      setHiddenPosts: (list) => updateSettings('hiddenPosts', list),
+      blockedTopics,
+      setTopicBlocked,
+      setBlockedTopics: (list) => updateSettings('blockedTopics', list),
       activity,
       unread,
       highlightAfter,
@@ -256,6 +320,7 @@ export function SocialProvider({children}) {
     [
       acceptChat,
       activity,
+      blockedTopics,
       cache,
       chats,
       epoch,
@@ -263,6 +328,9 @@ export function SocialProvider({children}) {
       feed,
       followedTopics,
       head,
+      hidden,
+      hiddenPosts,
+      hiddenWords,
       highlightAfter,
       markSeen,
       me,
@@ -279,7 +347,10 @@ export function SocialProvider({children}) {
       sending,
       setPeople,
       setPerson,
+      setPostHidden,
+      setTopicBlocked,
       setTopicFollowed,
+      shownFeed,
       syncing,
       targets,
       unread,

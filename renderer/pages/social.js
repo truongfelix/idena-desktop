@@ -24,22 +24,23 @@ import {Home} from '../screens/social/views/home'
 import {Inbox, InboxView} from '../screens/social/views/inbox'
 import {ProfileView} from '../screens/social/views/profile'
 import {TopicView} from '../screens/social/views/topic'
-import {FollowingView} from '../screens/social/views/following'
+import {SettingsTab, SocialSettingsView} from '../screens/social/views/settings'
 import {ChatView} from '../screens/social/views/messages'
 import {OpenTopicContext} from '../screens/social/components/topic'
 import {topicOf, topicChannel} from '../screens/social/topics'
+import {threadPost} from '../screens/social/hiding'
 
 const View = {
   Home: 'home',
   Profile: 'profile',
   Inbox: 'inbox',
-  Following: 'following',
+  Settings: 'settings',
 }
 
 /**
  * idena.social, read from the app's own node and laid out as the phone app's Social tab: Home (search, Feed or
- * Following, sorts; ⚙ the people and topics followed), Profile (yours), Inbox (notifications); a thread, another
- * profile or a topic opens on top.
+ * Following, sorts; ⚙ Social settings: the people and topics followed, what is blocked and hidden), Profile (yours),
+ * Inbox (notifications); a thread, another profile or a topic opens on top.
  */
 export default function SocialPage() {
   const {t} = useTranslation()
@@ -50,6 +51,7 @@ export default function SocialPage() {
   const {
     cache,
     feed,
+    hidden,
     head,
     error,
     missingMethod,
@@ -86,6 +88,9 @@ export default function SocialPage() {
   const inboxView = Object.values(InboxView).includes(query.inbox)
     ? query.inbox
     : InboxView.Notifications
+  const settingsTab = Object.values(SettingsTab).includes(query.tab)
+    ? query.tab
+    : SettingsTab.People
   const go = (next) =>
     router.push({pathname: '/social', query: next}, undefined, {shallow: true})
   const openThread = (id, focus) =>
@@ -99,9 +104,10 @@ export default function SocialPage() {
   const postId = query.post !== undefined ? idKey(query.post) : null
   // Opened from a profile, the inbox or the search: that item is shown and marked.
   const focusId = query.focus !== undefined ? idKey(query.focus) : null
+  // A post hidden still opens (folded); a blocked account's does not.
   const thread = React.useMemo(
-    () => (postId === null ? null : feed.find(({id}) => idKey(id) === postId)),
-    [feed, postId]
+    () => (postId === null ? null : threadPost(feed, postId, hidden, me)),
+    [feed, hidden, me, postId]
   )
   const profileAddress = isSocialAddress(query.address)
     ? String(query.address).toLowerCase()
@@ -127,7 +133,7 @@ export default function SocialPage() {
     postId !== null ||
     profileAddress !== null ||
     topic !== null ||
-    view === View.Following
+    view === View.Settings
 
   const state = scanOff
     ? {health: 'off', kind: 'scanOff'}
@@ -151,7 +157,13 @@ export default function SocialPage() {
         onProfile={openProfile}
       />
     ) : (
-      <SmallText>{t('This post is not in the blocks read so far.')}</SmallText>
+      <SmallText>
+        {feed.some(({id}) => idKey(id) === postId)
+          ? t(
+              'Its author is blocked. Unblock them in Social settings to see it.'
+            )
+          : t('This post is not in the blocks read so far.')}
+      </SmallText>
     )
   else if (chatKey !== null)
     content = <ChatView chatKey={chatKey} now={now} openProfile={openProfile} />
@@ -187,10 +199,19 @@ export default function SocialPage() {
     ) : (
       <SmallText>{t("Waiting for the node's address…")}</SmallText>
     )
-  else if (view === View.Following)
+  else if (view === View.Settings)
     content = (
-      <FollowingView
+      <SocialSettingsView
+        tab={settingsTab}
+        setTab={(next) =>
+          router.replace(
+            {pathname: '/social', query: {view: View.Settings, tab: next}},
+            undefined,
+            {shallow: true}
+          )
+        }
         now={now}
+        openThread={openThread}
         openProfile={openProfile}
         onRename={setRenaming}
       />
@@ -213,7 +234,7 @@ export default function SocialPage() {
         openThread={openThread}
         openProfile={openProfile}
         onRename={setRenaming}
-        openFollowing={() => go({view: View.Following})}
+        openSettings={() => go({view: View.Settings})}
       />
     )
 

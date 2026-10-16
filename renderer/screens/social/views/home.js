@@ -30,9 +30,16 @@ import {TOPIC_PREFIX, topicList} from '../topics'
 import {ContactRow, PAGE_SIZE, Rows, SearchField, ShowMore} from './common'
 import {PersonAvatar} from '../components/profile-public'
 
-export function Home({now, openThread, openProfile, onRename, openFollowing}) {
+export function Home({now, openThread, openProfile, onRename, openSettings}) {
   const {t} = useTranslation()
-  const {feed, people, names, epochStart, followedTopics} = useSocial()
+  // The feed as shown: without what is blocked or hidden (hiding.js).
+  const {
+    shownFeed: feed,
+    people,
+    names,
+    epochStart,
+    followedTopics,
+  } = useSocial()
   const [query, setQuery] = React.useState('')
   const [searched, setSearched] = React.useState('')
   const [following, setFollowing] = React.useState(false)
@@ -191,10 +198,10 @@ export function Home({now, openThread, openProfile, onRename, openFollowing}) {
             <IconButton
               variant="ghost"
               size="sm"
-              aria-label={t('People and topics followed')}
-              title={t('People and topics followed')}
+              aria-label={t('Social settings')}
+              title={t('Social settings')}
               icon={<Text>⚙</Text>}
-              onClick={openFollowing}
+              onClick={openSettings}
             />
             <Menu autoSelect={false}>
               <MenuButton

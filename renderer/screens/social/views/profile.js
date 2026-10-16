@@ -5,7 +5,7 @@ import {Box, HStack, Stack, Text, IconButton} from '@chakra-ui/react'
 import {SmallText} from '../../../shared/components/components'
 import {useSocial} from '../provider'
 import {useSocialIdentity} from '../hooks'
-import {shortAddress} from '../people'
+import {person, shortAddress} from '../people'
 import {socialProfile} from '../activity'
 import {ProfileItemCard} from '../components/activity'
 import {Chip, FollowChip} from '../components/chips'
@@ -16,6 +16,7 @@ import {CopyButton, PAGE_SIZE, Rows, ShowMore} from './common'
 import {useProfile} from '../profile-hooks'
 import {isActingMember} from '../vouching'
 import {ProfilePicture, PublicProfile} from '../components/profile-public'
+import {ProfileMenu} from '../components/hide-menu'
 
 export function ProfileView({
   address,
@@ -26,7 +27,8 @@ export function ProfileView({
   openChat,
 }) {
   const {t} = useTranslation()
-  const {feed, me, people, cache, chatKey} = useSocial()
+  // The feed as shown: a blocked account's profile lists nothing.
+  const {shownFeed: feed, me, people, setPerson, cache, chatKey} = useSocial()
   const {data: identity, isError} = useSocialIdentity(address)
   const profile = React.useMemo(
     () => socialProfile(feed, address),
@@ -43,6 +45,7 @@ export function ProfileView({
       ? `@${publicProfile.name}`
       : null)
   const isMe = address === me
+  const isBlocked = !isMe && people[address]?.blocked === true
   // An account without an identity acts through its voucher while that one is validated.
   const status = isActingMember(publicProfile)
     ? 'Vouched member'
@@ -98,7 +101,19 @@ export function ProfileView({
               onClick={() => onRename(address)}
             />
             <Box flex={1} />
-            {!isMe && openChat && (
+            {isBlocked && (
+              <Chip
+                onClick={() =>
+                  setPerson({
+                    ...(people[address] || person(address)),
+                    blocked: false,
+                  })
+                }
+              >
+                {t('Unblock')}
+              </Chip>
+            )}
+            {!isMe && !isBlocked && openChat && (
               <IconButton
                 variant="ghost"
                 size="sm"
@@ -108,7 +123,8 @@ export function ProfileView({
                 onClick={() => openChat(chatKey([address]))}
               />
             )}
-            {!isMe && <FollowChip address={address} />}
+            {!isMe && !isBlocked && <FollowChip address={address} />}
+            {!isMe && !isBlocked && <ProfileMenu address={address} />}
           </HStack>
           {name && (
             <HStack spacing={1}>
@@ -125,6 +141,14 @@ export function ProfileView({
           >
             {statusLine}
           </Text>
+          {isBlocked && (
+            <Text fontSize="md" color="red.500">
+              {t(
+                'Blocked: their posts, replies, comments and messages are hidden on this computer.',
+                {nsSeparator: '|'}
+              )}
+            </Text>
+          )}
         </Stack>
       </HStack>
       <PublicProfile
