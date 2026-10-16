@@ -60,6 +60,7 @@ import {
   PlusSolidIcon,
 } from '../../shared/components/icons'
 import {AdDrawer} from '../ads/containers'
+import {ShownName} from '../social/components/profile-public'
 
 export function ContactListSidebar({
   selectedContactId,
@@ -335,6 +336,7 @@ export function ContactCard({
                 </ContactCardBadge>
               )}
             </Stack>
+            <ShownName address={address} fontSize="mdx" />
             <Text color="muted" fontSize="mdx" wordBreak="break-all">
               {address}
             </Text>

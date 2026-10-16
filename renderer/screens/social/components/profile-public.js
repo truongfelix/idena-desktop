@@ -21,7 +21,7 @@ import {
 import {PrimaryButton, SecondaryButton} from '../../../shared/components/button'
 import {useSocial} from '../provider'
 import {useIpfsContent} from '../hooks'
-import {useTrust} from '../profile-hooks'
+import {useProfile, useTrust} from '../profile-hooks'
 import {MAX_BIO, PROFILE_NAME, ProfileCall, profilesEnabled} from '../profiles'
 import {ipfsCid} from '../calls'
 import {displayName} from '../people'
@@ -437,4 +437,23 @@ function ProfileEditDialog({profile, onClose}) {
       </DialogFooter>
     </Dialog>
   )
+}
+
+/**
+ * The name to show for `address` outside Social: the private one given in Social, else its claimed name ("@name")
+ * while its holder is in good standing; null without either.
+ */
+export function useShownName(address) {
+  const key = address ? String(address).toLowerCase() : null
+  const {people} = useSocial()
+  const {data: profile} = useProfile(key)
+  const own = key ? people?.[key]?.name : null
+  if (own) return own
+  return profile?.inStanding && profile.name ? `@${profile.name}` : null
+}
+
+/** The name useShownName gives `address`, as a Text with `props`; nothing without one. */
+export function ShownName({address, ...props}) {
+  const name = useShownName(address)
+  return name ? <Text {...props}>{name}</Text> : null
 }

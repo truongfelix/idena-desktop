@@ -36,6 +36,7 @@ import {
 } from './components'
 import {callRpc, isAddress, toLocaleDna} from '../../shared/utils/utils'
 import {useRecipient} from '../social/profile-hooks'
+import {useShownName} from '../social/components/profile-public'
 import {profilesEnabled} from '../social/profiles'
 import {identityStatus} from '../social/format'
 import {
@@ -294,6 +295,16 @@ export function SendDnaDrawer({address, onSend, onFail, ...props}) {
       </DrawerFooter>
     </WalletDrawer>
   )
+}
+
+/** Who a transaction's other side is: one of the account's wallets, a contract, a person's name, or an address. */
+function CounterpartyKind({tx}) {
+  const {t} = useTranslation()
+  const name = useShownName(tx.receipt ? null : tx.counterParty)
+  if (tx.counterPartyWallet)
+    return `${t('wallet')} ${tx.counterPartyWallet.name}`
+  if (tx.receipt) return t('smart contract')
+  return name || t('address')
 }
 
 /**
@@ -684,12 +695,7 @@ export function WalletTransactionList({txs = [], onOpenTransaction}) {
                   <Box w="48">
                     <Text fontWeight={500} whiteSpace="nowrap">
                       {tx.direction === 'Sent' ? t('To') : t('From')}{' '}
-                      {/* eslint-disable-next-line no-nested-ternary */}
-                      {tx.counterPartyWallet
-                        ? `${t('wallet')} ${tx.counterPartyWallet.name}`
-                        : tx.receipt
-                        ? t('smart contract')
-                        : t('address')}
+                      <CounterpartyKind tx={tx} />
                     </Text>
                     <SmallText fontWeight={500} isTruncated>
                       {tx.counterParty}

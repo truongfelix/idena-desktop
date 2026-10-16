@@ -27,6 +27,7 @@ import {
   toNumber,
   txTypeName,
 } from './utils'
+import {ShownName} from '../social/components/profile-public'
 
 const ROWS_STEP = 20
 
@@ -381,6 +382,7 @@ export function TransactionsTab({address, isOwn}) {
                   </Stack>
                 </TableCol>
                 <TableCol>
+                  {other && <ShownName address={other} fontSize="sm" />}
                   <Box fontFamily="mono" fontSize="sm" isTruncated maxW={48}>
                     {other ?? '–'}
                   </Box>
