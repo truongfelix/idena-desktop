@@ -190,6 +190,34 @@ describe('Trust', () => {
   })
 })
 
+describe('Trust counted by the giver now', () => {
+  it('counts a member who validated since with the identities', () => {
+    // bob gave his Trust as alice's member; he is Human now and the contract ended the vouch.
+    const givers = [{address: bob, vouched: true}]
+    const counts = countTrust(givers, {[bob]: 'Human'}, {})
+    expect(counts).toMatchObject({identities: 1, vouched: 0})
+    expect(counts.counted).toEqual([{address: bob, vouched: false}])
+  })
+
+  it('counts an identity that lost it while it is vouched for, and not after', () => {
+    const givers = [{address: carol, vouched: false}]
+    expect(
+      countTrust(
+        givers,
+        {[carol]: 'Killed', [alice]: 'Verified'},
+        {[carol]: alice}
+      )
+    ).toMatchObject({
+      identities: 0,
+      vouched: 1,
+    })
+    expect(countTrust(givers, {[carol]: 'Killed'}, {})).toMatchObject({
+      identities: 0,
+      vouched: 0,
+    })
+  })
+})
+
 describe('profile calls', () => {
   it('names the profiles contract and sends no argument to dropName', () => {
     const [params] = callParams(alice, {...ProfileCall.dropName(), contract})

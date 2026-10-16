@@ -202,16 +202,22 @@ export async function trustGivers(call, target, contract = PROFILE_CONTRACT) {
 }
 
 /**
- * Which givers count now, as the apps count Trust: an identity in a trusting state, or a vouched member in good
- * standing. `states` by lowercase address (the givers' and their vouchers'), `vouchers` the members' vouchers.
- * Returns the counted givers and the counts: by identities, and by vouched members ("Trusted by 12 (+3 vouched)").
+ * Which givers count now, as the apps count Trust: by each giver's standing now, whatever the Trust was stored as
+ * (a member who validated since counts as an identity; an identity that lost it counts while vouched for). An
+ * identity in a trusting state counts with the identities; an account without one, while its voucher is
+ * validated, with the vouched members. `states` by lowercase address (the givers' and their vouchers'), `vouchers`
+ * the givers' vouchers. Returns the counted givers ({address, vouched}: how each counts now) and the counts
+ * ("Trusted by 12 (+3 vouched)").
  */
 export function countTrust(givers, states, vouchers = {}) {
-  const counted = givers.filter(({address, vouched}) => {
-    if (!vouched) return isTrusting(states[address])
-    const voucher = vouchers[address]
-    return Boolean(voucher) && inStanding(states[address], states[voucher])
-  })
+  const counted = []
+  for (const giver of givers) {
+    const state = states[giver.address]
+    const voucher = vouchers[giver.address]
+    if (isTrusting(state)) counted.push({...giver, vouched: false})
+    else if (voucher && inStanding(state, states[voucher]))
+      counted.push({...giver, vouched: true})
+  }
   return {
     counted,
     identities: counted.filter((g) => !g.vouched).length,
@@ -222,23 +228,20 @@ export function countTrust(givers, states, vouchers = {}) {
 /** The Trust of `target` as the apps show it: its givers read, their states and vouchers, counted. */
 export async function readTrust(call, settled, target) {
   const givers = await trustGivers(call, target)
-  const members = givers.filter((g) => g.vouched).map((g) => g.address)
-  const voucherValues = members.length
-    ? await readEntries(
-        settled,
-        members.map((m) => ['v:', m])
-      )
-    : []
+  if (givers.length === 0) return {givers, ...countTrust([], {})}
+  const addresses = givers.map((g) => g.address)
+  const voucherValues = await readEntries(
+    settled,
+    addresses.map((a) => ['v:', a])
+  )
   const vouchers = {}
-  members.forEach((m, i) => {
-    if (voucherValues[i]) vouchers[m] = voucherValues[i].toLowerCase()
+  addresses.forEach((a, i) => {
+    if (voucherValues[i]) vouchers[a] = voucherValues[i].toLowerCase()
   })
-  const states = givers.length
-    ? await identityStates(settled, [
-        ...givers.map((g) => g.address),
-        ...Object.values(vouchers),
-      ])
-    : {}
+  const states = await identityStates(settled, [
+    ...addresses,
+    ...Object.values(vouchers),
+  ])
   return {givers, ...countTrust(givers, states, vouchers)}
 }
 

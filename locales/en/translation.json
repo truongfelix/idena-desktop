@@ -1518,5 +1518,6 @@
   "The node did not answer for @{{name}}.": "The node did not answer for @{{name}}.",
   "Nobody holds @{{name}}.": "Nobody holds @{{name}}.",
   "The holder of @{{name}} is neither validated nor vouched for: the name is hidden and may change hands. Send to an address.": "The holder of @{{name}} is neither validated nor vouched for: the name is hidden and may change hands. Send to an address.",
-  "Vouched member": "Vouched member"
+  "Vouched member": "Vouched member",
+  "has an identity now: End frees your slot": "has an identity now: End frees your slot"
 }

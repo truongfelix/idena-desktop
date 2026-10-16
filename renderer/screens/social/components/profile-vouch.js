@@ -11,6 +11,7 @@ import {
   useOffer,
   useOffersTo,
   useProfile,
+  useProfiles,
 } from '../profile-hooks'
 import {ProfileCall, isValidated, profilesEnabled} from '../profiles'
 import {displayName} from '../people'
@@ -191,6 +192,11 @@ export function MyVouching({profile}) {
   const {me, names, sending} = useSocial()
   const {data: offers} = useOffersTo(me)
   const {data: members} = useMembers(me)
+  const memberAddresses = React.useMemo(
+    () => (members || []).map(({member}) => member),
+    [members]
+  )
+  const memberProfiles = useProfiles(memberAddresses)
   if (!profilesEnabled || !me) return null
   const isMember = isActingMember(profile)
   return (
@@ -262,8 +268,17 @@ export function MyVouching({profile}) {
             })}
           </Text>
           {members.map(({member}) => (
-            <HStack key={member} spacing={2}>
+            <HStack key={member} spacing={2} flexWrap="wrap">
               <Text>{displayName(member, names)}</Text>
+              {/* The contract ends the vouch at the member's next call; End frees the slot now. */}
+              {memberProfiles[member] &&
+                !isVouchable(memberProfiles[member].state) && (
+                  <SmallText>
+                    {t('has an identity now: End frees your slot', {
+                      nsSeparator: '|',
+                    })}
+                  </SmallText>
+                )}
               <Action
                 onClick={() =>
                   sending.prepareProfile('endVouch', () =>
