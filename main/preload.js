@@ -122,6 +122,8 @@ expose(
     FINALIZE_ALL_LONG_FLIPS: process.env.FINALIZE_ALL_LONG_FLIPS ?? null,
     // A test network's idena.social contract: <address>@<first block> (screens/social/contract.js).
     IDENA_SOCIAL_CONTRACT: process.env.IDENA_SOCIAL_CONTRACT ?? null,
+    // A test network's profiles contract: <address> (screens/social/profiles.js).
+    IDENA_PROFILE_CONTRACT: process.env.IDENA_PROFILE_CONTRACT ?? null,
   })
 )
 expose('toggleFullScreen', () => {

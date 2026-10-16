@@ -6,6 +6,7 @@ import {MESSAGE_AMOUNT, plainMessage, sendMessageArgument} from './messages'
 import {topicChannel, typedTopic} from './topics'
 import {socialRpc} from './node'
 import {
+  prepareFile,
   estimateCall,
   prepareCall,
   prepareDraft as prepareDraftCall,
@@ -65,7 +66,21 @@ export const draftToPutBack = (sent, editor) =>
  * what was sent stays `waiting` until the feed shows its block, so a like is not sent twice and its pill stays off.
  * `readNewBlocks` asks the scan for the new blocks; the feed shows the blocks through `scannedThrough`.
  */
-export function useSocialSending({ready, readNewBlocks, scannedThrough}) {
+/** The kinds of action written to the profiles contract (prepareProfile). */
+const PROFILE_KINDS = new Set([
+  'name',
+  'dropName',
+  'profile',
+  'trust',
+  'untrust',
+])
+
+export function useSocialSending({
+  ready,
+  readNewBlocks,
+  scannedThrough,
+  onProfileChange,
+}) {
   const {t} = useTranslation()
   const [busy, setBusy] = React.useState(false)
   const [status, setStatus] = React.useState(null)
@@ -101,6 +116,11 @@ export function useSocialSending({ready, readNewBlocks, scannedThrough}) {
       like: t('Like'),
       tip: t('Tip'),
       message: t('Message'),
+      name: t('Name'),
+      dropName: t('Drop the name'),
+      profile: t('Profile'),
+      trust: t('Trust'),
+      untrust: t('Untrust'),
     }),
     [t]
   )
@@ -207,6 +227,34 @@ export function useSocialSending({ready, readNewBlocks, scannedThrough}) {
       }
     )
 
+  /**
+   * A call to the profiles contract (`kind`: name, dropName, profile, trust, untrust): `makeCall(picture)` gives it,
+   * with the "ipfs://" reference of `image` (bytes) once its CID is known; the image is stored on IPFS first, with
+   * its own fee, as a post's.
+   */
+  const prepareProfile = (kind, makeCall, {detail = null, image = null} = {}) =>
+    prepare(
+      kind,
+      async () => {
+        const from = await socialRpc('dna_getCoinbaseAddr')
+        const files = image
+          ? [
+              await prepareFile(
+                socialRpc,
+                from,
+                'image',
+                image,
+                storedRef.current
+              ),
+            ]
+          : []
+        const profileCall = makeCall(files[0] ? `ipfs://${files[0].cid}` : null)
+        const fee = await estimateCall(socialRpc, from, profileCall)
+        return {from, socialCall: profileCall, fee, files}
+      },
+      {detail}
+    )
+
   const prepareDraft = () =>
     prepare(
       draft.kind,
@@ -288,7 +336,8 @@ export function useSocialSending({ready, readNewBlocks, scannedThrough}) {
         )
       )
       show(t('{{what}} is in a block.', {what}), {ms: MINED_MS})
-      readNewBlocks()
+      if (PROFILE_KINDS.has(kind)) onProfileChange?.()
+      else readNewBlocks()
     }
   }
 
@@ -361,6 +410,7 @@ export function useSocialSending({ready, readNewBlocks, scannedThrough}) {
     prepareLike,
     prepareTip,
     prepareMessage,
+    prepareProfile,
     messagesSent,
     pendingLikes,
     draft,

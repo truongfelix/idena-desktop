@@ -107,17 +107,42 @@ export function storeToIpfsPayload(cid, size) {
 export const storeFeeHint = (feePerGas, size) =>
   BigInt(feePerGas) * BigInt((150 + Math.floor(size / 5)) * 10)
 
-/** The params of a contract call; with a max fee to send it, without one to estimate it. */
-export function callParams(from, {method, argument, amount}, maxFee = null) {
+/**
+ * The params of a contract call; with a max fee to send it, without one to estimate it. idena.social's unless the
+ * call names its `contract`; a call whose `argument` is null takes none.
+ */
+export function callParams(
+  from,
+  {contract = SOCIAL_CONTRACT, method, argument, amount},
+  maxFee = null
+) {
   const params = {
     from,
-    contract: SOCIAL_CONTRACT,
+    contract,
     method,
     amount,
-    args: [{index: 0, format: 'string', value: argument}],
+    args:
+      argument === null ? [] : [{index: 0, format: 'string', value: argument}],
   }
   if (maxFee !== null) params.maxFee = maxFee
   return [params]
+}
+
+/**
+ * The errors of a contract call's receipt: the call's own and each promise's callback (a callback refused only
+ * shows in its action result).
+ */
+export function receiptErrors(receipt) {
+  const errors = []
+  const walk = (action) => {
+    if (!action) return
+    if (action.success === false && action.error) errors.push(action.error)
+    ;(action.subActionResults || []).forEach(walk)
+  }
+  walk(receipt?.actionResult)
+  if (receipt && !receipt.success && receipt.error)
+    errors.unshift(receipt.error)
+  return [...new Set(errors)]
 }
 
 /**
@@ -130,8 +155,9 @@ export async function estimateCall(call, from, socialCall) {
     'contract_estimateCall',
     callParams(from, socialCall)
   )
-  if (!receipt?.success)
-    throw new Error(receipt?.error || 'the contract refused the post')
+  const errors = receiptErrors(receipt)
+  if (!receipt?.success || errors.length > 0)
+    throw new Error(errors[0] || 'the contract refused the post')
   const fee = toWei(receipt.txFee) + toWei(receipt.gasCost)
   return {fee, maxFee: ceilTo6(fee * TWO)}
 }
@@ -268,12 +294,14 @@ export async function waitForBlock(call, hash, {pause, isStopped}) {
           if (!block) throw new Error(`block ${tx.blockHash} is missing`)
           // eslint-disable-next-line no-await-in-loop
           const receipt = await call('bcn_txReceipt', [hash]).catch(() => null)
+          // A promise's callback refused shows only in its action result.
+          const errors = receipt ? receiptErrors(receipt) : []
           return {
             result: 'mined',
             height: block.height,
             error:
-              receipt && receipt.success === false
-                ? receipt.error || 'the contract refused it'
+              receipt && (receipt.success === false || errors.length > 0)
+                ? errors[0] || 'the contract refused it'
                 : null,
           }
         }
