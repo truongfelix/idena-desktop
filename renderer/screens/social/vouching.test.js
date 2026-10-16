@@ -2,10 +2,12 @@ import {
   challengeStep,
   isActingMember,
   isVouchable,
+  memberExtraFor,
   parseChallenge,
   readMembers,
   readOffer,
   readOffersTo,
+  showsVoucher,
   vouchCap,
   vouchedExtra,
 } from './vouching'
@@ -100,6 +102,15 @@ describe('vouched members', () => {
     expect(isActingMember({voucher: null, state: 'Undefined'})).toBe(false)
   })
 
+  it('shows a voucher only while the profile has no identity', () => {
+    expect(showsVoucher({voucher: alice, state: 'Undefined'})).toBe(true)
+    expect(showsVoucher({voucher: alice, state: 'Candidate'})).toBe(true)
+    // A member who validated stays listed in the contract until its next call: no longer shown as vouched for.
+    expect(showsVoucher({voucher: alice, state: 'Newbie'})).toBe(false)
+    expect(showsVoucher({voucher: alice, state: 'Suspended'})).toBe(false)
+    expect(showsVoucher({voucher: null, state: 'Undefined'})).toBe(false)
+  })
+
   it('sends 25,000 gas at the fee per gas, a tenth more, rounded up', () => {
     // 0.01 iDNA per gas: 250 iDNA, 275 with the margin.
     expect(vouchedExtra('10000000000000000')).toBe('275')
@@ -126,5 +137,61 @@ describe('vouched members', () => {
       })
     expect(await readOffer(settled, bob, alice)).toBe(7)
     expect(await readOffer(settled, alice, bob)).toBe(null)
+  })
+})
+
+describe("a vouched member's extra amount, as the contract reads it", () => {
+  const text = (hex) =>
+    Buffer.from(hex.replace(/^0x/, ''), 'hex').toString('utf8')
+  // The node of an epoch-12 chain at 0.01 iDNA per gas; `kept`: the contract's "i:" entry for bob, or none.
+  const node = (kept) => ({
+    call: async (method) =>
+      ({dna_epoch: {epoch: 12}, bcn_feePerGas: '10000000000000000'}[method]),
+    settled: async (method, list) =>
+      list.map(([, map, key]) =>
+        map === 'i:' && text(key) === bob && kept
+          ? {result: kept}
+          : {error: new Error('data is nil')}
+      ),
+  })
+  const extraFor = (profile, kept = null) =>
+    memberExtraFor(node(kept).call, node(kept).settled, {
+      address: bob,
+      ...profile,
+    })
+
+  it('is sent by an acting member', async () => {
+    expect(
+      await extraFor({
+        voucher: alice,
+        state: 'Undefined',
+        voucherState: 'Human',
+      })
+    ).toEqual({amount: '275', lapsed: false})
+  })
+
+  it('is sent by a member who validated, until the contract read its identity', async () => {
+    const grown = {voucher: alice, state: 'Newbie', voucherState: 'Human'}
+    // Its voucher is still listed and the contract has not read the identity in this epoch: it reads the amount.
+    expect(await extraFor(grown)).toEqual({amount: '275', lapsed: true})
+    expect(await extraFor(grown, '11:7')).toEqual({amount: '275', lapsed: true})
+    // Read in this epoch as a Newbie (7): the contract does not read it.
+    expect(await extraFor(grown, '12:7')).toBe(null)
+    // Read in this epoch without an identity (Candidate, 2): it does.
+    expect(await extraFor(grown, '12:2')).toEqual({amount: '275', lapsed: true})
+  })
+
+  it('is sent by a member whose voucher is not validated', async () => {
+    expect(
+      await extraFor({
+        voucher: alice,
+        state: 'Undefined',
+        voucherState: 'Suspended',
+      })
+    ).toEqual({amount: '275', lapsed: true})
+  })
+
+  it('is not sent without a voucher', async () => {
+    expect(await extraFor({voucher: null, state: 'Undefined'})).toBe(null)
   })
 })
