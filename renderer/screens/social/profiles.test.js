@@ -1,6 +1,8 @@
 /* global BigInt */
 import {
   ProfileCall,
+  parseRecipient,
+  recipientAddress,
   callbackGas,
   withCallbackGas,
   countTrust,
@@ -308,5 +310,36 @@ describe('gas reserved by promises', () => {
       )
     ).toEqual({name: 'alice', _gas: 2069136})
     expect(withCallbackGas(ProfileCall.dropName(), 2069136).argument).toBe(null)
+  })
+})
+
+describe('send to @name', () => {
+  it('reads a To field as an address, a name or nothing valid', () => {
+    expect(parseRecipient('  ')).toEqual({kind: 'empty'})
+    expect(parseRecipient(alice.toUpperCase().replace('0X', '0x'))).toEqual({
+      kind: 'address',
+      address: alice,
+    })
+    expect(parseRecipient('@Felix_Desk')).toEqual({
+      kind: 'name',
+      name: 'felix_desk',
+    })
+    // A name without its @ is not taken for one: an address-like typo stays invalid.
+    expect(parseRecipient('felix_desk')).toEqual({kind: 'invalid'})
+    expect(parseRecipient('@ab')).toEqual({kind: 'invalid'})
+    expect(parseRecipient('0x123')).toEqual({kind: 'invalid'})
+  })
+
+  it("sends to a name's holder only while it is in good standing", () => {
+    const name = parseRecipient('@alice')
+    expect(
+      recipientAddress(name, {holder: alice, profile: {inStanding: true}})
+    ).toBe(alice)
+    expect(
+      recipientAddress(name, {holder: alice, profile: {inStanding: false}})
+    ).toBe(null)
+    expect(recipientAddress(name, {holder: null, profile: null})).toBe(null)
+    expect(recipientAddress(name, null)).toBe(null)
+    expect(recipientAddress(parseRecipient(bob), null)).toBe(bob)
   })
 })

@@ -1,7 +1,14 @@
 import {useQuery, useQueryClient} from 'react-query'
 import React from 'react'
 import {socialRpc, socialRpcSettled} from './node'
-import {profilesEnabled, readProfiles, readTrust} from './profiles'
+import {
+  holderOf,
+  parseRecipient,
+  profilesEnabled,
+  readProfiles,
+  readTrust,
+  recipientAddress,
+} from './profiles'
 import {readChallenge, readMembers, readOffer, readOffersTo} from './vouching'
 
 /** How long a read profile or Trust count is shown before it is read again. */
@@ -115,4 +122,30 @@ export function useChallenge(name, challenger) {
       staleTime: PROFILE_STALE_MS,
     }
   )
+}
+
+/**
+ * The recipient a "To" field names (parseRecipient), with, for "@name", its holder and the holder's profile
+ * ({holder: null} when nobody holds it); `address` is whom to send to (recipientAddress).
+ */
+export function useRecipient(text) {
+  const recipient = parseRecipient(text)
+  const name = recipient.kind === 'name' ? recipient.name : null
+  const query = useQuery(
+    ['profile', 'recipient', name],
+    async () => {
+      const holder = await holderOf(socialRpcSettled, name)
+      if (!holder) return {holder: null, profile: null}
+      const profiles = await readProfiles(socialRpcSettled, [holder])
+      return {holder, profile: profiles[holder]}
+    },
+    {enabled: profilesEnabled && Boolean(name), staleTime: 60 * 1000}
+  )
+  return {
+    recipient,
+    resolved: query.data ?? null,
+    isLoading: query.isLoading && Boolean(name),
+    isError: query.isError,
+    address: recipientAddress(recipient, query.data),
+  }
 }

@@ -303,3 +303,31 @@ export const withCallbackGas = (call, gas) =>
           _gas: gas,
         }),
       }
+
+/**
+ * What a "To" field holds: {kind: 'empty'}, {kind: 'address', address} (lowercase), {kind: 'name', name} for
+ * "@name" (lowercase, a valid name), or {kind: 'invalid'}.
+ */
+export function parseRecipient(text) {
+  const value = String(text ?? '').trim()
+  if (value === '') return {kind: 'empty'}
+  if (/^0x[0-9a-fA-F]{40}$/.test(value))
+    return {kind: 'address', address: value.toLowerCase()}
+  if (value.startsWith('@')) {
+    const name = value.slice(1).toLowerCase()
+    if (PROFILE_NAME.test(name)) return {kind: 'name', name}
+  }
+  return {kind: 'invalid'}
+}
+
+/**
+ * Whom a recipient (parseRecipient) sends to: an address as typed; a name's holder only while it is in good
+ * standing (a hidden name can change hands); null otherwise. `resolved` = {holder, profile} for a name.
+ */
+export function recipientAddress(recipient, resolved) {
+  if (recipient.kind === 'address') return recipient.address
+  if (recipient.kind !== 'name') return null
+  return resolved?.holder && resolved.profile?.inStanding
+    ? resolved.holder
+    : null
+}
