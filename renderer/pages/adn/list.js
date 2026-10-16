@@ -28,6 +28,7 @@ import {
   useProfileAds,
 } from '../../screens/ads/hooks'
 import {AdStatus} from '../../screens/ads/types'
+import {copyAdAsDraft} from '../../screens/ads/drafts'
 import {
   Debug,
   Drawer,
@@ -169,7 +170,7 @@ export default function AdListPage() {
     queryClient.invalidateQueries(['bcn_burntCoins', []])
   }, [onCloseBurnDisclosure, queryClient])
 
-  const {query, replace} = useRouter()
+  const {query, replace, push} = useRouter()
 
   React.useEffect(() => {
     if (query.from === 'new' && query.save) {
@@ -214,6 +215,18 @@ export default function AdListPage() {
       }
     },
     [failToast, refetchPersistedAds]
+  )
+
+  const handleEditAsDraft = React.useCallback(
+    async (ad) => {
+      try {
+        const id = await copyAdAsDraft(ad.id, coinbase)
+        push(`/adn/edit?id=${id}`)
+      } catch (error) {
+        failToast(error?.message)
+      }
+    },
+    [coinbase, failToast, push]
   )
 
   const previewAdDisclosure = useDisclosure()
@@ -305,6 +318,7 @@ export default function AdListPage() {
                   burnDisclosure.onOpen()
                 }}
                 onRemove={handleRemoveAd}
+                onEditAsDraft={handleEditAsDraft}
                 onPreview={() => {
                   setSelectedAd(ad)
                   previewAdDisclosure.onOpen()

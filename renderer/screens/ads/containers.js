@@ -225,6 +225,7 @@ export function AdListItem({
   onBurn,
   onRemove,
   onPreview,
+  onEditAsDraft,
 }) {
   const {id, cid, title, language, age, os, stake, status, contract} = ad
 
@@ -275,7 +276,8 @@ export function AdListItem({
             {eitherStatus(
               AdStatus.Reviewing,
               AdStatus.Approved,
-              AdStatus.Published
+              AdStatus.Published,
+              AdStatus.Rejected
             ) ? (
               <Text
                 color="gray.500"
@@ -310,16 +312,23 @@ export function AdListItem({
                   {t('Preview')}
                 </MenuItem>
 
-                {eitherStatus(AdStatus.Draft, AdStatus.Rejected) &&
-                  !ad.reviewNotStarted && (
-                    <NextLink href={`/adn/edit?id=${id}`} passHref>
-                      <MenuItem
-                        icon={<EditIcon boxSize={5} color="blue.500" />}
-                      >
-                        {t('Edit')}
-                      </MenuItem>
-                    </NextLink>
-                  )}
+                {status === AdStatus.Draft && !ad.reviewNotStarted && (
+                  <NextLink href={`/adn/edit?id=${id}`} passHref>
+                    <MenuItem icon={<EditIcon boxSize={5} color="blue.500" />}>
+                      {t('Edit')}
+                    </MenuItem>
+                  </NextLink>
+                )}
+
+                {/* Its review's content and voting stay with it: the changes go to a new draft. */}
+                {status === AdStatus.Rejected && id && (
+                  <MenuItem
+                    icon={<EditIcon boxSize={5} color="blue.500" />}
+                    onClick={() => onEditAsDraft?.(ad)}
+                  >
+                    {t('Edit as a new draft')}
+                  </MenuItem>
+                )}
 
                 {/* Its stake and deposit come back from the voting's page (finish, terminate). */}
                 {contract &&
