@@ -69,11 +69,28 @@ describe('take a campaign out of the profile', () => {
     expect(changeEstimate.from).toBe(ME)
   })
 
-  it('plans an empty profile when it was the last campaign', async () => {
-    const {call} = fakeNode({ads: [campaignA]})
+  it('plans an empty profile when it was the last campaign, with no storage', async () => {
+    const {call, calls} = fakeNode({ads: [campaignA]})
     const plan = await planAdRemoval(call, ME, campaignA)
     expect(plan.profileHex).toBe('0x')
     expect(Profile.fromHex(plan.profileHex).ads).toEqual([])
+    // The node refuses to store 0 bytes (its estimate said ~21,000 iDNA on a devnet): only the change is paid.
+    expect(plan.fee).toBe('0.003500')
+    const estimated = calls
+      .filter(([method]) => method === 'bcn_estimateTx')
+      .map(([, [args]]) => args.type)
+    expect(estimated).toEqual([TxType.ChangeProfileTx])
+  })
+
+  it('sends only the change for an empty profile', async () => {
+    const {call, calls} = fakeNode({ads: [campaignA]})
+    const plan = await planAdRemoval(call, ME, campaignA)
+    await expect(sendAdRemoval(call, plan)).resolves.toBe('0xchange')
+    const sent = calls.map(([method]) => method)
+    expect(sent).not.toContain('ipfs_add')
+    expect(sent).not.toContain('dna_storeToIpfs')
+    const [, [tx]] = calls[calls.length - 1]
+    expect(tx.type).toBe(TxType.ChangeProfileTx)
   })
 
   it('refuses a campaign the profile does not list', async () => {

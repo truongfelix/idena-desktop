@@ -22,9 +22,10 @@ const changeProfilePayload = (cid) =>
   `0x${new ChangeProfileAttachment({cid: cidBytes(cid)}).toHex()}`
 
 /**
- * Plans taking the campaign `ad` out of the profile of `from`: the profile without it (stored on IPFS, an empty
- * profile too: a profile change needs a cid) and the fees of storing it and of the change, from the node's
- * estimates. `call(method, params)` asks the node. Throws when the profile does not list the ad.
+ * Plans taking the campaign `ad` out of the profile of `from`: the profile without it and the fees of storing it on
+ * IPFS and of the change, from the node's estimates. An empty profile is no file to store (the node refuses to
+ * store 0 bytes, and every IPFS node reads the empty file's cid at once): only the change, to that cid.
+ * `call(method, params)` asks the node. Throws when the profile does not list the ad.
  */
 export async function planAdRemoval(call, from, ad) {
   const {profileHash} = await call('dna_identity', [from])
@@ -37,16 +38,17 @@ export async function planAdRemoval(call, from, ad) {
   }
   const profileHex = `0x${new Profile({ads: remaining}).toHex()}`
   const profileCid = await call('ipfs_cid', [profileHex])
+  const size = (profileHex.length - 2) / 2
   const [store, change] = await Promise.all([
-    call('bcn_estimateTx', [
-      {
-        type: TxType.StoreToIpfsTx,
-        from,
-        payload: toHex(
-          storeToIpfsPayload(profileCid, (profileHex.length - 2) / 2)
-        ),
-      },
-    ]),
+    size === 0
+      ? null
+      : call('bcn_estimateTx', [
+          {
+            type: TxType.StoreToIpfsTx,
+            from,
+            payload: toHex(storeToIpfsPayload(profileCid, size)),
+          },
+        ]),
     call('bcn_estimateTx', [
       {
         type: TxType.ChangeProfileTx,
@@ -59,12 +61,21 @@ export async function planAdRemoval(call, from, ad) {
   return {from, profileHex, profileCid, fee: fromWei(fee, 6, true)}
 }
 
-/** Sends a removal planned by planAdRemoval: the new profile to IPFS, its storage, then the profile change. */
+/**
+ * Sends a removal planned by planAdRemoval: the new profile to IPFS and its storage (unless it is empty), then the
+ * profile change.
+ */
 export async function sendAdRemoval(call, {from, profileHex, profileCid}) {
-  const cid = await call('ipfs_add', [profileHex, true])
-  if (cid !== profileCid) throw new Error('IPFS gave the profile another cid')
-  await call('dna_storeToIpfs', [{cid}])
+  if (profileHex !== '0x') {
+    const cid = await call('ipfs_add', [profileHex, true])
+    if (cid !== profileCid) throw new Error('IPFS gave the profile another cid')
+    await call('dna_storeToIpfs', [{cid}])
+  }
   return call('dna_sendTransaction', [
-    {type: TxType.ChangeProfileTx, from, payload: changeProfilePayload(cid)},
+    {
+      type: TxType.ChangeProfileTx,
+      from,
+      payload: changeProfilePayload(profileCid),
+    },
   ])
 }
