@@ -1,7 +1,7 @@
 /* eslint-disable react/prop-types */
 import {useTranslation} from 'react-i18next'
 import {Box, Divider, HStack, Stack, Text} from '@chakra-ui/react'
-import {Avatar, SmallText} from '../../../shared/components/components'
+import {SmallText} from '../../../shared/components/components'
 import {useSocial} from '../provider'
 import {displayName} from '../people'
 import {ActivityKind, NotifyKind} from '../activity'
@@ -12,6 +12,7 @@ import {LINK, MUTED} from './theme'
 import {LIKE} from '../contract'
 import {likeCount, replyCount, tipTotal} from '../feed'
 import {timeAgo, tipText} from '../format'
+import {PersonAvatar} from './profile-public'
 
 /** A notification of the Inbox: who did what on which post, and the answer. */
 export function ActivityCard({item, now, isNew, onOpen, onProfile}) {
@@ -40,7 +41,7 @@ export function ActivityCard({item, now, isNew, onOpen, onProfile}) {
         </Text>
       )}
       <HStack spacing={2.5} align="center">
-        <Avatar address={item.actor} boxSize={8} rounded="md" />
+        <PersonAvatar address={item.actor} boxSize={8} rounded="md" />
         <Text fontSize="md">
           <NameLink address={item.actor} onProfile={onProfile} /> {action}
           <Text as="span" color={MUTED}>{`  ·  ${timeAgo(

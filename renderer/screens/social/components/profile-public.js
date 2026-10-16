@@ -43,33 +43,57 @@ function usePictureUrl(picture) {
 }
 
 /**
- * A person's picture: the profile's, while it is in good standing, with the robot as a badge; the robot alone
- * otherwise, or while the picture loads.
+ * A person's picture: the profile's, while it is in good standing, with the robot as a badge (always beside a name:
+ * a look-alike picture cannot hide whose address it is); the robot alone otherwise, or while the picture loads.
+ * `props` go to the picture (rounded, cursor, onClick).
  */
-export function ProfilePicture({address, profile, boxSize}) {
+export function ProfilePicture({address, profile, boxSize, ...props}) {
   const shown = profile?.inStanding ? profile.picture : null
   const url = usePictureUrl(shown)
-  if (!url) return <Avatar address={address} boxSize={boxSize} rounded="lg" />
+  const rounded = props.rounded || 'lg'
+  if (!url)
+    return (
+      <Avatar
+        address={address}
+        boxSize={boxSize}
+        {...props}
+        rounded={rounded}
+      />
+    )
+  // The badge: about half the picture, a quarter of it overlapping the corner.
+  const badge = Math.max(3, Math.round(boxSize * 0.45))
   return (
-    <Box position="relative" flexShrink={0}>
+    <Box position="relative" flexShrink={0} {...props}>
       <Image
         src={url}
         boxSize={boxSize}
-        rounded="lg"
+        rounded={rounded}
         objectFit="cover"
         alt=""
       />
       <Avatar
         address={address}
-        boxSize={6}
+        boxSize={badge}
         position="absolute"
-        right={-1}
-        bottom={-1}
+        right={-0.5}
+        bottom={-0.5}
         bg="white"
-        rounded="md"
+        rounded="sm"
         borderWidth={1}
       />
     </Box>
+  )
+}
+
+/** A person's picture (ProfilePicture) from the profiles read for everyone Social shows. */
+export function PersonAvatar({address, ...props}) {
+  const {profiles} = useSocial()
+  return (
+    <ProfilePicture
+      address={address}
+      profile={profiles?.[String(address).toLowerCase()]}
+      {...props}
+    />
   )
 }
 
@@ -157,7 +181,7 @@ function TrustGiversDialog({givers, onProfile, onClose}) {
               cursor="pointer"
               onClick={() => onProfile(address)}
             >
-              <Avatar address={address} boxSize={8} rounded="md" />
+              <PersonAvatar address={address} boxSize={8} rounded="md" />
               <Text>{displayName(address, names)}</Text>
               {vouched && <SmallText>{t('vouched member')}</SmallText>}
             </HStack>

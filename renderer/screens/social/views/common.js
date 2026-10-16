@@ -14,10 +14,11 @@ import {
   InputRightElement,
   useClipboard,
 } from '@chakra-ui/react'
-import {Avatar, SmallText} from '../../../shared/components/components'
+import {SmallText} from '../../../shared/components/components'
 import {TodoVotingCountBadge} from '../../oracles/components'
 import {shortAddress} from '../people'
 import {FollowChip} from '../components/chips'
+import {PersonAvatar} from '../components/profile-public'
 
 export const PAGE_SIZE = 30
 
@@ -91,7 +92,7 @@ export function ContactRow({contact, onProfile, onRename}) {
       cursor="pointer"
       onClick={() => onProfile(contact.address)}
     >
-      <Avatar address={contact.address} boxSize={10} rounded="md" />
+      <PersonAvatar address={contact.address} boxSize={10} rounded="md" />
       <Stack spacing={0} flex={1} minW={0}>
         <Text fontWeight={500} noOfLines={1}>
           {contact.name || shortAddress(contact.address)}
