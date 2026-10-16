@@ -2,6 +2,7 @@ import {
   challengeStep,
   isActingMember,
   isVouchable,
+  memberExtraFor,
   parseChallenge,
   readMembers,
   readOffer,
@@ -126,5 +127,61 @@ describe('vouched members', () => {
       })
     expect(await readOffer(settled, bob, alice)).toBe(7)
     expect(await readOffer(settled, alice, bob)).toBe(null)
+  })
+})
+
+describe("a vouched member's extra amount, as the contract reads it", () => {
+  const text = (hex) =>
+    Buffer.from(hex.replace(/^0x/, ''), 'hex').toString('utf8')
+  // The node of an epoch-12 chain at 0.01 iDNA per gas; `kept`: the contract's "i:" entry for bob, or none.
+  const node = (kept) => ({
+    call: async (method) =>
+      ({dna_epoch: {epoch: 12}, bcn_feePerGas: '10000000000000000'}[method]),
+    settled: async (method, list) =>
+      list.map(([, map, key]) =>
+        map === 'i:' && text(key) === bob && kept
+          ? {result: kept}
+          : {error: new Error('data is nil')}
+      ),
+  })
+  const extraFor = (profile, kept = null) =>
+    memberExtraFor(node(kept).call, node(kept).settled, {
+      address: bob,
+      ...profile,
+    })
+
+  it('is sent by an acting member', async () => {
+    expect(
+      await extraFor({
+        voucher: alice,
+        state: 'Undefined',
+        voucherState: 'Human',
+      })
+    ).toEqual({amount: '275', lapsed: false})
+  })
+
+  it('is sent by a member who validated, until the contract read its identity', async () => {
+    const grown = {voucher: alice, state: 'Newbie', voucherState: 'Human'}
+    // Its voucher is still listed and the contract has not read the identity in this epoch: it reads the amount.
+    expect(await extraFor(grown)).toEqual({amount: '275', lapsed: true})
+    expect(await extraFor(grown, '11:7')).toEqual({amount: '275', lapsed: true})
+    // Read in this epoch as a Newbie (7): the contract does not read it.
+    expect(await extraFor(grown, '12:7')).toBe(null)
+    // Read in this epoch without an identity (Candidate, 2): it does.
+    expect(await extraFor(grown, '12:2')).toEqual({amount: '275', lapsed: true})
+  })
+
+  it('is sent by a member whose voucher is not validated', async () => {
+    expect(
+      await extraFor({
+        voucher: alice,
+        state: 'Undefined',
+        voucherState: 'Suspended',
+      })
+    ).toEqual({amount: '275', lapsed: true})
+  })
+
+  it('is not sent without a voucher', async () => {
+    expect(await extraFor({voucher: null, state: 'Undefined'})).toBe(null)
   })
 })

@@ -12,7 +12,7 @@ import {
   withAmount,
   withCallbackGas,
 } from './profiles'
-import {isActingMember, vouchedExtra} from './vouching'
+import {memberExtraFor} from './vouching'
 import {
   prepareFile,
   estimateCall,
@@ -278,10 +278,8 @@ export function useSocialSending({
           const mine = (await readProfiles(socialRpcSettled, [from]))[
             String(from).toLowerCase()
           ]
-          if (isActingMember(mine)) {
-            extra = vouchedExtra(await socialRpc('bcn_feePerGas'))
-            profileCall = withAmount(profileCall, extra)
-          }
+          extra = await memberExtraFor(socialRpc, socialRpcSettled, mine)
+          if (extra) profileCall = withAmount(profileCall, extra.amount)
         }
         let estimate = await estimateCall(socialRpc, from, profileCall)
         // A second dry run with the callback's gas sized from the first: the max fee then reserves less.

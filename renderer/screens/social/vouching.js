@@ -37,6 +37,40 @@ export const vouchedExtra = (feePerGas) =>
     true
   ).replace(/\.?0+$/, '')
 
+/** The identity states (idena-go core/state codes, as the contract keeps them) of the accounts without an identity. */
+const VOUCHABLE_CODES = new Set(['0', '1', '2', '5'])
+
+/**
+ * Whether the profiles contract reads the extra amount from a call of an account with a voucher there (its
+ * payIfVouched): unless it read in `epoch` that the account has an identity (`kept`, its "i:" entry
+ * "<epoch>:<state>").
+ */
+const readsExtra = (kept, epoch) => {
+  if (!kept) return true
+  const [readIn, state] = String(kept).split(':')
+  return Number(readIn) !== epoch || VOUCHABLE_CODES.has(state)
+}
+
+/**
+ * The extra amount a call to the profiles contract sends for the caller's `profile` (readProfiles): {amount (iDNA),
+ * lapsed}, or null. The contract reads it from any account with a voucher there, not only from an acting member: a
+ * member who validated keeps its voucher until a call of its own, which pays it too, and a call without the amount
+ * fails in the VM. `lapsed`: the account does not act as a member (it has an identity now, or its voucher is not
+ * validated).
+ */
+export async function memberExtraFor(call, settled, profile) {
+  if (!profile?.voucher) return null
+  const [[kept], {epoch}] = await Promise.all([
+    readEntries(settled, [['i:', profile.address.toLowerCase()]]),
+    call('dna_epoch'),
+  ])
+  if (!readsExtra(kept, epoch)) return null
+  return {
+    amount: vouchedExtra(await call('bcn_feePerGas')),
+    lapsed: !isActingMember(profile),
+  }
+}
+
 /** The vouches offered to `member`, not accepted yet: [{voucher, epoch}]. */
 export async function readOffersTo(call, member) {
   const entries = await iterateEntries(call, `o:${member.toLowerCase()}:`)

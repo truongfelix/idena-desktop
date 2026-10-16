@@ -138,10 +138,15 @@ export function ConfirmDialog({pending, onSend, onCancel}) {
           </Text>
           {pending.memberExtra && (
             <Text>
-              {t(
-                'As a vouched member, you also send {{amount}} iDNA, burned by the contract (about one more fee).',
-                {amount: pending.memberExtra}
-              )}
+              {pending.memberExtra.lapsed
+                ? t(
+                    'The contract still lists you as a vouched member: you also send {{amount}} iDNA, burned by the contract (about one more fee). Ending the vouch first avoids it.',
+                    {amount: pending.memberExtra.amount, nsSeparator: '|'}
+                  )
+                : t(
+                    'As a vouched member, you also send {{amount}} iDNA, burned by the contract (about one more fee).',
+                    {amount: pending.memberExtra.amount}
+                  )}
             </Text>
           )}
           {hasFiles && (

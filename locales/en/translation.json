@@ -1511,6 +1511,7 @@
   "Decline the vouch": "Decline the vouch",
   "Withdraw your offer": "Withdraw your offer",
   "As a vouched member, you also send {{amount}} iDNA, burned by the contract (about one more fee).": "As a vouched member, you also send {{amount}} iDNA, burned by the contract (about one more fee).",
+  "The contract still lists you as a vouched member: you also send {{amount}} iDNA, burned by the contract (about one more fee). Ending the vouch first avoids it.": "The contract still lists you as a vouched member: you also send {{amount}} iDNA, burned by the contract (about one more fee). Ending the vouch first avoids it.",
   "Challenge": "Challenge",
   "Vouch": "Vouch",
   "Enter an address or @name": "Enter an address or @name",
