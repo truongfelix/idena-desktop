@@ -20,6 +20,7 @@ import {
   challengeStep,
   isActingMember,
   isVouchable,
+  showsVoucher,
   vouchCap,
 } from '../vouching'
 
@@ -64,7 +65,7 @@ export function VouchPanel({address, profile}) {
 
   return (
     <Stack spacing={1}>
-      {profile.voucher && (
+      {showsVoucher(profile) && (
         <Text>
           {iVouch
             ? t('You vouch for them.')
@@ -77,6 +78,14 @@ export function VouchPanel({address, profile}) {
         </Text>
       )}
       <HStack spacing={2} flexWrap="wrap">
+        {/* The contract ends the vouch at the member's next call; End frees the slot now. */}
+        {iVouch && !showsVoucher(profile) && (
+          <SmallText>
+            {t('has an identity now: End frees your slot', {
+              nsSeparator: '|',
+            })}
+          </SmallText>
+        )}
         {iVouch && (
           <Action
             onClick={() =>

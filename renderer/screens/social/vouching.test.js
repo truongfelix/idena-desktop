@@ -7,6 +7,7 @@ import {
   readMembers,
   readOffer,
   readOffersTo,
+  showsVoucher,
   vouchCap,
   vouchedExtra,
 } from './vouching'
@@ -99,6 +100,15 @@ describe('vouched members', () => {
       isActingMember({voucher: alice, state: 'Newbie', voucherState: 'Human'})
     ).toBe(false)
     expect(isActingMember({voucher: null, state: 'Undefined'})).toBe(false)
+  })
+
+  it('shows a voucher only while the profile has no identity', () => {
+    expect(showsVoucher({voucher: alice, state: 'Undefined'})).toBe(true)
+    expect(showsVoucher({voucher: alice, state: 'Candidate'})).toBe(true)
+    // A member who validated stays listed in the contract until its next call: no longer shown as vouched for.
+    expect(showsVoucher({voucher: alice, state: 'Newbie'})).toBe(false)
+    expect(showsVoucher({voucher: alice, state: 'Suspended'})).toBe(false)
+    expect(showsVoucher({voucher: null, state: 'Undefined'})).toBe(false)
   })
 
   it('sends 25,000 gas at the fee per gas, a tenth more, rounded up', () => {

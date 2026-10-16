@@ -23,6 +23,13 @@ export const isActingMember = (profile) =>
   isVouchable(profile.state) &&
   isValidated(profile.voucherState)
 
+/**
+ * Whether a profile (readProfiles) is shown as vouched for: only while it has no identity of its own. The contract
+ * keeps a member who validated listed with its voucher until a call of its own or the end of the vouch.
+ */
+export const showsVoucher = (profile) =>
+  Boolean(profile?.voucher) && isVouchable(profile.state)
+
 /** The gas a vouched member's call adds, burned by the contract (VOUCHED_EXTRA_GAS). */
 const VOUCHED_EXTRA_GAS = BigInt(25000)
 
