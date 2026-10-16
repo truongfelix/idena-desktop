@@ -19,7 +19,6 @@ import {
 } from '@chakra-ui/react'
 import {useMachine} from '@xstate/react'
 import semver from 'semver'
-import {assign, createMachine} from 'xstate'
 import NextLink from 'next/link'
 import Sidebar from './sidebar'
 import {useDebounce} from '../hooks/use-debounce'
@@ -84,6 +83,7 @@ import {
 import {useValidationToast} from '../../screens/validation/hooks/use-validation-toast'
 import {useIdentityState} from '../providers/identity-context'
 import {OfflineBanner} from './layout/offline'
+import {createPeersMachine} from './layout/peers'
 import {TroubleshootingScreen} from '../../screens/troubleshooting'
 
 const AVAILABLE_TIMEOUT = global.isDev || global.isTest ? 0 : 1000 * 5
@@ -366,6 +366,8 @@ function NormalApp({skipBanner, children}) {
   )
 }
 
+const syncingPeersMachine = createPeersMachine(() => callRpc('net_peers'))
+
 function SyncingApp() {
   const {t} = useTranslation()
 
@@ -374,30 +376,7 @@ function SyncingApp() {
 
   const {address} = useIdentityState()
 
-  const [current] = useMachine(
-    createMachine({
-      context: {
-        peers: [],
-      },
-      initial: 'loading',
-      states: {
-        loading: {
-          invoke: {
-            src: () => callRpc('net_peers'),
-            onDone: {
-              target: 'done',
-              actions: [assign({peers: (_, {data}) => data})],
-            },
-          },
-        },
-        done: {
-          after: {
-            5000: 'loading',
-          },
-        },
-      },
-    })
-  )
+  const [current] = useMachine(syncingPeersMachine)
   const {peers} = current.context
 
   const {runInternalNode, useExternalNode} = useSettingsState()
