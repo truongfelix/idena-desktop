@@ -112,6 +112,7 @@ import {
   calculateTargetScore,
   calculateTotalAdScore,
   compressAdImage,
+  AD_MEDIA_SIZE,
   isValidImage,
   OS,
   validateAd,
@@ -708,7 +709,12 @@ export const AdForm = React.forwardRef(({ad, onSubmit, ...props}, ref) => {
                 name="media"
                 value={media}
                 label={t('Upload media')}
-                description={t('640x640px, no more than 1 Mb')}
+                description={t(
+                  'Stored as {{size}}x{{size}}px, no more than 1 Mb',
+                  {
+                    size: AD_MEDIA_SIZE,
+                  }
+                )}
                 fallbackSrc="/static/upload-cover-icn.svg"
                 maybeError={fieldErrors.media}
                 onChange={setMedia}
@@ -1043,8 +1049,8 @@ export function ReviewAdDrawer({
                       ),
                       media: new Uint8Array(
                         await compressAdImage(await media.arrayBuffer(), {
-                          width: 320,
-                          height: 320,
+                          width: AD_MEDIA_SIZE,
+                          height: AD_MEDIA_SIZE,
                           // Its own type: with the thumbnail's, a PNG thumbnail made the photo a PNG,
                           // several times larger and so dearer to store (25-70 iDNA more).
                           type: media.type,

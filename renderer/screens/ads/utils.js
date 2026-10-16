@@ -273,6 +273,9 @@ export const adImageThumbSrc = (ad) =>
     ? ad.thumb
     : ad.thumb && URL.createObjectURL(ad.thumb)
 
+// The side of an ad's picture as the app stores it (a square), whatever was uploaded.
+export const AD_MEDIA_SIZE = 320
+
 export async function compressAdImage(
   // eslint-disable-next-line no-shadow
   bytes,

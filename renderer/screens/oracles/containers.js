@@ -107,6 +107,7 @@ import {
 } from '../../shared/components/icons'
 import {AdImage} from '../ads/components'
 import {AdDrawer} from '../ads/containers'
+import {AD_MEDIA_SIZE} from '../ads/utils'
 import {useFormatDna} from '../../shared/hooks/hooks'
 
 export function VotingCard({votingRef, ...props}) {
@@ -1793,7 +1794,7 @@ export function OracleAdDescription({ad}) {
           <Box>
             <Text>{t('Media')}</Text>
             <Text fontSize="sm" color="muted">
-              {t('640x640px')}
+              {t('{{size}}x{{size}}px', {size: AD_MEDIA_SIZE})}
             </Text>
           </Box>
         </HStack>
