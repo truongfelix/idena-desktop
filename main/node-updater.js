@@ -90,12 +90,15 @@ class NodeUpdater extends events.EventEmitter {
       !!this.downloadPromise
     )
     if (this.downloadPromise) return
-    this.downloadPromise = downloadNode((progress) => {
-      this.emit('download-progress', progress)
-    })
-      .then(() => {
+    this.downloadPromise = downloadNode(
+      (progress) => {
+        this.emit('download-progress', progress)
+      },
+      {minVersion: remoteVersion}
+    )
+      .then((version) => {
         this.downloadPromise = null
-        this.emit('update-downloaded', {version: remoteVersion})
+        this.emit('update-downloaded', {version})
       })
       .catch((e) => {
         this.downloadPromise = null

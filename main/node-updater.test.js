@@ -6,7 +6,11 @@ jest.mock('./idena-node', () => ({
 }))
 jest.mock('./stores/settings', () => ({persistZoomLevel: jest.fn()}))
 
-const {getRemoteRelease} = require('./idena-node')
+const {
+  downloadNode,
+  getCurrentVersion,
+  getRemoteRelease,
+} = require('./idena-node')
 const NodeUpdater = require('./node-updater')
 
 function updater() {
@@ -42,6 +46,23 @@ describe('node update check', () => {
     expect(await nodeUpdater.doUpdateCheck()).toBe(true)
     clearTimeout(nodeUpdater.timeout)
     expect(onAvailable).toHaveBeenCalledWith({version: '1.2.0', hardFork})
+  })
+
+  it('downloads the version it offers and reports the one it got', async () => {
+    getRemoteRelease.mockResolvedValue({version: '1.1.3', hardFork: null})
+    getCurrentVersion.mockRejectedValue(new Error('no new idena-go file'))
+    downloadNode.mockResolvedValue('1.1.3')
+    const {nodeUpdater} = updater()
+    nodeUpdater.isInternalNode = true
+    const downloaded = new Promise((resolve) => {
+      nodeUpdater.on('update-downloaded', resolve)
+    })
+    expect(await nodeUpdater.doUpdateCheck()).toBe(true)
+    clearTimeout(nodeUpdater.timeout)
+    expect(await downloaded).toEqual({version: '1.1.3'})
+    expect(downloadNode).toHaveBeenCalledWith(expect.any(Function), {
+      minVersion: '1.1.3',
+    })
   })
 
   it('still logs other errors', async () => {
