@@ -4,6 +4,7 @@ import {
   parseRecipient,
   recipientAddress,
   callbackGas,
+  keepStateGas,
   withCallbackGas,
   countTrust,
   holderOf,
@@ -341,5 +342,53 @@ describe('send to @name', () => {
     expect(recipientAddress(name, {holder: null, profile: null})).toBe(null)
     expect(recipientAddress(name, null)).toBe(null)
     expect(recipientAddress(parseRecipient(bob), null)).toBe(bob)
+  })
+})
+
+describe('gas kept for a state read before the acting callback', () => {
+  // A member's first call of an epoch: its state, then its voucher's; the first answer only keeps the state.
+  const memberReceipt = {
+    actionResult: {
+      subActionResults: [
+        {inputAction: {actionType: 5, gasLimit: 20000}, gasUsed: 1000},
+        {
+          inputAction: {
+            actionType: 1,
+            method: '_keepState',
+            gasLimit: 10000000,
+          },
+          gasUsed: 400000,
+        },
+        {inputAction: {actionType: 5, gasLimit: 20000}, gasUsed: 1000},
+        {
+          inputAction: {actionType: 1, method: '_trust', gasLimit: 10000000},
+          gasUsed: 600000,
+        },
+      ],
+    },
+  }
+
+  it('asks three times what _keepState used, within bounds; none without it', () => {
+    expect(keepStateGas(memberReceipt)).toBe(1200000)
+    expect(callbackGas(memberReceipt)).toBe(1800000)
+    expect(keepStateGas({actionResult: {subActionResults: []}})).toBe(null)
+  })
+
+  it('sends both gases in the argument, each only when sized', () => {
+    const call = withCallbackGas(ProfileCall.trust(alice), 1800000, 1200000)
+    expect(JSON.parse(call.argument)).toEqual({
+      target: alice,
+      _gas: 1800000,
+      _keepGas: 1200000,
+    })
+    expect(
+      JSON.parse(
+        withCallbackGas(ProfileCall.trust(alice), null, 1200000).argument
+      )
+    ).toEqual({
+      target: alice,
+      _keepGas: 1200000,
+    })
+    expect(withCallbackGas(ProfileCall.dropName(), 1, 1).argument).toBe(null)
   })
 })

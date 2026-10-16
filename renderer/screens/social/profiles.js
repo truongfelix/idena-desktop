@@ -292,17 +292,31 @@ export function callbackGas(receipt) {
   return Math.min(DEFAULT_CALLBACK_GAS, Math.max(MIN_CALLBACK_GAS, 3 * used))
 }
 
-/** `call` (a profile call) asking `gas` for its callback (its argument's "_gas"); unchanged without an argument or a gas. */
-export const withCallbackGas = (call, gas) =>
-  gas === null || call.argument === null
-    ? call
-    : {
-        ...call,
-        argument: JSON.stringify({
-          ...JSON.parse(call.argument),
-          _gas: gas,
-        }),
-      }
+/**
+ * The gas to ask for each _keepState callback of a call (it keeps a state read before the one that acts) from its
+ * dry run: three times the most one used, within the same bounds as callbackGas; null when it made none. The
+ * contract's default (`_keepGas`) is the same 10,000,000.
+ */
+export function keepStateGas(receipt) {
+  const keeps = (receipt?.actionResult?.subActionResults || []).filter(
+    (sub) => sub?.inputAction?.method === '_keepState'
+  )
+  if (keeps.length === 0) return null
+  const used = Math.max(...keeps.map((sub) => Number(sub.gasUsed || 0)))
+  return Math.min(DEFAULT_CALLBACK_GAS, Math.max(MIN_CALLBACK_GAS, 3 * used))
+}
+
+/**
+ * `call` (a profile call) asking `gas` for its callback ("_gas") and `keepGas` for each _keepState ("_keepGas"),
+ * each when not null; unchanged without an argument.
+ */
+export function withCallbackGas(call, gas, keepGas = null) {
+  if (call.argument === null || (gas === null && keepGas === null)) return call
+  const argument = JSON.parse(call.argument)
+  if (gas !== null) argument._gas = gas
+  if (keepGas !== null) argument._keepGas = keepGas
+  return {...call, argument: JSON.stringify(argument)}
+}
 
 /**
  * What a "To" field holds: {kind: 'empty'}, {kind: 'address', address} (lowercase), {kind: 'name', name} for

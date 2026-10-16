@@ -7,6 +7,7 @@ import {topicChannel, typedTopic} from './topics'
 import {socialRpc, socialRpcSettled} from './node'
 import {
   callbackGas,
+  keepStateGas,
   readProfiles,
   withAmount,
   withCallbackGas,
@@ -285,8 +286,9 @@ export function useSocialSending({
         let estimate = await estimateCall(socialRpc, from, profileCall)
         // A second dry run with the callback's gas sized from the first: the max fee then reserves less.
         const gas = callbackGas(estimate.receipt)
-        if (gas !== null) {
-          profileCall = withCallbackGas(profileCall, gas)
+        const keepGas = keepStateGas(estimate.receipt)
+        if (gas !== null || keepGas !== null) {
+          profileCall = withCallbackGas(profileCall, gas, keepGas)
           estimate = await estimateCall(socialRpc, from, profileCall)
         }
         const {fee, maxFee} = estimate
