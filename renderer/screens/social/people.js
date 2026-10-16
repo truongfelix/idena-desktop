@@ -2,9 +2,9 @@ import {ipfsCid} from './calls'
 import {topicOf} from './contract'
 
 // The Social contacts, kept on this computer only: a private name for an address, shown instead of the address in
-// the Social tab, and two marks: Following (their posts in the feed's Following filter) and Message (private
-// conversations, to come). Nothing is published. The same format as the phone app's people.json, so that a list
-// exported on one imports on the other.
+// the Social tab, and three marks: Following (their posts in the feed's Following filter), Message (their
+// conversations out of Requests) and Blocked (hidden everywhere on this computer, hiding.js). Nothing is published.
+// The same format as the phone app's people.json, so that a list exported on one imports on the other.
 
 export const MAX_NAME = 40
 export const PEOPLE_VERSION = 1
@@ -33,30 +33,30 @@ const isControl = (c) => {
   return code <= 0x1f || (code >= 0x7f && code <= 0x9f)
 }
 
-/** A text as a name: one line, no control characters, trimmed, at most MAX_NAME characters. */
-export function cleanName(text) {
-  const oneLine = Array.from(String(text || ''), (c) =>
-    isControl(c) ? ' ' : c
-  )
+/** A text on one line: no control characters, spaces collapsed, trimmed. */
+export const oneLine = (text) =>
+  Array.from(String(text || ''), (c) => (isControl(c) ? ' ' : c))
     .join('')
     .trim()
     .replace(/\s+/g, ' ')
-  return takeWhole(oneLine, MAX_NAME).trim()
-}
+
+/** A text as a name: one line, no control characters, trimmed, at most MAX_NAME characters. */
+export const cleanName = (text) => takeWhole(oneLine(text), MAX_NAME).trim()
 
 /** A contact: address lowercase, name empty when not named. */
 export const person = (
   address,
-  {name = '', following = false, message = false} = {}
+  {name = '', following = false, message = false, blocked = false} = {}
 ) => ({
   address: String(address).toLowerCase(),
   name,
   following,
   message,
+  blocked,
 })
 
-const isEmptyPerson = ({name, following, message}) =>
-  name === '' && !following && !message
+const isEmptyPerson = ({name, following, message, blocked}) =>
+  name === '' && !following && !message && !blocked
 
 /** The list (by address) with a contact put in, or taken out once it has no name and no mark. */
 export function withPerson(people, next) {
@@ -78,12 +78,15 @@ export function sortedPeople(people) {
 
 export const peopleToJson = (people) => ({
   version: PEOPLE_VERSION,
-  people: sortedPeople(people).map(({address, name, following, message}) => ({
-    address,
-    name,
-    following,
-    message,
-  })),
+  people: sortedPeople(people).map(
+    ({address, name, following, message, blocked}) => ({
+      address,
+      name,
+      following,
+      message,
+      blocked,
+    })
+  ),
 })
 
 /** The list from its JSON (the phone's export too); entries that are not valid are left out. */
@@ -97,11 +100,20 @@ export function peopleFromJson(json) {
           name: cleanName(entry.name),
           following: entry.following === true,
           message: entry.message === true,
+          blocked: entry.blocked === true,
         })
       )
   }
   return people
 }
+
+/** The addresses blocked in the list. */
+export const blockedAddresses = (people) =>
+  new Set(
+    Object.values(people)
+      .filter(({blocked}) => blocked)
+      .map(({address}) => address)
+  )
 
 /** The names of the list, by lowercase address. */
 export const peopleNames = (people) =>
@@ -184,13 +196,15 @@ export function mergePeople(current, imported) {
           name: one.name || old.name,
           following: old.following || one.following,
           message: old.message || one.message,
+          blocked: old.blocked || one.blocked,
         })
       : one
     if (!old) added += 1
     else if (
       merged.name !== old.name ||
       merged.following !== old.following ||
-      merged.message !== old.message
+      merged.message !== old.message ||
+      merged.blocked !== old.blocked
     )
       changed += 1
     people = withPerson(people, merged)
