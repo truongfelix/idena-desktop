@@ -26,7 +26,7 @@ import {MAX_BIO, PROFILE_NAME, ProfileCall, profilesEnabled} from '../profiles'
 import {ipfsCid} from '../calls'
 import {displayName} from '../people'
 import {IMAGE_TYPE} from '../posting'
-import {encodePicture} from '../image'
+import {encodePicture, isShowablePicture} from '../image'
 import {Chip} from './chips'
 import {MyVouching, VouchPanel} from './profile-vouch'
 
@@ -34,9 +34,12 @@ import {MyVouching, VouchPanel} from './profile-vouch'
 function usePictureUrl(picture) {
   const cid = picture ? ipfsCid(picture) : null
   const {data} = useIpfsContent(cid)
+  // A file the apps would not have made (too large, not a still WebP) is not shown: the robot stays.
   const url = React.useMemo(
     () =>
-      data ? URL.createObjectURL(new Blob([data], {type: IMAGE_TYPE})) : null,
+      isShowablePicture(data)
+        ? URL.createObjectURL(new Blob([data], {type: IMAGE_TYPE}))
+        : null,
     [data]
   )
   React.useEffect(() => () => url && URL.revokeObjectURL(url), [url])

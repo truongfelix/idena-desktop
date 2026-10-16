@@ -132,3 +132,20 @@ export async function encodePicture(file) {
     bitmap.close()
   }
 }
+
+const ascii = (bytes, from, to) =>
+  String.fromCharCode(...Array.from(bytes.slice(from, to)))
+
+/**
+ * Whether `bytes` may show as a profile picture (Q-48): a still WebP (RIFF/WEBP, and in an extended VP8X header no
+ * animation flag) of at most MAX_PICTURE_BYTES. The contract keeps only the reference: a direct call may point to
+ * any file.
+ */
+export function isShowablePicture(bytes) {
+  if (!bytes || bytes.length > MAX_PICTURE_BYTES || bytes.length < 21)
+    return false
+  if (ascii(bytes, 0, 4) !== 'RIFF' || ascii(bytes, 8, 12) !== 'WEBP')
+    return false
+  // eslint-disable-next-line no-bitwise
+  return !(ascii(bytes, 12, 16) === 'VP8X' && bytes[20] & 0x02)
+}
