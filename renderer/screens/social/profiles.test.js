@@ -1,7 +1,9 @@
 /* global BigInt */
 import {
+  MAINNET_PROFILE_CONTRACT,
   ProfileCall,
   parseRecipient,
+  profileContract,
   recipientAddress,
   callbackGas,
   keepStateGas,
@@ -418,5 +420,18 @@ describe('gas kept for a state read before the acting callback', () => {
       _keepGas: 1200000,
     })
     expect(withCallbackGas(ProfileCall.dropName(), 1, 1).argument).toBe(null)
+  })
+})
+
+describe('the profiles contract', () => {
+  it("is mainnet's unless a test network's copy is given", () => {
+    expect(MAINNET_PROFILE_CONTRACT).toBe(
+      '0xd558483330925f169bbe692d8ea15b2faa83c17f'
+    )
+    expect(profileContract(undefined)).toBe(MAINNET_PROFILE_CONTRACT)
+    expect(profileContract('')).toBe(MAINNET_PROFILE_CONTRACT)
+    expect(profileContract('not an address')).toBe(MAINNET_PROFILE_CONTRACT)
+    const devnet = '0x3055551f69558bcc8655f4d7b02dcb61747d2df0'
+    expect(profileContract(devnet)).toBe(devnet)
   })
 })

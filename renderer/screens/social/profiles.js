@@ -4,15 +4,22 @@ import {nextPageToken} from './calls'
 // Trust (a public vouch counted per person and per topic) and vouched members. Read with contract_readMap and
 // contract_iterateMap, every value a string; written with contract calls, each with one JSON argument.
 
-/**
- * A test network's copy of the contract, given when the app starts: IDENA_PROFILE_CONTRACT=<address>. Mainnet's is
- * not deployed yet: without it, the app shows no profiles.
- */
-const testContract = /^(0x[0-9a-fA-F]{40})$/.exec(
-  global.env?.IDENA_PROFILE_CONTRACT || ''
-)
+/** Mainnet's contract: the build of idena-profile b49127a, deployed 2026-10-16. */
+export const MAINNET_PROFILE_CONTRACT =
+  '0xd558483330925f169bbe692d8ea15b2faa83c17f'
 
-export const PROFILE_CONTRACT = testContract ? testContract[1] : null
+/**
+ * The contract the app reads and writes: a test network's copy, given when the app starts
+ * (IDENA_PROFILE_CONTRACT=<address>), else mainnet's.
+ */
+export function profileContract(testAddress) {
+  const test = /^(0x[0-9a-fA-F]{40})$/.exec(testAddress || '')
+  return test ? test[1] : MAINNET_PROFILE_CONTRACT
+}
+
+export const PROFILE_CONTRACT = profileContract(
+  global.env?.IDENA_PROFILE_CONTRACT
+)
 
 /** Whether the app reads a profiles contract. */
 export const profilesEnabled = PROFILE_CONTRACT !== null
