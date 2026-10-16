@@ -5,6 +5,7 @@ import {keccak256Hex} from './keccak'
 import {MESSAGE_AMOUNT, plainMessage, sendMessageArgument} from './messages'
 import {topicChannel, typedTopic} from './topics'
 import {socialRpc} from './node'
+import {callbackGas, withCallbackGas} from './profiles'
 import {
   prepareFile,
   estimateCall,
@@ -248,9 +249,16 @@ export function useSocialSending({
               ),
             ]
           : []
-        const profileCall = makeCall(files[0] ? `ipfs://${files[0].cid}` : null)
-        const fee = await estimateCall(socialRpc, from, profileCall)
-        return {from, socialCall: profileCall, fee, files}
+        let profileCall = makeCall(files[0] ? `ipfs://${files[0].cid}` : null)
+        let estimate = await estimateCall(socialRpc, from, profileCall)
+        // A second dry run with the callback's gas sized from the first: the max fee then reserves less.
+        const gas = callbackGas(estimate.receipt)
+        if (gas !== null) {
+          profileCall = withCallbackGas(profileCall, gas)
+          estimate = await estimateCall(socialRpc, from, profileCall)
+        }
+        const {fee, maxFee} = estimate
+        return {from, socialCall: profileCall, fee: {fee, maxFee}, files}
       },
       {detail}
     )

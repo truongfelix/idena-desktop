@@ -241,3 +241,37 @@ function profileCall(method, arg, amount = '0') {
     amount,
   }
 }
+
+/** The contract's default gas for a callback (WASM gas), and the least the app asks for. */
+const DEFAULT_CALLBACK_GAS = 10000000
+const MIN_CALLBACK_GAS = 1000000
+
+/**
+ * The gas to ask for the callback of a call from its dry run (`receipt`): three times what the callback used, at
+ * least MIN_CALLBACK_GAS, at most the contract's default; null when the call made no callback. The node reserves the
+ * whole callback gas out of the call's gas limit: the default (100,000 gas) would make the max fee, which the
+ * balance must cover, about ten times the fee.
+ */
+export function callbackGas(receipt) {
+  const callbacks = (receipt?.actionResult?.subActionResults || []).filter(
+    (sub) =>
+      sub?.inputAction?.actionType === 1 &&
+      String(sub.inputAction.method).startsWith('_') &&
+      sub.inputAction.method !== '_keepState'
+  )
+  if (callbacks.length === 0) return null
+  const used = Number(callbacks[callbacks.length - 1].gasUsed || 0)
+  return Math.min(DEFAULT_CALLBACK_GAS, Math.max(MIN_CALLBACK_GAS, 3 * used))
+}
+
+/** `call` (a profile call) asking `gas` for its callback (its argument's "_gas"); unchanged without an argument or a gas. */
+export const withCallbackGas = (call, gas) =>
+  gas === null || call.argument === null
+    ? call
+    : {
+        ...call,
+        argument: JSON.stringify({
+          ...JSON.parse(call.argument),
+          _gas: gas,
+        }),
+      }

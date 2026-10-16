@@ -1,5 +1,8 @@
+/* global BigInt */
 import {
   ProfileCall,
+  callbackGas,
+  withCallbackGas,
   countTrust,
   holderOf,
   inStanding,
@@ -8,7 +11,7 @@ import {
   readTrust,
   shownNames,
 } from './profiles'
-import {callParams, estimateCall, receiptErrors} from './posting'
+import {callParams, estimateCall, receiptErrors, reservedGas} from './posting'
 
 const contract = '0xcccc000000000000000000000000000000000001'
 const alice = '0xaaaa000000000000000000000000000000000001'
@@ -221,5 +224,89 @@ describe('profile calls', () => {
     await expect(
       estimateCall(call, alice, ProfileCall.claimName('alice'))
     ).rejects.toThrow('neither validated nor vouched for')
+  })
+})
+
+describe('gas reserved by promises', () => {
+  // A claim's dry run on the social devnet (2026-10-16): 0.01 iDNA per gas, the callback with the default 10M.
+  const claimReceipt = {
+    success: true,
+    gasUsed: 11066,
+    gasCost: '110.66',
+    txFee: '14.2',
+    actionResult: {
+      success: true,
+      inputAction: {
+        actionType: 1,
+        method: 'claimName',
+        gasLimit: 1e19,
+      },
+      gasUsed: 1106682,
+      subActionResults: [
+        {
+          success: true,
+          inputAction: {actionType: 5, method: '', gasLimit: 20000},
+          gasUsed: 1000,
+        },
+        {
+          success: true,
+          inputAction: {
+            actionType: 1,
+            method: '_claimName',
+            gasLimit: 10000000,
+          },
+          gasUsed: 689712,
+        },
+      ],
+    },
+  }
+
+  it('makes the max fee cover the gas the promises reserve', async () => {
+    expect(reservedGas(claimReceipt)).toBe(BigInt(100200))
+    const {fee, maxFee} = await estimateCall(
+      async () => claimReceipt,
+      alice,
+      ProfileCall.claimName('alice')
+    )
+    const wei = (idna) => BigInt(Math.round(idna * 1e6)) * BigInt(1e12)
+    expect(fee).toBe(wei(124.86))
+    // The node's gas limit = (max fee - size fee) / fee per gas: it must hold the call's gas and the reservations.
+    const limit = (maxFee - wei(14.2)) / wei(0.01)
+    expect(limit >= BigInt(11066 + 100200)).toBe(true)
+    // A call without promises keeps twice its fee.
+    const post = {
+      success: true,
+      gasUsed: 100,
+      gasCost: '1',
+      txFee: '1',
+      actionResult: {success: true},
+    }
+    const plain = await estimateCall(
+      async () => post,
+      alice,
+      ProfileCall.claimName('alice')
+    )
+    expect(plain.maxFee).toBe(wei(4))
+  })
+
+  it('asks the callback three times what it used, within bounds', () => {
+    expect(callbackGas(claimReceipt)).toBe(2069136)
+    const small = JSON.parse(JSON.stringify(claimReceipt))
+    small.actionResult.subActionResults[1].gasUsed = 1000
+    expect(callbackGas(small)).toBe(1000000)
+    const keepOnly = {
+      actionResult: {
+        subActionResults: [
+          {inputAction: {actionType: 1, method: '_keepState'}, gasUsed: 5},
+        ],
+      },
+    }
+    expect(callbackGas(keepOnly)).toBe(null)
+    expect(
+      JSON.parse(
+        withCallbackGas(ProfileCall.claimName('alice'), 2069136).argument
+      )
+    ).toEqual({name: 'alice', _gas: 2069136})
+    expect(withCallbackGas(ProfileCall.dropName(), 2069136).argument).toBe(null)
   })
 })

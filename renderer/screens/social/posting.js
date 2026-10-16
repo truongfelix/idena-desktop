@@ -145,10 +145,26 @@ export function receiptErrors(receipt) {
   return [...new Set(errors)]
 }
 
+/** WASM gas per unit of gas (idena-go's costs.GasToWasmGas). */
+const WASM_PER_GAS = BigInt(100)
+
+/**
+ * The gas the promises of a dry run reserve (`receipt`'s direct sub-actions, their gas limits in WASM gas): the node
+ * takes each from the call's gas limit when the promise is made, and gives back what its callback does not use.
+ */
+export function reservedGas(receipt) {
+  let wasm = BigInt(0)
+  for (const sub of receipt?.actionResult?.subActionResults || [])
+    wasm += BigInt(sub?.inputAction?.gasLimit || 0)
+  return (wasm + WASM_PER_GAS - BigInt(1)) / WASM_PER_GAS
+}
+
 /**
  * The fee of a call from a dry run by the node: about `fee`, at most `maxFee`, twice the estimate as the node's own
  * margin for plain transactions (the gas price may change before the call is in a block; only the fee used is
- * taken). Both in 10^-18 iDNA. Throws with the contract's reason, or the node's (e.g. insufficient funds).
+ * taken). The node sets the call's gas limit from its max fee, and a promise's gas is reserved out of it: the max
+ * fee also covers the gas its promises reserve (reservedGas), given back after. Both in 10^-18 iDNA, with the dry
+ * run's `receipt`. Throws with the contract's reason, or the node's (e.g. insufficient funds).
  */
 export async function estimateCall(call, from, socialCall) {
   const receipt = await call(
@@ -158,8 +174,12 @@ export async function estimateCall(call, from, socialCall) {
   const errors = receiptErrors(receipt)
   if (!receipt?.success || errors.length > 0)
     throw new Error(errors[0] || 'the contract refused the post')
-  const fee = toWei(receipt.txFee) + toWei(receipt.gasCost)
-  return {fee, maxFee: ceilTo6(fee * TWO)}
+  const gasCost = toWei(receipt.gasCost)
+  const fee = toWei(receipt.txFee) + gasCost
+  const gasUsed = BigInt(receipt.gasUsed || 0)
+  const reserved =
+    gasUsed > BigInt(0) ? (gasCost * reservedGas(receipt)) / gasUsed : BigInt(0)
+  return {fee, maxFee: ceilTo6((fee + reserved) * TWO), receipt}
 }
 
 /**
