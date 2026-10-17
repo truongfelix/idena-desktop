@@ -33,6 +33,8 @@ export const MAX_PICTURE = 120
 const VALIDATED = new Set(['Newbie', 'Verified', 'Human'])
 /** The states whose Trust counts: the validated ones and the two that come back at the next validation. */
 const TRUSTING = new Set([...VALIDATED, 'Zombie', 'Suspended'])
+/** The states that may be vouched for: no identity of their own. */
+const VOUCHABLE = new Set(['Undefined', 'Invite', 'Candidate', 'Killed'])
 
 /** The maps an address's profile is read from, by field. */
 const PROFILE_MAPS = {
@@ -79,12 +81,17 @@ export const isValidated = (state) => VALIDATED.has(state)
 /** Whether an identity state counts as a giver of Trust. */
 export const isTrusting = (state) => TRUSTING.has(state)
 
+/** Whether an identity state may be vouched for: no identity of its own (unknown = Undefined). */
+export const isVouchable = (state) => VOUCHABLE.has(state || 'Undefined')
+
 /**
- * Whether an address is in good standing: a validated identity, or a member vouched for by one ([voucherState]).
- * Out of good standing, the apps hide its name, bio, picture and Trusts (Q-47).
+ * Whether an address is in good standing, as the contract decides it: a validated identity, or an account without an
+ * identity vouched for by a validated one ([voucherState]). A member who got an identity is out of it until it
+ * validates: the contract ends its vouch. Out of good standing, the apps hide its name, bio, picture and Trusts (Q-47).
  */
 export const inStanding = (state, voucherState = null) =>
-  isValidated(state) || (voucherState !== null && isValidated(voucherState))
+  isValidated(state) ||
+  (voucherState !== null && isVouchable(state) && isValidated(voucherState))
 
 /** The identity states of `addresses` in one request, by lowercase address ("Undefined" when unknown). */
 export async function identityStates(settled, addresses) {

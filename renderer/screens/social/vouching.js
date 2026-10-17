@@ -1,6 +1,6 @@
 /* global BigInt */
 import {fromWei} from './posting'
-import {isValidated, iterateEntries, readEntries} from './profiles'
+import {isValidated, isVouchable, iterateEntries, readEntries} from './profiles'
 
 // Vouched members and name challenges in the profiles contract (idena-profile, rulings Q-46 and Q-47): a validated
 // identity vouches for accounts without an identity, which may then hold a name, write a profile and give Trust; a
@@ -13,9 +13,7 @@ export const GRACE_EPOCHS = 2
 const VOUCH_CAPS = {Human: 5, Verified: 3, Newbie: 1}
 export const vouchCap = (state) => VOUCH_CAPS[state] || 0
 
-/** The states that may be vouched for: no identity of their own. */
-const VOUCHABLE = new Set(['Undefined', 'Invite', 'Candidate', 'Killed'])
-export const isVouchable = (state) => VOUCHABLE.has(state || 'Undefined')
+export {isVouchable}
 
 /** Whether a profile (readProfiles) acts as a vouched member: no identity, a validated voucher. */
 export const isActingMember = (profile) =>
