@@ -202,12 +202,15 @@ export function PostBody({call, lines, maxH, media = true, inThread = false}) {
   )
 }
 
+/** The lines of a post's text shown in the lists (the feeds, a topic, a profile) before it is cut, as the phone's. */
+export const FEED_TEXT_LINES = 8
+
 /** How a post row shows the post's topic: as a tag under the author, in the author's place (Home), or not (the topic's page). */
 export const TopicShown = {Tag: 'tag', InsteadOfAuthor: 'author', Not: 'not'}
 
 /**
  * A post of the feed, as the phone app's rows: avatar, name, identity state in its color, time ago on one line
- * (or the post's topic in their place, `topicShown`), the text on 3 lines, the image, then the counters. A click
+ * (or the post's topic in their place, `topicShown`), the text on FEED_TEXT_LINES lines, the image, then the counters. A click
  * opens the thread.
  */
 export function PostRow({
@@ -256,7 +259,7 @@ export function PostRow({
         {topic !== null && topicShown === TopicShown.Tag && (
           <TopicTag name={topic} />
         )}
-        <PostBody call={call} lines={3} maxH="220px" />
+        <PostBody call={call} lines={FEED_TEXT_LINES} maxH="220px" />
       </Stack>
       <ActionBar node={node} onAnswers={onOpen} onProfile={onProfile} />
     </Stack>
