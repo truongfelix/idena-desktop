@@ -164,7 +164,7 @@ export function SocialThread({node, now, focusId, onProfile}) {
         bg={focusId === idKey(node.id) ? 'gray.50' : undefined}
         rounded="md"
       >
-        {topic !== null && <TopicLine name={topic} now={now} large />}
+        {topic !== null && <TopicLine name={topic} large />}
         <FullHeader
           address={node.call.author}
           time={node.call.time}

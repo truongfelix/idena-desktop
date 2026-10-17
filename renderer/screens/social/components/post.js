@@ -13,7 +13,7 @@ import {MUTED} from './theme'
 import {timeAgo} from '../format'
 import {postTopic} from '../topics'
 import {PicturesMode} from '../hiding'
-import {TopicLine, TopicTag} from './topic'
+import {TopicTag} from './topic'
 import {PersonAvatar} from './profile-public'
 
 const textDecoder = new TextDecoder()
@@ -205,13 +205,12 @@ export function PostBody({call, lines, maxH, media = true, inThread = false}) {
 /** The lines of a post's text shown in the lists (the feeds, a topic, a profile) before it is cut, as the phone's. */
 export const FEED_TEXT_LINES = 8
 
-/** How a post row shows the post's topic: as a tag under the author, in the author's place (Home), or not (the topic's page). */
-export const TopicShown = {Tag: 'tag', InsteadOfAuthor: 'author', Not: 'not'}
+/** How a post row shows the post's topic: as a tag under the author, or not (the topic's page). */
+export const TopicShown = {Tag: 'tag', Not: 'not'}
 
 /**
- * A post of the feed, as the phone app's rows: avatar, name, identity state in its color, time ago on one line
- * (or the post's topic in their place, `topicShown`), the text on FEED_TEXT_LINES lines, the image, then the counters. A click
- * opens the thread.
+ * A post of the feed: avatar, name, identity state in its color, time ago on one line, the post's topic as a tag
+ * (`topicShown`), the text on FEED_TEXT_LINES lines, the image, then the counters. A click opens the thread.
  */
 export function PostRow({
   node,
@@ -226,33 +225,29 @@ export function PostRow({
     <Stack spacing={1.5} py={3} w="full">
       <Stack spacing={1} cursor="pointer" onClick={onOpen}>
         <HStack spacing={2} align="center">
-          {topic !== null && topicShown === TopicShown.InsteadOfAuthor ? (
-            <TopicLine name={topic} time={call.time} now={now} />
-          ) : (
-            <HStack spacing={2} align="center" minW={0}>
-              <PersonAvatar
-                address={call.author}
-                boxSize={10}
-                rounded="md"
-                cursor="pointer"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onProfile(call.author)
-                }}
-              />
-              <Text fontSize="sm" noOfLines={1}>
-                <NameLink address={call.author} onProfile={onProfile} />
-                <Text as="span" color={MUTED}>
-                  {'  ·  '}
-                </Text>
-                <IdentityLabel address={call.author} fontSize="sm" />
-                <Text as="span" color={MUTED}>{`  ·  ${timeAgo(
-                  call.time,
-                  now
-                )}`}</Text>
+          <HStack spacing={2} align="center" minW={0}>
+            <PersonAvatar
+              address={call.author}
+              boxSize={10}
+              rounded="md"
+              cursor="pointer"
+              onClick={(e) => {
+                e.stopPropagation()
+                onProfile(call.author)
+              }}
+            />
+            <Text fontSize="sm" noOfLines={1}>
+              <NameLink address={call.author} onProfile={onProfile} />
+              <Text as="span" color={MUTED}>
+                {'  ·  '}
               </Text>
-            </HStack>
-          )}
+              <IdentityLabel address={call.author} fontSize="sm" />
+              <Text as="span" color={MUTED}>{`  ·  ${timeAgo(
+                call.time,
+                now
+              )}`}</Text>
+            </Text>
+          </HStack>
           <Box flex={1} />
           <PostMenu call={call} />
         </HStack>

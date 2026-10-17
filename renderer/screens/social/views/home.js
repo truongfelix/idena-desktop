@@ -5,7 +5,7 @@ import {Divider, HStack, Stack, Text} from '@chakra-ui/react'
 import {SmallText} from '../../../shared/components/components'
 import {useSocial} from '../provider'
 import {displayName, shortAddress, MIN_SEARCH, searchSocial} from '../people'
-import {PostRow, TopicShown} from '../components/post'
+import {PostRow} from '../components/post'
 import {TopicRow} from '../components/topic'
 import {FeedSort} from '../feed'
 import {feedPosts} from '../hiding'
@@ -196,7 +196,6 @@ export function Home({now, openThread, openProfile, onRename, openList}) {
                 now={now}
                 onOpen={() => openThread(node.id)}
                 onProfile={openProfile}
-                topicShown={TopicShown.InsteadOfAuthor}
               />
             ))}
           </Rows>
