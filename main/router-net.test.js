@@ -185,9 +185,11 @@ function recordingSockets(onReady) {
       socket.memberships.push([group, address])
       if (socket.memberships.length === 1) setImmediate(() => onReady(socket))
     })
+    // The answers to a search come as it goes out: a later turn of the event loop can come after the test's short
+    // search window when the suite loads the PC (B-94).
     socket.send = jest.fn((message, port, host) => {
       socket.sent.push([String(message), port, host])
-      if (socket.sent.length === 1) setImmediate(() => onReady(socket))
+      if (socket.sent.length === 1) onReady(socket)
     })
     socket.close = jest.fn()
     sockets.push(socket)
@@ -273,7 +275,8 @@ describe('router search', () => {
       createSocket,
       addresses: () => ['192.168.2.97'],
       routers: async () => ['192.168.2.1'],
-      searchMs: 20,
+      // Room for the second search (at a third of the window) on a loaded PC.
+      searchMs: 300,
     })
     expect(await net.search(onHeard)).toBeNull()
     expect(onHeard.mock.calls).toEqual([['Speedport Smart 4 Typ B']])

@@ -19,10 +19,11 @@ export function bannerItems(ads) {
 }
 
 /** The package this app belongs to: its GitHub repositories (their names say what each one is). */
-const PACKAGE = [
+export const PACKAGE = [
   'truongfelix/idena-go',
   'truongfelix/idena-desktop',
   'truongfelix/idena-mobile',
+  'truongfelix/idena-profile',
 ]
 
 /** The original code and the contributors, direct and indirect, with what the package owes them. */
