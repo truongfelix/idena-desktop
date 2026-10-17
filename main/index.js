@@ -6,6 +6,7 @@ const {
   ipcMain,
   Tray,
   Menu,
+  nativeImage,
   nativeTheme,
   net,
   protocol,
@@ -94,6 +95,7 @@ const {
 
 const NodeUpdater = require('./node-updater')
 const {createNodeProcess} = require('./node-process')
+const {createAppBadge} = require('./app-badge')
 const {createNodeReports} = require('./node-reports')
 const {READ_INTERVAL_MS} = require('./node-watch')
 const {createNodeWatchdog} = require('./node-watchdog')
@@ -523,9 +525,24 @@ function trayIcon() {
     : icon
 }
 
+// The Social news on the dock, taskbar and tray icons (main/app-badge.js), counted by the renderer.
+const appBadge = createAppBadge({
+  app,
+  nativeImage,
+  tray: () => tray,
+  window: () => mainWindow,
+  trayImagePath: () => resolve(__dirname, 'static', 'tray', trayIcon()),
+  t: (text, options) => i18next.t(text, options),
+})
+
+ipcMain.on('app-badge', (event, count) => {
+  if (!acceptIpcSender(event)) return
+  appBadge.set(count)
+})
+
 if (isMac) {
   nativeTheme.on('updated', () => {
-    tray.setImage(resolve(__dirname, 'static', 'tray', trayIcon()))
+    appBadge.refresh()
   })
 }
 

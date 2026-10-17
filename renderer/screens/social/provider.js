@@ -37,6 +37,7 @@ import {
   useRefreshProfiles,
 } from './profile-hooks'
 import {profilesEnabled, shownNames} from './profiles'
+import {socialNewsCount} from './news-count'
 
 const SocialContext = React.createContext(null)
 
@@ -398,6 +399,12 @@ export function SocialProvider({children}) {
       validation,
     ]
   )
+
+  // The count on the app's icons while its window is closed to the tray (main/app-badge.js).
+  const newsCount = socialNewsCount(value)
+  React.useEffect(() => {
+    global.ipcRenderer?.send('app-badge', newsCount)
+  }, [newsCount])
 
   return (
     <SocialContext.Provider value={value}>{children}</SocialContext.Provider>

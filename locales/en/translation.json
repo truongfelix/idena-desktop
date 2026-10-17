@@ -1667,5 +1667,6 @@
   "If your node has trouble connecting or syncing: Make a report, Save the last report, and share it with the Idena community to understand what happens.": "If your node has trouble connecting or syncing: Make a report, Save the last report, and share it with the Idena community to understand what happens.",
   "Last report: {{time}}": "Last report: {{time}}",
   "Make a report": "Make a report",
-  "Save the last report": "Save the last report"
+  "Save the last report": "Save the last report",
+  "{{count}} Social news": "{{count}} Social news"
 }
