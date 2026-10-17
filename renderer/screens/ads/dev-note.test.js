@@ -1,6 +1,6 @@
 import React from 'react'
 import {renderToStaticMarkup} from 'react-dom/server'
-import {bannerItems, DEV_NOTE, DevNoteBannerContent} from './dev-note'
+import {bannerItems, DEV_NOTE, DevNoteBannerContent, PACKAGE} from './dev-note'
 
 describe('the banner items', () => {
   it('are the ads, then the developer note', () => {
@@ -21,5 +21,16 @@ describe('the developer note in the banner', () => {
     )
     expect(html).toContain('A note from the dev')
     expect(html).toContain('Community work, same chain as the original.')
+  })
+})
+
+describe('the package the developer note lists', () => {
+  it('names every repository, the profiles contract included', () => {
+    expect(PACKAGE).toEqual([
+      'truongfelix/idena-go',
+      'truongfelix/idena-desktop',
+      'truongfelix/idena-mobile',
+      'truongfelix/idena-profile',
+    ])
   })
 })
