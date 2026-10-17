@@ -108,10 +108,16 @@ export function TrustButton({target}) {
   const {data: trust} = useTrust(target)
   if (!profilesEnabled) return null
   const mine = Boolean(trust?.givers.some((g) => g.address === me))
+  // A Trust or its taking back waits for its block: the contract would refuse the next one.
+  const waits =
+    sending.isInFlight(ProfileCall.trust(target)) ||
+    sending.isInFlight(ProfileCall.untrust(target))
+  let label = mine ? t('Trusted') : t('Trust')
+  if (waits) label = t('{{action}} · waiting for a block', {action: t('Trust')})
   return (
     <Chip
       isSelected={mine}
-      isDisabled={!sending.canAct || !trust}
+      isDisabled={!sending.canAct || !trust || waits}
       onClick={(e) => {
         e.stopPropagation()
         sending.prepareProfile(mine ? 'untrust' : 'trust', () =>
@@ -119,7 +125,7 @@ export function TrustButton({target}) {
         )
       }}
     >
-      {mine ? t('Trusted') : t('Trust')}
+      {label}
     </Chip>
   )
 }
@@ -275,6 +281,10 @@ export function ProfileEditDialog({profile, onClose}) {
     picture !== null ||
     (removed && Boolean(profile?.picture))
 
+  // A name claimed or dropped, or a profile saved, waits for its block before the next (the contract allows one
+  // name change an epoch, and a second call would pay a fee for nothing).
+  const nameWaits = sending.kindInFlight('name', 'dropName')
+  const profileWaits = sending.kindInFlight('profile')
   const saveName = () => {
     onClose()
     sending.prepareProfile('name', () => ProfileCall.claimName(cleanName), {
@@ -316,7 +326,9 @@ export function ProfileEditDialog({profile, onClose}) {
                 maxLength={21}
               />
               <PrimaryButton
-                isDisabled={!nameValid || !nameChanged || !sending.canAct}
+                isDisabled={
+                  !nameValid || !nameChanged || !sending.canAct || nameWaits
+                }
                 onClick={saveName}
               >
                 {t('Save the name')}
@@ -327,6 +339,11 @@ export function ProfileEditDialog({profile, onClose}) {
                 'a-z, 0-9 and _, 3 to 20 characters. One name change per epoch; a name you leave stays blocked for 2 epochs.'
               )}
             </SmallText>
+            {nameWaits && (
+              <SmallText>
+                {t('Your name change waits for its block.')}
+              </SmallText>
+            )}
             {profile?.name && (
               <Box>
                 <Button
@@ -334,7 +351,7 @@ export function ProfileEditDialog({profile, onClose}) {
                   variant="ghost"
                   colorScheme="red"
                   onClick={dropName}
-                  isDisabled={!sending.canAct}
+                  isDisabled={!sending.canAct || nameWaits}
                 >
                   {t('Drop the name @{{name}}', {name: profile.name})}
                 </Button>
@@ -418,10 +435,14 @@ export function ProfileEditDialog({profile, onClose}) {
       <DialogFooter>
         <SecondaryButton onClick={onClose}>{t('Close')}</SecondaryButton>
         <PrimaryButton
-          isDisabled={!profileChanged || !sending.canAct}
+          isDisabled={!profileChanged || !sending.canAct || profileWaits}
           onClick={saveProfile}
         >
-          {t('Save the profile')}
+          {profileWaits
+            ? t('{{action}} · waiting for a block', {
+                action: t('Save the profile'),
+              })
+            : t('Save the profile')}
         </PrimaryButton>
       </DialogFooter>
     </Dialog>

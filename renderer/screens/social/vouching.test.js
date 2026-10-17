@@ -6,6 +6,7 @@ import {
   parseChallenge,
   readMembers,
   readOffer,
+  readOffersFrom,
   readOffersTo,
   showsVoucher,
   vouchCap,
@@ -137,6 +138,28 @@ describe('vouched members', () => {
       })
     expect(await readOffer(settled, bob, alice)).toBe(7)
     expect(await readOffer(settled, alice, bob)).toBe(null)
+  })
+
+  it("reads the offers a voucher sent from all open offers, not others'", async () => {
+    const maps = {
+      [`o:${bob}:${alice}`]: '7',
+      [`o:${holder}:${alice}`]: '9',
+      [`o:${alice}:${bob}`]: '8',
+      [`m:${alice}:${bob}`]: '8',
+    }
+    const call = async (method, [, prefix]) => ({
+      items: Object.keys(maps)
+        .filter((k) => k.startsWith(prefix))
+        .map((k) => ({key: k.slice(prefix.length), value: maps[k]})),
+      continuationToken: null,
+    })
+    expect(
+      await readOffersFrom(call, alice.toUpperCase().replace('0X', '0x'))
+    ).toEqual([
+      {member: bob, epoch: 7},
+      {member: holder, epoch: 9},
+    ])
+    expect(await readOffersFrom(call, holder)).toEqual([])
   })
 })
 

@@ -7,9 +7,16 @@ import {
   profilesEnabled,
   readProfiles,
   readTrust,
+  readTrustsGiven,
   recipientAddress,
 } from './profiles'
-import {readChallenge, readMembers, readOffer, readOffersTo} from './vouching'
+import {
+  readChallenge,
+  readMembers,
+  readOffer,
+  readOffersFrom,
+  readOffersTo,
+} from './vouching'
 import {readIdentities} from './profile-lists'
 
 /** How long a read profile or Trust count is shown before it is read again. */
@@ -104,6 +111,24 @@ export function useOffersTo(member) {
     ['profile', 'offers-to', member],
     () => readOffersTo(socialRpc, member),
     {enabled: profilesEnabled && Boolean(member), staleTime: PROFILE_STALE_MS}
+  )
+}
+
+/** The vouches `voucher` offered that wait for their answer (readOffersFrom). */
+export function useOffersFrom(voucher) {
+  return useQuery(
+    ['profile', 'offers-from', voucher],
+    () => readOffersFrom(socialRpc, voucher),
+    {enabled: profilesEnabled && Boolean(voucher), staleTime: PROFILE_STALE_MS}
+  )
+}
+
+/** The Trusts `giver` gives, to people and topics (readTrustsGiven). */
+export function useTrustsGiven(giver) {
+  return useQuery(
+    ['profile', 'trusts-given', giver],
+    () => readTrustsGiven(socialRpc, giver),
+    {enabled: profilesEnabled && Boolean(giver), staleTime: PROFILE_STALE_MS}
   )
 }
 

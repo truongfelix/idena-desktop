@@ -61,6 +61,15 @@ export const stillWaiting = (waiting, scannedThrough) =>
   waiting.filter(({height}) => height === null || height > scannedThrough)
 
 /**
+ * Which action a profile call is, to tell the same one sent twice: its contract, method and argument, without the
+ * callback gas the second dry run sizes (`_gas`, `_keepGas`), as the phone's.
+ */
+export const actionKey = ({contract = '', method, argument}) =>
+  `${String(contract).toLowerCase()}:${method}:${String(argument ?? '')
+    .replace(/,"_gas":\d+/, '')
+    .replace(/,"_keepGas":\d+/, '')}`
+
+/**
  * What the editor gets back when a draft it sent (`sent`: {text, image, textOnIpfs}) is dropped by the node or
  * refused by the contract: the draft, if the editor holds no text and no image (`editor`: {text, image}); null when
  * it holds something, which stays. The editor does not open: as after Cancel, the next draft starts from it.
@@ -108,6 +117,9 @@ export function useSocialSending({
   const [textOnIpfs, setTextOnIpfs] = React.useState(false)
   const [draftTopic, setDraftTopic] = React.useState('')
   const [waiting, setWaiting] = React.useState([])
+  // The profile calls the node accepted, until their block (or a refusal, or the node dropping them): the same
+  // action is not sent again meanwhile (the contract would refuse it in the block, its fee lost).
+  const [inFlight, setInFlight] = React.useState([])
   // Counts the private messages sent: the conversation's box empties then.
   const [messagesSent, setMessagesSent] = React.useState(0)
   const storedRef = React.useRef(new Set())
@@ -137,11 +149,11 @@ export function useSocialSending({
       dropName: t('Drop the name'),
       profile: t('Profile'),
       trust: t('Trust'),
-      untrust: t('Untrust'),
+      untrust: t('Take your Trust back'),
       challenge: t('Challenge'),
       vouch: t('Vouch'),
       acceptVouch: t('Accept the vouch'),
-      declineOffer: t('Decline the vouch'),
+      declineOffer: t('Decline the offer'),
       cancelOffer: t('Withdraw the offer'),
       endVouch: t('End the vouch'),
     }),
@@ -334,6 +346,7 @@ export function useSocialSending({
       isStopped: () => !aliveRef.current,
     })
     if (outcome.result === 'stopped') return
+    setInFlight((current) => current.filter((item) => item.hash !== hash))
     const what = whatOf[kind]
     const sentDraft = sentDraftsRef.current.get(hash) ?? null
     sentDraftsRef.current.delete(hash)
@@ -392,6 +405,13 @@ export function useSocialSending({
     setConfirm(null)
     if (!pending) return
     const what = whatOf[pending.kind]
+    const key = PROFILE_KINDS.has(pending.kind)
+      ? actionKey(pending.socialCall)
+      : null
+    if (key !== null && inFlight.some((item) => item.key === key)) {
+      refused(pending.kind, new Error(t('it already waits for its block')))
+      return
+    }
     setBusy(true)
     let hash
     try {
@@ -425,6 +445,8 @@ export function useSocialSending({
       setTextOnIpfs(false)
       setDraftTopic('')
     }
+    if (key !== null)
+      setInFlight((current) => [...current, {key, kind: pending.kind, hash}])
     setWaiting((current) => [
       ...current,
       {hash, kind: pending.kind, likeOf: pending.likeOf ?? null, height: null},
@@ -446,9 +468,17 @@ export function useSocialSending({
     [waiting]
   )
 
+  const isInFlight = (call) =>
+    inFlight.some((item) => item.key === actionKey(call))
+
   return {
     canAct: ready && !busy,
     busy,
+    // The profile calls waiting for their block ({key, kind, hash}), each with what it is.
+    inFlight: inFlight.map((item) => ({...item, what: whatOf[item.kind]})),
+    isInFlight,
+    kindInFlight: (...kinds) =>
+      inFlight.some((item) => kinds.includes(item.kind)),
     status,
     confirm,
     cancelConfirm: () => setConfirm(null),

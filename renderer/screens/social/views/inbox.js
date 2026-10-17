@@ -15,6 +15,7 @@ import {ActivityCard, notifyKindLabels} from '../components/activity'
 import {Chip} from '../components/chips'
 import {PAGE_SIZE, ShowMore} from './common'
 import {MessagesList} from './messages'
+import {OfferReceivedCard} from '../components/profile-vouch'
 
 export const InboxView = {Notifications: 'notifications', Messages: 'messages'}
 
@@ -27,6 +28,7 @@ function Notifications({now, openThread, openProfile}) {
     notifyKinds,
     setNotifyKinds,
     setInboxOpen,
+    offersTo,
   } = useSocial()
   const [isInfoOpen, setIsInfoOpen] = React.useState(false)
   const [shown, setShown] = React.useState(PAGE_SIZE)
@@ -66,6 +68,13 @@ function Notifications({now, openThread, openProfile}) {
           onClick={() => setIsInfoOpen(true)}
         />
       </HStack>
+      {offersTo.map(({voucher}) => (
+        <OfferReceivedCard
+          key={voucher}
+          voucher={voucher}
+          onProfile={openProfile}
+        />
+      ))}
       {activity.length === 0 && (
         <SmallText>
           {t('No likes, answers or tips on your posts yet.')}
@@ -112,7 +121,9 @@ function Notifications({now, openThread, openProfile}) {
 
 export function Inbox({view, setView, now, openThread, openProfile, openChat}) {
   const {t} = useTranslation()
-  const {unread, unreadConversations} = useSocial()
+  const {unread, unreadConversations, offersTo} = useSocial()
+  // The vouch offers waiting for an answer count as new notifications.
+  const news = unread.length + offersTo.length
   return (
     <Stack spacing={3} w="full">
       <HStack spacing={2}>
@@ -120,8 +131,8 @@ export function Inbox({view, setView, now, openThread, openProfile, openChat}) {
           isSelected={view === InboxView.Notifications}
           onClick={() => setView(InboxView.Notifications)}
         >
-          {unread.length > 0
-            ? t('Notifications · {{count}} new', {count: unread.length})
+          {news > 0
+            ? t('Notifications · {{count}} new', {count: news})
             : t('Notifications')}
         </Chip>
         <Chip

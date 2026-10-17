@@ -324,8 +324,13 @@ function Navbar() {
   const {t} = useTranslation()
 
   const [{todoCount}] = useVotingNotification()
-  const {unread = [], unreadConversations = 0} = useSocial() || {}
-  const socialNews = unread.length + unreadConversations
+  const {
+    unread = [],
+    unreadConversations = 0,
+    offersTo = [],
+  } = useSocial() || {}
+  // A vouch offer waiting for an answer counts as news too.
+  const socialNews = unread.length + unreadConversations + offersTo.length
 
   return (
     <Nav>

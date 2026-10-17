@@ -14,6 +14,7 @@ import {
   readEntries,
   readProfiles,
   readTrust,
+  readTrustsGiven,
   shownNames,
 } from './profiles'
 import {callParams, estimateCall, receiptErrors, reservedGas} from './posting'
@@ -441,5 +442,24 @@ describe('the profiles contract', () => {
     expect(profileContract('not an address')).toBe(MAINNET_PROFILE_CONTRACT)
     const devnet = '0x3055551f69558bcc8655f4d7b02dcb61747d2df0'
     expect(profileContract(devnet)).toBe(devnet)
+  })
+})
+
+describe('the Trusts given', () => {
+  it("are read from all Trusts, people and topics, the giver's only", async () => {
+    const node = fakeNode({
+      maps: {
+        [`t:${alice}:${bob}`]: '10',
+        [`t:r/idena_topic:${bob}`]: '11:v',
+        [`t:${carol}:${alice}`]: '12',
+        [`t:${dave}:${bob}`]: '13',
+      },
+    })
+    expect(await readTrustsGiven(node.call, bob, contract)).toEqual([
+      {target: alice, epoch: 10},
+      {target: dave, epoch: 13},
+      {target: 'r/idena_topic', epoch: 11},
+    ])
+    expect(await readTrustsGiven(node.call, carol, contract)).toEqual([])
   })
 })
