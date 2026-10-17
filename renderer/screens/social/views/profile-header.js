@@ -92,13 +92,15 @@ function PeopleCounts({address, identity, identityLoading, openList}) {
 }
 
 /**
- * The header of the profile of `address`: `name` (shown name, or null), `statusLine` (its identity), `identity` (the
+ * The header of the profile of `address`: `name` (shown name, or null), `nameNote` (the private name given here when
+ * the title is the claimed one, B-72, or null), `statusLine` (its identity), `identity` (the
  * node's dna_identity answer), `activity` (its likes and tips received and given); `onEdit` opens one's own profile
  * editor, `openSettings(tab)` Social settings (at the people or the topics followed).
  */
 export function ProfileHeader({
   address,
   name,
+  nameNote,
   statusLine,
   identity,
   identityLoading,
@@ -128,6 +130,11 @@ export function ProfileHeader({
             {name || shortAddress(address)}
             {isMe && ` ${t('(you)')}`}
           </Text>
+          {nameNote && (
+            <Text color="muted" noOfLines={1}>
+              {t('{{name}} (your name for them)', {name: nameNote})}
+            </Text>
+          )}
           {/* The address beside the picture, then ⚙ or ⋯ (user 2026-10-17, B-92). */}
           <HStack spacing={1}>
             <Text
@@ -144,7 +151,6 @@ export function ProfileHeader({
             {isMe && (
               <OwnProfileMenu
                 onEdit={onEdit}
-                onRename={() => onRename(address)}
                 openSettings={() => openSettings()}
               />
             )}

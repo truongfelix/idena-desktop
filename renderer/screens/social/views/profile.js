@@ -72,12 +72,20 @@ export function ProfileView({
       />
     )
 
-  // A private name wins; then the claimed one, while its holder is in good standing.
-  const name =
-    people[address]?.name ||
-    (publicProfile?.inStanding && publicProfile.name
+  // The claimed name first, while its holder is in good standing, the private name given here as a note under it
+  // (B-72); the private name alone when none is shown. One's own profile has no private name.
+  const claimed =
+    publicProfile?.inStanding && publicProfile.name
       ? `@${publicProfile.name}`
-      : null)
+      : null
+  const privateName = (!isMe && people[address]?.name) || null
+  const name = claimed || privateName
+  const nameNote =
+    claimed &&
+    privateName &&
+    privateName.toLowerCase() !== publicProfile.name.toLowerCase()
+      ? privateName
+      : null
   const isBlocked = !isMe && people[address]?.blocked === true
   // An account without an identity acts through its voucher while that one is validated.
   const status = isActingMember(publicProfile)
@@ -115,6 +123,7 @@ export function ProfileView({
       <ProfileHeader
         address={address}
         name={name}
+        nameNote={nameNote}
         statusLine={statusLine}
         identity={identity}
         identityLoading={identityLoading}
@@ -133,12 +142,7 @@ export function ProfileView({
         openSettings={openSettings}
         onEdit={() => setEditing(true)}
       />
-      <PublicProfile
-        address={address}
-        isMe={isMe}
-        profile={publicProfile}
-        privateName={Boolean(people[address]?.name)}
-      />
+      <PublicProfile address={address} isMe={isMe} profile={publicProfile} />
       {editing && (
         <ProfileEditDialog
           profile={publicProfile}

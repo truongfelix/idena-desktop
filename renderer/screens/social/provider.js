@@ -8,7 +8,7 @@ import {
   blockedAddresses,
   mutedAddresses,
   peopleFromJson,
-  peopleNames,
+  socialNames,
   peopleToJson,
   person,
   withPerson,
@@ -151,7 +151,7 @@ export function SocialProvider({children}) {
     [feed, hidden, me]
   )
   const chats = useChats({me, cache, ready, people, blocked})
-  // The profiles of everyone shown: their claimed names, then the private ones given here, which win.
+  // The profiles of everyone shown: their claimed names first, the private ones given here beside them (B-72).
   const shownAddresses = React.useMemo(() => {
     const addresses = feedAddresses(feed)
     Object.keys(people).forEach((a) => addresses.add(a))
@@ -162,9 +162,9 @@ export function SocialProvider({children}) {
     return addresses
   }, [chats.conversations, feed, me, people])
   const profiles = useProfiles(shownAddresses)
-  const names = React.useMemo(
-    () => ({...shownNames(profiles), ...peopleNames(people)}),
-    [people, profiles]
+  const {names, parts: nameParts} = React.useMemo(
+    () => socialNames(shownNames(profiles), people, me),
+    [me, people, profiles]
   )
   const notifyKinds = React.useMemo(
     () =>
@@ -313,6 +313,7 @@ export function SocialProvider({children}) {
       me,
       people,
       names,
+      nameParts,
       profiles,
       setPerson,
       setPeople,
@@ -375,6 +376,7 @@ export function SocialProvider({children}) {
       me,
       missingMethod,
       names,
+      nameParts,
       notifyKinds,
       offersTo,
       offline,

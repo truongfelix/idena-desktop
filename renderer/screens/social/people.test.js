@@ -10,6 +10,7 @@ import {
   person,
   searchSocial,
   shortAddress,
+  socialNames,
   sortedPeople,
   withPerson,
 } from './people'
@@ -133,6 +134,35 @@ describe('contacts', () => {
     expect(shortAddress(b)).toBe('0xbbbb…0002')
   })
 
+  it('give the claimed name first, the private one beside it (B-72)', () => {
+    const d = '0xdddd000000000000000000000000000000000004'
+    const me = '0xeeee000000000000000000000000000000000005'
+    const {names, parts} = socialNames(
+      {[a]: '@alice', [c]: '@carol', [d]: '@dave', [me]: '@felix'},
+      {
+        [a]: person(a, {name: 'Mum'}),
+        [b]: person(b, {name: 'Bob'}),
+        [d]: person(d, {name: 'Dave'}),
+        [me]: person(me, {name: 'Me at home'}),
+      },
+      me.toUpperCase().replace('0X', '0x')
+    )
+    expect(names[a]).toBe('@alice · Mum')
+    expect(parts[a]).toEqual({name: '@alice', note: 'Mum'})
+    expect(names[b]).toBe('Bob')
+    expect(names[c]).toBe('@carol')
+    expect(names[d]).toBe('@dave')
+    expect(names[me]).toBe('@felix')
+    expect(parts[me]).toEqual({name: '@felix', note: null})
+    expect(displayName(a, names)).toBe('@alice · Mum')
+  })
+
+  it("give one's own address no private name when it claimed none", () => {
+    const me = '0xeeee000000000000000000000000000000000005'
+    const {names} = socialNames({}, {[me]: person(me, {name: 'Me'})}, me)
+    expect(displayName(me, names)).toBe(shortAddress(me))
+  })
+
   it('keep the followed authors for Following', () => {
     const feed = [
       node(2, call('p2', b, 'two', 20)),
@@ -183,7 +213,9 @@ describe('the search', () => {
     }
     const ipfs = {bafkreitext1234: 'hello on IPFS'}
 
-    const hits = searchSocial(feed, people, 'hello', (cid) => ipfs[cid])
+    const hits = searchSocial(feed, people, 'hello', {
+      ipfsText: (cid) => ipfs[cid],
+    })
     expect(hits[0]).toEqual({kind: 'person', person: people[a]})
     expect(hits.slice(1).map((hit) => hit.node.id)).toEqual([5, 3, 1])
     expect(hits[1].threadId).toBe(1)
@@ -200,6 +232,15 @@ describe('the search', () => {
       {kind: 'person', person: people[b]},
     ])
     expect(searchSocial(feed, people, 'h')).toEqual([])
+  })
+
+  it('find a contact by its claimed name too (B-72)', () => {
+    const people = {[b]: person(b, {following: true})}
+    const {names} = socialNames({[b]: '@bobby'}, people)
+    expect(searchSocial([], people, 'bobby', {names})).toEqual([
+      {kind: 'person', person: people[b]},
+    ])
+    expect(searchSocial([], people, 'bobby')).toEqual([])
   })
 })
 

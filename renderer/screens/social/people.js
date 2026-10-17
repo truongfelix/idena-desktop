@@ -141,6 +141,34 @@ export const peopleNames = (people) =>
       .map(({address, name}) => [address, name])
   )
 
+/**
+ * How each address is named (B-72, user 2026-10-17): its claimed name first (`claimed`, from shownNames), the private
+ * name given on this computer (`people`) as a note beside it; the private name alone for an address that claimed none.
+ * One's own address (`me`) has no note: its claimed name only. A note that only repeats the claimed name is dropped.
+ * {names: the text shown, by lowercase address ("@alice · Mum"), parts: {name, note} by lowercase address}.
+ */
+export function socialNames(claimed, people, me = null) {
+  const own = me ? String(me).toLowerCase() : null
+  const given = peopleNames(people)
+  const parts = {}
+  Object.entries(given).forEach(([address, name]) => {
+    if (address !== own) parts[address] = {name, note: null}
+  })
+  Object.entries(claimed).forEach(([address, name]) => {
+    const note = address === own ? null : given[address] || null
+    const repeats =
+      note && note.toLowerCase() === name.replace(/^@/, '').toLowerCase()
+    parts[address] = {name, note: repeats ? null : note}
+  })
+  const names = Object.fromEntries(
+    Object.entries(parts).map(([address, {name, note}]) => [
+      address,
+      note ? `${name} · ${note}` : name,
+    ])
+  )
+  return {names, parts}
+}
+
 /** How an address shows: its contact name, else shortened. */
 export const displayName = (address, names) =>
   names[String(address).toLowerCase()] || shortAddress(address)
@@ -155,16 +183,16 @@ export const followingFeed = (feed, people, topics = []) =>
 
 /**
  * What a query finds, in this order: the address it is, the contacts whose name (or address) has it, then the
- * posts, replies and comments whose text has it, newest first, at most `limit`. A text on IPFS is searched when
- * ipfsText(cid) has it (fetched already). Hits: {kind: 'address', address} | {kind: 'person', person} |
+ * posts, replies and comments whose text has it, newest first, at most `limit`. A contact's name is the one shown
+ * (`names`, socialNames: the claimed one and the private one, B-72), else its private name. A text on IPFS is searched
+ * when ipfsText(cid) has it (fetched already). Hits: {kind: 'address', address} | {kind: 'person', person} |
  * {kind: 'text', node, threadId}.
  */
 export function searchSocial(
   feed,
   people,
   query,
-  ipfsText = () => null,
-  limit = 200
+  {ipfsText = () => null, limit = 200, names = {}} = {}
 ) {
   const q = String(query || '').trim()
   if (q.length < MIN_SEARCH) return []
@@ -176,7 +204,8 @@ export function searchSocial(
       lower.startsWith('0x') &&
       lower.length >= 4 &&
       one.address.startsWith(lower)
-    if (one.name.toLowerCase().includes(lower) || byAddress)
+    const name = names[one.address] || one.name
+    if (name.toLowerCase().includes(lower) || byAddress)
       hits.push({kind: 'person', person: one})
   }
   const texts = []

@@ -63,8 +63,8 @@ export function Home({now, openThread, openProfile, onRename, openList}) {
   const topicSearch = query.trim().startsWith(TOPIC_PREFIX)
   const searching = !topicSearch && searched.trim().length >= MIN_SEARCH
   const hits = React.useMemo(
-    () => (searching ? searchSocial(feed, people, searched) : []),
-    [feed, people, searched, searching]
+    () => (searching ? searchSocial(feed, people, searched, {names}) : []),
+    [feed, names, people, searched, searching]
   )
   const topics = React.useMemo(
     () => (topicSearch ? topicList(feed, query) : []),
