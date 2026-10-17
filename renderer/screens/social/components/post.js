@@ -232,7 +232,7 @@ export function PostRow({
             <HStack spacing={2} align="center" minW={0}>
               <PersonAvatar
                 address={call.author}
-                boxSize={6}
+                boxSize={10}
                 rounded="md"
                 cursor="pointer"
                 onClick={(e) => {

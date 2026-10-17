@@ -1,7 +1,7 @@
 /* eslint-disable react/prop-types */
 import React from 'react'
 import {useTranslation} from 'react-i18next'
-import {Divider, HStack, Stack, Text, IconButton} from '@chakra-ui/react'
+import {HStack, Stack, Text, IconButton} from '@chakra-ui/react'
 import {
   Dialog,
   DialogBody,
@@ -14,12 +14,10 @@ import {NotifyKind} from '../activity'
 import {ActivityCard, notifyKindLabels} from '../components/activity'
 import {Chip} from '../components/chips'
 import {PAGE_SIZE, ShowMore} from './common'
-import {MessagesList} from './messages'
 import {OfferReceivedCard} from '../components/profile-vouch'
 
-export const InboxView = {Notifications: 'notifications', Messages: 'messages'}
-
-function Notifications({now, openThread, openProfile}) {
+/** The Notifications tab: the vouch offers waiting for an answer, then the likes, answers and tips on your posts. */
+export function Notifications({now, openThread, openProfile}) {
   const {t} = useTranslation()
   const {
     activity,
@@ -114,45 +112,6 @@ function Notifications({now, openThread, openProfile}) {
             </SecondaryButton>
           </DialogFooter>
         </Dialog>
-      )}
-    </Stack>
-  )
-}
-
-export function Inbox({view, setView, now, openThread, openProfile, openChat}) {
-  const {t} = useTranslation()
-  const {unread, unreadConversations, offersTo} = useSocial()
-  // The vouch offers waiting for an answer count as new notifications.
-  const news = unread.length + offersTo.length
-  return (
-    <Stack spacing={3} w="full">
-      <HStack spacing={2}>
-        <Chip
-          isSelected={view === InboxView.Notifications}
-          onClick={() => setView(InboxView.Notifications)}
-        >
-          {news > 0
-            ? t('Notifications · {{count}} new', {count: news})
-            : t('Notifications')}
-        </Chip>
-        <Chip
-          isSelected={view === InboxView.Messages}
-          onClick={() => setView(InboxView.Messages)}
-        >
-          {unreadConversations > 0
-            ? t('Messages · {{count}} new', {count: unreadConversations})
-            : t('Messages')}
-        </Chip>
-      </HStack>
-      <Divider />
-      {view === InboxView.Messages ? (
-        <MessagesList now={now} openChat={openChat} />
-      ) : (
-        <Notifications
-          now={now}
-          openThread={openThread}
-          openProfile={openProfile}
-        />
       )}
     </Stack>
   )

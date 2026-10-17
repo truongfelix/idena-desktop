@@ -19,29 +19,42 @@ import {PostTarget} from '../screens/social/contract'
 import {SocialThread} from '../screens/social/components/thread'
 import {idKey} from '../screens/social/feed'
 import {scanState} from '../screens/social/scan'
-import {TabButton, useNow} from '../screens/social/views/common'
+import {
+  SOCIAL_FONT_SIZES,
+  TabButton,
+  useNow,
+} from '../screens/social/views/common'
 import {Home} from '../screens/social/views/home'
-import {Inbox, InboxView} from '../screens/social/views/inbox'
+import {Notifications} from '../screens/social/views/inbox'
 import {ProfileView} from '../screens/social/views/profile'
 import {WaitingLine} from '../screens/social/components/waiting-line'
 import {TopicView} from '../screens/social/views/topic'
 import {SettingsTab, SocialSettingsView} from '../screens/social/views/settings'
-import {ChatView} from '../screens/social/views/messages'
+import {ChatView, MessagesList} from '../screens/social/views/messages'
 import {OpenTopicContext} from '../screens/social/components/topic'
 import {topicOf, topicChannel} from '../screens/social/topics'
 import {threadPost} from '../screens/social/hiding'
 
 const View = {
-  Home: 'home',
+  Feed: 'feed',
+  Messages: 'messages',
+  Notifications: 'notifications',
   Profile: 'profile',
-  Inbox: 'inbox',
   Settings: 'settings',
 }
 
+/** A view of an older link: Home is the Feed; the Inbox, its Messages or its Notifications. */
+const viewOf = ({view, inbox}) => {
+  if (view === 'home') return View.Feed
+  if (view === 'inbox')
+    return inbox === 'messages' ? View.Messages : View.Notifications
+  return Object.values(View).includes(view) ? view : View.Feed
+}
+
 /**
- * idena.social, read from the app's own node and laid out as the phone app's Social tab: Home (search, Feed or
- * Following, sorts; ⚙ Social settings: the people and topics followed, what is blocked and hidden), Profile (yours),
- * Inbox (notifications); a thread, another profile or a topic opens on top.
+ * idena.social, read from the app's own node and laid out as the phone app's Social tab: four tabs, Feed (the search
+ * with the feed's filter at its end), Messages, Notifications and Profile (yours; its ⚙ opens Social settings: the
+ * people and topics followed, what is muted, blocked and hidden); a thread, another profile or a topic opens on top.
  */
 export default function SocialPage() {
   const {t} = useTranslation()
@@ -86,10 +99,7 @@ export default function SocialPage() {
     query.chat,
   ])
 
-  const view = Object.values(View).includes(query.view) ? query.view : View.Home
-  const inboxView = Object.values(InboxView).includes(query.inbox)
-    ? query.inbox
-    : InboxView.Notifications
+  const view = viewOf(query)
   const settingsTab = Object.values(SettingsTab).includes(query.tab)
     ? query.tab
     : SettingsTab.People
@@ -220,15 +230,14 @@ export default function SocialPage() {
         onRename={setRenaming}
       />
     )
-  else if (view === View.Inbox)
+  else if (view === View.Messages)
+    content = <MessagesList now={now} openChat={openChat} />
+  else if (view === View.Notifications)
     content = (
-      <Inbox
-        view={inboxView}
-        setView={(next) => go({view: View.Inbox, inbox: next})}
+      <Notifications
         now={now}
         openThread={openThread}
         openProfile={openProfile}
-        openChat={openChat}
       />
     )
   else
@@ -238,7 +247,12 @@ export default function SocialPage() {
         openThread={openThread}
         openProfile={openProfile}
         onRename={setRenaming}
-        openSettings={() => go({view: View.Settings})}
+        openList={(list) =>
+          go({
+            view: View.Settings,
+            tab: list === 'topics' ? SettingsTab.Topics : SettingsTab.People,
+          })
+        }
       />
     )
 
@@ -247,7 +261,7 @@ export default function SocialPage() {
     <Layout>
       <OpenTopicContext.Provider value={openTopic}>
         <Page ref={pageRef}>
-          <Stack spacing={4} w="full" maxW="3xl">
+          <Stack spacing={4} w="full" maxW="3xl" sx={SOCIAL_FONT_SIZES}>
             <Flex align="center" justify="space-between">
               <PageTitle mb={0}>{t('Social')}</PageTitle>
               <HStack
@@ -294,25 +308,30 @@ export default function SocialPage() {
               ) : (
                 <HStack spacing={1}>
                   <TabButton
-                    isActive={view === View.Home}
-                    onClick={() => go({view: View.Home})}
+                    isActive={view === View.Feed}
+                    onClick={() => go({view: View.Feed})}
                   >
-                    {t('Home')}
+                    {t('Feed')}
+                  </TabButton>
+                  <TabButton
+                    isActive={view === View.Messages}
+                    badge={unreadConversations}
+                    onClick={() => go({view: View.Messages})}
+                  >
+                    {t('Messages')}
+                  </TabButton>
+                  <TabButton
+                    isActive={view === View.Notifications}
+                    badge={unread.length + offersTo.length}
+                    onClick={() => go({view: View.Notifications})}
+                  >
+                    {t('Notifications')}
                   </TabButton>
                   <TabButton
                     isActive={view === View.Profile}
                     onClick={() => go({view: View.Profile})}
                   >
                     {t('Profile')}
-                  </TabButton>
-                  <TabButton
-                    isActive={view === View.Inbox}
-                    badge={
-                      unread.length + unreadConversations + offersTo.length
-                    }
-                    onClick={() => go({view: View.Inbox})}
-                  >
-                    {t('Inbox')}
                   </TabButton>
                   <Box flex={1} />
                   <PrimaryButton
