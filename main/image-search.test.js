@@ -1,4 +1,7 @@
 const {
+  IMAGE_SOURCE_NAMES,
+  searchImageSource,
+  searchImages,
   _internals: {
     dedupeSearchResults,
     extractDuckDuckGoVqd,
@@ -189,5 +192,61 @@ describe('image search helpers', () => {
       []
     )
     expect(logger.warn).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('image search by source (B-33)', () => {
+  const pic = (name) => ({
+    image: `https://example.com/${name}.jpg`,
+    thumbnail: `https://example.com/${name}-t.jpg`,
+  })
+  const sources = {
+    first: async () => [pic('a'), pic('b')],
+    second: async () => [pic('b'), pic('c')],
+    silent: () => new Promise(() => {}),
+  }
+
+  test('asks only the source named, and nothing for an unknown name', async () => {
+    const asked = []
+    const spy = {
+      first: async (query) => {
+        asked.push(`first:${query}`)
+        return [pic('a'), pic('a')]
+      },
+      second: async () => {
+        asked.push('second')
+        return [pic('c')]
+      },
+    }
+    await expect(
+      searchImageSource(' cat ', 'first', {sources: spy})
+    ).resolves.toEqual([pic('a')])
+    expect(asked).toEqual(['first:cat'])
+    await expect(
+      searchImageSource('cat', 'toString', {sources: spy})
+    ).resolves.toEqual([])
+    await expect(
+      searchImageSource('', 'first', {sources: spy})
+    ).resolves.toEqual([])
+    expect(asked).toEqual(['first:cat'])
+  })
+
+  test('gives a source that does not answer in time no pictures', async () => {
+    await expect(
+      searchImageSource('cat', 'silent', {sources, timeoutMs: 20})
+    ).resolves.toEqual([])
+  })
+
+  test('keeps every source in order for the whole search', async () => {
+    const {silent, ...answering} = sources
+    await expect(searchImages('cat', {sources: answering})).resolves.toEqual([
+      pic('a'),
+      pic('b'),
+      pic('c'),
+    ])
+  })
+
+  test('names the three sources the renderer asks', () => {
+    expect(IMAGE_SOURCE_NAMES).toEqual(['duckduckgo', 'openverse', 'wikimedia'])
   })
 })

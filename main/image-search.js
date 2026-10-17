@@ -315,34 +315,48 @@ function normalizeImageSearchQuery(query) {
     .slice(0, MAX_QUERY_LENGTH)
 }
 
-async function searchImages(query, {logger} = {}) {
+// The sources, by the name the renderer asks for one of them with (B-33: each one's pictures shown as it answers).
+const IMAGE_SOURCES = {
+  duckduckgo: searchDuckDuckGoImages,
+  openverse: searchOpenverseImages,
+  wikimedia: searchWikimediaImages,
+}
+
+const MAX_RESULTS = 64
+
+/** The pictures `source` (a name of IMAGE_SOURCES) finds for `query`: [] when it fails, times out or is unknown. */
+async function searchImageSource(
+  query,
+  source,
+  {logger, sources = IMAGE_SOURCES, timeoutMs} = {}
+) {
   const normalizedQuery = normalizeImageSearchQuery(query)
-  if (!normalizedQuery) return []
+  const search = Object.prototype.hasOwnProperty.call(sources, source)
+    ? sources[source]
+    : null
+  if (!normalizedQuery || !search) return []
 
-  const [duckResults, openverseResults, wikimediaResults] = await Promise.all([
-    withSearchSourceTimeout(
-      searchDuckDuckGoImages(normalizedQuery, {logger}),
-      'duckduckgo image search',
-      {logger}
-    ),
-    withSearchSourceTimeout(
-      searchOpenverseImages(normalizedQuery, {logger}),
-      'openverse image search',
-      {logger}
-    ),
-    withSearchSourceTimeout(
-      searchWikimediaImages(normalizedQuery, {logger}),
-      'wikimedia image search',
-      {logger}
-    ),
-  ])
+  const results = await withSearchSourceTimeout(
+    search(normalizedQuery, {logger}),
+    `${source} image search`,
+    {logger, timeoutMs}
+  )
+  return dedupeSearchResults(results).slice(0, MAX_RESULTS)
+}
 
-  return dedupeSearchResults(
-    duckResults.concat(openverseResults).concat(wikimediaResults)
-  ).slice(0, 64)
+/** The pictures every source finds for `query`, once all have answered. */
+async function searchImages(query, {logger, sources = IMAGE_SOURCES} = {}) {
+  const found = await Promise.all(
+    Object.keys(sources).map((source) =>
+      searchImageSource(query, source, {logger, sources})
+    )
+  )
+  return dedupeSearchResults(found.flat()).slice(0, MAX_RESULTS)
 }
 
 module.exports = {
+  IMAGE_SOURCE_NAMES: Object.keys(IMAGE_SOURCES),
+  searchImageSource,
   searchImages,
   _internals: {
     dedupeSearchResults,

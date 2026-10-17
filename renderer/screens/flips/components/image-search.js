@@ -127,6 +127,8 @@ export function ImageSearchDialog({onPick, onClose, onError, ...props}) {
   })
 
   const {images, query, selectedImage} = current.context
+  // Each source's pictures show as it answers (B-33); the spinner stays while the others still come.
+  const searching = eitherState(current, 'searching')
 
   if (imageSearch !== true) {
     const wasAsked = imageSearch === false
@@ -223,7 +225,7 @@ export function ImageSearchDialog({onPick, onClose, onError, ...props}) {
             </FillCenter>
           )}
 
-          {eitherState(current, 'done') && (
+          {(eitherState(current, 'done') || images.length > 0) && (
             <SimpleGrid
               columns={4}
               spacing={2}
@@ -269,10 +271,15 @@ export function ImageSearchDialog({onPick, onClose, onError, ...props}) {
               ))}
             </SimpleGrid>
           )}
-          {eitherState(current, 'searching') && (
+          {searching && images.length === 0 && (
             <FillCenter>
               <Spinner color="blue.500" />
             </FillCenter>
+          )}
+          {searching && images.length > 0 && (
+            <Center>
+              <Spinner size="sm" color="blue.500" />
+            </Center>
           )}
         </Stack>
       </DialogBody>
