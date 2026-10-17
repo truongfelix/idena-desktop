@@ -15,6 +15,7 @@ import {ActivityCard, notifyKindLabels} from '../components/activity'
 import {Chip} from '../components/chips'
 import {PAGE_SIZE, ShowMore} from './common'
 import {OfferReceivedCard} from '../components/profile-vouch'
+import {useKeptState} from '../kept-state'
 
 /** The Notifications tab: the vouch offers waiting for an answer, then the likes, answers and tips on your posts. */
 export function Notifications({now, openThread, openProfile}) {
@@ -29,7 +30,7 @@ export function Notifications({now, openThread, openProfile}) {
     offersTo,
   } = useSocial()
   const [isInfoOpen, setIsInfoOpen] = React.useState(false)
-  const [shown, setShown] = React.useState(PAGE_SIZE)
+  const [shown, setShown] = useKeptState('inbox.shown', PAGE_SIZE)
   React.useEffect(() => {
     setInboxOpen(true)
     return () => setInboxOpen(false)
