@@ -1456,6 +1456,7 @@
   "Trusted by {{count}} (+{{vouched}} vouched)": "Trusted by {{count}} (+{{vouched}} vouched)",
   "Trusted by {{count}}": "Trusted by {{count}}",
   "Trusted by": "Trusted by",
+  "Trusted by nobody yet": "Trusted by nobody yet",
   "Nobody yet.": "Nobody yet.",
   "vouched member": "vouched member",
   "hidden: not validated, nor vouched for": "hidden: not validated, nor vouched for",
