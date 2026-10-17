@@ -1,13 +1,40 @@
 /* eslint-disable react/prop-types */
 import * as React from 'react'
-import {Box, Text} from '@chakra-ui/react'
+import {Box, Stack, Text} from '@chakra-ui/react'
 import {useTranslation} from 'react-i18next'
 import {Dialog, DialogBody, DialogFooter} from './components'
 import {PrimaryButton, SecondaryButton} from './button'
+import {noteBlocks} from './release-note'
 import {
   useSettingsDispatch,
   useSettingsState,
 } from '../providers/settings-context'
+
+/** One block of a release note (release-note.js). */
+function NoteBlock({type, text}) {
+  if (type === 'heading')
+    return (
+      <Text fontWeight={600} pt={1}>
+        {text}
+      </Text>
+    )
+  if (type === 'item')
+    return (
+      <Box display="flex">
+        <Text as="span" mr={2}>
+          •
+        </Text>
+        <Text>{text}</Text>
+      </Box>
+    )
+  if (type === 'code')
+    return (
+      <Text fontFamily="mono" fontSize="xs" wordBreak="break-all" mt={0}>
+        {text}
+      </Text>
+    )
+  return <Text>{text}</Text>
+}
 
 /**
  * A newer release (main/app-update-check.js) with its note; Download opens its page in the browser: the app
@@ -28,16 +55,12 @@ export function ReleaseNoteDialog({release, isOpen, onClose, onDownload}) {
     >
       <DialogBody>
         {release.notes ? (
-          <Box
-            as="pre"
-            whiteSpace="pre-wrap"
-            fontFamily="inherit"
-            fontSize="sm"
-            maxH="sm"
-            overflowY="auto"
-          >
-            {release.notes}
-          </Box>
+          <Stack spacing={2} fontSize="sm" maxH="sm" overflowY="auto" pr={2}>
+            {noteBlocks(release.notes).map(({type, text}, i) => (
+              // eslint-disable-next-line react/no-array-index-key
+              <NoteBlock key={i} type={type} text={text} />
+            ))}
+          </Stack>
         ) : (
           <Text color="muted">{t('This release has no note.')}</Text>
         )}
