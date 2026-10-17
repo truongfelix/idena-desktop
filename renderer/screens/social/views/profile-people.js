@@ -14,11 +14,18 @@ import {PersonAvatar, useShownName} from '../components/profile-public'
 import {Action} from '../components/profile-vouch'
 import {OpenTopicContext, TopicAvatar} from '../components/topic'
 
-// A profile's tabs "Invitees" and "Members" (profile-lists.js), and on one's own profile the vouch offers waiting
-// and the Trusts given, as the phone app's: each account with its picture or robot, its name and its identity
-// state; a click opens its profile.
+// The lists a profile's counts open (profile-list-page.js), as the phone app's: Invitees and Members
+// (profile-lists.js), on one's own profile the vouch offers waiting, the Trusts given; each account with its picture
+// or robot, its name and its identity state (`suffix` after it); a click opens its profile.
 
-function PersonRow({address, identity, onOpen, note = null, action = null}) {
+export function PersonRow({
+  address,
+  identity,
+  onOpen,
+  note = null,
+  action = null,
+  suffix = '',
+}) {
   const name = useShownName(address)
   return (
     <HStack
@@ -42,6 +49,7 @@ function PersonRow({address, identity, onOpen, note = null, action = null}) {
             noOfLines={1}
           >
             {identityLabel(identity.state, identity.age)}
+            {suffix}
           </Text>
         )}
         {note && <SmallText>{note}</SmallText>}
@@ -114,8 +122,8 @@ function TopicRow({name, action}) {
   )
 }
 
-/** One's own tab "Trusts given": the people and topics given Trust, each with Take back. */
-export function TrustsGiven({trusts, onOpen}) {
+/** The Trusts a profile gives, to people and topics (public on chain); on one's own (`isMine`) each with Take back. */
+export function TrustsGiven({trusts, isMine, onOpen}) {
   const {t} = useTranslation()
   const {sending} = useSocial()
   const people = React.useMemo(
@@ -139,23 +147,26 @@ export function TrustsGiven({trusts, onOpen}) {
   if (!trusts.data || trusts.data.length === 0)
     return (
       <SmallText>
-        {t("You give no Trust yet: Trust on a profile or a topic's page.", {
-          nsSeparator: '|',
-        })}
+        {isMine
+          ? t("You give no Trust yet: Trust on a profile or a topic's page.", {
+              nsSeparator: '|',
+            })
+          : t('No Trust given.')}
       </SmallText>
     )
-  const takeBack = (target) => (
-    <Action
-      call={ProfileCall.untrust(target)}
-      onClick={() =>
-        sending.prepareProfile('untrust', () => ProfileCall.untrust(target), {
-          detail: t('Your Trust no longer counts'),
-        })
-      }
-    >
-      {t('Take back')}
-    </Action>
-  )
+  const takeBack = (target) =>
+    isMine ? (
+      <Action
+        call={ProfileCall.untrust(target)}
+        onClick={() =>
+          sending.prepareProfile('untrust', () => ProfileCall.untrust(target), {
+            detail: t('Your Trust no longer counts'),
+          })
+        }
+      >
+        {t('Take back')}
+      </Action>
+    ) : null
   return (
     <Stack spacing={2}>
       {trusts.data.map(({target}) => {

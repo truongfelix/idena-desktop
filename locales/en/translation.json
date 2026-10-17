@@ -1620,5 +1620,21 @@
   "Period": "Period",
   "Show all posts": "Show all posts",
   "Sort": "Sort",
-  "Topics I follow": "Topics I follow"
+  "Topics I follow": "Topics I follow",
+  "1 identity": "1 identity",
+  "1 invitee": "1 invitee",
+  "1 member": "1 member",
+  "1 vouched member": "1 vouched member",
+  "{{count}} identities": "{{count}} identities",
+  "{{count}} invitees": "{{count}} invitees",
+  "{{count}} members": "{{count}} members",
+  "{{count}} trusted by": "{{count}} trusted by",
+  "{{count}} trusts given": "{{count}} trusts given",
+  "{{count}} vouched members": "{{count}} vouched members",
+  "Identities": "Identities",
+  "Nobody's Trust counts yet.": "Nobody's Trust counts yet.",
+  "No Trust given.": "No Trust given.",
+  "(vouched)": "(vouched)",
+  "vouched by {{name}}": "vouched by {{name}}",
+  "Vouched members": "Vouched members"
 }

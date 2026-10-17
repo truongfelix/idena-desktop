@@ -130,7 +130,21 @@ export function TrustButton({target}) {
   )
 }
 
-/** "Trusted by 12 (+3 vouched)": the givers counted now; a click lists them. */
+/** "12 identities · 3 vouched members": how a Trust count splits. */
+export function useTrustSplit() {
+  const {t} = useTranslation()
+  return (trust) =>
+    [
+      trust.identities === 1
+        ? t('1 identity')
+        : t('{{count}} identities', {count: trust.identities}),
+      trust.vouched === 1
+        ? t('1 vouched member')
+        : t('{{count}} vouched members', {count: trust.vouched}),
+    ].join(' · ')
+}
+
+/** "Trusted by 15": the givers counted now, identities and vouched members together; a click lists them. */
 export function TrustLine({target, onProfile}) {
   const {t} = useTranslation()
   const {data: trust, isError} = useTrust(target)
@@ -144,13 +158,10 @@ export function TrustLine({target, onProfile}) {
     )
   if (!trust)
     return <SmallText>{t('Trust: reading…', {nsSeparator: '|'})}</SmallText>
-  let text = t('Trusted by {{count}}', {count: trust.identities})
-  if (trust.counted.length === 0) text = t('Trusted by nobody yet')
-  else if (trust.vouched > 0)
-    text = t('Trusted by {{count}} (+{{vouched}} vouched)', {
-      count: trust.identities,
-      vouched: trust.vouched,
-    })
+  const text =
+    trust.counted.length === 0
+      ? t('Trusted by nobody yet')
+      : t('Trusted by {{count}}', {count: trust.counted.length})
   return (
     <>
       <Text
@@ -164,7 +175,7 @@ export function TrustLine({target, onProfile}) {
       </Text>
       {open && (
         <TrustGiversDialog
-          givers={trust.counted}
+          trust={trust}
           onProfile={(address) => {
             setOpen(false)
             onProfile(address)
@@ -176,14 +187,24 @@ export function TrustLine({target, onProfile}) {
   )
 }
 
-function TrustGiversDialog({givers, onProfile, onClose}) {
+/** The givers of a Trust count: the split, the identities first, then the vouched members, marked. */
+function TrustGiversDialog({trust, onProfile, onClose}) {
   const {t} = useTranslation()
   const {names} = useSocial()
+  const split = useTrustSplit()
+  const givers = [
+    ...trust.counted.filter(({vouched}) => !vouched),
+    ...trust.counted.filter(({vouched}) => vouched),
+  ]
   return (
-    <Dialog title={t('Trusted by')} isOpen onClose={onClose}>
+    <Dialog
+      title={t('Trusted by {{count}}', {count: givers.length})}
+      isOpen
+      onClose={onClose}
+    >
       <DialogBody>
         <Stack spacing={2} maxH="60vh" overflowY="auto">
-          {givers.length === 0 && <Text>{t('Nobody yet.')}</Text>}
+          <SmallText>{split(trust)}</SmallText>
           {givers.map(({address, vouched}) => (
             <HStack
               key={address}
@@ -193,7 +214,7 @@ function TrustGiversDialog({givers, onProfile, onClose}) {
             >
               <PersonAvatar address={address} boxSize={8} rounded="md" />
               <Text>{displayName(address, names)}</Text>
-              {vouched && <SmallText>{t('vouched member')}</SmallText>}
+              {vouched && <SmallText>{t('(vouched)')}</SmallText>}
             </HStack>
           ))}
         </Stack>
@@ -206,17 +227,12 @@ function TrustGiversDialog({givers, onProfile, onClose}) {
 }
 
 /**
- * The public profile of `address` from the profiles contract: its name, its bio and its Trust (the account's own
- * profile edits them from its ⚙ menu: ProfileEditDialog). Out of good standing it shows nothing, except to its owner. The name
- * line shows only when the title does not: a private name there (`privateName`), or the name hidden.
+ * The public profile of `address` from the profiles contract: its name and its bio (the account's own profile edits
+ * them from its ⚙ menu: ProfileEditDialog), then the vouching. Out of good standing it shows nothing, except to its
+ * owner. The name line shows only when the title does not: a private name there (`privateName`), or the name hidden.
+ * Its Trust is in the profile's header (profile-header.js).
  */
-export function PublicProfile({
-  address,
-  isMe,
-  profile,
-  privateName = false,
-  onProfile,
-}) {
+export function PublicProfile({address, isMe, profile, privateName = false}) {
   const {t} = useTranslation()
   if (!profilesEnabled) return null
   const shown = profile?.inStanding || isMe
@@ -235,10 +251,6 @@ export function PublicProfile({
       {shown && profile?.bio && (
         <Text whiteSpace="pre-wrap">{profile.bio}</Text>
       )}
-      <HStack spacing={3}>
-        <TrustLine target={address} onProfile={onProfile} />
-        {!isMe && <TrustButton target={address} />}
-      </HStack>
       {isMe ? (
         <MyVouching profile={profile} />
       ) : (

@@ -97,6 +97,7 @@ export default function SocialPage() {
     query.address,
     query.topic,
     query.chat,
+    query.list,
   ])
 
   const view = viewOf(query)
@@ -141,6 +142,7 @@ export default function SocialPage() {
       : null
   const openChat = (key) => go({chat: key})
   const onPage =
+    query.list !== undefined ||
     chatKey !== null ||
     postId !== null ||
     profileAddress !== null ||
@@ -192,6 +194,8 @@ export default function SocialPage() {
     content = (
       <ProfileView
         address={profileAddress}
+        list={query.list ?? null}
+        openList={(list) => go({address: profileAddress, list})}
         now={now}
         openThread={openThread}
         openProfile={openProfile}
@@ -204,6 +208,8 @@ export default function SocialPage() {
     content = me ? (
       <ProfileView
         address={me}
+        list={query.list ?? null}
+        openList={(list) => go({view: View.Profile, list})}
         now={now}
         openThread={openThread}
         openProfile={openProfile}

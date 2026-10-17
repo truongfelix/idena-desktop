@@ -1,50 +1,32 @@
 /* eslint-disable react/prop-types */
 import React from 'react'
 import {useTranslation} from 'react-i18next'
-import {Box, HStack, Stack, Text, IconButton} from '@chakra-ui/react'
+import {HStack, Stack, Text} from '@chakra-ui/react'
 import {SmallText} from '../../../shared/components/components'
 import {useSocial} from '../provider'
 import {useSocialIdentity} from '../hooks'
-import {person, shortAddress} from '../people'
 import {socialProfile} from '../activity'
 import {ProfileItemCard} from '../components/activity'
-import {Chip, FollowChip} from '../components/chips'
+import {Chip} from '../components/chips'
 import {PostRow} from '../components/post'
-import {identityColor, identityStatus} from '../format'
+import {identityStatus} from '../format'
 import {historyDone} from '../scan'
-import {CopyButton, PAGE_SIZE, Rows, ShowMore} from './common'
-import {useMembers, useProfile, useTrustsGiven} from '../profile-hooks'
+import {PAGE_SIZE, Rows, ShowMore} from './common'
+import {useProfile} from '../profile-hooks'
 import {isActingMember} from '../vouching'
-import {inviteeAddresses, inviterOf} from '../profile-lists'
-import {
-  ProfileEditDialog,
-  ProfilePicture,
-  PublicProfile,
-  useShownName,
-} from '../components/profile-public'
-import {OwnProfileMenu, ProfileMenu} from '../components/hide-menu'
-import {LINK} from '../components/theme'
-import {OffersSent, ProfilePeople, TrustsGiven} from './profile-people'
+import {ProfileEditDialog, PublicProfile} from '../components/profile-public'
+import {ProfileHeader, ProfileList} from './profile-header'
+import {ProfileListPage} from './profile-list-page'
 
-/** "Invited by <name>" under the identity line, while the node keeps the link; a click opens the inviter. */
-function InvitedBy({address, onProfile}) {
-  const {t} = useTranslation()
-  const name = useShownName(address)
-  return (
-    <Text
-      as="button"
-      textAlign="left"
-      fontSize="md"
-      color={LINK}
-      onClick={() => onProfile(address)}
-    >
-      {t('Invited by {{name}}', {name: name || shortAddress(address)})}
-    </Text>
-  )
-}
-
+/**
+ * The profile of `address`, as the phone app's: its header (profile-header.js: the people as counts), its public
+ * profile, then its content in tabs (Posts, Replies, Comments, Likes, Tips, Media). With `list` (ProfileList), the
+ * page of that list instead; `openList(list)` opens one.
+ */
 export function ProfileView({
   address,
+  list = null,
+  openList,
   now,
   openThread,
   openProfile,
@@ -54,25 +36,15 @@ export function ProfileView({
 }) {
   const {t} = useTranslation()
   // The feed as shown: a blocked account's profile lists nothing.
-  const {shownFeed: feed, me, people, setPerson, cache, chatKey} = useSocial()
+  const {shownFeed: feed, me, people, cache} = useSocial()
   const {
     data: identity,
     isError,
     isLoading: identityLoading,
     error: identityError,
   } = useSocialIdentity(address)
-  const members = useMembers(address)
   const isMe = address === me
-  // One's own Trusts given, to people and topics (read on one's own profile only).
-  const trustsGiven = useTrustsGiven(isMe ? address : null)
   const [editing, setEditing] = React.useState(false)
-  // The invitees the node keeps (until each is Verified or Human, or killed) and the members vouched for.
-  const invitees = React.useMemo(() => inviteeAddresses(identity), [identity])
-  const memberAddresses = React.useMemo(
-    () => (members.data || []).map(({member}) => member),
-    [members.data]
-  )
-  const inviter = inviterOf(identity)
   const profile = React.useMemo(
     () => socialProfile(feed, address),
     [address, feed]
@@ -80,11 +52,21 @@ export function ProfileView({
   const [tab, setTab] = React.useState('posts')
   const [shown, setShown] = React.useState(PAGE_SIZE)
   React.useEffect(() => setShown(PAGE_SIZE), [tab, address])
-  // "Trusts given" is on one's own profile only.
-  React.useEffect(() => {
-    if (!isMe && tab === 'trusts') setTab('posts')
-  }, [isMe, tab])
   const {data: publicProfile} = useProfile(address)
+
+  if (Object.values(ProfileList).includes(list))
+    return (
+      <ProfileListPage
+        address={address}
+        list={list}
+        isMe={isMe}
+        identity={identity}
+        identityLoading={identityLoading}
+        identityError={identityError}
+        openProfile={openProfile}
+      />
+    )
+
   // A private name wins; then the claimed one, while its holder is in good standing.
   const name =
     people[address]?.name ||
@@ -103,17 +85,8 @@ export function ProfileView({
     ['likes', t('Likes')],
     ['tips', t('Tips')],
     ['media', t('Media')],
-    ['invitees', t('Invitees')],
-    ['members', t('Members')],
-    ...(isMe ? [['trusts', t('Trusts given')]] : []),
   ]
-  const counts = {
-    invitees: identityLoading ? '…' : invitees.length,
-    members: members.isLoading ? '…' : memberAddresses.length,
-    trusts: trustsGiven.isLoading ? '…' : (trustsGiven.data || []).length,
-  }
-  const isPeople = ['invitees', 'members', 'trusts'].includes(tab)
-  const items = isPeople ? [] : profile[tab]
+  const items = profile[tab]
 
   let statusLine = t('Identity: asking the node…', {nsSeparator: '|'})
   if (isError)
@@ -134,87 +107,27 @@ export function ProfileView({
 
   return (
     <Stack spacing={3} w="full">
-      <HStack spacing={3} align="center">
-        <ProfilePicture
-          address={address}
-          profile={publicProfile}
-          boxSize={24}
-        />
-        <Stack spacing={0.5} flex={1} minW={0}>
-          <HStack spacing={1}>
-            <Text fontSize="lg" fontWeight={500} noOfLines={1}>
-              {name || shortAddress(address)}
-              {isMe && ` ${t('(you)')}`}
-            </Text>
-            {/* Next to the name, where the eye is (user 2026-10-17). */}
-            {isMe && (
-              <OwnProfileMenu
-                onEdit={() => setEditing(true)}
-                onRename={() => onRename(address)}
-                openSettings={openSettings}
-              />
-            )}
-            {!name && <CopyButton value={address} />}
-            <Box flex={1} />
-            {isBlocked && (
-              <Chip
-                onClick={() =>
-                  setPerson({
-                    ...(people[address] || person(address)),
-                    blocked: false,
-                  })
-                }
-              >
-                {t('Unblock')}
-              </Chip>
-            )}
-            {!isMe && !isBlocked && openChat && (
-              <IconButton
-                variant="ghost"
-                size="md"
-                aria-label={t('Message')}
-                title={t('Message')}
-                icon={<Text fontSize="lg">✉</Text>}
-                onClick={() => openChat(chatKey([address]))}
-              />
-            )}
-            {!isMe && !isBlocked && <FollowChip address={address} />}
-            {!isMe && !isBlocked && (
-              <ProfileMenu address={address} onRename={onRename} />
-            )}
-          </HStack>
-          {name && (
-            <HStack spacing={1}>
-              <Text fontFamily="mono" fontSize="sm" color="muted">
-                {shortAddress(address)}
-              </Text>
-              <CopyButton value={address} />
-            </HStack>
-          )}
-          <Text
-            fontSize="md"
-            fontWeight={500}
-            color={identityColor(identity?.state) || 'muted'}
-          >
-            {statusLine}
-          </Text>
-          {inviter && <InvitedBy address={inviter} onProfile={openProfile} />}
-          {isBlocked && (
-            <Text fontSize="md" color="red.500">
-              {t(
-                'Blocked: their posts, replies, comments and messages are hidden on this computer.',
-                {nsSeparator: '|'}
-              )}
-            </Text>
-          )}
-        </Stack>
-      </HStack>
+      <ProfileHeader
+        address={address}
+        name={name}
+        statusLine={statusLine}
+        identity={identity}
+        identityLoading={identityLoading}
+        publicProfile={publicProfile}
+        isMe={isMe}
+        isBlocked={isBlocked}
+        openList={openList}
+        openProfile={openProfile}
+        onRename={onRename}
+        openChat={openChat}
+        openSettings={openSettings}
+        onEdit={() => setEditing(true)}
+      />
       <PublicProfile
         address={address}
         isMe={isMe}
         profile={publicProfile}
         privateName={Boolean(people[address]?.name)}
-        onProfile={openProfile}
       />
       {editing && (
         <ProfileEditDialog
@@ -250,69 +163,37 @@ export function ProfileView({
             isSelected={tab === value}
             onClick={() => setTab(value)}
           >
-            {`${label} ${counts[value] ?? profile[value].length}`}
+            {`${label} ${profile[value].length}`}
           </Chip>
         ))}
       </HStack>
-      {tab === 'invitees' && (
-        <ProfilePeople
-          addresses={invitees}
-          isLoading={identityLoading}
-          error={identityError}
-          empty={t(
-            'No invitee on the way: an invitee shows here from its invitation until it is Verified.',
-            {nsSeparator: '|'}
-          )}
-          onOpen={openProfile}
-        />
+      {items.length === 0 && <SmallText>{t('Nothing here yet.')}</SmallText>}
+      {tab === 'posts' ? (
+        <Rows>
+          {items.slice(0, shown).map((item) => (
+            <PostRow
+              key={item.node.id}
+              node={item.node}
+              now={now}
+              onOpen={() => openThread(item.threadId, item.node.id)}
+              onProfile={openProfile}
+            />
+          ))}
+        </Rows>
+      ) : (
+        <Stack spacing={2}>
+          {items.slice(0, shown).map((item) => (
+            <ProfileItemCard
+              key={`${item.node.id}-${item.like?.hash || item.tip?.hash || ''}`}
+              item={item}
+              tab={tab}
+              now={now}
+              onOpen={() => openThread(item.threadId, item.node.id)}
+              onProfile={openProfile}
+            />
+          ))}
+        </Stack>
       )}
-      {tab === 'members' && (
-        <ProfilePeople
-          addresses={memberAddresses}
-          isLoading={members.isLoading}
-          error={members.error}
-          empty={t('No vouched member.')}
-          onOpen={openProfile}
-        />
-      )}
-      {tab === 'members' && isMe && (
-        <OffersSent me={address} onOpen={openProfile} />
-      )}
-      {tab === 'trusts' && isMe && (
-        <TrustsGiven trusts={trustsGiven} onOpen={openProfile} />
-      )}
-      {!isPeople && items.length === 0 && (
-        <SmallText>{t('Nothing here yet.')}</SmallText>
-      )}
-      {!isPeople &&
-        (tab === 'posts' ? (
-          <Rows>
-            {items.slice(0, shown).map((item) => (
-              <PostRow
-                key={item.node.id}
-                node={item.node}
-                now={now}
-                onOpen={() => openThread(item.threadId, item.node.id)}
-                onProfile={openProfile}
-              />
-            ))}
-          </Rows>
-        ) : (
-          <Stack spacing={2}>
-            {items.slice(0, shown).map((item) => (
-              <ProfileItemCard
-                key={`${item.node.id}-${
-                  item.like?.hash || item.tip?.hash || ''
-                }`}
-                item={item}
-                tab={tab}
-                now={now}
-                onOpen={() => openThread(item.threadId, item.node.id)}
-                onProfile={openProfile}
-              />
-            ))}
-          </Stack>
-        ))}
       <ShowMore
         shown={shown}
         total={items.length}
