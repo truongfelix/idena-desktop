@@ -26,6 +26,7 @@ import {Chip} from '../components/chips'
 import {PostRow, TopicShown} from '../components/post'
 import {TopicRow} from '../components/topic'
 import {FeedPeriod, FeedSort, sortFeed} from '../feed'
+import {feedPosts} from '../hiding'
 import {TOPIC_PREFIX, topicList} from '../topics'
 import {ContactRow, PAGE_SIZE, Rows, SearchField, ShowMore} from './common'
 import {PersonAvatar} from '../components/profile-public'
@@ -35,6 +36,8 @@ export function Home({now, openThread, openProfile, onRename, openSettings}) {
   // The feed as shown: without what is blocked or hidden (hiding.js).
   const {
     shownFeed: feed,
+    me,
+    hidden,
     people,
     names,
     epochStart,
@@ -63,7 +66,10 @@ export function Home({now, openThread, openProfile, onRename, openSettings}) {
   const posts = React.useMemo(
     () =>
       sortFeed(
-        following ? followingFeed(feed, people, followedTopics) : feed,
+        // Muted accounts and, at Hide, posts with a picture leave the feeds only: the search still finds them.
+        following
+          ? followingFeed(feedPosts(feed, hidden, me), people, followedTopics)
+          : feedPosts(feed, hidden, me),
         sort,
         {
           period,
@@ -71,7 +77,18 @@ export function Home({now, openThread, openProfile, onRename, openSettings}) {
           epochStart,
         }
       ),
-    [epochStart, feed, followedTopics, following, now, people, period, sort]
+    [
+      epochStart,
+      feed,
+      followedTopics,
+      following,
+      hidden,
+      me,
+      now,
+      people,
+      period,
+      sort,
+    ]
   )
   // "r/…" lists the topics whose name holds the rest.
   const topicSearch = query.trim().startsWith(TOPIC_PREFIX)

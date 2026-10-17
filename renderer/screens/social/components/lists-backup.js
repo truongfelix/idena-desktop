@@ -10,8 +10,8 @@ import {Chip} from './chips'
 const MAX_IMPORT_BYTES = 2000000
 
 /**
- * Export and import of the names, the people followed and blocked, the topics followed and blocked, the hidden words
- * and the posts hidden, as one file (the phone app's format): an import adds to the lists, never removes.
+ * Export and import of the names, the people followed, muted and blocked, the topics followed and blocked, the hidden
+ * words and the posts hidden, as one file (the phone app's format): an import adds to the lists, never removes.
  */
 export function ListsBackup() {
   const {t} = useTranslation()
@@ -92,7 +92,7 @@ export function ListsBackup() {
       <Text fontWeight={500}>{t('Your lists')}</Text>
       <SmallText>
         {t(
-          'The names you gave, the people and the topics you follow, the accounts and topics you blocked, the hidden words and posts: kept on this computer only. Export saves them to a file; Import adds a file (from this computer or the phone app) without removing anything.',
+          'The names you gave, the people and the topics you follow, the accounts you muted, the accounts and topics you blocked, the hidden words and posts: kept on this computer only. Export saves them to a file; Import adds a file (from this computer or the phone app) without removing anything.',
           {nsSeparator: '|'}
         )}
       </SmallText>

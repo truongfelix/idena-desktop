@@ -3,6 +3,7 @@ import {readCache} from './scan'
 import {cleanTopics} from './topics'
 import {readChatStore} from './messages'
 import {cleanHiddenPosts, cleanHiddenWords} from './lists'
+import {picturesMode} from './hiding'
 
 function socialDb() {
   return subDb(requestDb(), 'social', {valueEncoding: 'json'})
@@ -34,7 +35,7 @@ async function getOr(db, key, fallback) {
 /**
  * The Social settings kept on this computer: the contacts (the phone's people.json format, blocks included), the
  * topics followed and blocked (names), the hidden words, the posts hidden (transaction hashes), the block through
- * which the notifications were seen, the kinds switched off, and whether the scan is off.
+ * which the notifications were seen, the kinds switched off, whether the scan is off, and "Pictures in posts".
  */
 export async function loadSocialSettings(db = socialDb()) {
   const [
@@ -46,6 +47,7 @@ export async function loadSocialSettings(db = socialDb()) {
     hiddenWords,
     hiddenPosts,
     blockedTopics,
+    picturesInPosts,
   ] = await Promise.all([
     getOr(db, 'people', null),
     getOr(db, 'topics', []),
@@ -55,6 +57,7 @@ export async function loadSocialSettings(db = socialDb()) {
     getOr(db, 'hiddenWords', []),
     getOr(db, 'hiddenPosts', []),
     getOr(db, 'blockedTopics', []),
+    getOr(db, 'picturesInPosts', null),
   ])
   return {
     people,
@@ -65,6 +68,7 @@ export async function loadSocialSettings(db = socialDb()) {
     hiddenWords: cleanHiddenWords(hiddenWords),
     hiddenPosts: cleanHiddenPosts(hiddenPosts),
     blockedTopics: cleanTopics(blockedTopics),
+    picturesInPosts: picturesMode(picturesInPosts),
   }
 }
 

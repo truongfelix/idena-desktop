@@ -6,8 +6,21 @@ import {postTopic} from './topics'
 // `blocked` mark), hidden words, posts hidden one by one and blocked topics. A blocked account's posts, replies,
 // comments, likes and tips leave the lists, the threads, the notifications and the messages. A post hidden, or whose
 // text has a hidden word, leaves the lists and the notifications; inside a thread, such a reply or comment shows
-// folded. A blocked topic's posts leave the lists. The identity's own posts are never hidden. The same rules as the
-// phone app (SocialHiding.kt).
+// folded. A blocked topic's posts leave the lists. A muted account's posts, and with "Pictures in posts" at Hide the
+// posts with a picture, leave the feeds only (leavesFeeds). The identity's own posts are never hidden. The same rules
+// as the phone app (SocialHiding.kt).
+
+/**
+ * The Social setting "Pictures in posts" (user 2026-10-17), kept on this computer and not in the lists file: Show
+ * them (as before); TapToShow: the post stays, another's picture is one line until clicked in its thread (nothing
+ * downloaded before); Hide posts with pictures: they leave the feeds, a reply or comment with one folds in its
+ * thread. The values are the phone's names.
+ */
+export const PicturesMode = {Show: 'Show', TapToShow: 'TapToShow', Hide: 'Hide'}
+
+/** A saved "Pictures in posts" value: Show unless it is one of PicturesMode. */
+export const picturesMode = (value) =>
+  Object.values(PicturesMode).includes(value) ? value : PicturesMode.Show
 
 /** A hidden word or phrase is at most this long. */
 export const MAX_HIDDEN_WORD = 60
@@ -64,19 +77,25 @@ export function wordFilter(words = []) {
 
 /**
  * What is hidden: the accounts blocked (`blocked`, lowercase), the hidden words (`words`), the posts, replies and
- * comments hidden one by one (by transaction hash, `posts`) and the topics blocked (`topics`).
+ * comments hidden one by one (by transaction hash, `posts`) and the topics blocked (`topics`); what leaves the feeds
+ * only: the accounts muted (`muted`, lowercase) and, with `pictures` at Hide, the posts with a picture.
  */
 export function hiding({
   blocked = new Set(),
   words = wordFilter(),
   posts = new Set(),
   topics = new Set(),
+  muted = new Set(),
+  pictures = PicturesMode.Show,
 } = {}) {
   return {
     blocked,
     words,
     posts,
     topics,
+    muted,
+    pictures,
+    // isEmpty is about what visibleFeed hides: muted accounts and pictures leave the feeds only (feedPosts).
     isEmpty:
       blocked.size === 0 &&
       words.isEmpty &&
@@ -86,6 +105,22 @@ export function hiding({
 }
 
 export const NO_HIDING = hiding()
+
+/**
+ * Whether a post, reply or comment leaves the feeds (Home, Following, a topic's page) but stays on its author's
+ * profile, in threads and in the search: a muted author's, or one with a picture while pictures are hidden; never
+ * `me`'s. In a thread, such a reply or comment starts folded.
+ */
+export const leavesFeeds = (hidden, call, me) =>
+  call.author !== me &&
+  (hidden.muted.has(call.author) ||
+    (hidden.pictures === PicturesMode.Hide && Boolean(call.hasMedia)))
+
+/** The posts of a feed without those that leave the feeds (leavesFeeds); the same list when none can. */
+export const feedPosts = (feed, hidden, me) =>
+  hidden.muted.size === 0 && hidden.pictures !== PicturesMode.Hide
+    ? feed
+    : feed.filter((node) => !leavesFeeds(hidden, node.call, me))
 
 /** Whether a call's text is hidden (hidden one by one, or with a hidden word in the transaction); never `me`'s. */
 export const hidesText = (hidden, call, me) =>

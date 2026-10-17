@@ -1,7 +1,15 @@
 /* eslint-disable react/prop-types */
 import React from 'react'
 import {useTranslation} from 'react-i18next'
-import {HStack, IconButton, Input, Stack, Text} from '@chakra-ui/react'
+import {
+  HStack,
+  IconButton,
+  Input,
+  Radio,
+  RadioGroup,
+  Stack,
+  Text,
+} from '@chakra-ui/react'
 import {SmallText} from '../../../shared/components/components'
 import {useSocial} from '../provider'
 import {displayName, person, sortedPeople} from '../people'
@@ -10,6 +18,7 @@ import {timeAgo} from '../format'
 import {
   MAX_HIDDEN_WORD,
   MAX_HIDDEN_WORDS,
+  PicturesMode,
   cleanHiddenWord,
   hiddenEntries,
   matchForm,
@@ -20,8 +29,8 @@ import {OpenTopicContext, TopicAvatar} from '../components/topic'
 import {PersonAvatar} from '../components/profile-public'
 
 // The lists of Social settings for what is hidden on this computer, each entry undone there, as the phone app's
-// (SocialBlocking.kt, SocialHiddenViews.kt): the accounts blocked, the hidden words, the posts hidden one by one
-// and the topics blocked.
+// (SocialBlocking.kt, SocialHiddenViews.kt, SocialMuting.kt): the accounts muted and blocked, the hidden words, the
+// posts hidden one by one and the topics blocked; and the "Pictures in posts" setting.
 
 function Row({onOpen, children}) {
   return (
@@ -49,6 +58,85 @@ function UndoChip({onClick, children}) {
     >
       {children}
     </Chip>
+  )
+}
+
+/** The accounts muted, each with Unmute; a click on one opens its profile. */
+export function MutedList({openProfile}) {
+  const {t} = useTranslation()
+  const {people, names, setPerson} = useSocial()
+  const muted = sortedPeople(people).filter((one) => one.muted)
+  return (
+    <>
+      <SmallText>
+        {t(
+          'Their posts leave Home, Following and the topics, and their replies show folded in threads, on this computer only. Their likes, replies and tips on your posts still notify you, their messages still arrive, and their profile still lists their posts.'
+        )}
+      </SmallText>
+      {muted.length === 0 && (
+        <SmallText>
+          {t(
+            'Nobody is muted. To mute an account: ⋯ on its profile or on one of its posts.',
+            {nsSeparator: '|'}
+          )}
+        </SmallText>
+      )}
+      {muted.map(({address}) => (
+        <Row key={address} onOpen={() => openProfile(address)}>
+          <PersonAvatar address={address} boxSize={10} rounded="md" />
+          <Text fontWeight={500} flex={1} minW={0} noOfLines={1}>
+            {displayName(address, names)}
+          </Text>
+          <UndoChip
+            onClick={() =>
+              setPerson({
+                ...(people[address] || person(address)),
+                muted: false,
+              })
+            }
+          >
+            {t('Unmute')}
+          </UndoChip>
+        </Row>
+      ))}
+    </>
+  )
+}
+
+/** "Pictures in posts": Show, Click to show, or Hide posts with pictures (PicturesMode); one's own posts never change. */
+export function PicturesSetting() {
+  const {t} = useTranslation()
+  const {picturesInPosts, setPicturesInPosts} = useSocial()
+  const titles = {
+    [PicturesMode.Show]: t('Show'),
+    [PicturesMode.TapToShow]: t('Click to show'),
+    [PicturesMode.Hide]: t('Hide posts with pictures'),
+  }
+  const lines = {
+    [PicturesMode.Show]: t('Pictures show in the posts.'),
+    [PicturesMode.TapToShow]: t(
+      "A post's picture is one line until you click it in its thread: nothing is downloaded before.",
+      {nsSeparator: '|'}
+    ),
+    [PicturesMode.Hide]: t(
+      'Posts with a picture leave Home, Following and the topics; a reply with one shows folded in its thread.'
+    ),
+  }
+  return (
+    <Stack spacing={2}>
+      <RadioGroup value={picturesInPosts} onChange={setPicturesInPosts}>
+        <Stack spacing={2}>
+          {Object.values(PicturesMode).map((mode) => (
+            <Radio key={mode} value={mode}>
+              {titles[mode]}
+            </Radio>
+          ))}
+        </Stack>
+      </RadioGroup>
+      <SmallText>
+        {`${lines[picturesInPosts]} ${t('Your own posts never change.')}`}
+      </SmallText>
+    </Stack>
   )
 }
 

@@ -10,10 +10,14 @@ import {
 import {
   MAX_HIDDEN_WORD,
   NO_HIDING,
+  PicturesMode,
   cleanHiddenWord,
+  feedPosts,
   hiddenEntries,
   hidesText,
   hiding,
+  leavesFeeds,
+  picturesMode,
   threadPost,
   txHashOf,
   visibleActivity,
@@ -267,5 +271,52 @@ describe('what is hidden', () => {
     expect(entries[1].threadId).toBe(5)
     expect(entries[1].node.id).toBe(7)
     expect(entries[0].node).toBeUndefined()
+  })
+})
+
+describe('mute and "Pictures in posts"', () => {
+  const withPicture = (n) => ({...n, call: {...n.call, hasMedia: true}})
+
+  it("take a muted author's posts out of the feeds only", () => {
+    const feed = [node(1, bob), node(2, eve), node(3, me)]
+    const hidden = hiding({muted: new Set([bob, me])})
+    expect(ids(feedPosts(feed, hidden, me))).toEqual([2, 3])
+    // Not a block: the feed as shown everywhere else (profiles, threads, search) keeps them.
+    expect(ids(visibleFeed(feed, hidden, me))).toEqual([1, 2, 3])
+    expect(leavesFeeds(hidden, call(4, bob, 'hi', {replyTo: '1'}), me)).toBe(
+      true
+    )
+    expect(leavesFeeds(hidden, call(5, eve, 'hi', {replyTo: '1'}), me)).toBe(
+      false
+    )
+  })
+
+  it('take posts with a picture out of the feeds only when hidden', () => {
+    const feed = [
+      withPicture(node(1, bob)),
+      node(2, eve),
+      withPicture(node(3, me)),
+    ]
+    const at = (pictures) => ids(feedPosts(feed, hiding({pictures}), me))
+    expect(at(PicturesMode.Show)).toEqual([1, 2, 3])
+    expect(at(PicturesMode.TapToShow)).toEqual([1, 2, 3])
+    // Never one's own.
+    expect(at(PicturesMode.Hide)).toEqual([2, 3])
+    // Nothing to filter: the same list.
+    expect(feedPosts(feed, NO_HIDING, me)).toBe(feed)
+  })
+
+  it('read the saved setting by name, Show by default', () => {
+    expect(picturesMode('TapToShow')).toBe(PicturesMode.TapToShow)
+    expect(picturesMode('Hide')).toBe(PicturesMode.Hide)
+    expect(picturesMode(null)).toBe(PicturesMode.Show)
+    expect(picturesMode('tap')).toBe(PicturesMode.Show)
+  })
+
+  it('keep a person only muted in the list, and in its file', () => {
+    const people = withPerson({}, person(bob, {muted: true}))
+    expect(Object.keys(people)).toEqual([bob])
+    expect(peopleFromJson(peopleToJson(people))[bob].muted).toBe(true)
+    expect(withPerson(people, person(bob))).toEqual({})
   })
 })

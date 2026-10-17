@@ -2,8 +2,9 @@ import {ipfsCid} from './calls'
 import {topicOf} from './contract'
 
 // The Social contacts, kept on this computer only: a private name for an address, shown instead of the address in
-// the Social tab, and three marks: Following (their posts in the feed's Following filter), Message (their
-// conversations out of Requests) and Blocked (hidden everywhere on this computer, hiding.js). Nothing is published.
+// the Social tab, and four marks: Following (their posts in the feed's Following filter), Message (their
+// conversations out of Requests), Blocked (hidden everywhere on this computer, hiding.js) and Muted (their posts out
+// of the feeds, their replies folded: hiding.js, leavesFeeds). Nothing is published.
 // The same format as the phone app's people.json, so that a list exported on one imports on the other.
 
 export const MAX_NAME = 40
@@ -46,17 +47,24 @@ export const cleanName = (text) => takeWhole(oneLine(text), MAX_NAME).trim()
 /** A contact: address lowercase, name empty when not named. */
 export const person = (
   address,
-  {name = '', following = false, message = false, blocked = false} = {}
+  {
+    name = '',
+    following = false,
+    message = false,
+    blocked = false,
+    muted = false,
+  } = {}
 ) => ({
   address: String(address).toLowerCase(),
   name,
   following,
   message,
   blocked,
+  muted,
 })
 
-const isEmptyPerson = ({name, following, message, blocked}) =>
-  name === '' && !following && !message && !blocked
+const isEmptyPerson = ({name, following, message, blocked, muted}) =>
+  name === '' && !following && !message && !blocked && !muted
 
 /** The list (by address) with a contact put in, or taken out once it has no name and no mark. */
 export function withPerson(people, next) {
@@ -79,12 +87,13 @@ export function sortedPeople(people) {
 export const peopleToJson = (people) => ({
   version: PEOPLE_VERSION,
   people: sortedPeople(people).map(
-    ({address, name, following, message, blocked}) => ({
+    ({address, name, following, message, blocked, muted}) => ({
       address,
       name,
       following,
       message,
       blocked,
+      muted,
     })
   ),
 })
@@ -101,6 +110,7 @@ export function peopleFromJson(json) {
           following: entry.following === true,
           message: entry.message === true,
           blocked: entry.blocked === true,
+          muted: entry.muted === true,
         })
       )
   }
@@ -112,6 +122,14 @@ export const blockedAddresses = (people) =>
   new Set(
     Object.values(people)
       .filter(({blocked}) => blocked)
+      .map(({address}) => address)
+  )
+
+/** The addresses muted in the list: their posts leave the feeds only (hiding.js, leavesFeeds). */
+export const mutedAddresses = (people) =>
+  new Set(
+    Object.values(people)
+      .filter(({muted}) => muted)
       .map(({address}) => address)
   )
 
@@ -197,6 +215,7 @@ export function mergePeople(current, imported) {
           following: old.following || one.following,
           message: old.message || one.message,
           blocked: old.blocked || one.blocked,
+          muted: old.muted || one.muted,
         })
       : one
     if (!old) added += 1
@@ -204,7 +223,8 @@ export function mergePeople(current, imported) {
       merged.name !== old.name ||
       merged.following !== old.following ||
       merged.message !== old.message ||
-      merged.blocked !== old.blocked
+      merged.blocked !== old.blocked ||
+      merged.muted !== old.muted
     )
       changed += 1
     people = withPerson(people, merged)
