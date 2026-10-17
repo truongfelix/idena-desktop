@@ -54,6 +54,7 @@ import {
   VotingStatusBadge,
   VoteDrawer,
   AsideStat,
+  VotingAuthor,
   VotingInspector,
   VotingResult,
   LaunchDrawer,
@@ -971,6 +972,7 @@ export default function ViewVotingPage() {
                         </StatNumber>
                       </Stat>
                     )}
+                    <VotingAuthor address={issuer} />
                     <AsideStat
                       label={t('Committee size')}
                       value={t('{{committeeSize}} oracles', {committeeSize})}

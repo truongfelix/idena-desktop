@@ -109,6 +109,8 @@ import {AdImage} from '../ads/components'
 import {AdDrawer} from '../ads/containers'
 import {AD_MEDIA_SIZE} from '../ads/utils'
 import {useFormatDna} from '../../shared/hooks/hooks'
+import {useShownName} from '../social/components/profile-public'
+import {shortAddress} from '../social/people'
 
 export function VotingCard({votingRef, ...props}) {
   const router = useRouter()
@@ -731,6 +733,30 @@ export function AsideStat({label, value, ...props}) {
         {value}
       </StatNumber>
     </Stat>
+  )
+}
+
+/** "Author": the robot and the name shown for `address` (else its short address), "(you)" for one's own. */
+export function VotingAuthor({address, ...props}) {
+  const {t} = useTranslation()
+  const {address: me} = useIdentityState()
+  const name = useShownName(address)
+  if (!address) return null
+  const own = String(address).toLowerCase() === String(me).toLowerCase()
+  return (
+    <AsideStat
+      label={t('Author')}
+      value={
+        <HStack spacing={2} as="span">
+          <Avatar address={address} w={5} h={5} />
+          <Text as="span" title={address}>
+            {name || shortAddress(address)}
+            {own && ` ${t('(you)')}`}
+          </Text>
+        </HStack>
+      }
+      {...props}
+    />
   )
 }
 
