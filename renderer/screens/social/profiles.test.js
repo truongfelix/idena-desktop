@@ -221,6 +221,8 @@ describe('Trust counted by the giver now', () => {
     ).toMatchObject({
       identities: 0,
       vouched: 1,
+      // The voucher, for "vouched by" in the list.
+      counted: [{address: carol, vouched: true, voucher: alice}],
     })
     expect(countTrust(givers, {[carol]: 'Killed'}, {})).toMatchObject({
       identities: 0,

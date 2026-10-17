@@ -243,8 +243,8 @@ export async function readTrustsGiven(
  * (a member who validated since counts as an identity; an identity that lost it counts while vouched for). An
  * identity in a trusting state counts with the identities; an account without one, while its voucher is
  * validated, with the vouched members. `states` by lowercase address (the givers' and their vouchers'), `vouchers`
- * the givers' vouchers. Returns the counted givers ({address, vouched}: how each counts now) and the counts
- * ("Trusted by 12 (+3 vouched)").
+ * the givers' vouchers. Returns the counted givers ({address, vouched}: how each counts now; a vouched one with its
+ * `voucher`) and the counts (identities, vouched; "Trusted by" shows their sum).
  */
 export function countTrust(givers, states, vouchers = {}) {
   const counted = []
@@ -253,7 +253,7 @@ export function countTrust(givers, states, vouchers = {}) {
     const voucher = vouchers[giver.address]
     if (isTrusting(state)) counted.push({...giver, vouched: false})
     else if (voucher && inStanding(state, states[voucher]))
-      counted.push({...giver, vouched: true})
+      counted.push({...giver, vouched: true, voucher})
   }
   return {
     counted,
