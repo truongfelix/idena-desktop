@@ -31,6 +31,8 @@ import {
   Portal,
   IconButton,
   Link,
+  useDisclosure,
+  useInterval,
 } from '@chakra-ui/react'
 import {useRouter} from 'next/router'
 import {useTranslation} from 'react-i18next'
@@ -60,7 +62,6 @@ import {
   DrawerFormHelper,
 } from '../../shared/components/components'
 import {
-  useCurrentAd,
   useRotatingAds,
   useRotateAds,
   useAdStatusColor,
@@ -131,13 +132,38 @@ import {
 } from './review-fees'
 import {DnaInput} from '../oracles/components'
 import {useFormatDna} from '../../shared/hooks/hooks'
+import {
+  bannerItems,
+  DEV_NOTE,
+  DevNoteBannerContent,
+  DevNoteDialog,
+} from './dev-note'
 
+/** How long each item of the banner shows, in seconds (as on the phone app). */
+const BANNER_ROTATION_SECONDS = 10
+
+/** The banner on top of the pages: the approved ads for this identity in turn, then the developer's note. */
 export function AdBanner() {
   const {t} = useTranslation()
 
   const router = useRouter()
 
-  const activeAd = useCurrentAd()
+  const ads = useRotatingAds()
+
+  const items = bannerItems(ads)
+
+  const [index, setIndex] = React.useState(0)
+
+  useInterval(
+    () => setIndex((current) => (current + 1) % items.length),
+    items.length > 1 ? BANNER_ROTATION_SECONDS * 1000 : null
+  )
+
+  const item = items[index % items.length]
+
+  const activeAd = item === DEV_NOTE ? null : item
+
+  const devNoteDisclosure = useDisclosure()
 
   return (
     <Flex
@@ -149,9 +175,16 @@ export function AdBanner() {
       pr="4"
       h="14"
     >
-      <AdBannerContent ad={activeAd} />
+      {activeAd ? (
+        <AdBannerContent ad={activeAd} />
+      ) : (
+        <DevNoteBannerContent onOpen={devNoteDisclosure.onOpen} />
+      )}
+      <DevNoteDialog {...devNoteDisclosure} />
       <HStack spacing="10">
-        <AdBannerAuthor ad={activeAd} display={['none', 'flex']} />
+        {activeAd && (
+          <AdBannerAuthor ad={activeAd} display={['none', 'flex']} />
+        )}
         <Menu zIndex="popover">
           {false && (
             <MenuItem

@@ -1645,5 +1645,16 @@
   "Terminate the invitation": "Terminate the invitation",
   "Terminate the invitation of {{name}}?": "Terminate the invitation of {{name}}?",
   "They can no longer validate with this invitation, and your invitation is not given back": "They can no longer validate with this invitation, and your invitation is not given back",
-  "You no longer vouch for them": "You no longer vouch for them"
+  "You no longer vouch for them": "You no longer vouch for them",
+  "the original Idena code, no longer maintained": "the original Idena code, no longer maintained",
+  "the forks I started from, and code reviews": "the forks I started from, and code reviews",
+  "idena.social, the Social tab": "idena.social, the Social tab",
+  "A note from the dev": "A note from the dev",
+  "Community work, same chain as the original. Click to read.": "Community work, same chain as the original. Click to read.",
+  "Community work, not by the original Idena team. Same chain as the original.": "Community work, not by the original Idena team. Same chain as the original.",
+  "Thanks to:": "Thanks to:",
+  "What I believe: today an identity that fails to solve flips loses mining rewards, but an identity whose flips get reported loses nothing. That is unfair, and it weakens the network.": "What I believe: today an identity that fails to solve flips loses mining rewards, but an identity whose flips get reported loses nothing. That is unfair, and it weakens the network.",
+  "The proposal: cut an identity's mining rewards in proportion to its share of reported flips over the last 10 epochs. Also, an identity with 2 or more flips reported in a validation can't mine during the next epoch. If you agree, say so on Telegram, Discord or idena.social.": "The proposal: cut an identity's mining rewards in proportion to its share of reported flips over the last 10 epochs. Also, an identity with 2 or more flips reported in a validation can't mine during the next epoch. If you agree, say so on Telegram, Discord or idena.social.",
+  "Want to help? Feel free to fork the code, review it and propose changes on GitHub.": "Want to help? Feel free to fork the code, review it and propose changes on GitHub.",
+  "Robot avatars: RoboHash (MIT), robots by Zikri Kader (CC-BY 4.0), drawn by this app.": "Robot avatars: RoboHash (MIT), robots by Zikri Kader (CC-BY 4.0), drawn by this app."
 }

@@ -74,7 +74,6 @@ import {
 import {viewVotingHref} from '../../screens/oracles/utils'
 import {useHardFork} from '../../screens/hardfork/hooks'
 import {AdBanner} from '../../screens/ads/containers'
-import {useRotatingAds} from '../../screens/ads/hooks'
 import {ChevronRightIcon, GithubIcon} from './icons'
 import {
   useAutoStartLottery,
@@ -308,12 +307,9 @@ function NormalApp({skipBanner, children}) {
 
   useDnaLinkRedirect(DnaLinkMethod.Vote, ({address}) => viewVotingHref(address))
 
-  const ads = useRotatingAds()
-  const hasRotatingAds = ads?.length > 0
-
   return (
     <Flex as="section" direction="column" flex={1} h="100vh" overflowY="auto">
-      {hasRotatingAds && !skipBanner && <AdBanner />}
+      {!skipBanner && <AdBanner />}
 
       {children}
 
