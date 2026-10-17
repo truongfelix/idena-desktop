@@ -54,9 +54,72 @@ function Pill({onClick, label, isDisabled = false, children}) {
 }
 
 /**
- * The counters and actions of a post, reply or comment, as the phone app's pills: ♡ likes (❤️ once liked, by the
- * scan or a like still on its way), 💬 answers (in a thread: answer it), 🪙 tip (or the iDNA tipped), and 👁 to see
- * who liked and tipped. Each action shows its fee before anything is sent. `onAnswers` opens the thread.
+ * A pill of two parts: the action (`onAction`, dimmed when `isDisabled`) and its count, which opens who did it
+ * (`onCount`, a button only while the count is not zero).
+ */
+function SplitPill({label, countLabel, isDisabled, onAction, count, onCount}) {
+  const hasCount = Boolean(onCount)
+  const part = (active) => ({
+    px: 3,
+    py: 1,
+    cursor: active ? 'pointer' : 'default',
+    _hover: active ? {bg: 'gray.50'} : undefined,
+  })
+  return (
+    <HStack
+      spacing={0}
+      borderWidth={1}
+      borderColor="gray.100"
+      rounded="full"
+      overflow="hidden"
+      fontSize="sm"
+      fontWeight={500}
+      color="brandGray.500"
+      whiteSpace="nowrap"
+    >
+      <Box
+        as="button"
+        aria-label={label}
+        title={label}
+        disabled={isDisabled}
+        opacity={isDisabled ? 0.45 : 1}
+        {...part(!isDisabled)}
+        onClick={(e) => {
+          e.stopPropagation()
+          if (!isDisabled) onAction()
+        }}
+      >
+        {count.action}
+      </Box>
+      {count.text !== null && (
+        <Box
+          as={hasCount ? 'button' : 'span'}
+          aria-label={hasCount ? countLabel : undefined}
+          title={hasCount ? countLabel : undefined}
+          borderLeftWidth={1}
+          borderColor="gray.100"
+          {...part(hasCount)}
+          onClick={
+            hasCount
+              ? (e) => {
+                  e.stopPropagation()
+                  onCount()
+                }
+              : undefined
+          }
+        >
+          {count.text}
+        </Box>
+      )}
+    </HStack>
+  )
+}
+
+/**
+ * The counters and actions of a post, reply or comment: ♡ likes (❤️ once liked, by the scan or a like still on its
+ * way), 💬 answers (in a thread: answer it), 🪙 Tip and the iDNA tipped. A click on the likes or the tips opens who
+ * liked and tipped; one's own post has no Tip, only its tipped total. Each action shows its fee before anything is
+ * sent. `onAnswers` opens the thread.
  */
 export function ActionBar({node, onAnswers, onProfile, showAnswers = true}) {
   const {t} = useTranslation()
@@ -71,15 +134,18 @@ export function ActionBar({node, onAnswers, onProfile, showAnswers = true}) {
   const target = targets.get(node.id)
   const canAct = sending.canAct && Boolean(target)
   const {author: postAuthor} = node.call
+  const isOwn = postAuthor === me
+  const openWho = () => setIsWhoOpen(true)
   return (
     <HStack spacing={2} align="center">
-      <Pill
+      <SplitPill
         label={liked ? t('Liked') : t('Like')}
+        countLabel={t('Who liked and tipped')}
         isDisabled={!canAct || liked}
-        onClick={() => sending.prepareLike(target, node.id)}
-      >
-        {liked ? LIKE : '♡'} {likes}
-      </Pill>
+        onAction={() => sending.prepareLike(target, node.id)}
+        count={{action: liked ? LIKE : '♡', text: String(likes)}}
+        onCount={likes > 0 ? openWho : null}
+      />
       {showAnswers ? (
         <Pill label={t('Answers')} onClick={onAnswers}>
           💬 {replyCount(node)}
@@ -93,21 +159,24 @@ export function ActionBar({node, onAnswers, onProfile, showAnswers = true}) {
           💬 {t('Reply')}
         </Pill>
       )}
-      <Pill
-        label={t('Tip')}
-        isDisabled={!canAct || postAuthor === me}
-        onClick={() => setIsTipOpen(true)}
-      >
-        🪙 {tips > 0 ? tipText(tips) : t('Tip')}
-      </Pill>
-      <Box flex={1} />
-      {(likes > 0 || node.tips.length > 0) && (
-        <Pill
-          label={t('Who liked and tipped')}
-          onClick={() => setIsWhoOpen(true)}
-        >
-          👁
-        </Pill>
+      {isOwn ? (
+        tips > 0 && (
+          <Pill label={t('Who liked and tipped')} onClick={openWho}>
+            🪙 {tipText(tips)}
+          </Pill>
+        )
+      ) : (
+        <SplitPill
+          label={t('Tip')}
+          countLabel={t('Who liked and tipped')}
+          isDisabled={!canAct}
+          onAction={() => setIsTipOpen(true)}
+          count={{
+            action: `🪙 ${t('Tip')}`,
+            text: tips > 0 ? tipText(tips) : null,
+          }}
+          onCount={tips > 0 ? openWho : null}
+        />
       )}
       {isTipOpen && (
         <TipDialog
@@ -146,7 +215,7 @@ function WhoLine({address, extra, time, onProfile}) {
   )
 }
 
-/** Who liked and who tipped, newest first, as the phone app's 👁 dialog. */
+/** Who liked and who tipped, newest first: a click on a post's likes or tips opens it. */
 function WhoDialog({node, onClose, onProfile}) {
   const {t} = useTranslation()
   const likes = [...node.likeCalls].reverse()

@@ -15,6 +15,12 @@ import {postTopic} from '../topics'
 import {hidesText, leavesFeeds} from '../hiding'
 import {TopicLine} from './topic'
 
+/**
+ * The author's picture in a thread: an answer to the post (depth 0) a little bigger than a comment under it. Steps
+ * of the theme's size scale: one outside it (11) is read as pixels, an 11 px picture (B-100).
+ */
+export const answerAvatarSize = (depth) => (depth === 0 ? 10 : 9)
+
 const RAIL = '18px'
 const MAX_INDENT = 6
 
@@ -112,7 +118,7 @@ function ThreadItem({
               time={node.call.time}
               now={now}
               onProfile={onProfile}
-              avatarSize={depth === 0 ? 11 : 9}
+              avatarSize={answerAvatarSize(depth)}
               onClick={() => setFolded(true)}
               isOp={node.call.author === opAuthor}
               call={node.call}
@@ -158,7 +164,7 @@ export function SocialThread({node, now, focusId, onProfile}) {
         bg={focusId === idKey(node.id) ? 'gray.50' : undefined}
         rounded="md"
       >
-        {topic !== null && <TopicLine name={topic} now={now} large />}
+        {topic !== null && <TopicLine name={topic} large />}
         <FullHeader
           address={node.call.author}
           time={node.call.time}

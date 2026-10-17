@@ -8,6 +8,7 @@ import {
   PopoverBody,
   PopoverContent,
   PopoverTrigger,
+  Portal,
   Stack,
   Text,
 } from '@chakra-ui/react'
@@ -124,48 +125,51 @@ export function FeedFilterButton({
           icon={<FilterIcon isDefault={isDefault} />}
         />
       </PopoverTrigger>
-      <PopoverContent w="sm">
-        <PopoverBody p={4}>
-          <Stack spacing={4}>
-            <Section title={t('Show')}>
-              <Chip
-                isSelected={!isFollowed(filter)}
-                onClick={() =>
-                  onChange({...filter, people: false, topics: false})
-                }
-              >
-                {t('All')}
-              </Chip>
-              {followed('people', labels.people, peopleCount)}
-              {followed('topics', labels.topics, topicsCount)}
-            </Section>
-            <Section title={t('Sort')}>
-              {Object.values(FeedSort).map((sort) => (
+      {/* In a portal: inside the search field, its box made the page wider than the window (B-99). */}
+      <Portal>
+        <PopoverContent w="sm">
+          <PopoverBody p={4}>
+            <Stack spacing={4}>
+              <Section title={t('Show')}>
                 <Chip
-                  key={sort}
-                  isSelected={filter.sort === sort}
-                  onClick={() => onChange({...filter, sort})}
+                  isSelected={!isFollowed(filter)}
+                  onClick={() =>
+                    onChange({...filter, people: false, topics: false})
+                  }
                 >
-                  {labels.sorts[sort]}
+                  {t('All')}
                 </Chip>
-              ))}
-            </Section>
-            {isRanked(filter.sort) && (
-              <Section title={t('Period')}>
-                {Object.values(FeedPeriod).map((period) => (
+                {followed('people', labels.people, peopleCount)}
+                {followed('topics', labels.topics, topicsCount)}
+              </Section>
+              <Section title={t('Sort')}>
+                {Object.values(FeedSort).map((sort) => (
                   <Chip
-                    key={period}
-                    isSelected={filter.period === period}
-                    onClick={() => onChange({...filter, period})}
+                    key={sort}
+                    isSelected={filter.sort === sort}
+                    onClick={() => onChange({...filter, sort})}
                   >
-                    {labels.periods[period]}
+                    {labels.sorts[sort]}
                   </Chip>
                 ))}
               </Section>
-            )}
-          </Stack>
-        </PopoverBody>
-      </PopoverContent>
+              {isRanked(filter.sort) && (
+                <Section title={t('Period')}>
+                  {Object.values(FeedPeriod).map((period) => (
+                    <Chip
+                      key={period}
+                      isSelected={filter.period === period}
+                      onClick={() => onChange({...filter, period})}
+                    >
+                      {labels.periods[period]}
+                    </Chip>
+                  ))}
+                </Section>
+              )}
+            </Stack>
+          </PopoverBody>
+        </PopoverContent>
+      </Portal>
     </Popover>
   )
 }
