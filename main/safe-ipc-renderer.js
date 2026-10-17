@@ -44,6 +44,7 @@ const NODE_COMMANDS = new Set([
 ])
 
 const AUTO_UPDATE_COMMANDS = new Set([
+  'release-check',
   'start-checking',
   'update-node',
   'update-ui',

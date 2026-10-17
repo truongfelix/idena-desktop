@@ -82,6 +82,7 @@ import {
 import {useValidationToast} from '../../screens/validation/hooks/use-validation-toast'
 import {useIdentityState} from '../providers/identity-context'
 import {OfflineBanner} from './layout/offline'
+import {ReleaseCheckQuestion} from './release-check'
 import {createPeersMachine} from './layout/peers'
 import {TroubleshootingScreen} from '../../screens/troubleshooting'
 
@@ -188,6 +189,8 @@ export default function Layout({
         didRejectFork={didRejectFork}
         onResetForkVoting={resetForkVoting}
       />
+
+      <ReleaseCheckQuestion />
 
       {loading && <LoadingApp />}
 

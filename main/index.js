@@ -19,16 +19,12 @@ const i18next = require('i18next')
 const macosVersion = require('macos-version')
 const axios = require('axios')
 const kill = require('tree-kill')
-const {zoomIn, zoomOut, resetZoom, isNotFoundError} = require('./utils')
+const {zoomIn, zoomOut, resetZoom} = require('./utils')
 const loadRoute = require('./utils/routes')
 const {getI18nConfig} = require('./language')
 const {searchImages} = require('./image-search')
 const {openExternalUrl} = require('./safe-external-url')
-const {
-  LATEST_RELEASE_API,
-  LATEST_RELEASE_PAGE,
-  newerReleaseTag,
-} = require('./app-update-check')
+const {RELEASES_API, createReleaseCheck} = require('./app-update-check')
 const {isTrustedIpcSender} = require('./ipc-sender')
 const {
   installRendererProtocol,
@@ -628,8 +624,6 @@ app.on('ready', async () => {
     }
 
     createTray()
-
-    checkForUpdates()
   })
 })
 
@@ -935,6 +929,19 @@ ipcMain.on(NODE_COMMAND, async (event, command, data) => {
   }
 })
 
+// The app's release check (main/app-update-check.js): nothing goes to GitHub until the user turns it on.
+const releaseCheck = createReleaseCheck({
+  async fetchReleases() {
+    const {data} = await axios.get(RELEASES_API, {timeout: 30000})
+    return data
+  },
+  appVersion,
+  onRelease(release) {
+    sendMainWindowMsg(AUTO_UPDATE_EVENT, 'ui-update-ready', release)
+  },
+  logger,
+})
+
 nodeUpdater.on('update-available', (info) => {
   sendMainWindowMsg(AUTO_UPDATE_EVENT, 'node-update-available', info)
 })
@@ -956,7 +963,12 @@ ipcMain.on(AUTO_UPDATE_COMMAND, async (event, command, data) => {
       break
     }
     case 'update-ui': {
-      openExternalUrl(shell, LATEST_RELEASE_PAGE, logger)
+      openExternalUrl(shell, releaseCheck.pageUrl, logger)
+      break
+    }
+    // The user's setting (ruling Q-50): the window sends it at its start and on each change.
+    case 'release-check': {
+      if (!isDev) releaseCheck.setEnabled(data?.enabled === true)
       break
     }
     case 'update-node': {
@@ -978,36 +990,6 @@ ipcMain.on(AUTO_UPDATE_COMMAND, async (event, command, data) => {
     default:
   }
 })
-
-function checkForUpdates() {
-  if (isDev) {
-    return
-  }
-
-  async function runCheck() {
-    try {
-      const {data} = await axios.get(LATEST_RELEASE_API)
-      const tag = newerReleaseTag(data, appVersion)
-      if (tag) {
-        setTimeout(() => {
-          sendMainWindowMsg(AUTO_UPDATE_EVENT, 'ui-update-ready', {
-            version: tag,
-          })
-        }, 30000)
-      }
-    } catch (e) {
-      if (isNotFoundError(e)) {
-        logger.info('no app release published yet')
-      } else {
-        logger.error('error while checking UI update', e.toString())
-      }
-    } finally {
-      setTimeout(runCheck, 10 * 60 * 1000)
-    }
-  }
-
-  runCheck()
-}
 
 ipcMain.on('reload', (event) => {
   if (!acceptIpcSender(event)) return
