@@ -23,8 +23,8 @@ import {topicChannel, topicOf} from '../topics'
 import {useTrust} from '../profile-hooks'
 import {ProfileCall} from '../profiles'
 
-// Blocking an account (⋯ on its profile or on its posts), hiding a post and blocking a topic (⋯, or the topic's
-// page), as the phone app's SocialBlocking.kt. What they hide: hiding.js; the lists to undo them: Social settings.
+// Muting and blocking an account (⋯ on its profile or on its posts), hiding a post and blocking a topic (⋯, or the
+// topic's page), as the phone app's SocialBlocking.kt and SocialMuting.kt. What they hide: hiding.js; the lists to undo them: Social settings.
 
 const stop = (e) => e.stopPropagation()
 
@@ -105,15 +105,26 @@ export function BlockDialog({address, onClose}) {
   )
 }
 
-/** ⋯ on another's profile, with Block (asked first). */
+/** Mutes `address` (its posts leave the feeds: hiding.js, leavesFeeds), or unmutes it: [isMuted, toggle]. */
+function useMute(address) {
+  const {people, setPerson} = useSocial()
+  const one = people[address] || person(address)
+  return [one.muted, () => setPerson({...one, muted: !one.muted})]
+}
+
+/** ⋯ on another's profile, with Mute (or Unmute) and Block (asked first). */
 export function ProfileMenu({address}) {
   const {t} = useTranslation()
   const [isBlocking, setIsBlocking] = React.useState(false)
+  const [isMuted, toggleMute] = useMute(address)
   return (
     <Box onClick={stop}>
       <Menu autoSelect={false} placement="bottom-end">
         <MoreButton label={t('More')} />
         <MenuList zIndex="popover">
+          <MenuItem onClick={toggleMute}>
+            {isMuted ? t('Unmute') : t('Mute')}
+          </MenuItem>
           <MenuItem onClick={() => setIsBlocking(true)}>{t('Block')}</MenuItem>
         </MenuList>
       </Menu>
@@ -125,14 +136,16 @@ export function ProfileMenu({address}) {
 }
 
 /**
- * ⋯ at the top right of a post, reply or comment of another (none on one's own): Hide (or Show again), Block its
- * author (asked first), Block its topic.
+ * ⋯ at the top right of a post, reply or comment of another (none on one's own): Hide (or Show again), Mute (or
+ * Unmute) its author, Block its author (asked first), Block its topic.
  */
 export function PostMenu({call}) {
   const {t} = useTranslation()
   const {me, names, hidden, setPostHidden, setTopicBlocked} = useSocial()
   const [isBlocking, setIsBlocking] = React.useState(false)
+  const [isMuted, toggleMute] = useMute(call.author)
   if (call.author === me) return null
+  const name = displayName(call.author, names)
   const isHidden = hidden.posts.has(String(call.hash).toLowerCase())
   const topic = call.replyTo === '' ? topicOf(call.channel) : null
   return (
@@ -143,8 +156,13 @@ export function PostMenu({call}) {
           <MenuItem onClick={() => setPostHidden(call.hash, !isHidden)}>
             {isHidden ? t('Show again') : t('Hide')}
           </MenuItem>
+          <MenuItem onClick={toggleMute}>
+            {isMuted
+              ? t('Unmute {{name}}', {name})
+              : t('Mute {{name}}', {name})}
+          </MenuItem>
           <MenuItem onClick={() => setIsBlocking(true)}>
-            {t('Block {{name}}', {name: displayName(call.author, names)})}
+            {t('Block {{name}}', {name})}
           </MenuItem>
           {topic !== null && (
             <MenuItem onClick={() => setTopicBlocked(topic, true)}>

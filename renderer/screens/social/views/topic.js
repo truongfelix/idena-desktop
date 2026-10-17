@@ -7,6 +7,7 @@ import {SecondaryButton} from '../../../shared/components/button'
 import {useSocial} from '../provider'
 import {PostTarget} from '../contract'
 import {topicChannel, topicFeed} from '../topics'
+import {feedPosts} from '../hiding'
 import {PostRow, TopicShown} from '../components/post'
 import {FollowTopicChip, TopicAvatar} from '../components/topic'
 import {Chip} from '../components/chips'
@@ -19,10 +20,21 @@ import {TrustButton, TrustLine} from '../components/profile-public'
  */
 export function TopicView({name, now, openThread, openProfile}) {
   const {t} = useTranslation()
-  const {shownFeed: feed, sending, blockedTopics, setTopicBlocked} = useSocial()
+  const {
+    shownFeed: feed,
+    me,
+    hidden,
+    sending,
+    blockedTopics,
+    setTopicBlocked,
+  } = useSocial()
   const isBlocked = blockedTopics.includes(name)
   const [shown, setShown] = React.useState(PAGE_SIZE)
-  const posts = React.useMemo(() => topicFeed(feed, name), [feed, name])
+  // Without muted accounts' posts and, at Hide, those with a picture (leavesFeeds).
+  const posts = React.useMemo(
+    () => topicFeed(feedPosts(feed, hidden, me), name),
+    [feed, hidden, me, name]
+  )
   return (
     <Stack spacing={3} w="full">
       <HStack spacing={3}>

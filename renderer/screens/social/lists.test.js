@@ -14,7 +14,7 @@ describe('the Social lists file', () => {
     const lists = {
       people: {
         [a]: person(a, {name: 'Anna', following: true}),
-        [b]: person(b, {name: 'Bob'}),
+        [b]: person(b, {name: 'Bob', muted: true}),
         [c]: person(c, {blocked: true}),
       },
       topics: ['idena', 'flips'],
@@ -23,7 +23,7 @@ describe('the Social lists file', () => {
       blockedTopics: ['scam_topic'],
     }
     const json = socialListsToJson(lists)
-    expect(json.version).toBe(3)
+    expect(json.version).toBe(4)
     // Sorted.
     expect(json.hiddenWords).toEqual(['free coins', 'spam'])
     expect(json.topics).toEqual(['flips', 'idena'])
@@ -35,12 +35,19 @@ describe('the Social lists file', () => {
   })
 
   it('reads the file the phone app writes', () => {
-    // As SocialLists.kt writes it (version 3).
+    // As SocialLists.kt writes it (version 4).
     const hash = `0x${'ab'.repeat(32)}`
     const phone = {
-      version: 3,
+      version: 4,
       people: [
-        {address: c, name: '', following: false, message: false, blocked: true},
+        {
+          address: c,
+          name: '',
+          following: false,
+          message: false,
+          blocked: true,
+          muted: false,
+        },
       ],
       topics: ['idena'],
       hiddenWords: ['free coins'],
@@ -58,6 +65,40 @@ describe('the Social lists file', () => {
     expect(
       Object.keys(socialListsToJson(socialListsFromJson(phone))).sort()
     ).toEqual(Object.keys(phone).sort())
+  })
+
+  it('imports a version 3 file with nobody muted, and adds mutes on import', () => {
+    const v3 = {
+      version: 3,
+      people: [
+        {
+          address: a,
+          name: 'Anna',
+          following: false,
+          message: false,
+          blocked: false,
+        },
+      ],
+    }
+    expect(socialListsFromJson(v3).people[a]).toEqual(person(a, {name: 'Anna'}))
+    // A mute set on either side stays, and a person only muted is kept in the list.
+    const file = socialListsFromJson({
+      version: 4,
+      people: [
+        {address: a, muted: true},
+        {address: b, muted: true},
+      ],
+    })
+    const result = mergeLists(
+      {people: {[a]: person(a, {name: 'Anna'})}, topics: []},
+      file
+    )
+    expect(result.lists.people[a]).toEqual(
+      person(a, {name: 'Anna', muted: true})
+    )
+    expect(result.lists.people[b]).toEqual(person(b, {muted: true}))
+    expect(result.added).toBe(1)
+    expect(result.changed).toBe(1)
   })
 
   it('imports a version 2 file without hidden words', () => {

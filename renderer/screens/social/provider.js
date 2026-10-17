@@ -6,13 +6,20 @@ import {useIdentityState} from '../../shared/providers/identity-context'
 import {EpochPeriod} from '../../shared/types'
 import {
   blockedAddresses,
+  mutedAddresses,
   peopleFromJson,
   peopleNames,
   peopleToJson,
   person,
   withPerson,
 } from './people'
-import {hiding, visibleActivity, visibleFeed, wordFilter} from './hiding'
+import {
+  hiding,
+  picturesMode,
+  visibleActivity,
+  visibleFeed,
+  wordFilter,
+} from './hiding'
 import {newActivity, NotifyKind, socialActivity} from './activity'
 import {postTargets} from './feed'
 import {cacheFeed} from './scan'
@@ -64,6 +71,7 @@ export function SocialProvider({children}) {
         hiddenWords: [],
         hiddenPosts: [],
         blockedTopics: [],
+        picturesInPosts: picturesMode(null),
       })),
     ]).then(([saved, savedSettings]) => {
       if (!alive) return
@@ -102,6 +110,8 @@ export function SocialProvider({children}) {
   })
   const people = React.useMemo(() => settings?.people || {}, [settings])
   const blocked = React.useMemo(() => blockedAddresses(people), [people])
+  const muted = React.useMemo(() => mutedAddresses(people), [people])
+  const picturesInPosts = picturesMode(settings?.picturesInPosts)
   const hiddenWords = React.useMemo(
     () => settings?.hiddenWords || [],
     [settings]
@@ -122,8 +132,10 @@ export function SocialProvider({children}) {
         words: wordFilter(hiddenWords),
         posts: new Set(hiddenPosts),
         topics: new Set(blockedTopics),
+        muted,
+        pictures: picturesInPosts,
       }),
-    [blocked, blockedTopics, hiddenPosts, hiddenWords]
+    [blocked, blockedTopics, hiddenPosts, hiddenWords, muted, picturesInPosts]
   )
   const shownFeed = React.useMemo(
     () => visibleFeed(feed, hidden, me),
@@ -296,6 +308,8 @@ export function SocialProvider({children}) {
       blockedTopics,
       setTopicBlocked,
       setBlockedTopics: (list) => updateSettings('blockedTopics', list),
+      picturesInPosts,
+      setPicturesInPosts: (mode) => updateSettings('picturesInPosts', mode),
       activity,
       unread,
       highlightAfter,
@@ -340,6 +354,7 @@ export function SocialProvider({children}) {
       offline,
       peers,
       people,
+      picturesInPosts,
       profiles,
       ready,
       scanOff,

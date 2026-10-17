@@ -12,7 +12,7 @@ import {LINK, MUTED} from './theme'
 import {commentTree, descendants, idKey, replyCount} from '../feed'
 import {timeAgo} from '../format'
 import {postTopic} from '../topics'
-import {hidesText} from '../hiding'
+import {hidesText, leavesFeeds} from '../hiding'
 import {TopicLine} from './topic'
 
 const RAIL = '18px'
@@ -50,7 +50,9 @@ function ThreadItem({
 }) {
   const {t} = useTranslation()
   const {names, hidden: hiding, me} = useSocial()
-  const [folded, setFolded] = React.useState(false)
+  // A muted author's reply, or one with a picture while pictures are hidden, starts folded (leavesFeeds).
+  const [toggled, setFolded] = React.useState(null)
+  const folded = toggled ?? leavesFeeds(hiding, node.call, me)
   const ref = React.useRef()
   const isFocus = idKey(node.id) === focusId
   React.useEffect(() => {
@@ -63,6 +65,10 @@ function ThreadItem({
   const rails = Math.min(depth, MAX_INDENT) + 1
   let preview = textPreview(node.call.message, t)
   if (hidesText(hiding, node.call, me)) preview = t('Hidden')
+  else if (node.call.author !== me && hiding.muted.has(node.call.author))
+    preview = t('Muted')
+  else if (leavesFeeds(hiding, node.call, me))
+    preview = t('🖼 A picture: hidden', {nsSeparator: '|'})
   else if (node.call.hasMedia && !node.call.message) preview = t('🖼 Media')
   return (
     <Stack spacing={0}>
@@ -111,7 +117,7 @@ function ThreadItem({
               isOp={node.call.author === opAuthor}
               call={node.call}
             />
-            <PostBody call={node.call} maxH="360px" />
+            <PostBody call={node.call} maxH="360px" inThread />
             <ActionBar node={node} onProfile={onProfile} showAnswers={false} />
           </Stack>
         )}
@@ -160,7 +166,7 @@ export function SocialThread({node, now, focusId, onProfile}) {
           onProfile={onProfile}
           call={node.call}
         />
-        <PostBody call={node.call} maxH="360px" />
+        <PostBody call={node.call} maxH="360px" inThread />
         <ActionBar node={node} onProfile={onProfile} showAnswers={false} />
         {node.call.version && (
           <SmallText>

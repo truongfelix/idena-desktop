@@ -12,6 +12,7 @@ import {IdentityLabel, NameLink} from './identity'
 import {MUTED} from './theme'
 import {timeAgo} from '../format'
 import {postTopic} from '../topics'
+import {PicturesMode} from '../hiding'
 import {TopicLine, TopicTag} from './topic'
 import {PersonAvatar} from './profile-public'
 
@@ -141,10 +142,40 @@ export function PostMedia({call: {hasMedia, media, mediaType}, maxH}) {
 }
 
 /**
- * A post's text (`lines` clamps it) and, with `media`, its first media; a text hidden (by the user, or with a hidden
- * word: a text on IPFS once fetched) shows as one line instead, a click shows it. Never one's own.
+ * Another's media with "Pictures in posts" at Click to show (TapToShow): one line, nothing downloaded; in a thread (`inThread`) a
+ * click on it shows the media, in a list it says to open the post.
  */
-export function PostBody({call, lines, maxH, media = true}) {
+function TapToShowMedia({call, maxH, inThread}) {
+  const {t} = useTranslation()
+  const [shown, setShown] = React.useState(false)
+  if (shown) return <PostMedia call={call} maxH={maxH} />
+  if (!inThread)
+    return (
+      <SmallText>
+        {t('🖼 A picture: open the post to show it.', {nsSeparator: '|'})}
+      </SmallText>
+    )
+  return (
+    <Button
+      variant="link"
+      size="sm"
+      alignSelf="flex-start"
+      onClick={(e) => {
+        e.stopPropagation()
+        setShown(true)
+      }}
+    >
+      {t('🖼 A picture. Click to show it.')}
+    </Button>
+  )
+}
+
+/**
+ * A post's text (`lines` clamps it) and, with `media`, its first media; a text hidden (by the user, or with a hidden
+ * word: a text on IPFS once fetched) shows as one line instead, a click shows it. Never one's own. With "Pictures in
+ * posts" at Click to show (TapToShow), another's media is one line (TapToShowMedia; `inThread`: the post's thread is open).
+ */
+export function PostBody({call, lines, maxH, media = true, inThread = false}) {
   const {me, hidden} = useSocial()
   const [shown, setShown] = React.useState(false)
   const cid = ipfsCid(call.message)
@@ -161,7 +192,12 @@ export function PostBody({call, lines, maxH, media = true}) {
   return (
     <>
       <PostText message={call.message} lines={lines} />
-      {media && <PostMedia call={call} maxH={maxH} />}
+      {media &&
+        (hidden.pictures === PicturesMode.TapToShow && !own && call.hasMedia ? (
+          <TapToShowMedia call={call} maxH={maxH} inThread={inThread} />
+        ) : (
+          <PostMedia call={call} maxH={maxH} />
+        ))}
     </>
   )
 }

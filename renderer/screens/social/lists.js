@@ -2,13 +2,13 @@ import {mergePeople, peopleFromJson, peopleToJson, sortedPeople} from './people'
 import {cleanTopics} from './topics'
 import {MAX_HIDDEN_WORDS, cleanHiddenWord, txHashOf} from './hiding'
 
-// What Social keeps on this computer for the user alone: the names given to people, the people followed and
+// What Social keeps on this computer for the user alone: the names given to people, the people followed, muted and
 // blocked, the topics followed and blocked, the hidden words and the posts hidden. Exported and imported as one file
 // (Social's ⓘ), to keep it or move it to another computer or to the phone app: the phone's format (SocialLists.kt).
-// Version 1 files (the Contacts export: names and people only) and version 2 (no blocks nor hidden things) still
-// import.
+// Version 1 files (the Contacts export: names and people only), version 2 (no blocks nor hidden things) and version
+// 3 (nobody muted) still import. The "Pictures in posts" setting is not in the file: it is this computer's.
 
-const LISTS_VERSION = 3
+const LISTS_VERSION = 4
 
 /** The people followed, in name order. */
 export const followedPeople = (people) =>
