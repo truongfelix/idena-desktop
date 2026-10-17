@@ -99,7 +99,8 @@ export default function AfterValidationPage() {
         mb={['8', 0]}
       >
         <Status />
-        <NextLink href="/home" passHref>
+        {/* Replaces the closed screen: the way back from Home does not reopen it. */}
+        <NextLink href="/home" passHref replace>
           <CloseButton boxSize={4} color="white" />
         </NextLink>
       </Flex>

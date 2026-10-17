@@ -50,7 +50,7 @@ export default function NewAdPage() {
                 author: coinbase,
               })
 
-              router.push('/adn/list?from=new&save=true')
+              router.replace('/adn/list?from=new&save=true')
             }}
           />
         </Box>
