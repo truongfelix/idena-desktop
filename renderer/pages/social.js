@@ -34,6 +34,7 @@ import {ChatView, MessagesList} from '../screens/social/views/messages'
 import {OpenTopicContext} from '../screens/social/components/topic'
 import {topicOf, topicChannel} from '../screens/social/topics'
 import {threadPost} from '../screens/social/hiding'
+import {editorMove, withCompose} from '../screens/social/editor-history'
 
 const View = {
   Feed: 'feed',
@@ -136,6 +137,24 @@ export default function SocialPage() {
     profileAddress !== null ||
     topic !== null ||
     view === View.Settings
+
+  // The editor is a step of the history (editor-history.js): the way back closes it as Cancel does, and Cancel or a
+  // sent post step back to the thread or page it was opened from. A draft left open on another page closes too.
+  const hasDraft = Boolean(sending.draft)
+  const hasCompose = query.compose !== undefined
+  const editorRef = React.useRef({hadDraft: hasDraft, hadCompose: hasDraft})
+  React.useEffect(() => {
+    const move = editorMove({...editorRef.current, hasDraft, hasCompose})
+    editorRef.current = {hadDraft: hasDraft, hadCompose: hasCompose}
+    if (move === 'push')
+      router.push({pathname: '/social', query: withCompose(query)}, undefined, {
+        shallow: true,
+      })
+    else if (move === 'cancel') sending.cancelDraft()
+    else if (move === 'back') router.back()
+    // Only the draft and the editor's step decide.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasDraft, hasCompose])
 
   const state = scanOff
     ? {health: 'off', kind: 'scanOff'}
