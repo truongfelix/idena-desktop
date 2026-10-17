@@ -200,8 +200,8 @@ function TrustGiversDialog({givers, onProfile, onClose}) {
 }
 
 /**
- * The public profile of `address` from the profiles contract: its name, its bio, its Trust and, on the account's
- * own profile, the button that edits them. Out of good standing it shows nothing, except to its owner. The name
+ * The public profile of `address` from the profiles contract: its name, its bio and its Trust (the account's own
+ * profile edits them from its ⚙ menu: ProfileEditDialog). Out of good standing it shows nothing, except to its owner. The name
  * line shows only when the title does not: a private name there (`privateName`), or the name hidden.
  */
 export function PublicProfile({
@@ -212,7 +212,6 @@ export function PublicProfile({
   onProfile,
 }) {
   const {t} = useTranslation()
-  const [editing, setEditing] = React.useState(false)
   if (!profilesEnabled) return null
   const shown = profile?.inStanding || isMe
   return (
@@ -239,19 +238,6 @@ export function PublicProfile({
       ) : (
         <VouchPanel address={address} profile={profile} />
       )}
-      {isMe && (
-        <Box>
-          <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
-            {t('Edit your public profile')}
-          </Button>
-        </Box>
-      )}
-      {editing && (
-        <ProfileEditDialog
-          profile={profile}
-          onClose={() => setEditing(false)}
-        />
-      )}
     </Stack>
   )
 }
@@ -260,7 +246,7 @@ export function PublicProfile({
  * The account's public name, bio and picture, each change a call of its own: Save name (claimName), Drop the name
  * (dropName), Save the profile (setProfile, the picture stored on IPFS first). The confirmation shows the fees.
  */
-function ProfileEditDialog({profile, onClose}) {
+export function ProfileEditDialog({profile, onClose}) {
   const {t} = useTranslation()
   const {sending} = useSocial()
   const [name, setName] = React.useState(profile?.name || '')

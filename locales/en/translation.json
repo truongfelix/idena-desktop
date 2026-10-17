@@ -1584,5 +1584,14 @@
   "Posts with a picture leave Home, Following and the topics; a reply with one shows folded in its thread.": "Posts with a picture leave Home, Following and the topics; a reply with one shows folded in its thread.",
   "Your own posts never change.": "Your own posts never change.",
   "Muted {{count}}": "Muted {{count}}",
-  "Pictures in posts": "Pictures in posts"
+  "Pictures in posts": "Pictures in posts",
+  "Asking the node…": "Asking the node…",
+  "Invited by {{name}}": "Invited by {{name}}",
+  "Invitees": "Invitees",
+  "Members": "Members",
+  "Name on this computer": "Name on this computer",
+  "No invitee on the way: an invitee shows here from its invitation until it is Verified.": "No invitee on the way: an invitee shows here from its invitation until it is Verified.",
+  "No vouched member.": "No vouched member.",
+  "Profile and settings": "Profile and settings",
+  "The node did not answer: {{message}}": "The node did not answer: {{message}}"
 }

@@ -10,6 +10,7 @@ import {
   recipientAddress,
 } from './profiles'
 import {readChallenge, readMembers, readOffer, readOffersTo} from './vouching'
+import {readIdentities} from './profile-lists'
 
 /** How long a read profile or Trust count is shown before it is read again. */
 const PROFILE_STALE_MS = 10 * 60 * 1000
@@ -79,7 +80,22 @@ export function useRefreshProfiles() {
     client.invalidateQueries('profiles')
     client.invalidateQueries('profile')
     client.invalidateQueries('trust')
+    // The identities too: a profile's invitees and inviter come with them.
+    client.invalidateQueries('social-identity')
   }, [client])
+}
+
+/** The identity state and age of each address (readIdentities), for a profile's lists of invitees and members. */
+export function useIdentities(addresses) {
+  return useQuery(
+    ['profile', 'identities', addresses.join(',')],
+    () => readIdentities(socialRpcSettled, addresses),
+    {
+      enabled: addresses.length > 0,
+      staleTime: PROFILE_STALE_MS,
+      keepPreviousData: true,
+    }
+  )
 }
 
 /** The vouches offered to `member` (readOffersTo). */

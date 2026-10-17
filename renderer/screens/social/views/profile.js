@@ -13,10 +13,35 @@ import {PostRow} from '../components/post'
 import {identityColor, identityStatus} from '../format'
 import {historyDone} from '../scan'
 import {CopyButton, PAGE_SIZE, Rows, ShowMore} from './common'
-import {useProfile} from '../profile-hooks'
+import {useMembers, useProfile} from '../profile-hooks'
 import {isActingMember} from '../vouching'
-import {ProfilePicture, PublicProfile} from '../components/profile-public'
-import {ProfileMenu} from '../components/hide-menu'
+import {inviteeAddresses, inviterOf} from '../profile-lists'
+import {
+  ProfileEditDialog,
+  ProfilePicture,
+  PublicProfile,
+  useShownName,
+} from '../components/profile-public'
+import {OwnProfileMenu, ProfileMenu} from '../components/hide-menu'
+import {LINK} from '../components/theme'
+import {ProfilePeople} from './profile-people'
+
+/** "Invited by <name>" under the identity line, while the node keeps the link; a click opens the inviter. */
+function InvitedBy({address, onProfile}) {
+  const {t} = useTranslation()
+  const name = useShownName(address)
+  return (
+    <Text
+      as="button"
+      textAlign="left"
+      fontSize="md"
+      color={LINK}
+      onClick={() => onProfile(address)}
+    >
+      {t('Invited by {{name}}', {name: name || shortAddress(address)})}
+    </Text>
+  )
+}
 
 export function ProfileView({
   address,
@@ -25,11 +50,26 @@ export function ProfileView({
   openProfile,
   onRename,
   openChat,
+  openSettings,
 }) {
   const {t} = useTranslation()
   // The feed as shown: a blocked account's profile lists nothing.
   const {shownFeed: feed, me, people, setPerson, cache, chatKey} = useSocial()
-  const {data: identity, isError} = useSocialIdentity(address)
+  const {
+    data: identity,
+    isError,
+    isLoading: identityLoading,
+    error: identityError,
+  } = useSocialIdentity(address)
+  const members = useMembers(address)
+  const [editing, setEditing] = React.useState(false)
+  // The invitees the node keeps (until each is Verified or Human, or killed) and the members vouched for.
+  const invitees = React.useMemo(() => inviteeAddresses(identity), [identity])
+  const memberAddresses = React.useMemo(
+    () => (members.data || []).map(({member}) => member),
+    [members.data]
+  )
+  const inviter = inviterOf(identity)
   const profile = React.useMemo(
     () => socialProfile(feed, address),
     [address, feed]
@@ -57,8 +97,15 @@ export function ProfileView({
     ['likes', t('Likes')],
     ['tips', t('Tips')],
     ['media', t('Media')],
+    ['invitees', t('Invitees')],
+    ['members', t('Members')],
   ]
-  const items = profile[tab]
+  const counts = {
+    invitees: identityLoading ? '…' : invitees.length,
+    members: members.isLoading ? '…' : memberAddresses.length,
+  }
+  const isPeople = tab === 'invitees' || tab === 'members'
+  const items = isPeople ? [] : profile[tab]
 
   let statusLine = t('Identity: asking the node…', {nsSeparator: '|'})
   if (isError)
@@ -92,14 +139,6 @@ export function ProfileView({
               {isMe && ` ${t('(you)')}`}
             </Text>
             {!name && <CopyButton value={address} />}
-            <IconButton
-              variant="ghost"
-              size="xs"
-              aria-label={name ? t('Rename') : t('Name')}
-              title={name ? t('Rename') : t('Name')}
-              icon={<Text>✎</Text>}
-              onClick={() => onRename(address)}
-            />
             <Box flex={1} />
             {isBlocked && (
               <Chip
@@ -124,7 +163,16 @@ export function ProfileView({
               />
             )}
             {!isMe && !isBlocked && <FollowChip address={address} />}
-            {!isMe && !isBlocked && <ProfileMenu address={address} />}
+            {!isMe && !isBlocked && (
+              <ProfileMenu address={address} onRename={onRename} />
+            )}
+            {isMe && (
+              <OwnProfileMenu
+                onEdit={() => setEditing(true)}
+                onRename={() => onRename(address)}
+                openSettings={openSettings}
+              />
+            )}
           </HStack>
           {name && (
             <HStack spacing={1}>
@@ -141,6 +189,7 @@ export function ProfileView({
           >
             {statusLine}
           </Text>
+          {inviter && <InvitedBy address={inviter} onProfile={openProfile} />}
           {isBlocked && (
             <Text fontSize="md" color="red.500">
               {t(
@@ -158,6 +207,12 @@ export function ProfileView({
         privateName={Boolean(people[address]?.name)}
         onProfile={openProfile}
       />
+      {editing && (
+        <ProfileEditDialog
+          profile={publicProfile}
+          onClose={() => setEditing(false)}
+        />
+      )}
       <Stack spacing={0.5} fontSize="md">
         <Text>
           {`❤️ ${t('{{received}} received · {{given}} given', {
@@ -186,37 +241,63 @@ export function ProfileView({
             isSelected={tab === value}
             onClick={() => setTab(value)}
           >
-            {`${label} ${profile[value].length}`}
+            {`${label} ${counts[value] ?? profile[value].length}`}
           </Chip>
         ))}
       </HStack>
-      {items.length === 0 && <SmallText>{t('Nothing here yet.')}</SmallText>}
-      {tab === 'posts' ? (
-        <Rows>
-          {items.slice(0, shown).map((item) => (
-            <PostRow
-              key={item.node.id}
-              node={item.node}
-              now={now}
-              onOpen={() => openThread(item.threadId, item.node.id)}
-              onProfile={openProfile}
-            />
-          ))}
-        </Rows>
-      ) : (
-        <Stack spacing={2}>
-          {items.slice(0, shown).map((item) => (
-            <ProfileItemCard
-              key={`${item.node.id}-${item.like?.hash || item.tip?.hash || ''}`}
-              item={item}
-              tab={tab}
-              now={now}
-              onOpen={() => openThread(item.threadId, item.node.id)}
-              onProfile={openProfile}
-            />
-          ))}
-        </Stack>
+      {tab === 'invitees' && (
+        <ProfilePeople
+          addresses={invitees}
+          isLoading={identityLoading}
+          error={identityError}
+          empty={t(
+            'No invitee on the way: an invitee shows here from its invitation until it is Verified.',
+            {nsSeparator: '|'}
+          )}
+          onOpen={openProfile}
+        />
       )}
+      {tab === 'members' && (
+        <ProfilePeople
+          addresses={memberAddresses}
+          isLoading={members.isLoading}
+          error={members.error}
+          empty={t('No vouched member.')}
+          onOpen={openProfile}
+        />
+      )}
+      {!isPeople && items.length === 0 && (
+        <SmallText>{t('Nothing here yet.')}</SmallText>
+      )}
+      {!isPeople &&
+        (tab === 'posts' ? (
+          <Rows>
+            {items.slice(0, shown).map((item) => (
+              <PostRow
+                key={item.node.id}
+                node={item.node}
+                now={now}
+                onOpen={() => openThread(item.threadId, item.node.id)}
+                onProfile={openProfile}
+              />
+            ))}
+          </Rows>
+        ) : (
+          <Stack spacing={2}>
+            {items.slice(0, shown).map((item) => (
+              <ProfileItemCard
+                key={`${item.node.id}-${
+                  item.like?.hash || item.tip?.hash || ''
+                }`}
+                item={item}
+                tab={tab}
+                now={now}
+                onOpen={() => openThread(item.threadId, item.node.id)}
+                onProfile={openProfile}
+              />
+            ))}
+          </Stack>
+        ))}
       <ShowMore
         shown={shown}
         total={items.length}
