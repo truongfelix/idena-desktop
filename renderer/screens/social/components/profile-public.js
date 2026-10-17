@@ -229,17 +229,17 @@ function TrustGiversDialog({trust, onProfile, onClose}) {
 /**
  * The public profile of `address` from the profiles contract: its name and its bio (the account's own profile edits
  * them from its ⚙ menu: ProfileEditDialog), then the vouching. Out of good standing it shows nothing, except to its
- * owner. The name line shows only when the title does not: a private name there (`privateName`), or the name hidden.
+ * owner. The name line shows only when the title does not: the name hidden (the title shows it otherwise, B-72).
  * Its Trust is in the profile's header (profile-header.js).
  */
-export function PublicProfile({address, isMe, profile, privateName = false}) {
+export function PublicProfile({address, isMe, profile}) {
   const {t} = useTranslation()
   if (!profilesEnabled) return null
   const shown = profile?.inStanding || isMe
   return (
     <Stack spacing={1} fontSize="md">
-      {/* The title shows the claimed name, unless a private name replaces it there. */}
-      {shown && profile?.name && (privateName || !profile.inStanding) && (
+      {/* The title shows the claimed name while it is in good standing. */}
+      {shown && profile?.name && !profile.inStanding && (
         <Text fontWeight={500}>
           {`@${profile.name}`}
           {!profile.inStanding &&

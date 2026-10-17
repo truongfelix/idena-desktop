@@ -18,6 +18,8 @@ import {SmallText} from '../../../shared/components/components'
 import {TodoVotingCountBadge} from '../../oracles/components'
 import {shortAddress} from '../people'
 import {FollowChip} from '../components/chips'
+import {PersonName} from '../components/identity'
+import {useSocial} from '../provider'
 import {PersonAvatar} from '../components/profile-public'
 
 export const PAGE_SIZE = 30
@@ -106,8 +108,12 @@ export function SearchField({value, onChange, trailing = null}) {
   )
 }
 
+/** A person of the list (`contact`): the name as everywhere (PersonName, B-72), ✎ for the private name but on oneself. */
 export function ContactRow({contact, onProfile, onRename}) {
   const {t} = useTranslation()
+  const {me, nameParts} = useSocial()
+  const named = Boolean(nameParts?.[contact.address])
+  const isMe = Boolean(me) && contact.address === String(me).toLowerCase()
   return (
     <HStack
       spacing={3}
@@ -121,25 +127,27 @@ export function ContactRow({contact, onProfile, onRename}) {
       <PersonAvatar address={contact.address} boxSize={10} rounded="md" />
       <Stack spacing={0} flex={1} minW={0}>
         <Text fontWeight={500} noOfLines={1}>
-          {contact.name || shortAddress(contact.address)}
+          <PersonName address={contact.address} />
         </Text>
-        {contact.name && (
+        {named && (
           <SmallText fontFamily="mono">
             {shortAddress(contact.address)}
           </SmallText>
         )}
       </Stack>
-      <IconButton
-        variant="ghost"
-        size="sm"
-        aria-label={t('Rename')}
-        title={t('Rename')}
-        icon={<Text>✎</Text>}
-        onClick={(e) => {
-          e.stopPropagation()
-          onRename(contact.address)
-        }}
-      />
+      {!isMe && (
+        <IconButton
+          variant="ghost"
+          size="sm"
+          aria-label={t('Rename')}
+          title={t('Rename')}
+          icon={<Text>✎</Text>}
+          onClick={(e) => {
+            e.stopPropagation()
+            onRename(contact.address)
+          }}
+        />
+      )}
       <FollowChip address={contact.address} />
     </HStack>
   )

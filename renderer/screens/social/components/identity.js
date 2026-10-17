@@ -3,7 +3,7 @@ import {useTranslation} from 'react-i18next'
 import {Box, Text} from '@chakra-ui/react'
 import {useSocialIdentity} from '../hooks'
 import {useSocial} from '../provider'
-import {displayName} from '../people'
+import {shortAddress} from '../people'
 import {LINK, MUTED} from './theme'
 import {identityColor, identityStatus} from '../format'
 
@@ -45,9 +45,28 @@ export function useScanLabel(state) {
   }[state.kind]
 }
 
-/** An address as a link to its profile, shown by its contact name if it has one. */
+/**
+ * The name of `address` (B-72): its claimed name first, the private name given here beside it in grey, else the
+ * private name alone, else the short address.
+ */
+export function PersonName({address}) {
+  const {nameParts} = useSocial()
+  const parts = nameParts?.[String(address).toLowerCase()]
+  if (!parts) return shortAddress(address)
+  return (
+    <>
+      {parts.name}
+      {parts.note && (
+        <Text as="span" color={MUTED} fontWeight={400}>
+          {` · ${parts.note}`}
+        </Text>
+      )}
+    </>
+  )
+}
+
+/** An address as a link to its profile, shown by its name (PersonName). */
 export function NameLink({address, onProfile, ...props}) {
-  const {names} = useSocial()
   return (
     <Text
       as="button"
@@ -60,7 +79,7 @@ export function NameLink({address, onProfile, ...props}) {
       }}
       {...props}
     >
-      {displayName(address, names)}
+      <PersonName address={address} />
     </Text>
   )
 }

@@ -147,10 +147,10 @@ export function ProfileMenu({address, onRename}) {
 }
 
 /**
- * ⚙ on one's own profile: Edit your public profile (`onEdit`), Name on this computer (`onRename`), Social settings
- * (`openSettings`), as the phone app's (B-79).
+ * ⚙ on one's own profile: Edit your public profile (`onEdit`) and Social settings (`openSettings`), as the phone app's
+ * (B-79); no private name for one's own address (B-72: its claimed name shows).
  */
-export function OwnProfileMenu({onEdit, onRename, openSettings}) {
+export function OwnProfileMenu({onEdit, openSettings}) {
   const {t} = useTranslation()
   return (
     <Box onClick={stop}>
@@ -173,7 +173,6 @@ export function OwnProfileMenu({onEdit, onRename, openSettings}) {
               {t('Edit your public profile')}
             </MenuItem>
           )}
-          <MenuItem onClick={onRename}>{t('Name on this computer')}</MenuItem>
           {openSettings && (
             <MenuItem onClick={openSettings}>{t('Social settings')}</MenuItem>
           )}
