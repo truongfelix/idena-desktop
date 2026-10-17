@@ -1636,5 +1636,14 @@
   "No Trust given.": "No Trust given.",
   "(vouched)": "(vouched)",
   "vouched by {{name}}": "vouched by {{name}}",
-  "Vouched members": "Vouched members"
+  "Vouched members": "Vouched members",
+  "1 topic": "1 topic",
+  "An invitation cannot be terminated during the validation.": "An invitation cannot be terminated during the validation.",
+  "{{count}} following": "{{count}} following",
+  "{{count}} topics": "{{count}} topics",
+  "Invited by": "Invited by",
+  "Terminate the invitation": "Terminate the invitation",
+  "Terminate the invitation of {{name}}?": "Terminate the invitation of {{name}}?",
+  "They can no longer validate with this invitation, and your invitation is not given back": "They can no longer validate with this invitation, and your invitation is not given back",
+  "You no longer vouch for them": "You no longer vouch for them"
 }

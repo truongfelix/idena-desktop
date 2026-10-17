@@ -1,3 +1,4 @@
+/* global BigInt */
 import React from 'react'
 import {useTranslation} from 'react-i18next'
 import {LIKE, SocialCall, makePostArgument} from './contract'
@@ -19,6 +20,8 @@ import {
   prepareCall,
   prepareDraft as prepareDraftCall,
   sendPrepared,
+  toWei,
+  fromWei,
   waitForBlock,
 } from './posting'
 
@@ -96,7 +99,33 @@ const PROFILE_KINDS = new Set([
   'declineOffer',
   'cancelOffer',
   'endVouch',
+  // Not the profiles contract, but a profile's list (its invitees) changes with it.
+  'killInvitee',
 ])
+
+/** A KillInviteeTx: it ends an invitation not yet validated (the invitee still Invite or Candidate). */
+const KILL_INVITEE_TX = 10
+
+/**
+ * Terminating the invitation of `invitee`, prepared as the other actions (its fee from the node's dry run, twice as
+ * the most it may cost): the transaction, and its key among the actions waiting (actionKey).
+ */
+export async function prepareKillInvitee(call, invitee) {
+  const from = await call('dna_getCoinbaseAddr')
+  const to = String(invitee).toLowerCase()
+  const estimate = await call('bcn_estimateTx', [
+    {type: KILL_INVITEE_TX, from, to},
+  ])
+  const fee = toWei(estimate?.txFee)
+  const maxFee = fee * BigInt(2)
+  return {
+    from,
+    tx: {type: KILL_INVITEE_TX, from, to, maxFee: fromWei(maxFee, 6, true)},
+    socialCall: {contract: '', method: 'killInvitee', argument: to},
+    fee: {fee, maxFee},
+    files: [],
+  }
+}
 
 /** The profile calls a vouched member pays for with an extra amount, burned (payIfVouched in the contract). */
 const MEMBER_PAYS = new Set(['name', 'profile', 'trust', 'challenge'])
@@ -156,6 +185,7 @@ export function useSocialSending({
       declineOffer: t('Decline the offer'),
       cancelOffer: t('Withdraw the offer'),
       endVouch: t('End the vouch'),
+      killInvitee: t('Terminate the invitation'),
     }),
     [t]
   )
@@ -415,21 +445,23 @@ export function useSocialSending({
     setBusy(true)
     let hash
     try {
-      hash = await sendPrepared(socialRpc, pending, {
-        onFile: (file) =>
-          show(
-            file === 'text'
-              ? t('{{what}}: storing the text on IPFS…', {
-                  what,
-                  nsSeparator: '|',
-                })
-              : t('{{what}}: storing the image on IPFS…', {
-                  what,
-                  nsSeparator: '|',
-                })
-          ),
-        onStored: (cid) => storedRef.current.add(cid),
-      })
+      hash = pending.tx
+        ? await socialRpc('dna_sendTransaction', [pending.tx])
+        : await sendPrepared(socialRpc, pending, {
+            onFile: (file) =>
+              show(
+                file === 'text'
+                  ? t('{{what}}: storing the text on IPFS…', {
+                      what,
+                      nsSeparator: '|',
+                    })
+                  : t('{{what}}: storing the image on IPFS…', {
+                      what,
+                      nsSeparator: '|',
+                    })
+              ),
+            onStored: (cid) => storedRef.current.add(cid),
+          })
     } catch (error) {
       refused(pending.kind, error)
       return
@@ -460,6 +492,13 @@ export function useSocialSending({
     watch(pending.kind, hash)
   }
 
+  /** Terminating the invitation of `invitee` (an Invite or a Candidate), its fee shown first under `title`. */
+  const prepareTerminate = (invitee, {title, detail}) =>
+    prepare('killInvitee', () => prepareKillInvitee(socialRpc, invitee), {
+      title,
+      detail,
+    })
+
   const pendingLikes = React.useMemo(
     () =>
       new Set(
@@ -487,6 +526,7 @@ export function useSocialSending({
     prepareTip,
     prepareMessage,
     prepareProfile,
+    prepareTerminate,
     messagesSent,
     pendingLikes,
     draft,

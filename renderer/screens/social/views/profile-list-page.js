@@ -11,10 +11,14 @@ import {
   useTrust,
   useTrustsGiven,
 } from '../profile-hooks'
-import {inviteeAddresses} from '../profile-lists'
+import {inviteeAddresses, inviterOf} from '../profile-lists'
+import {useEpochState} from '../../../shared/providers/epoch-context'
+import {EpochPeriod} from '../../../shared/types'
+import {Action} from '../components/profile-vouch'
 import {useShownName, useTrustSplit} from '../components/profile-public'
 import {ProfileList} from './profile-header'
 import {
+  MyMembers,
   OffersSent,
   PersonRow,
   ProfilePeople,
@@ -78,24 +82,120 @@ function TrustedBy({address, onOpen}) {
   )
 }
 
+/** Another's members; on one's own Members page, its members with End and the cap, then its offers waiting. */
 function Members({address, isMe, onOpen}) {
   const {t} = useTranslation()
-  const members = useMembers(address)
+  const members = useMembers(isMe ? null : address)
   const addresses = React.useMemo(
     () => (members.data || []).map(({member}) => member),
     [members.data]
   )
+  if (isMe)
+    return (
+      <>
+        <MyMembers me={address} onOpen={onOpen} />
+        <OffersSent me={address} onOpen={onOpen} />
+      </>
+    )
   return (
-    <>
-      <ProfilePeople
-        addresses={addresses}
-        isLoading={members.isLoading}
-        error={members.error}
-        empty={t('No vouched member.')}
-        onOpen={onOpen}
-      />
-      {isMe && <OffersSent me={address} onOpen={onOpen} />}
-    </>
+    <ProfilePeople
+      addresses={addresses}
+      isLoading={members.isLoading}
+      error={members.error}
+      empty={t('No vouched member.')}
+      onOpen={onOpen}
+    />
+  )
+}
+
+/** The identity states whose invitation can still be terminated (KillInviteeTx). */
+const TERMINABLE = ['Invite', 'Candidate']
+
+/**
+ * The invitees, after "Invited by <name>" (the profile's own inviter, while the node keeps the link). On one's own
+ * page, an invitee still Invite or Candidate has Terminate, outside the validation only; its fee is shown first.
+ */
+function Invitees({isMe, identity, identityLoading, identityError, onOpen}) {
+  const {t} = useTranslation()
+  const {sending, names} = useSocial()
+  const epoch = useEpochState()
+  const outsideValidation = epoch?.currentPeriod === EpochPeriod.None
+  const addresses = inviteeAddresses(identity)
+  const inviter = inviterOf(identity)
+  // The inviter's identity is read with the invitees'.
+  const identities = useIdentities(
+    inviter ? [inviter, ...addresses] : addresses
+  )
+  const terminate = (invitee) => {
+    const state = identities.data?.[invitee]?.state
+    if (!isMe || !TERMINABLE.includes(state)) return null
+    const call = {contract: '', method: 'killInvitee', argument: invitee}
+    return (
+      <Action
+        call={call}
+        isDisabled={!sending.canAct || !outsideValidation}
+        title={
+          outsideValidation
+            ? undefined
+            : t('An invitation cannot be terminated during the validation.')
+        }
+        onClick={() =>
+          sending.prepareTerminate(invitee, {
+            title: t('Terminate the invitation of {{name}}?', {
+              name: displayName(invitee, names),
+            }),
+            detail: t(
+              'They can no longer validate with this invitation, and your invitation is not given back'
+            ),
+          })
+        }
+      >
+        {t('Terminate')}
+      </Action>
+    )
+  }
+  return (
+    <Stack spacing={2}>
+      {inviter && (
+        <>
+          <Text fontWeight={600}>{t('Invited by')}</Text>
+          <PersonRow
+            address={inviter}
+            identity={identities.data?.[inviter]}
+            onOpen={onOpen}
+          />
+          <Text fontWeight={600} pt={2}>
+            {t('Invitees')}
+          </Text>
+        </>
+      )}
+      {identityError && (
+        <SmallText>
+          {t('The node did not answer: {{message}}', {
+            message: identityError.message,
+            nsSeparator: '|',
+          })}
+        </SmallText>
+      )}
+      {identityLoading && <SmallText>{t('Asking the node…')}</SmallText>}
+      {identity && addresses.length === 0 && (
+        <SmallText>
+          {t(
+            'No invitee on the way: an invitee shows here from its invitation until it is Verified.',
+            {nsSeparator: '|'}
+          )}
+        </SmallText>
+      )}
+      {addresses.map((invitee) => (
+        <PersonRow
+          key={invitee}
+          address={invitee}
+          identity={identities.data?.[invitee]}
+          onOpen={onOpen}
+          action={terminate(invitee)}
+        />
+      ))}
+    </Stack>
   )
 }
 
@@ -135,14 +235,11 @@ export function ProfileListPage({
         <Members address={address} isMe={isMe} onOpen={openProfile} />
       )}
       {list === ProfileList.Invitees && (
-        <ProfilePeople
-          addresses={inviteeAddresses(identity)}
-          isLoading={identityLoading}
-          error={identityError}
-          empty={t(
-            'No invitee on the way: an invitee shows here from its invitation until it is Verified.',
-            {nsSeparator: '|'}
-          )}
+        <Invitees
+          isMe={isMe}
+          identity={identity}
+          identityLoading={identityLoading}
+          identityError={identityError}
           onOpen={openProfile}
         />
       )}

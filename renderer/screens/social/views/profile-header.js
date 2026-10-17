@@ -8,19 +8,15 @@ import {identityColor} from '../format'
 import {Chip, FollowChip} from '../components/chips'
 import {CopyButton} from './common'
 import {useMembers, useTrust, useTrustsGiven} from '../profile-hooks'
-import {inviteeAddresses, inviterOf} from '../profile-lists'
+import {inviteeAddresses} from '../profile-lists'
 import {profilesEnabled} from '../profiles'
-import {
-  ProfilePicture,
-  TrustButton,
-  useShownName,
-} from '../components/profile-public'
+import {ProfilePicture, TrustButton} from '../components/profile-public'
 import {OwnProfileMenu, ProfileMenu} from '../components/hide-menu'
-import {LINK} from '../components/theme'
 
-// The top of a profile, as the phone app's (B-89): the picture, the name with ⚙ (one's own) or ⋯ (another's), the
-// identity, "Invited by", then the people as counts, each opening its list: "🤝 15 trusted by · 4 trusts given",
-// "👥 3 members · 2 invitees". Under it, on another's profile, Message, Trust and Follow.
+// The top of a profile, as the phone app's (B-89, B-91): the picture, beside it the name and the address with ⚙ (one's
+// own) or ⋯ (another's); then, in this order, the identity, the people as counts, each opening its list ("🤝 15
+// trusted by · 4 trusts given", "👥 3 members · 2 invitees"), the likes, the tips, and on one's own profile the people
+// and topics followed. Under it, on another's profile, Message, Trust and Follow.
 
 /** The lists a profile's counts open (ProfileListPage). */
 export const ProfileList = {
@@ -28,23 +24,6 @@ export const ProfileList = {
   TrustsGiven: 'trusts-given',
   Members: 'members',
   Invitees: 'invitees',
-}
-
-/** "Invited by <name>" under the identity line, while the node keeps the link; a click opens the inviter. */
-function InvitedBy({address, onProfile}) {
-  const {t} = useTranslation()
-  const name = useShownName(address)
-  return (
-    <Text
-      as="button"
-      textAlign="left"
-      fontSize="md"
-      color={LINK}
-      onClick={() => onProfile(address)}
-    >
-      {t('Invited by {{name}}', {name: name || shortAddress(address)})}
-    </Text>
-  )
 }
 
 /** A count of the header: "…" while it is read; a click opens its list. */
@@ -114,7 +93,8 @@ function PeopleCounts({address, identity, identityLoading, openList}) {
 
 /**
  * The header of the profile of `address`: `name` (shown name, or null), `statusLine` (its identity), `identity` (the
- * node's dna_identity answer); `onEdit` opens one's own profile editor.
+ * node's dna_identity answer), `activity` (its likes and tips received and given); `onEdit` opens one's own profile
+ * editor, `openSettings(tab)` Social settings (at the people or the topics followed).
  */
 export function ProfileHeader({
   address,
@@ -125,36 +105,47 @@ export function ProfileHeader({
   publicProfile,
   isMe,
   isBlocked,
+  activity,
   openList,
-  openProfile,
   onRename,
   openChat,
   openSettings,
   onEdit,
 }) {
   const {t} = useTranslation()
-  const {people, setPerson, chatKey} = useSocial()
-  const inviter = inviterOf(identity)
+  const {people, setPerson, chatKey, followedTopics} = useSocial()
+  const following = Object.values(people).filter((one) => one.following)
   return (
     <Stack spacing={3}>
-      <HStack spacing={4} align="flex-start">
+      <HStack spacing={4} align="center">
         <ProfilePicture
           address={address}
           profile={publicProfile}
           boxSize={24}
         />
         <Stack spacing={1} flex={1} minW={0}>
+          <Text fontSize="lg" fontWeight={500} noOfLines={1}>
+            {name || shortAddress(address)}
+            {isMe && ` ${t('(you)')}`}
+          </Text>
+          {/* The address beside the picture, then ⚙ or ⋯ (user 2026-10-17, B-92). */}
           <HStack spacing={1}>
-            <Text fontSize="lg" fontWeight={500} noOfLines={1}>
-              {name || shortAddress(address)}
-              {isMe && ` ${t('(you)')}`}
+            <Text
+              fontFamily="mono"
+              fontSize="sm"
+              color="muted"
+              flex={1}
+              minW={0}
+              wordBreak="break-all"
+            >
+              {address}
             </Text>
-            {/* Next to the name, where the eye is (user 2026-10-17). */}
+            <CopyButton value={address} />
             {isMe && (
               <OwnProfileMenu
                 onEdit={onEdit}
                 onRename={() => onRename(address)}
-                openSettings={openSettings}
+                openSettings={() => openSettings()}
               />
             )}
             {!isMe && !isBlocked && (
@@ -172,40 +163,61 @@ export function ProfileHeader({
                 {t('Unblock')}
               </Chip>
             )}
-            {!name && <CopyButton value={address} />}
           </HStack>
-          {name && (
-            <HStack spacing={1}>
-              <Text fontFamily="mono" fontSize="sm" color="muted">
-                {shortAddress(address)}
-              </Text>
-              <CopyButton value={address} />
-            </HStack>
-          )}
-          <Text
-            fontSize="md"
-            fontWeight={500}
-            color={identityColor(identity?.state) || 'muted'}
-          >
-            {statusLine}
-          </Text>
-          {inviter && <InvitedBy address={inviter} onProfile={openProfile} />}
-          {isBlocked && (
-            <Text fontSize="md" color="red.500">
-              {t(
-                'Blocked: their posts, replies, comments and messages are hidden on this computer.',
-                {nsSeparator: '|'}
-              )}
-            </Text>
-          )}
-          <PeopleCounts
-            address={address}
-            identity={identity}
-            identityLoading={identityLoading}
-            openList={openList}
-          />
         </Stack>
       </HStack>
+      <Stack spacing={1} fontSize="md">
+        <Text
+          fontWeight={500}
+          color={identityColor(identity?.state) || 'muted'}
+        >
+          {statusLine}
+        </Text>
+        {isBlocked && (
+          <Text color="red.500">
+            {t(
+              'Blocked: their posts, replies, comments and messages are hidden on this computer.',
+              {nsSeparator: '|'}
+            )}
+          </Text>
+        )}
+        <PeopleCounts
+          address={address}
+          identity={identity}
+          identityLoading={identityLoading}
+          openList={openList}
+        />
+        <Text>
+          {`♡ ${t('{{received}} received · {{given}} given', {
+            received: activity.likesReceived,
+            given: activity.likesGiven,
+          })}`}
+        </Text>
+        <Text>
+          {`🪙 ${t('{{received}} received · {{given}} given iDNA', {
+            received: activity.tipsReceived,
+            given: activity.tipsGiven,
+          })}`}
+        </Text>
+        {isMe && (
+          <HStack spacing={1.5}>
+            <Text>⭐</Text>
+            <Count
+              text={t('{{count}} following', {count: following.length})}
+              onClick={() => openSettings('people')}
+            />
+            <Text color="muted">·</Text>
+            <Count
+              text={
+                followedTopics.length === 1
+                  ? t('1 topic')
+                  : t('{{count}} topics', {count: followedTopics.length})
+              }
+              onClick={() => openSettings('topics')}
+            />
+          </HStack>
+        )}
+      </Stack>
       {!isMe && !isBlocked && (
         <HStack spacing={2}>
           {openChat && (

@@ -5,14 +5,7 @@ import {Button, HStack, Stack, Text} from '@chakra-ui/react'
 import {SmallText} from '../../../shared/components/components'
 import {useEpochState} from '../../../shared/providers/epoch-context'
 import {useSocial} from '../provider'
-import {
-  useChallenge,
-  useMembers,
-  useOffer,
-  useOffersTo,
-  useProfile,
-  useProfiles,
-} from '../profile-hooks'
+import {useChallenge, useOffer, useOffersTo, useProfile} from '../profile-hooks'
 import {ProfileCall, isValidated, profilesEnabled} from '../profiles'
 import {displayName} from '../people'
 import {PersonAvatar} from './profile-public'
@@ -205,19 +198,13 @@ export function VouchPanel({address, profile}) {
 }
 
 /**
- * On the account's own profile: the vouches offered to it (Accept, Decline), its voucher (End), and the members it
- * vouches for (End each), with how many it may have.
+ * On the account's own profile: the vouches offered to it (Accept, Decline) and its voucher (End). The members it
+ * vouches for are on its Members page (MyMembers).
  */
 export function MyVouching({profile}) {
   const {t} = useTranslation()
   const {me, names, sending} = useSocial()
   const {data: offers} = useOffersTo(me)
-  const {data: members} = useMembers(me)
-  const memberAddresses = React.useMemo(
-    () => (members || []).map(({member}) => member),
-    [members]
-  )
-  const memberProfiles = useProfiles(memberAddresses)
   if (!profilesEnabled || !me) return null
   const isMember = isActingMember(profile)
   return (
@@ -283,40 +270,6 @@ export function MyVouching({profile}) {
           </Action>
         </HStack>
       ))}
-      {isValidated(profile?.state) && (members || []).length > 0 && (
-        <Stack spacing={1}>
-          <Text fontWeight={500}>
-            {t('You vouch for {{count}} of at most {{cap}}', {
-              count: members.length,
-              cap: vouchCap(profile.state),
-            })}
-          </Text>
-          {members.map(({member}) => (
-            <HStack key={member} spacing={2} flexWrap="wrap">
-              <Text>{displayName(member, names)}</Text>
-              {/* The contract ends the vouch at the member's next call; End frees the slot now. */}
-              {memberProfiles[member] &&
-                !isVouchable(memberProfiles[member].state) && (
-                  <SmallText>
-                    {t('has an identity now: End frees your slot', {
-                      nsSeparator: '|',
-                    })}
-                  </SmallText>
-                )}
-              <Action
-                call={ProfileCall.endVouch(member)}
-                onClick={() =>
-                  sending.prepareProfile('endVouch', () =>
-                    ProfileCall.endVouch(member)
-                  )
-                }
-              >
-                {t('End')}
-              </Action>
-            </HStack>
-          ))}
-        </Stack>
-      )}
     </Stack>
   )
 }

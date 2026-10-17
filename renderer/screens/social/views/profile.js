@@ -1,7 +1,7 @@
 /* eslint-disable react/prop-types */
 import React from 'react'
 import {useTranslation} from 'react-i18next'
-import {HStack, Stack, Text} from '@chakra-ui/react'
+import {HStack, Stack} from '@chakra-ui/react'
 import {SmallText} from '../../../shared/components/components'
 import {useSocial} from '../provider'
 import {useSocialIdentity} from '../hooks'
@@ -19,7 +19,8 @@ import {ProfileHeader, ProfileList} from './profile-header'
 import {ProfileListPage} from './profile-list-page'
 
 /**
- * The profile of `address`, as the phone app's: its header (profile-header.js: the people as counts), its public
+ * The profile of `address`, as the phone app's: its header (profile-header.js: the people as counts, the likes and
+ * tips), its public
  * profile, then its content in tabs (Posts, Replies, Comments, Likes, Tips, Media). With `list` (ProfileList), the
  * page of that list instead; `openList(list)` opens one.
  */
@@ -116,8 +117,13 @@ export function ProfileView({
         publicProfile={publicProfile}
         isMe={isMe}
         isBlocked={isBlocked}
+        activity={{
+          likesReceived: profile.likesReceived,
+          likesGiven: profile.likes.length,
+          tipsReceived: profile.tipsReceived,
+          tipsGiven: profile.tipsGiven,
+        }}
         openList={openList}
-        openProfile={openProfile}
         onRename={onRename}
         openChat={openChat}
         openSettings={openSettings}
@@ -135,20 +141,6 @@ export function ProfileView({
           onClose={() => setEditing(false)}
         />
       )}
-      <Stack spacing={0.5} fontSize="md">
-        <Text>
-          {`❤️ ${t('{{received}} received · {{given}} given', {
-            received: profile.likesReceived,
-            given: profile.likes.length,
-          })}`}
-        </Text>
-        <Text>
-          {`🪙 ${t('{{received}} received · {{given}} given iDNA', {
-            received: profile.tipsReceived,
-            given: profile.tipsGiven,
-          })}`}
-        </Text>
-      </Stack>
       {cache && !historyDone(cache) && (
         <SmallText>
           {t(
