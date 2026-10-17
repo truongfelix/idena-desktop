@@ -29,7 +29,7 @@ function setup({
   const onRestart = jest.fn()
   const watchdog = createNodeWatchdog({
     nodeProcess,
-    nodeRpc: jest.fn(async () => {
+    nodeAnswers: jest.fn(async () => {
       if (!answers(clock)) throw new Error('connect ECONNREFUSED')
       return {syncing: false}
     }),

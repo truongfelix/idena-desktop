@@ -13,13 +13,14 @@ const HAND_REPORT_STACKS =
   'Not taken: the node runs on. The app takes them when it restarts a node that stopped answering (not on Windows).'
 
 /**
- * `nodeProcess` (main/node-process.js), `nodeRpc(method)` the node's answer, `reports` (main/node-reports.js),
+ * `nodeProcess` (main/node-process.js), `nodeAnswers()` resolves when the node answers its RPC port at all (an
+ * error answer included: a starting node answers "method not available"), `reports` (main/node-reports.js),
  * `onRestart()` has the app start the node again after the stop; `now()` a monotonic clock, `wallNow()` the
  * wall clock.
  */
 function createNodeWatchdog({
   nodeProcess,
-  nodeRpc,
+  nodeAnswers,
   reports,
   onRestart,
   logger,
@@ -77,7 +78,7 @@ function createNodeWatchdog({
       if (!current || !nodeProcess.current) return
       let answered = false
       try {
-        await nodeRpc('bcn_syncing')
+        await nodeAnswers()
         answered = true
       } catch {
         answered = false

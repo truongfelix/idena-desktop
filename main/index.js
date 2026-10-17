@@ -170,7 +170,15 @@ const nodeReports = createNodeReports({
 })
 const nodeWatchdog = createNodeWatchdog({
   nodeProcess,
-  nodeRpc,
+  async nodeAnswers() {
+    if (!nodeConnection) throw new Error('the node has not started')
+    // Any HTTP answer: a starting node answers its RPC with errors.
+    await axios.post(
+      `http://localhost:${nodeConnection.rpcPort}`,
+      {method: 'bcn_syncing', params: [], id: 1, key: nodeConnection.apiKey},
+      {timeout: 5000, validateStatus: () => true}
+    )
+  },
   reports: nodeReports,
   onRestart() {
     // As the 'restart-node' command: the renderer starts the node again with its settings.
