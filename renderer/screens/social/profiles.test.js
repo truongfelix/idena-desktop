@@ -138,6 +138,14 @@ describe('profiles and names', () => {
     expect(inStanding('Newbie')).toBe(true)
   })
 
+  it('takes a member who got an identity out of good standing until it validates', () => {
+    // The contract ends the vouch of a member with an identity: a Suspended or Zombie one is not shown as vouched for.
+    expect(inStanding('Suspended', 'Human')).toBe(false)
+    expect(inStanding('Zombie', 'Verified')).toBe(false)
+    expect(inStanding('Killed', 'Human')).toBe(true)
+    expect(inStanding('Verified', 'Suspended')).toBe(true)
+  })
+
   it('finds the holder of a name, with or without its @', async () => {
     const node = fakeNode({
       maps: {'n:alice': alice.toUpperCase().replace('0X', '0x')},
