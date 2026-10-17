@@ -54,6 +54,7 @@ import {
 import {ExternalLink, Tooltip} from './components'
 import {useTimingState} from '../providers/timing-context'
 import {TodoVotingCountBadge} from '../../screens/oracles/components'
+import {socialNewsCount} from '../../screens/social/news-count'
 import {useSocial} from '../../screens/social/provider'
 import {
   AdsIcon,
@@ -324,13 +325,7 @@ function Navbar() {
   const {t} = useTranslation()
 
   const [{todoCount}] = useVotingNotification()
-  const {
-    unread = [],
-    unreadConversations = 0,
-    offersTo = [],
-  } = useSocial() || {}
-  // A vouch offer waiting for an answer counts as news too.
-  const socialNews = unread.length + unreadConversations + offersTo.length
+  const socialNews = socialNewsCount(useSocial() || {})
 
   return (
     <Nav>

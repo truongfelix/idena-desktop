@@ -1645,5 +1645,6 @@
   "Terminate the invitation": "Terminate the invitation",
   "Terminate the invitation of {{name}}?": "Terminate the invitation of {{name}}?",
   "They can no longer validate with this invitation, and your invitation is not given back": "They can no longer validate with this invitation, and your invitation is not given back",
-  "You no longer vouch for them": "You no longer vouch for them"
+  "You no longer vouch for them": "You no longer vouch for them",
+  "{{count}} Social news": "{{count}} Social news"
 }
