@@ -18,18 +18,22 @@ export function scrollTargetOf(move, key, saved = positions) {
   return move === 'push' ? 0 : null
 }
 
-/** Keeps the scroll of the page `ref` scrolls per address: saved as it scrolls, restored on the way back. */
+/** Keeps the scroll of the page `ref` scrolls per address: saved as a move starts, restored on the way back. */
 export function usePageScroll(ref) {
-  const {asPath} = useRouter()
+  const router = useRouter()
+  const {asPath} = router
 
-  // Attached at the commit: a list that shrinks while the view changes cannot write over the last view's place.
-  React.useLayoutEffect(() => {
-    const element = ref.current
-    if (!element) return undefined
-    const save = () => positions.set(asPath, element.scrollTop)
-    element.addEventListener('scroll', save, {passive: true})
-    return () => element.removeEventListener('scroll', save)
-  }, [asPath, ref])
+  // Saved as a move starts, before the view changes (a back or forward included): no scroll event is needed, and a
+  // list that shrinks as the view changes cannot write over the last view's place.
+  const pathRef = React.useRef(asPath)
+  pathRef.current = asPath
+  React.useEffect(() => {
+    const save = () => {
+      if (ref.current) positions.set(pathRef.current, ref.current.scrollTop)
+    }
+    router.events.on('routeChangeStart', save)
+    return () => router.events.off('routeChangeStart', save)
+  }, [ref, router.events])
 
   React.useLayoutEffect(() => {
     const element = ref.current
