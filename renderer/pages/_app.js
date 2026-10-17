@@ -30,7 +30,7 @@ export default function App({Component, ...pageProps}) {
 
   // Numbers the history entries, so that a page closes back where it was opened from (page-history.js).
   React.useEffect(() => {
-    numberHistory(window.history)
+    numberHistory(window.history, window)
   }, [])
 
   // The keyboard's way back and forward, as in a browser (Alt+Left, Cmd+[); the mouse's buttons work by themselves.

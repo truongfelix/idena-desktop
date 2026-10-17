@@ -67,23 +67,30 @@ import {
   InfoIcon,
   MoreIcon,
 } from './icons'
+import {usePageScroll} from '../utils/page-scroll'
 
-export const Page = React.forwardRef((props, ref) => (
-  <Flex
-    ref={ref}
-    flexDirection="column"
-    align="flex-start"
-    flexBasis={0}
-    flexGrow={999}
-    maxH="100vh"
-    minW="50%"
-    px="20"
-    py="6"
-    overflowY="auto"
-    position="relative"
-    {...props}
-  />
-))
+/** A page's column: it scrolls, and keeps its place per address on the way back (usePageScroll). */
+export const Page = React.forwardRef((props, ref) => {
+  const inner = React.useRef()
+  React.useImperativeHandle(ref, () => inner.current)
+  usePageScroll(inner)
+  return (
+    <Flex
+      ref={inner}
+      flexDirection="column"
+      align="flex-start"
+      flexBasis={0}
+      flexGrow={999}
+      maxH="100vh"
+      minW="50%"
+      px="20"
+      py="6"
+      overflowY="auto"
+      position="relative"
+      {...props}
+    />
+  )
+})
 
 export function PageTitle(props) {
   return (

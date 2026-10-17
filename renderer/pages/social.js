@@ -86,19 +86,7 @@ export default function SocialPage() {
     return () => setPageOpen(false)
   }, [setPageOpen])
 
-  // Each view opens at its top, as a new screen of the phone app.
-  const pageRef = React.useRef()
-  React.useEffect(() => {
-    pageRef.current?.scrollTo(0, 0)
-  }, [
-    query.view,
-    query.inbox,
-    query.post,
-    query.address,
-    query.topic,
-    query.chat,
-    query.list,
-  ])
+  // A new view opens at its top and the way back finds a list where it was left: the Page keeps it (page-scroll.js).
 
   const view = viewOf(query)
   const settingsTab = Object.values(SettingsTab).includes(query.tab)
@@ -270,7 +258,7 @@ export default function SocialPage() {
   return (
     <Layout>
       <OpenTopicContext.Provider value={openTopic}>
-        <Page ref={pageRef}>
+        <Page>
           <Stack spacing={4} w="full" maxW="3xl" sx={SOCIAL_FONT_SIZES}>
             <Flex align="center" justify="space-between">
               <PageTitle mb={0}>{t('Social')}</PageTitle>

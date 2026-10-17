@@ -1,6 +1,11 @@
 import fs from 'fs'
 import path from 'path'
-import {closeMove, historyIndexOf, numberHistory} from './page-history'
+import {
+  closeMove,
+  historyIndexOf,
+  lastHistoryMove,
+  numberHistory,
+} from './page-history'
 
 /** A window.history with its entries, as the browser keeps them. */
 function fakeHistory() {
@@ -45,6 +50,24 @@ describe('the numbered history', () => {
     expect(historyIndexOf(history.state)).toBe(1)
     history.pushState({__N: true}, '', '/flips/list')
     expect(historyIndexOf(history.state)).toBe(2)
+  })
+
+  it('notes the last move: push, replace, or back and forward', () => {
+    const history = fakeHistory()
+    const listeners = {}
+    const win = {addEventListener: (type, fn) => (listeners[type] = fn)}
+    numberHistory(history, win)
+    history.pushState({}, '', '/a')
+    expect(lastHistoryMove()).toBe('push')
+    history.replaceState({}, '', '/b')
+    expect(lastHistoryMove()).toBe('replace')
+    listeners.popstate()
+    expect(lastHistoryMove()).toBe('pop')
+    // Next's router replaces the entry it pops to.
+    history.replaceState({}, '', '/a')
+    expect(lastHistoryMove()).toBe('pop')
+    history.pushState({}, '', '/c')
+    expect(lastHistoryMove()).toBe('push')
   })
 
   it('numbers a history once', () => {

@@ -10,20 +10,38 @@ const INDEX = 'idenaIndex'
 export const historyIndexOf = (state) =>
   Number.isInteger(state?.[INDEX]) ? state[INDEX] : 0
 
-/** Numbers the entries of `history` (window.history) from now on: its push and replace keep Next's state. */
-export function numberHistory(history) {
+// The last move in the history: 'push', 'replace' or 'pop' (back or forward), for the pages' scroll (Page).
+let lastMove = 'push'
+
+/** The last move in the window's history since it was numbered: 'push', 'replace' or 'pop'. */
+export const lastHistoryMove = () => lastMove
+
+/**
+ * Numbers the entries of `history` (window.history) from now on: its push and replace keep Next's state; a back or
+ * forward (`win`'s popstate) is noted as the last move.
+ */
+export function numberHistory(history, win = null) {
   if (history.idenaNumbered) return
   const push = history.pushState.bind(history)
   const replace = history.replaceState.bind(history)
   // eslint-disable-next-line no-param-reassign
-  history.pushState = (state, title, url) =>
+  history.pushState = (state, title, url) => {
+    lastMove = 'push'
     push({...state, [INDEX]: historyIndexOf(history.state) + 1}, title, url)
+  }
   // eslint-disable-next-line no-param-reassign
-  history.replaceState = (state, title, url) =>
+  history.replaceState = (state, title, url) => {
+    // Next's router replaces the entry it pops to: the move stays a pop until the next push.
+    if (lastMove !== 'pop') lastMove = 'replace'
     replace({...state, [INDEX]: historyIndexOf(history.state)}, title, url)
+  }
   // eslint-disable-next-line no-param-reassign
   history.idenaNumbered = true
   history.replaceState(history.state, '')
+  lastMove = 'push'
+  win?.addEventListener('popstate', () => {
+    lastMove = 'pop'
+  })
 }
 
 /** How to close the page whose entry has `state`: back to the app's page behind it, or replace it with a list. */
