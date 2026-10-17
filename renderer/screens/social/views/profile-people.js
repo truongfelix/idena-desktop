@@ -8,8 +8,14 @@ import {shortAddress} from '../people'
 import {topicOf} from '../contract'
 import {topicChannel} from '../topics'
 import {identityColor, identityLabel} from '../format'
-import {useIdentities, useOffersFrom} from '../profile-hooks'
-import {ProfileCall} from '../profiles'
+import {
+  useIdentities,
+  useMembers,
+  useOffersFrom,
+  useProfile,
+} from '../profile-hooks'
+import {ProfileCall, isValidated} from '../profiles'
+import {isVouchable, vouchCap} from '../vouching'
 import {PersonAvatar, useShownName} from '../components/profile-public'
 import {Action} from '../components/profile-vouch'
 import {OpenTopicContext, TopicAvatar} from '../components/topic'
@@ -56,6 +62,78 @@ export function PersonRow({
       </Stack>
       {action && <Box onClick={(e) => e.stopPropagation()}>{action}</Box>}
     </HStack>
+  )
+}
+
+/**
+ * One's own Members page, first: "You vouch for N of at most M", each member with End (a member who has an identity
+ * now is noted: End frees the slot; the contract ends the vouch at its next call anyway).
+ */
+export function MyMembers({me, onOpen}) {
+  const {t} = useTranslation()
+  const {sending} = useSocial()
+  const members = useMembers(me)
+  const {data: mine} = useProfile(me)
+  const addresses = React.useMemo(
+    () => (members.data || []).map(({member}) => member),
+    [members.data]
+  )
+  const identities = useIdentities(addresses)
+  if (members.error)
+    return (
+      <SmallText>
+        {t('The node did not answer: {{message}}', {
+          message: members.error.message,
+          nsSeparator: '|',
+        })}
+      </SmallText>
+    )
+  if (members.isLoading) return <SmallText>{t('Asking the node…')}</SmallText>
+  if (addresses.length === 0)
+    return <SmallText>{t('No vouched member.')}</SmallText>
+  return (
+    <Stack spacing={2}>
+      {isValidated(mine?.state) && (
+        <Text fontWeight={500}>
+          {t('You vouch for {{count}} of at most {{cap}}', {
+            count: addresses.length,
+            cap: vouchCap(mine.state),
+          })}
+        </Text>
+      )}
+      {addresses.map((member) => {
+        const identity = identities.data?.[member]
+        return (
+          <PersonRow
+            key={member}
+            address={member}
+            identity={identity}
+            onOpen={onOpen}
+            suffix={
+              identity && !isVouchable(identity.state)
+                ? ` · ${t('has an identity now: End frees your slot', {
+                    nsSeparator: '|',
+                  })}`
+                : ''
+            }
+            action={
+              <Action
+                call={ProfileCall.endVouch(member)}
+                onClick={() =>
+                  sending.prepareProfile(
+                    'endVouch',
+                    () => ProfileCall.endVouch(member),
+                    {detail: t('You no longer vouch for them')}
+                  )
+                }
+              >
+                {t('End')}
+              </Action>
+            }
+          />
+        )
+      })}
+    </Stack>
   )
 }
 

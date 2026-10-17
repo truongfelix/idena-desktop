@@ -201,7 +201,9 @@ export default function SocialPage() {
         openProfile={openProfile}
         onRename={setRenaming}
         openChat={openChat}
-        openSettings={() => go({view: View.Settings})}
+        openSettings={(tab) =>
+          go(tab ? {view: View.Settings, tab} : {view: View.Settings})
+        }
       />
     )
   else if (view === View.Profile)
@@ -214,7 +216,9 @@ export default function SocialPage() {
         openThread={openThread}
         openProfile={openProfile}
         onRename={setRenaming}
-        openSettings={() => go({view: View.Settings})}
+        openSettings={(tab) =>
+          go(tab ? {view: View.Settings, tab} : {view: View.Settings})
+        }
       />
     ) : (
       <SmallText>{t("Waiting for the node's address…")}</SmallText>

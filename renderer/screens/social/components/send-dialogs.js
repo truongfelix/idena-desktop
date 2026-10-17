@@ -59,11 +59,16 @@ export function ConfirmDialog({pending, onSend, onCancel}) {
     declineOffer: t('Decline the vouch'),
     cancelOffer: t('Withdraw your offer'),
     endVouch: t('End the vouch'),
+    killInvitee: t('Terminate the invitation'),
   }
   const isProfile = PROFILE_TITLES.includes(pending.kind)
   const hasFiles = pending.files.length > 0
   return (
-    <Dialog title={titles[pending.kind]} isOpen onClose={onCancel}>
+    <Dialog
+      title={pending.title || titles[pending.kind]}
+      isOpen
+      onClose={onCancel}
+    >
       <DialogBody>
         <Stack spacing={3}>
           <Text>
