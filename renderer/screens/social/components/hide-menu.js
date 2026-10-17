@@ -21,7 +21,7 @@ import {useSocial} from '../provider'
 import {displayName, person} from '../people'
 import {topicChannel, topicOf} from '../topics'
 import {useTrust} from '../profile-hooks'
-import {ProfileCall} from '../profiles'
+import {ProfileCall, profilesEnabled} from '../profiles'
 
 // Muting and blocking an account (⋯ on its profile or on its posts), hiding a post and blocking a topic (⋯, or the
 // topic's page), as the phone app's SocialBlocking.kt and SocialMuting.kt. What they hide: hiding.js; the lists to undo them: Social settings.
@@ -112,8 +112,8 @@ function useMute(address) {
   return [one.muted, () => setPerson({...one, muted: !one.muted})]
 }
 
-/** ⋯ on another's profile, with Mute (or Unmute) and Block (asked first). */
-export function ProfileMenu({address}) {
+/** ⋯ on another's profile: Name on this computer (`onRename`), Mute (or Unmute) and Block (asked first). */
+export function ProfileMenu({address, onRename}) {
   const {t} = useTranslation()
   const [isBlocking, setIsBlocking] = React.useState(false)
   const [isMuted, toggleMute] = useMute(address)
@@ -122,6 +122,9 @@ export function ProfileMenu({address}) {
       <Menu autoSelect={false} placement="bottom-end">
         <MoreButton label={t('More')} />
         <MenuList zIndex="popover">
+          <MenuItem onClick={() => onRename(address)}>
+            {t('Name on this computer')}
+          </MenuItem>
           <MenuItem onClick={toggleMute}>
             {isMuted ? t('Unmute') : t('Mute')}
           </MenuItem>
@@ -131,6 +134,39 @@ export function ProfileMenu({address}) {
       {isBlocking && (
         <BlockDialog address={address} onClose={() => setIsBlocking(false)} />
       )}
+    </Box>
+  )
+}
+
+/**
+ * ⚙ on one's own profile: Edit your public profile (`onEdit`), Name on this computer (`onRename`), Social settings
+ * (`openSettings`), as the phone app's (B-79).
+ */
+export function OwnProfileMenu({onEdit, onRename, openSettings}) {
+  const {t} = useTranslation()
+  return (
+    <Box onClick={stop}>
+      <Menu autoSelect={false} placement="bottom-end">
+        <MenuButton
+          as={IconButton}
+          variant="ghost"
+          size="sm"
+          aria-label={t('Profile and settings')}
+          title={t('Profile and settings')}
+          icon={<Text>⚙</Text>}
+        />
+        <MenuList zIndex="popover">
+          {profilesEnabled && (
+            <MenuItem onClick={onEdit}>
+              {t('Edit your public profile')}
+            </MenuItem>
+          )}
+          <MenuItem onClick={onRename}>{t('Name on this computer')}</MenuItem>
+          {openSettings && (
+            <MenuItem onClick={openSettings}>{t('Social settings')}</MenuItem>
+          )}
+        </MenuList>
+      </Menu>
     </Box>
   )
 }
