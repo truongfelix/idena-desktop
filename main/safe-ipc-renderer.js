@@ -20,6 +20,7 @@ const INVOKE_CHANNELS = new Set([
   'CHECK_DNA_LINK',
   'search-image',
   'router-port',
+  'node-reports',
 ])
 
 const LISTEN_CHANNELS = new Set([

@@ -60,6 +60,7 @@ import {
 import {ipfsConnectionsFor} from '../../../main/node-peers'
 import {DirectPeersSettings} from './direct-peers'
 import {RouterPortSettings} from './router-port'
+import {NodeReportsSettings} from './node-reports'
 import {AVAILABLE_LANGS, isoLangs} from '../../i18n'
 import {EyeIcon, EyeOffIcon} from '../../shared/components/icons'
 
@@ -562,6 +563,7 @@ export function AdvancedNodeSettings() {
         options={IPFS_WRITE_BUFFERS.map(bufferOption)}
       />
       <RouterPortSettings isDisabled={!settings.runInternalNode} />
+      <NodeReportsSettings isDisabled={!settings.runInternalNode} />
       <DirectPeersSettings
         isDisabled={!settings.runInternalNode || unsupported('directPeers')}
         description={

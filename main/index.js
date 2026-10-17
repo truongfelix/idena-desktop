@@ -2,6 +2,7 @@ const {join, resolve} = require('path')
 const {
   BrowserWindow,
   app,
+  dialog,
   ipcMain,
   Tray,
   Menu,
@@ -84,6 +85,7 @@ const {
   cleanNodeState,
   getLastLogs,
   readNodeLogTail,
+  getNodeLogsFile,
   getNodeChainDbFolder,
   getNodeFile,
   getNodeIpfsDir,
@@ -92,6 +94,9 @@ const {
 
 const NodeUpdater = require('./node-updater')
 const {createNodeProcess} = require('./node-process')
+const {createNodeReports} = require('./node-reports')
+const {READ_INTERVAL_MS} = require('./node-watch')
+const {createNodeWatchdog} = require('./node-watchdog')
 const {createRouterNet} = require('./router-net')
 const {
   UPKEEP_INTERVAL_MS,
@@ -134,24 +139,47 @@ const nodeProcess = createNodeProcess({
 // The built-in node's RPC port, API key and IPFS port from its last start: the router port asks the node.
 let nodeConnection = null
 
+/** The built-in node's answer to `method` (no parameters). */
+async function nodeRpc(method) {
+  if (!nodeConnection) throw new Error('the node has not started')
+  const {data} = await axios.post(
+    `http://localhost:${nodeConnection.rpcPort}`,
+    {method, params: [], id: 1, key: nodeConnection.apiKey},
+    {timeout: 5000}
+  )
+  if (data?.error) throw new Error(data.error.message)
+  return data?.result
+}
+
 // The node's port on the router, opened by the user in the Advanced settings (main/router-port-service.js).
 const routerPort = createRouterPortService({
   file: () => join(app.getPath('userData'), 'router-port.json'),
   net: createRouterNet(),
-  async nodeRpc(method) {
-    if (!nodeConnection) throw new Error('the node has not started')
-    const {data} = await axios.post(
-      `http://localhost:${nodeConnection.rpcPort}`,
-      {method, params: [], id: 1, key: nodeConnection.apiKey},
-      {timeout: 5000}
-    )
-    if (data?.error) throw new Error(data.error.message)
-    return data?.result
-  },
+  nodeRpc,
   configuredPort: () => Number(nodeConnection?.ipfsPort) || null,
   nodeLogTail: () => readNodeLogTail(),
   logger,
 })
+
+// Node reports and the restart of a built-in node that stopped answering (main/node-watchdog.js), as in the
+// phone app's Advanced settings.
+const nodeReports = createNodeReports({
+  dir: () => join(app.getPath('userData'), 'node', 'reports'),
+  logFile: () => getNodeLogsFile(),
+  app: appVersion,
+})
+const nodeWatchdog = createNodeWatchdog({
+  nodeProcess,
+  nodeRpc,
+  reports: nodeReports,
+  onRestart() {
+    // As the 'restart-node' command: the renderer starts the node again with its settings.
+    sendMainWindowMsg(NODE_EVENT, 'node-stopped')
+    setTimeout(() => sendMainWindowMsg(NODE_EVENT, 'restart-node'), 1000)
+  },
+  logger,
+})
+setInterval(() => nodeWatchdog.read(), READ_INTERVAL_MS)
 
 function finishE2ESmoke(ok, detail) {
   if (!isE2ESmoke || e2eSmokeFinished) return
@@ -736,11 +764,13 @@ ipcMain.on(NODE_COMMAND, async (event, command, data) => {
             data.nodeOptions,
             isDev,
             (log) => {
+              nodeWatchdog.logged(log)
               sendMainWindowMsg(NODE_EVENT, 'node-log', log)
             }
           )
         )
         .then(({child, started}) => {
+          if (started) nodeWatchdog.started()
           logger.info(
             started
               ? `node started, PID: ${child.pid}`
@@ -993,6 +1023,40 @@ ipcMain.handle('router-port', async (event, command, data) => {
       return routerPort.close()
     default:
       throw new Error('unknown router port command')
+  }
+})
+
+/** What the Node reports row of the Advanced settings shows. */
+function nodeReportsStatus() {
+  const latest = nodeReports.latest()
+  return {
+    restarts: nodeReports.restarts(),
+    latest: latest && {name: latest.name, madeAt: latest.madeAt},
+    nodeRuns: Boolean(nodeProcess.current),
+  }
+}
+
+ipcMain.handle('node-reports', async (event, command) => {
+  requireIpcSender(event)
+  switch (command) {
+    case 'status':
+      return nodeReportsStatus()
+    case 'make':
+      nodeWatchdog.makeReport()
+      return nodeReportsStatus()
+    case 'save': {
+      const latest = nodeReports.latest()
+      if (!latest) throw new Error('there is no report')
+      const {canceled, filePath} = await dialog.showSaveDialog(mainWindow, {
+        defaultPath: join(app.getPath('downloads'), latest.name),
+        filters: [{name: 'Text', extensions: ['txt']}],
+      })
+      if (canceled || !filePath) return {saved: false}
+      await fs.copy(latest.file, filePath)
+      return {saved: true}
+    }
+    default:
+      throw new Error('unknown node reports command')
   }
 })
 

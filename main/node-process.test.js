@@ -156,4 +156,50 @@ describe('built-in node process', () => {
     const child = fakeChild()
     expect((await nodeProcess.start(async () => child)).started).toBe(true)
   })
+
+  it('quits a node with SIGQUIT and keeps the stacks it writes', async () => {
+    const {nodeProcess, signals, onFailed} = setup({exitOn: {}})
+    const child = fakeChild()
+    child.stderr = new EventEmitter()
+    await nodeProcess.start(async () => child)
+    signals.length = 0
+    const quitting = nodeProcess.quit()
+    await new Promise(setImmediate)
+    child.stderr.emit('data', Buffer.from('SIGQUIT: quit\n'))
+    child.stderr.emit('data', Buffer.from('goroutine 1 [select]:\n'))
+    child.exit(2)
+    const {stacks} = await quitting
+    expect(signals).toEqual([[child.pid, 'SIGQUIT']])
+    expect(stacks).toBe('SIGQUIT: quit\ngoroutine 1 [select]:\n')
+    expect(child.stderr.listenerCount('data')).toBe(0)
+    // Asked for: not a failure.
+    expect(onFailed).not.toHaveBeenCalled()
+    expect(nodeProcess.current).toBeNull()
+  })
+
+  it('kills a node that writes nothing on SIGQUIT', async () => {
+    const {nodeProcess, signals} = setup({exitOn: {}})
+    const child = fakeChild()
+    child.stderr = new EventEmitter()
+    await nodeProcess.start(async () => child)
+    const {stacks} = await nodeProcess.quit()
+    expect(signals.map(([, sig]) => sig)).toEqual(['SIGQUIT', 'SIGKILL'])
+    expect(stacks).toBeNull()
+  })
+
+  it('stops a node without SIGQUIT on Windows', async () => {
+    const signal = jest.fn(async (node) => setImmediate(() => node.exit(1)))
+    const nodeProcess = createNodeProcess({
+      signal,
+      onFailed: jest.fn(),
+      logger: {info: jest.fn(), warn: jest.fn()},
+      isWindows: true,
+      stopTimeoutMs: 50,
+    })
+    const child = fakeChild()
+    child.stderr = new EventEmitter()
+    await nodeProcess.start(async () => child)
+    expect((await nodeProcess.quit()).stacks).toBeNull()
+    expect(signal).toHaveBeenCalledWith(child, undefined)
+  })
 })

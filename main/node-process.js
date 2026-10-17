@@ -57,7 +57,11 @@ function createNodeProcess({
       })
     })
 
-  async function stop() {
+  /**
+   * Stops the node: SIGINT, or `quitSignal` when given (Linux and macOS only), then SIGKILL after
+   * `stopTimeoutMs`. Resolves to a line for the log.
+   */
+  async function stop({quitSignal} = {}) {
     if (stopping) return stopping
     const child = current
     if (!child || hasExited(child)) {
@@ -68,7 +72,7 @@ function createNodeProcess({
       // eslint-disable-next-line no-param-reassign
       child.stopRequested = true
       try {
-        await signal(child, isWindows ? undefined : 'SIGINT')
+        await signal(child, isWindows ? undefined : quitSignal || 'SIGINT')
         if (!(await waitForExit(child, stopTimeoutMs))) {
           logger.warn(`node ${child.pid} still running, killing it`)
           await signal(child, 'SIGKILL')
@@ -81,6 +85,27 @@ function createNodeProcess({
       return `node ${child.pid} stopped`
     })()
     return stopping
+  }
+
+  /**
+   * Stops a node that stopped answering with SIGQUIT, on which Go writes the stack of each goroutine to the
+   * node's error output before it exits. Resolves to `{log, stacks}`: `stacks` is that output, or null on
+   * Windows (no SIGQUIT: a plain stop) and when no node runs.
+   */
+  async function quit() {
+    const child = current
+    if (isWindows || !child || hasExited(child) || !child.stderr) {
+      return {log: await stop(), stacks: null}
+    }
+    const chunks = []
+    const collect = (data) => chunks.push(String(data))
+    child.stderr.on('data', collect)
+    try {
+      const log = await stop({quitSignal: 'SIGQUIT'})
+      return {log, stacks: chunks.join('') || null}
+    } finally {
+      child.stderr.off('data', collect)
+    }
   }
 
   /**
@@ -107,6 +132,7 @@ function createNodeProcess({
   return {
     start,
     stop,
+    quit,
     /** The running node's process, or null. */
     get current() {
       return current && !hasExited(current) ? current : null

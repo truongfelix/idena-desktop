@@ -669,6 +669,7 @@ module.exports = {
   installBundledNodeOverOther,
   getLastLogs,
   readNodeLogTail,
+  getNodeLogsFile,
   getNodeFile,
   getNodeChainDbFolder,
   getNodeIpfsDir,
