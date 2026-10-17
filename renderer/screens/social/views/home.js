@@ -1,37 +1,25 @@
 /* eslint-disable react/prop-types */
 import React from 'react'
 import {useTranslation} from 'react-i18next'
-import {
-  Button,
-  Divider,
-  HStack,
-  IconButton,
-  Stack,
-  Text,
-  Menu,
-  MenuButton,
-  MenuItem,
-  MenuList,
-} from '@chakra-ui/react'
+import {Divider, HStack, Stack, Text} from '@chakra-ui/react'
 import {SmallText} from '../../../shared/components/components'
 import {useSocial} from '../provider'
-import {
-  displayName,
-  shortAddress,
-  MIN_SEARCH,
-  followingFeed,
-  searchSocial,
-} from '../people'
-import {Chip} from '../components/chips'
+import {displayName, shortAddress, MIN_SEARCH, searchSocial} from '../people'
 import {PostRow, TopicShown} from '../components/post'
 import {TopicRow} from '../components/topic'
-import {FeedPeriod, FeedSort, sortFeed} from '../feed'
+import {FeedSort} from '../feed'
 import {feedPosts} from '../hiding'
+import {applyFeedFilter, isFollowed} from '../feed-filter'
+import {FeedFilterButton, FeedFilterLine} from '../components/feed-filter'
 import {TOPIC_PREFIX, topicList} from '../topics'
 import {ContactRow, PAGE_SIZE, Rows, SearchField, ShowMore} from './common'
 import {PersonAvatar} from '../components/profile-public'
 
-export function Home({now, openThread, openProfile, onRename, openSettings}) {
+/**
+ * The Feed, as the phone app's: the search bar with the feed's filter at its end (feed-filter.js; the line under it
+ * names a filter that is not the default), then the posts. `openList` opens the people or the topics followed.
+ */
+export function Home({now, openThread, openProfile, onRename, openList}) {
   const {t} = useTranslation()
   // The feed as shown: without what is blocked or hidden (hiding.js).
   const {
@@ -42,54 +30,30 @@ export function Home({now, openThread, openProfile, onRename, openSettings}) {
     names,
     epochStart,
     followedTopics,
+    feedFilter: filter,
+    setFeedFilter,
   } = useSocial()
   const [query, setQuery] = React.useState('')
   const [searched, setSearched] = React.useState('')
-  const [following, setFollowing] = React.useState(false)
-  const [sort, setSort] = React.useState(FeedSort.Newest)
-  const [period, setPeriod] = React.useState(FeedPeriod.Epoch)
   const [shown, setShown] = React.useState(PAGE_SIZE)
   React.useEffect(() => {
     const timer = setTimeout(() => setSearched(query), 250)
     return () => clearTimeout(timer)
   }, [query])
-  React.useEffect(() => setShown(PAGE_SIZE), [following, sort, period])
+  React.useEffect(() => setShown(PAGE_SIZE), [filter])
 
-  const sortLabels = {
-    [FeedSort.Newest]: t('Newest posts'),
-    [FeedSort.Activity]: t('Latest activity'),
-    [FeedSort.Likes]: t('Most liked'),
-    [FeedSort.Comments]: t('Most commented'),
-    [FeedSort.Tips]: t('Most tipped'),
-  }
-  const ranked = ![FeedSort.Newest, FeedSort.Activity].includes(sort)
   const posts = React.useMemo(
     () =>
-      sortFeed(
-        // Muted accounts and, at Hide, posts with a picture leave the feeds only: the search still finds them.
-        following
-          ? followingFeed(feedPosts(feed, hidden, me), people, followedTopics)
-          : feedPosts(feed, hidden, me),
-        sort,
-        {
-          period,
-          now,
-          epochStart,
-        }
-      ),
-    [
-      epochStart,
-      feed,
-      followedTopics,
-      following,
-      hidden,
-      me,
-      now,
-      people,
-      period,
-      sort,
-    ]
+      // Muted accounts and, at Hide, posts with a picture leave the feeds only: the search still finds them.
+      applyFeedFilter(feedPosts(feed, hidden, me), filter, {
+        people,
+        followedTopics,
+        now,
+        epochStart,
+      }),
+    [epochStart, feed, filter, followedTopics, hidden, me, now, people]
   )
+  const {sort} = filter
   // "r/…" lists the topics whose name holds the rest.
   const topicSearch = query.trim().startsWith(TOPIC_PREFIX)
   const searching = !topicSearch && searched.trim().length >= MIN_SEARCH
@@ -105,9 +69,9 @@ export function Home({now, openThread, openProfile, onRename, openSettings}) {
 
   let empty = t('No posts found yet.')
   if (
-    following &&
-    !Object.values(people).some((p) => p.following) &&
-    followedTopics.length === 0
+    isFollowed(filter) &&
+    !(filter.people && Object.values(people).some((p) => p.following)) &&
+    !(filter.topics && followedTopics.length > 0)
   )
     empty = t(
       'You follow nobody and no topic yet. Open a profile or a topic and select Follow.'
@@ -119,7 +83,24 @@ export function Home({now, openThread, openProfile, onRename, openSettings}) {
 
   return (
     <Stack spacing={3} w="full">
-      <SearchField value={query} onChange={setQuery} />
+      <SearchField
+        value={query}
+        onChange={setQuery}
+        trailing={
+          <FeedFilterButton
+            filter={filter}
+            onChange={setFeedFilter}
+            peopleCount={
+              Object.values(people).filter((one) => one.following).length
+            }
+            topicsCount={followedTopics.length}
+            openList={openList}
+          />
+        }
+      />
+      {!topicSearch && !searching && (
+        <FeedFilterLine filter={filter} onChange={setFeedFilter} />
+      )}
       {topicSearch && (
         <Stack spacing={2}>
           {topics.length === 0 && (
@@ -205,63 +186,6 @@ export function Home({now, openThread, openProfile, onRename, openSettings}) {
       )}
       {!topicSearch && !searching && (
         <>
-          <HStack spacing={2} flexWrap="wrap">
-            <Chip isSelected={!following} onClick={() => setFollowing(false)}>
-              {t('Feed')}
-            </Chip>
-            <Chip isSelected={following} onClick={() => setFollowing(true)}>
-              {t('Following')}
-            </Chip>
-            <IconButton
-              variant="ghost"
-              size="sm"
-              aria-label={t('Social settings')}
-              title={t('Social settings')}
-              icon={<Text>⚙</Text>}
-              onClick={openSettings}
-            />
-            <Menu autoSelect={false}>
-              <MenuButton
-                as={Button}
-                size="sm"
-                h={8}
-                variant="outline"
-                borderColor="gray.100"
-                fontWeight={500}
-              >
-                {sortLabels[sort]} ▾
-              </MenuButton>
-              <MenuList zIndex="popover">
-                {Object.values(FeedSort).map((value) => (
-                  <MenuItem key={value} onClick={() => setSort(value)}>
-                    {sortLabels[value]}
-                  </MenuItem>
-                ))}
-              </MenuList>
-            </Menu>
-            {ranked && (
-              <>
-                <Chip
-                  isSelected={period === FeedPeriod.Epoch}
-                  onClick={() => setPeriod(FeedPeriod.Epoch)}
-                >
-                  {t('This epoch')}
-                </Chip>
-                <Chip
-                  isSelected={period === FeedPeriod.Week}
-                  onClick={() => setPeriod(FeedPeriod.Week)}
-                >
-                  {t('7 days')}
-                </Chip>
-                <Chip
-                  isSelected={period === FeedPeriod.All}
-                  onClick={() => setPeriod(FeedPeriod.All)}
-                >
-                  {t('All')}
-                </Chip>
-              </>
-            )}
-          </HStack>
           <Divider />
           {posts.length === 0 && <SmallText>{empty}</SmallText>}
           <Rows>

@@ -138,7 +138,7 @@ export function ProfileView({
         <ProfilePicture
           address={address}
           profile={publicProfile}
-          boxSize={16}
+          boxSize={24}
         />
         <Stack spacing={0.5} flex={1} minW={0}>
           <HStack spacing={1}>
@@ -146,6 +146,14 @@ export function ProfileView({
               {name || shortAddress(address)}
               {isMe && ` ${t('(you)')}`}
             </Text>
+            {/* Next to the name, where the eye is (user 2026-10-17). */}
+            {isMe && (
+              <OwnProfileMenu
+                onEdit={() => setEditing(true)}
+                onRename={() => onRename(address)}
+                openSettings={openSettings}
+              />
+            )}
             {!name && <CopyButton value={address} />}
             <Box flex={1} />
             {isBlocked && (
@@ -163,23 +171,16 @@ export function ProfileView({
             {!isMe && !isBlocked && openChat && (
               <IconButton
                 variant="ghost"
-                size="sm"
+                size="md"
                 aria-label={t('Message')}
                 title={t('Message')}
-                icon={<Text>✉</Text>}
+                icon={<Text fontSize="lg">✉</Text>}
                 onClick={() => openChat(chatKey([address]))}
               />
             )}
             {!isMe && !isBlocked && <FollowChip address={address} />}
             {!isMe && !isBlocked && (
               <ProfileMenu address={address} onRename={onRename} />
-            )}
-            {isMe && (
-              <OwnProfileMenu
-                onEdit={() => setEditing(true)}
-                onRename={() => onRename(address)}
-                openSettings={openSettings}
-              />
             )}
           </HStack>
           {name && (

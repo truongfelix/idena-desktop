@@ -22,6 +22,19 @@ import {PersonAvatar} from '../components/profile-public'
 
 export const PAGE_SIZE = 30
 
+/**
+ * Social's text sizes, as the phone's (user 2026-10-17, B-88): a post's text 16 px (the app's 13), names and times
+ * 13 px (11); the others a step up too. Chakra 1.8 writes the theme's font sizes as CSS variables, so the Social
+ * page's box redefines them for what it holds (its dialogs open outside it and keep the app's sizes).
+ */
+export const SOCIAL_FONT_SIZES = {
+  '--chakra-fontSizes-sm': '13px',
+  '--chakra-fontSizes-md': '16px',
+  '--chakra-fontSizes-mdx': '17px',
+  '--chakra-fontSizes-base': '18px',
+  '--chakra-fontSizes-lg': '20px',
+}
+
 export const useNow = () => {
   const [now, setNow] = React.useState(() => Math.floor(Date.now() / 1000))
   React.useEffect(() => {
@@ -53,10 +66,11 @@ export function Rows({children}) {
   )
 }
 
-export function SearchField({value, onChange}) {
+/** The rounded search bar; `trailing` (the feed's filter) sits at its end, after ✕ while something is typed. */
+export function SearchField({value, onChange, trailing = null}) {
   const {t} = useTranslation()
   return (
-    <InputGroup>
+    <InputGroup size="lg">
       <InputLeftElement pointerEvents="none" color="muted">
         🔍
       </InputLeftElement>
@@ -67,13 +81,25 @@ export function SearchField({value, onChange}) {
         bg="gray.50"
         borderColor="gray.50"
         placeholder={t('Search')}
+        pr={trailing ? 24 : undefined}
         onChange={(e) => onChange(e.target.value)}
       />
-      {value && (
-        <InputRightElement>
-          <Button variant="ghost" size="sm" onClick={() => onChange('')}>
-            ✕
-          </Button>
+      {(value || trailing) && (
+        <InputRightElement w="auto" pr={2}>
+          <HStack spacing={0}>
+            {value && (
+              <Button
+                variant="ghost"
+                size="sm"
+                rounded="full"
+                aria-label={t('Clear the search')}
+                onClick={() => onChange('')}
+              >
+                ✕
+              </Button>
+            )}
+            {trailing}
+          </HStack>
         </InputRightElement>
       )}
     </InputGroup>

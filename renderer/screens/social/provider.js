@@ -21,6 +21,7 @@ import {
   wordFilter,
 } from './hiding'
 import {newActivity, NotifyKind, socialActivity} from './activity'
+import {DEFAULT_FEED_FILTER} from './feed-filter'
 import {postTargets} from './feed'
 import {cacheFeed} from './scan'
 import {useActivityNotices} from './notices'
@@ -60,6 +61,8 @@ export function SocialProvider({children}) {
   const [pageOpen, setPageOpen] = React.useState(false)
   const [inboxOpen, setInboxOpen] = React.useState(false)
   const [highlightAfter, setHighlightAfter] = React.useState(null)
+  // The feed's filter (feed-filter.js), kept while the app runs, as on the phone.
+  const [feedFilter, setFeedFilter] = React.useState(DEFAULT_FEED_FILTER)
 
   const cacheRef = React.useRef()
 
@@ -316,6 +319,8 @@ export function SocialProvider({children}) {
       setTopicFollowed,
       setFollowedTopics: (list) => updateSettings('topics', list),
       shownFeed,
+      feedFilter,
+      setFeedFilter,
       hidden,
       hiddenWords,
       setHiddenWords: (list) => updateSettings('hiddenWords', list),
@@ -358,6 +363,7 @@ export function SocialProvider({children}) {
       epoch,
       error,
       feed,
+      feedFilter,
       followedTopics,
       head,
       hidden,

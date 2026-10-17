@@ -55,7 +55,7 @@ export function TopicLine({name, time = null, now, large = false}) {
   const open = React.useContext(OpenTopicContext)
   return (
     <HStack spacing={large ? 2.5 : 2} align="center" {...openProps(open, name)}>
-      <TopicAvatar name={name} boxSize={large ? 9 : 6} />
+      <TopicAvatar name={name} boxSize={large ? 11 : 10} />
       <Text fontSize={large ? 'md' : 'sm'} fontWeight={600} noOfLines={1}>
         {topicChannel(name)}
         {time !== null && (

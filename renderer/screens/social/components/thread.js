@@ -112,7 +112,7 @@ function ThreadItem({
               time={node.call.time}
               now={now}
               onProfile={onProfile}
-              avatarSize={depth === 0 ? 9 : 7}
+              avatarSize={depth === 0 ? 11 : 9}
               onClick={() => setFolded(true)}
               isOp={node.call.author === opAuthor}
               call={node.call}

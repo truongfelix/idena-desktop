@@ -52,7 +52,7 @@ export function useActivityNotices({
       title,
       actionContent: t('View'),
       onAction: () =>
-        router.push({pathname: '/social', query: {view: 'inbox'}}),
+        router.push({pathname: '/social', query: {view: 'notifications'}}),
     })
   }, [
     activity,

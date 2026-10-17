@@ -41,7 +41,7 @@ export function ActivityCard({item, now, isNew, onOpen, onProfile}) {
         </Text>
       )}
       <HStack spacing={2.5} align="center">
-        <PersonAvatar address={item.actor} boxSize={8} rounded="md" />
+        <PersonAvatar address={item.actor} boxSize={10} rounded="md" />
         <Text fontSize="md">
           <NameLink address={item.actor} onProfile={onProfile} /> {action}
           <Text as="span" color={MUTED}>{`  ·  ${timeAgo(

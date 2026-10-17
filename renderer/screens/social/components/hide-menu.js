@@ -28,15 +28,20 @@ import {ProfileCall, profilesEnabled} from '../profiles'
 
 const stop = (e) => e.stopPropagation()
 
+/** ⋯, dark and big enough to see and hit (user 2026-10-17: it was too small and grey). */
 function MoreButton({label}) {
   return (
     <MenuButton
       as={IconButton}
       variant="ghost"
-      size="xs"
+      size="sm"
       aria-label={label}
       title={label}
-      icon={<Text color="muted">⋯</Text>}
+      icon={
+        <Text fontSize="lg" fontWeight={700} color="gray.700" lineHeight={1}>
+          ⋯
+        </Text>
+      }
     />
   )
 }
@@ -153,10 +158,14 @@ export function OwnProfileMenu({onEdit, onRename, openSettings}) {
         <MenuButton
           as={IconButton}
           variant="ghost"
-          size="sm"
+          size="md"
           aria-label={t('Profile and settings')}
           title={t('Profile and settings')}
-          icon={<Text>⚙</Text>}
+          icon={
+            <Text fontSize="lg" color="gray.700" lineHeight={1}>
+              ⚙
+            </Text>
+          }
         />
         <MenuList zIndex="popover">
           {profilesEnabled && (
