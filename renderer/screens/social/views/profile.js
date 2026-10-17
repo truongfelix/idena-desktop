@@ -13,7 +13,7 @@ import {PostRow} from '../components/post'
 import {identityColor, identityStatus} from '../format'
 import {historyDone} from '../scan'
 import {CopyButton, PAGE_SIZE, Rows, ShowMore} from './common'
-import {useMembers, useProfile} from '../profile-hooks'
+import {useMembers, useProfile, useTrustsGiven} from '../profile-hooks'
 import {isActingMember} from '../vouching'
 import {inviteeAddresses, inviterOf} from '../profile-lists'
 import {
@@ -24,7 +24,7 @@ import {
 } from '../components/profile-public'
 import {OwnProfileMenu, ProfileMenu} from '../components/hide-menu'
 import {LINK} from '../components/theme'
-import {ProfilePeople} from './profile-people'
+import {OffersSent, ProfilePeople, TrustsGiven} from './profile-people'
 
 /** "Invited by <name>" under the identity line, while the node keeps the link; a click opens the inviter. */
 function InvitedBy({address, onProfile}) {
@@ -62,6 +62,9 @@ export function ProfileView({
     error: identityError,
   } = useSocialIdentity(address)
   const members = useMembers(address)
+  const isMe = address === me
+  // One's own Trusts given, to people and topics (read on one's own profile only).
+  const trustsGiven = useTrustsGiven(isMe ? address : null)
   const [editing, setEditing] = React.useState(false)
   // The invitees the node keeps (until each is Verified or Human, or killed) and the members vouched for.
   const invitees = React.useMemo(() => inviteeAddresses(identity), [identity])
@@ -77,6 +80,10 @@ export function ProfileView({
   const [tab, setTab] = React.useState('posts')
   const [shown, setShown] = React.useState(PAGE_SIZE)
   React.useEffect(() => setShown(PAGE_SIZE), [tab, address])
+  // "Trusts given" is on one's own profile only.
+  React.useEffect(() => {
+    if (!isMe && tab === 'trusts') setTab('posts')
+  }, [isMe, tab])
   const {data: publicProfile} = useProfile(address)
   // A private name wins; then the claimed one, while its holder is in good standing.
   const name =
@@ -84,7 +91,6 @@ export function ProfileView({
     (publicProfile?.inStanding && publicProfile.name
       ? `@${publicProfile.name}`
       : null)
-  const isMe = address === me
   const isBlocked = !isMe && people[address]?.blocked === true
   // An account without an identity acts through its voucher while that one is validated.
   const status = isActingMember(publicProfile)
@@ -99,12 +105,14 @@ export function ProfileView({
     ['media', t('Media')],
     ['invitees', t('Invitees')],
     ['members', t('Members')],
+    ...(isMe ? [['trusts', t('Trusts given')]] : []),
   ]
   const counts = {
     invitees: identityLoading ? '…' : invitees.length,
     members: members.isLoading ? '…' : memberAddresses.length,
+    trusts: trustsGiven.isLoading ? '…' : (trustsGiven.data || []).length,
   }
-  const isPeople = tab === 'invitees' || tab === 'members'
+  const isPeople = ['invitees', 'members', 'trusts'].includes(tab)
   const items = isPeople ? [] : profile[tab]
 
   let statusLine = t('Identity: asking the node…', {nsSeparator: '|'})
@@ -265,6 +273,12 @@ export function ProfileView({
           empty={t('No vouched member.')}
           onOpen={openProfile}
         />
+      )}
+      {tab === 'members' && isMe && (
+        <OffersSent me={address} onOpen={openProfile} />
+      )}
+      {tab === 'trusts' && isMe && (
+        <TrustsGiven trusts={trustsGiven} onOpen={openProfile} />
       )}
       {!isPeople && items.length === 0 && (
         <SmallText>{t('Nothing here yet.')}</SmallText>

@@ -23,6 +23,7 @@ import {TabButton, useNow} from '../screens/social/views/common'
 import {Home} from '../screens/social/views/home'
 import {Inbox, InboxView} from '../screens/social/views/inbox'
 import {ProfileView} from '../screens/social/views/profile'
+import {WaitingLine} from '../screens/social/components/waiting-line'
 import {TopicView} from '../screens/social/views/topic'
 import {SettingsTab, SocialSettingsView} from '../screens/social/views/settings'
 import {ChatView} from '../screens/social/views/messages'
@@ -59,6 +60,7 @@ export default function SocialPage() {
     me,
     unread,
     unreadConversations,
+    offersTo,
     scanOff,
     setPageOpen,
     sending,
@@ -263,6 +265,7 @@ export default function SocialPage() {
                 <Text color="muted">ⓘ</Text>
               </HStack>
             </Flex>
+            <WaitingLine />
             {missingMethod && (
               <Text fontSize="sm" color="red.500">
                 {t(
@@ -304,7 +307,9 @@ export default function SocialPage() {
                   </TabButton>
                   <TabButton
                     isActive={view === View.Inbox}
-                    badge={unread.length + unreadConversations}
+                    badge={
+                      unread.length + unreadConversations + offersTo.length
+                    }
                     onClick={() => go({view: View.Inbox})}
                   >
                     {t('Inbox')}

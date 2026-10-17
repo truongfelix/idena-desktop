@@ -85,6 +85,22 @@ export async function readOffersTo(call, member) {
   }))
 }
 
+/**
+ * The vouches `voucher` offered and that wait for their answer: [{member, epoch}], from all open offers ("o:", keys
+ * "<member>:<voucher>") where the voucher is `voucher`.
+ */
+export async function readOffersFrom(call, voucher) {
+  const me = voucher.toLowerCase()
+  const entries = await iterateEntries(call, 'o:')
+  return entries
+    .map(({key, value}) => {
+      const [member, from] = key.toLowerCase().split(':')
+      return {member, from, epoch: Number(value)}
+    })
+    .filter(({member, from}) => from === me && Boolean(member))
+    .map(({member, epoch}) => ({member, epoch}))
+}
+
 /** The members `voucher` vouches for: [{member, epoch accepted}]. */
 export async function readMembers(call, voucher) {
   const entries = await iterateEntries(call, `m:${voucher.toLowerCase()}:`)

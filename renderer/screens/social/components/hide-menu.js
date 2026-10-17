@@ -86,7 +86,10 @@ export function BlockDialog({address, onClose}) {
           <>
             <SecondaryButton onClick={block}>{t('Block only')}</SecondaryButton>
             <PrimaryButton
-              isDisabled={!sending.canAct}
+              isDisabled={
+                !sending.canAct ||
+                sending.isInFlight(ProfileCall.untrust(address))
+              }
               onClick={() => {
                 block()
                 sending.prepareProfile('untrust', () =>

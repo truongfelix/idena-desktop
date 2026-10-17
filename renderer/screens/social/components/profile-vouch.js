@@ -15,6 +15,7 @@ import {
 } from '../profile-hooks'
 import {ProfileCall, isValidated, profilesEnabled} from '../profiles'
 import {displayName} from '../people'
+import {PersonAvatar} from './profile-public'
 import {
   GRACE_EPOCHS,
   challengeStep,
@@ -24,18 +25,25 @@ import {
   vouchCap,
 } from '../vouching'
 
-/** A small action button of the panel: disabled while another action runs. */
-function Action({children, onClick, ...props}) {
+/**
+ * A small action button of the panel: disabled while another action is being prepared or sent, and while its own
+ * `call` waits for its block ("… · waiting for a block": the contract would refuse it a second time).
+ */
+export function Action({children, call = null, onClick, isDisabled, ...props}) {
+  const {t} = useTranslation()
   const {sending} = useSocial()
+  const waits = call !== null && sending.isInFlight(call)
   return (
     <Button
       size="sm"
       variant="outline"
-      isDisabled={!sending.canAct}
+      isDisabled={(isDisabled ?? !sending.canAct) || waits}
       onClick={onClick}
       {...props}
     >
-      {children}
+      {waits
+        ? t('{{action}} · waiting for a block', {action: children})
+        : children}
     </Button>
   )
 }
@@ -88,6 +96,7 @@ export function VouchPanel({address, profile}) {
         )}
         {iVouch && (
           <Action
+            call={ProfileCall.endVouch(address)}
             onClick={() =>
               sending.prepareProfile('endVouch', () =>
                 ProfileCall.endVouch(address)
@@ -99,6 +108,7 @@ export function VouchPanel({address, profile}) {
         )}
         {canOffer && offer === null && (
           <Action
+            call={ProfileCall.vouch(address)}
             onClick={() =>
               sending.prepareProfile(
                 'vouch',
@@ -121,6 +131,7 @@ export function VouchPanel({address, profile}) {
               {t('Your offer waits for them to accept it.')}
             </SmallText>
             <Action
+              call={ProfileCall.cancelOffer(address)}
               onClick={() =>
                 sending.prepareProfile('cancelOffer', () =>
                   ProfileCall.cancelOffer(address)
@@ -142,6 +153,7 @@ export function VouchPanel({address, profile}) {
           </SmallText>
           <HStack spacing={2}>
             <Action
+              call={ProfileCall.challengeName(hiddenName)}
               isDisabled={!sending.canAct || !step.canCall || !mayClaim}
               onClick={() =>
                 sending.prepareProfile(
@@ -219,6 +231,7 @@ export function MyVouching({profile}) {
             {!isMember && ` ${t('(not active now)')}`}
           </Text>
           <Action
+            call={ProfileCall.endVouch()}
             onClick={() =>
               sending.prepareProfile('endVouch', () => ProfileCall.endVouch())
             }
@@ -242,6 +255,7 @@ export function MyVouching({profile}) {
             })}
           </Text>
           <Action
+            call={ProfileCall.acceptVouch(voucher)}
             onClick={() =>
               sending.prepareProfile(
                 'acceptVouch',
@@ -258,6 +272,7 @@ export function MyVouching({profile}) {
             {t('Accept')}
           </Action>
           <Action
+            call={ProfileCall.declineOffer(voucher)}
             onClick={() =>
               sending.prepareProfile('declineOffer', () =>
                 ProfileCall.declineOffer(voucher)
@@ -289,6 +304,7 @@ export function MyVouching({profile}) {
                   </SmallText>
                 )}
               <Action
+                call={ProfileCall.endVouch(member)}
                 onClick={() =>
                   sending.prepareProfile('endVouch', () =>
                     ProfileCall.endVouch(member)
@@ -302,5 +318,77 @@ export function MyVouching({profile}) {
         </Stack>
       )}
     </Stack>
+  )
+}
+
+/**
+ * In Notifications, above the activity: a vouch offered to the account and waiting for its answer, with Accept and
+ * Decline; a click on the voucher opens its profile.
+ */
+export function OfferReceivedCard({voucher, onProfile}) {
+  const {t} = useTranslation()
+  const {names, sending} = useSocial()
+  const name = displayName(voucher, names)
+  return (
+    <HStack
+      spacing={3}
+      align="flex-start"
+      borderWidth={1}
+      borderColor="gray.100"
+      rounded="lg"
+      p={3}
+    >
+      <PersonAvatar
+        address={voucher}
+        boxSize={10}
+        rounded="md"
+        cursor="pointer"
+        onClick={() => onProfile(voucher)}
+      />
+      <Stack spacing={1} flex={1} minW={0}>
+        <Text
+          as="button"
+          textAlign="left"
+          fontWeight={500}
+          onClick={() => onProfile(voucher)}
+        >
+          {t('{{name}} offers to vouch for you.', {name})}
+        </Text>
+        <SmallText>
+          {t(
+            'Once you accept, you may hold a name, write a profile and give Trust while they are validated.'
+          )}
+        </SmallText>
+        <HStack spacing={2}>
+          <Action
+            call={ProfileCall.acceptVouch(voucher)}
+            onClick={() =>
+              sending.prepareProfile(
+                'acceptVouch',
+                () => ProfileCall.acceptVouch(voucher),
+                {
+                  detail: t(
+                    'You may then hold a name, write a profile and give Trust while {{name}} is validated',
+                    {name}
+                  ),
+                }
+              )
+            }
+          >
+            {t('Accept')}
+          </Action>
+          <Action
+            call={ProfileCall.declineOffer(voucher)}
+            onClick={() =>
+              sending.prepareProfile('declineOffer', () =>
+                ProfileCall.declineOffer(voucher)
+              )
+            }
+          >
+            {t('Decline')}
+          </Action>
+        </HStack>
+      </Stack>
+    </HStack>
   )
 }

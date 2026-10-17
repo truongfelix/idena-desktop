@@ -216,6 +216,29 @@ export async function trustGivers(call, target, contract = PROFILE_CONTRACT) {
 }
 
 /**
+ * The Trusts `giver` gives: [{target, epoch}] (`target` an address or "r/<topic>"), from all Trusts ("t:", keys
+ * "<target>:<giver>", split at the last ':'; values "<epoch>" or "<epoch>:v").
+ */
+export async function readTrustsGiven(
+  call,
+  giver,
+  contract = PROFILE_CONTRACT
+) {
+  const me = String(giver).toLowerCase()
+  const entries = await iterateEntries(call, 't:', contract)
+  const given = []
+  for (const {key, value} of entries) {
+    const at = key.lastIndexOf(':')
+    if (at > 0 && key.slice(at + 1).toLowerCase() === me)
+      given.push({
+        target: key.slice(0, at).toLowerCase(),
+        epoch: Number(value.split(':')[0]),
+      })
+  }
+  return given
+}
+
+/**
  * Which givers count now, as the apps count Trust: by each giver's standing now, whatever the Trust was stored as
  * (a member who validated since counts as an identity; an identity that lost it counts while vouched for). An
  * identity in a trusting state counts with the identities; an account without one, while its voucher is

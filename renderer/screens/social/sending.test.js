@@ -1,5 +1,6 @@
 import {PostTarget} from './contract'
-import {draftTarget, draftToPutBack, stillWaiting} from './sending'
+import {ProfileCall, withCallbackGas} from './profiles'
+import {actionKey, draftTarget, draftToPutBack, stillWaiting} from './sending'
 
 const sent = (hash, height = null, likeOf = null) => ({
   hash,
@@ -62,6 +63,26 @@ describe('draftTarget', () => {
   it('keeps an answer where it goes', () => {
     expect(draftTarget(PostTarget.onReply(4), 'idena')).toEqual(
       PostTarget.onReply(4)
+    )
+  })
+})
+
+describe('an action waiting for its block', () => {
+  const member = '0xbbbb000000000000000000000000000000000002'
+
+  it('is the same action whatever the callback gas the dry run sized', () => {
+    const fresh = ProfileCall.vouch(member)
+    const sized = withCallbackGas(fresh, 300000, 1200000)
+    expect(sized.argument).not.toBe(fresh.argument)
+    expect(actionKey(sized)).toBe(actionKey(fresh))
+  })
+
+  it('is another action for another method or person', () => {
+    expect(actionKey(ProfileCall.trust(member))).not.toBe(
+      actionKey(ProfileCall.untrust(member))
+    )
+    expect(actionKey(ProfileCall.trust(member))).not.toBe(
+      actionKey(ProfileCall.trust('r/idena_topic'))
     )
   })
 })

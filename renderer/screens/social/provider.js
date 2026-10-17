@@ -29,8 +29,13 @@ import {useSocialSending} from './sending'
 import {useChats} from './chats'
 import {nodeMessages} from './node'
 import {loadSocialCache, loadSocialSettings, saveSocialSetting} from './storage'
-import {feedAddresses, useProfiles, useRefreshProfiles} from './profile-hooks'
-import {shownNames} from './profiles'
+import {
+  feedAddresses,
+  useOffersTo,
+  useProfiles,
+  useRefreshProfiles,
+} from './profile-hooks'
+import {profilesEnabled, shownNames} from './profiles'
 
 const SocialContext = React.createContext(null)
 
@@ -170,6 +175,18 @@ export function SocialProvider({children}) {
     [feed, hidden, me]
   )
   const seenThrough = settings?.seenThrough ?? null
+  // The vouches offered to the account, waiting for its answer: in Notifications and its badge, read again at each
+  // scan step (and after each profile call in a block, with the profiles).
+  const offersQuery = useOffersTo(me)
+  const offersTo = React.useMemo(
+    () => offersQuery.data || [],
+    [offersQuery.data]
+  )
+  const {refetch: refetchOffers} = offersQuery
+  const scannedHeight = cache?.authorsHeight ?? 0
+  React.useEffect(() => {
+    if (profilesEnabled && me && scannedHeight > 0) refetchOffers()
+  }, [me, refetchOffers, scannedHeight])
 
   const updateSettings = React.useCallback((key, next, saved = next) => {
     setSettings((current) => ({...current, [key]: next}))
@@ -312,6 +329,7 @@ export function SocialProvider({children}) {
       setPicturesInPosts: (mode) => updateSettings('picturesInPosts', mode),
       activity,
       unread,
+      offersTo,
       highlightAfter,
       markSeen,
       notifyKinds,
@@ -351,6 +369,7 @@ export function SocialProvider({children}) {
       missingMethod,
       names,
       notifyKinds,
+      offersTo,
       offline,
       peers,
       people,

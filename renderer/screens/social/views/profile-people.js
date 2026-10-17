@@ -1,16 +1,24 @@
 /* eslint-disable react/prop-types */
+import React from 'react'
 import {useTranslation} from 'react-i18next'
-import {HStack, Stack, Text} from '@chakra-ui/react'
+import {Box, HStack, Stack, Text} from '@chakra-ui/react'
 import {SmallText} from '../../../shared/components/components'
+import {useSocial} from '../provider'
 import {shortAddress} from '../people'
+import {topicOf} from '../contract'
+import {topicChannel} from '../topics'
 import {identityColor, identityLabel} from '../format'
-import {useIdentities} from '../profile-hooks'
+import {useIdentities, useOffersFrom} from '../profile-hooks'
+import {ProfileCall} from '../profiles'
 import {PersonAvatar, useShownName} from '../components/profile-public'
+import {Action} from '../components/profile-vouch'
+import {OpenTopicContext, TopicAvatar} from '../components/topic'
 
-// A profile's tabs "Invitees" and "Members" (profile-lists.js), as the phone app's: each account with its picture
-// or robot, its name and its identity state; a click opens its profile.
+// A profile's tabs "Invitees" and "Members" (profile-lists.js), and on one's own profile the vouch offers waiting
+// and the Trusts given, as the phone app's: each account with its picture or robot, its name and its identity
+// state; a click opens its profile.
 
-function PersonRow({address, identity, onOpen}) {
+function PersonRow({address, identity, onOpen, note = null, action = null}) {
   const name = useShownName(address)
   return (
     <HStack
@@ -36,8 +44,135 @@ function PersonRow({address, identity, onOpen}) {
             {identityLabel(identity.state, identity.age)}
           </Text>
         )}
+        {note && <SmallText>{note}</SmallText>}
       </Stack>
+      {action && <Box onClick={(e) => e.stopPropagation()}>{action}</Box>}
     </HStack>
+  )
+}
+
+/** Under one's own Members tab: the vouch offers waiting for an answer, each with Withdraw. */
+export function OffersSent({me, onOpen}) {
+  const {t} = useTranslation()
+  const {sending} = useSocial()
+  const offers = useOffersFrom(me)
+  const addresses = React.useMemo(
+    () => (offers.data || []).map(({member}) => member),
+    [offers.data]
+  )
+  const identities = useIdentities(addresses)
+  if (!offers.data || offers.data.length === 0) return null
+  return (
+    <Stack spacing={2} pt={2}>
+      <Text fontWeight={500}>{t('Offers waiting')}</Text>
+      {offers.data.map(({member, epoch}) => (
+        <PersonRow
+          key={member}
+          address={member}
+          identity={identities.data?.[member]}
+          onOpen={onOpen}
+          note={t('Offered in epoch {{epoch}}', {epoch})}
+          action={
+            <Action
+              call={ProfileCall.cancelOffer(member)}
+              onClick={() =>
+                sending.prepareProfile(
+                  'cancelOffer',
+                  () => ProfileCall.cancelOffer(member),
+                  {detail: t('Your offer to vouch for them ends')}
+                )
+              }
+            >
+              {t('Withdraw')}
+            </Action>
+          }
+        />
+      ))}
+    </Stack>
+  )
+}
+
+/** A topic given Trust: its picture and "r/name"; a click opens the topic. */
+function TopicRow({name, action}) {
+  const open = React.useContext(OpenTopicContext)
+  return (
+    <HStack
+      spacing={3}
+      borderWidth={1}
+      borderColor="gray.100"
+      rounded="lg"
+      p={3}
+      cursor="pointer"
+      onClick={() => open?.(name)}
+    >
+      <TopicAvatar name={name} boxSize={10} />
+      <Text fontWeight={500} flex={1} minW={0} noOfLines={1}>
+        {topicChannel(name)}
+      </Text>
+      <Box onClick={(e) => e.stopPropagation()}>{action}</Box>
+    </HStack>
+  )
+}
+
+/** One's own tab "Trusts given": the people and topics given Trust, each with Take back. */
+export function TrustsGiven({trusts, onOpen}) {
+  const {t} = useTranslation()
+  const {sending} = useSocial()
+  const people = React.useMemo(
+    () =>
+      (trusts.data || [])
+        .map(({target}) => target)
+        .filter((target) => topicOf(target) === null),
+    [trusts.data]
+  )
+  const identities = useIdentities(people)
+  if (trusts.error)
+    return (
+      <SmallText>
+        {t('The node did not answer: {{message}}', {
+          message: trusts.error.message,
+          nsSeparator: '|',
+        })}
+      </SmallText>
+    )
+  if (trusts.isLoading) return <SmallText>{t('Asking the node…')}</SmallText>
+  if (!trusts.data || trusts.data.length === 0)
+    return (
+      <SmallText>
+        {t("You give no Trust yet: Trust on a profile or a topic's page.", {
+          nsSeparator: '|',
+        })}
+      </SmallText>
+    )
+  const takeBack = (target) => (
+    <Action
+      call={ProfileCall.untrust(target)}
+      onClick={() =>
+        sending.prepareProfile('untrust', () => ProfileCall.untrust(target), {
+          detail: t('Your Trust no longer counts'),
+        })
+      }
+    >
+      {t('Take back')}
+    </Action>
+  )
+  return (
+    <Stack spacing={2}>
+      {trusts.data.map(({target}) => {
+        const topic = topicOf(target)
+        return topic !== null ? (
+          <TopicRow key={target} name={topic} action={takeBack(target)} />
+        ) : (
+          <PersonRow
+            key={target}
+            address={target}
+            identity={identities.data?.[target]}
+            onOpen={onOpen}
+            action={takeBack(target)}
+          />
+        )
+      })}
+    </Stack>
   )
 }
 
