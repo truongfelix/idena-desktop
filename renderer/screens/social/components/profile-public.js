@@ -138,13 +138,13 @@ export function TrustLine({target, onProfile}) {
     )
   if (!trust)
     return <SmallText>{t('Trust: reading…', {nsSeparator: '|'})}</SmallText>
-  const text =
-    trust.vouched > 0
-      ? t('Trusted by {{count}} (+{{vouched}} vouched)', {
-          count: trust.identities,
-          vouched: trust.vouched,
-        })
-      : t('Trusted by {{count}}', {count: trust.identities})
+  let text = t('Trusted by {{count}}', {count: trust.identities})
+  if (trust.counted.length === 0) text = t('Trusted by nobody yet')
+  else if (trust.vouched > 0)
+    text = t('Trusted by {{count}} (+{{vouched}} vouched)', {
+      count: trust.identities,
+      vouched: trust.vouched,
+    })
   return (
     <>
       <Text
