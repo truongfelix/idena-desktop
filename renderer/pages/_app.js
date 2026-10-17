@@ -18,12 +18,26 @@ import {DnaLinkProvider} from '../screens/dna/hooks'
 import {SocialProvider} from '../screens/social/provider'
 import {ConfirmQuit} from '../shared/components/confirm-quit'
 import {queryClient} from '../shared/utils/utils'
+import {historyMoveOf} from '../shared/utils/history-keys'
 
 export default function App({Component, ...pageProps}) {
   const [isMounted, setIsMounted] = React.useState(false)
 
   React.useEffect(() => {
     setIsMounted(true)
+  }, [])
+
+  // The keyboard's way back and forward, as in a browser (Alt+Left, Cmd+[); the mouse's buttons work by themselves.
+  React.useEffect(() => {
+    const onKeyDown = (event) => {
+      const move = historyMoveOf(event, Boolean(global.isMac))
+      if (!move) return
+      event.preventDefault()
+      if (move === 'back') window.history.back()
+      else window.history.forward()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
   React.useEffect(() => {

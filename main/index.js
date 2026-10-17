@@ -360,6 +360,16 @@ const createMainWindow = () => {
   mainWindow.on('closed', () => {
     mainWindow = null
   })
+
+  // On Windows the mouse's back and forward buttons come as app commands, which Electron does not act on (on Linux
+  // the page itself goes back: acting here too would go back twice).
+  mainWindow.on('app-command', (_event, command) => {
+    if (!isWin) return
+    const history = mainWindow?.webContents.navigationHistory
+    if (command === 'browser-backward' && history?.canGoBack()) history.goBack()
+    if (command === 'browser-forward' && history?.canGoForward())
+      history.goForward()
+  })
 }
 
 const showMainWindow = () => {
