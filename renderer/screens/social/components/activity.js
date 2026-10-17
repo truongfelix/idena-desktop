@@ -7,7 +7,7 @@ import {displayName} from '../people'
 import {ActivityKind, NotifyKind} from '../activity'
 import {validTipAmount} from '../calls'
 import {NameLink} from './identity'
-import {FullHeader, PostBody, PostText} from './post'
+import {FEED_TEXT_LINES, FullHeader, PostBody, PostText} from './post'
 import {LINK, MUTED} from './theme'
 import {LIKE} from '../contract'
 import {likeCount, replyCount, tipTotal} from '../feed'
@@ -119,7 +119,7 @@ export function ProfileItemCard({item, tab, now, onOpen, onProfile}) {
       )}
       <PostBody
         call={node.call}
-        lines={showHeader ? 6 : 4}
+        lines={showHeader ? FEED_TEXT_LINES : 4}
         maxH="360px"
         media={tab === 'media'}
       />
