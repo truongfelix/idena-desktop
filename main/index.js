@@ -22,7 +22,7 @@ const kill = require('tree-kill')
 const {zoomIn, zoomOut, resetZoom} = require('./utils')
 const loadRoute = require('./utils/routes')
 const {getI18nConfig} = require('./language')
-const {searchImages} = require('./image-search')
+const {searchImageSource, searchImages} = require('./image-search')
 const {openExternalUrl} = require('./safe-external-url')
 const {RELEASES_API, createReleaseCheck} = require('./app-update-check')
 const {isTrustedIpcSender} = require('./ipc-sender')
@@ -1022,8 +1022,10 @@ function sendMainWindowMsg(channel, message, data) {
   }
 }
 
-ipcMain.handle('search-image', async (event, query) => {
+// With a source's name, that source alone (the renderer shows each one's pictures as it answers, B-33).
+ipcMain.handle('search-image', async (event, query, source) => {
   requireIpcSender(event)
+  if (source !== undefined) return searchImageSource(query, source, {logger})
   return searchImages(query, {logger})
 })
 

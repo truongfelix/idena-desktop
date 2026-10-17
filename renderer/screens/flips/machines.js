@@ -1,4 +1,4 @@
-import {Machine, assign, spawn, sendParent, createMachine} from 'xstate'
+import {Machine, assign, spawn, sendParent} from 'xstate'
 import {log, send} from 'xstate/lib/actions'
 import {nanoid} from 'nanoid'
 import {
@@ -1240,56 +1240,4 @@ export const createViewFlipMachine = (id) =>
     }
   )
 
-export const imageSearchMachine = createMachine({
-  context: {
-    images: [],
-    query: '',
-  },
-  initial: 'idle',
-  states: {
-    idle: {},
-    searching: {
-      invoke: {
-        // eslint-disable-next-line no-shadow
-        src: ({query}, {query: queryParam}) =>
-          global.ipcRenderer.invoke('search-image', query || queryParam),
-        onDone: {
-          target: 'done',
-          actions: [
-            assign({
-              images: (_, {data}) => data,
-            }),
-            log(),
-          ],
-        },
-        onError: 'fail',
-      },
-    },
-    done: {
-      on: {
-        PICK: {
-          actions: [
-            assign({
-              selectedImage: (_, {image}) => image,
-            }),
-            log(),
-          ],
-        },
-      },
-    },
-    fail: {
-      entry: ['onError', log()],
-    },
-  },
-  on: {
-    SEARCH: 'searching',
-    TYPE: {
-      actions: [
-        assign({
-          // eslint-disable-next-line no-shadow
-          query: (_, {query}) => query,
-        }),
-      ],
-    },
-  },
-})
+export {imageSearchMachine} from './image-search-machine'
