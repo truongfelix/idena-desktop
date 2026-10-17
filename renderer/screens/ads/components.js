@@ -33,6 +33,7 @@ import {rem} from '../../shared/theme'
 import {FormLabel, HDivider, Skeleton} from '../../shared/components/components'
 import {omit, pick} from '../../shared/utils/utils'
 import {adFallbackSrc, calculateTargetParamWeight} from './utils'
+import {useClosePage} from '../../shared/utils/page-history'
 
 export function AdStatLabel(props) {
   return <StatLabel color="muted" fontSize="md" {...props} />
@@ -180,12 +181,10 @@ export function PageHeader(props) {
   )
 }
 
+/** Closes the page: back where it was opened from, or to `href` when nothing of the app is behind it. */
 export function PageCloseButton({href, ...props}) {
-  return (
-    <NextLink href={href}>
-      <CloseButton {...props} />
-    </NextLink>
-  )
+  const closePage = useClosePage()
+  return <CloseButton onClick={() => closePage(href)} {...props} />
 }
 
 export function PageFooter(props) {

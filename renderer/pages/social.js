@@ -34,6 +34,7 @@ import {ChatView, MessagesList} from '../screens/social/views/messages'
 import {OpenTopicContext} from '../screens/social/components/topic'
 import {topicOf, topicChannel} from '../screens/social/topics'
 import {threadPost} from '../screens/social/hiding'
+import {editorMove, withCompose} from '../screens/social/editor-history'
 
 const View = {
   Feed: 'feed',
@@ -86,19 +87,7 @@ export default function SocialPage() {
     return () => setPageOpen(false)
   }, [setPageOpen])
 
-  // Each view opens at its top, as a new screen of the phone app.
-  const pageRef = React.useRef()
-  React.useEffect(() => {
-    pageRef.current?.scrollTo(0, 0)
-  }, [
-    query.view,
-    query.inbox,
-    query.post,
-    query.address,
-    query.topic,
-    query.chat,
-    query.list,
-  ])
+  // A new view opens at its top and the way back finds a list where it was left: the Page keeps it (page-scroll.js).
 
   const view = viewOf(query)
   const settingsTab = Object.values(SettingsTab).includes(query.tab)
@@ -148,6 +137,24 @@ export default function SocialPage() {
     profileAddress !== null ||
     topic !== null ||
     view === View.Settings
+
+  // The editor is a step of the history (editor-history.js): the way back closes it as Cancel does, and Cancel or a
+  // sent post step back to the thread or page it was opened from. A draft left open on another page closes too.
+  const hasDraft = Boolean(sending.draft)
+  const hasCompose = query.compose !== undefined
+  const editorRef = React.useRef({hadDraft: hasDraft, hadCompose: hasDraft})
+  React.useEffect(() => {
+    const move = editorMove({...editorRef.current, hasDraft, hasCompose})
+    editorRef.current = {hadDraft: hasDraft, hadCompose: hasCompose}
+    if (move === 'push')
+      router.push({pathname: '/social', query: withCompose(query)}, undefined, {
+        shallow: true,
+      })
+    else if (move === 'cancel') sending.cancelDraft()
+    else if (move === 'back') router.back()
+    // Only the draft and the editor's step decide.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasDraft, hasCompose])
 
   const state = scanOff
     ? {health: 'off', kind: 'scanOff'}
@@ -270,7 +277,7 @@ export default function SocialPage() {
   return (
     <Layout>
       <OpenTopicContext.Provider value={openTopic}>
-        <Page ref={pageRef}>
+        <Page>
           <Stack spacing={4} w="full" maxW="3xl" sx={SOCIAL_FONT_SIZES}>
             <Flex align="center" justify="space-between">
               <PageTitle mb={0}>{t('Social')}</PageTitle>

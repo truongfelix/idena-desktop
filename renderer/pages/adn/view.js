@@ -14,11 +14,13 @@ import {useCoinbase, useIpfsAd} from '../../screens/ads/hooks'
 import {ExternalLink, Page, PageTitle} from '../../shared/components/components'
 import {AdPreview} from '../../screens/ads/containers'
 import {ArrowUpIcon} from '../../shared/components/icons'
+import {useClosePage} from '../../shared/utils/page-history'
 
 export default function ViewAdPage() {
   const {t} = useTranslation()
 
   const router = useRouter()
+  const closePage = useClosePage()
 
   const {data} = useIpfsAd(router.query?.cid)
 
@@ -76,7 +78,7 @@ export default function ViewAdPage() {
         <PageFooter>
           <SecondaryButton
             onClick={() => {
-              router.push('/adn/list')
+              closePage('/adn/list')
             }}
           >
             {t('Close')}

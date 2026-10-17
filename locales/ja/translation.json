@@ -563,7 +563,6 @@
   "Confirm transaction": "処理の確認",
   "You’re about to sign and send tx from your wallet": "あなたのウォレットから署名してtxを送信するところです",
   "Transaction details": "処理の詳細",
-  "onboardingValidateSubscribe": "イデナからのお知らせを<0>購読</0>する（重要なお知らせのみ）",
   "onboardingValidateTest": "認証の前に<0>自分でテスト</0>",
   "Leaving Idena": "イデナから離れる",
   "Continue": "続き",

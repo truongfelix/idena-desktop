@@ -17,6 +17,7 @@ import {isActingMember} from '../vouching'
 import {ProfileEditDialog, PublicProfile} from '../components/profile-public'
 import {ProfileHeader, ProfileList} from './profile-header'
 import {ProfileListPage} from './profile-list-page'
+import {useKeptState} from '../kept-state'
 
 /**
  * The profile of `address`, as the phone app's: its header (profile-header.js: the people as counts, the likes and
@@ -50,9 +51,12 @@ export function ProfileView({
     () => socialProfile(feed, address),
     [address, feed]
   )
-  const [tab, setTab] = React.useState('posts')
-  const [shown, setShown] = React.useState(PAGE_SIZE)
-  React.useEffect(() => setShown(PAGE_SIZE), [tab, address])
+  // Kept per profile while the app runs: the way back finds the list chosen (B-106); a new list starts at its top.
+  const [tab, setTab] = useKeptState(`profile.tab:${address}`, 'posts')
+  const [shown, setShown] = useKeptState(
+    `profile.shown:${address}:${tab}`,
+    PAGE_SIZE
+  )
   const {data: publicProfile} = useProfile(address)
 
   if (Object.values(ProfileList).includes(list))

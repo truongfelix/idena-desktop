@@ -14,6 +14,7 @@ import {FeedFilterButton, FeedFilterLine} from '../components/feed-filter'
 import {TOPIC_PREFIX, topicList} from '../topics'
 import {ContactRow, PAGE_SIZE, Rows, SearchField, ShowMore} from './common'
 import {PersonAvatar} from '../components/profile-public'
+import {useKeptState} from '../kept-state'
 
 /**
  * The Feed, as the phone app's: the search bar with the feed's filter at its end (feed-filter.js; the line under it
@@ -33,14 +34,18 @@ export function Home({now, openThread, openProfile, onRename, openList}) {
     feedFilter: filter,
     setFeedFilter,
   } = useSocial()
-  const [query, setQuery] = React.useState('')
-  const [searched, setSearched] = React.useState('')
-  const [shown, setShown] = React.useState(PAGE_SIZE)
+  // Kept while the app runs: the way back from a result finds the search and the feed as they were (B-106).
+  const [query, setQuery] = useKeptState('home.query', '')
+  const [searched, setSearched] = React.useState(query)
+  // A new filter starts at the first page.
+  const [shown, setShown] = useKeptState(
+    `home.shown:${JSON.stringify(filter)}`,
+    PAGE_SIZE
+  )
   React.useEffect(() => {
     const timer = setTimeout(() => setSearched(query), 250)
     return () => clearTimeout(timer)
   }, [query])
-  React.useEffect(() => setShown(PAGE_SIZE), [filter])
 
   const posts = React.useMemo(
     () =>

@@ -116,6 +116,7 @@ import {
 import {useSuccessToast} from '../../shared/hooks/use-toast'
 import {AdStatus} from '../../screens/ads/types'
 import {useFormatDna} from '../../shared/hooks/hooks'
+import {useClosePage} from '../../shared/utils/page-history'
 
 dayjs.extend(relativeTime)
 dayjs.extend(duration)
@@ -129,6 +130,8 @@ export default function ViewVotingPage() {
     query: {id},
     push: redirect,
   } = useRouter()
+
+  const closePage = useClosePage()
 
   const {syncing, offline} = useChainState()
   const {epoch} = useEpochState() ?? {epoch: -1}
@@ -284,7 +287,7 @@ export default function ViewVotingPage() {
               <Heading fontSize={21} fontWeight={500}>
                 {t('This oracle voting cannot be shown')}
               </Heading>
-              <CloseButton onClick={() => redirect('/oracles/list')} />
+              <CloseButton onClick={() => closePage('/oracles/list')} />
             </Flex>
             <Stack isInline spacing={2} align="center">
               <Avatar w={5} h={5} address={id} />
@@ -321,7 +324,7 @@ export default function ViewVotingPage() {
                     </Stack>
                   </Box>
                 </Stack>
-                <CloseButton onClick={() => redirect('/oracles/list')} />
+                <CloseButton onClick={() => closePage('/oracles/list')} />
               </Flex>
             </VotingSkeleton>
             <Stack isInline spacing={10} w="full">

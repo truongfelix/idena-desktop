@@ -65,6 +65,7 @@ import {useIdentityState} from '../../shared/providers/identity-context'
 import Layout from '../../shared/components/layout'
 import {useChainState} from '../../shared/providers/chain-context'
 import {ChevronDownIcon, ChevronUpIcon} from '../../shared/components/icons'
+import {useClosePage} from '../../shared/utils/page-history'
 
 dayjs.extend(duration)
 dayjs.extend(relativeTime)
@@ -73,6 +74,7 @@ function NewVotingPage() {
   const {t, i18n} = useTranslation()
 
   const router = useRouter()
+  const closePage = useClosePage()
 
   const toast = useToast()
 
@@ -149,10 +151,7 @@ function NewVotingPage() {
         <Box px={20} py={6} w="full" overflowY="auto">
           <Flex justify="space-between" align="center">
             <PageTitle mb={0}>{t('New voting')}</PageTitle>
-            <CloseButton
-              ml="auto"
-              onClick={() => router.push('/oracles/list')}
-            />
+            <CloseButton ml="auto" onClick={() => closePage('/oracles/list')} />
           </Flex>
           <SuccessAlert my={8}>
             {t(

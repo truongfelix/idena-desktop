@@ -131,7 +131,7 @@ export default function EditFlipPage() {
     },
     actions: {
       onMined: () => {
-        router.push('/flips/list')
+        router.replace('/flips/list')
       },
       onError: (
         _,
@@ -210,7 +210,7 @@ export default function EditFlipPage() {
                     <Toast title={t('Flip has been saved to drafts')} />
                   ),
                 })
-              router.push('/flips/list')
+              router.replace('/flips/list')
             }}
           >
             {t('Edit flip')}

@@ -131,7 +131,7 @@ export default function NewFlipPage() {
     },
     actions: {
       onMined: () => {
-        router.push('/flips/list')
+        router.replace('/flips/list')
       },
       onError: (
         _,
@@ -218,7 +218,7 @@ export default function NewFlipPage() {
                     <Toast title={t('Flip has been saved to drafts')} />
                   ),
                 })
-              router.push('/flips/list')
+              router.replace('/flips/list')
             }}
           >
             {t('New flip')}

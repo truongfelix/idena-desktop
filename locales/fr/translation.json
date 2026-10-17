@@ -571,7 +571,6 @@
   "Confirm transaction": "Transaction confirmée",
   "You’re about to sign and send tx from your wallet": "Vous êtes sur le point de signer en envoyer une transaction depuis votre portefeuille",
   "Transaction details": "Détails de la transaction",
-  "onboardingValidateSubscribe": "<0>Inscrivez-vous</0> aux annonces Idena (seulement des annonces importantes)",
   "onboardingValidateTest": "<0>Testez-vous</0> avant la validation",
   "Leaving Idena": "Quitter Idena",
   "Continue": "Continuer",

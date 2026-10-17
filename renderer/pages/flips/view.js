@@ -39,11 +39,13 @@ import {DEFAULT_FLIP_ORDER} from '../../screens/flips/utils'
 import Layout from '../../shared/components/layout'
 import {useChainState} from '../../shared/providers/chain-context'
 import {DeleteIcon} from '../../shared/components/icons'
+import {useClosePage} from '../../shared/utils/page-history'
 
 export default function ViewFlipPage() {
   const {t, i18n} = useTranslation()
 
   const router = useRouter()
+  const closePage = useClosePage()
   const {id} = router.query
 
   const {
@@ -80,7 +82,7 @@ export default function ViewFlipPage() {
       },
     },
     actions: {
-      onDeleted: () => router.push('/flips/list'),
+      onDeleted: () => router.replace('/flips/list'),
       onDeleteFailed: ({error}) =>
         toast({
           // eslint-disable-next-line react/display-name
@@ -127,7 +129,7 @@ export default function ViewFlipPage() {
               <PageTitle mb={0} pb={0}>
                 {t('View flip')}
               </PageTitle>
-              <CloseButton onClick={() => router.push('/flips/list')} />
+              <CloseButton onClick={() => closePage('/flips/list')} />
             </Flex>
             {current.matches('loaded') && (
               <FlipMaster>

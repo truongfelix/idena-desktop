@@ -561,7 +561,6 @@
   "Confirm transaction": "确认交易",
   "You’re about to sign and send tx from your wallet": "你即将签署并从你的钱包中发送Tx",
   "Transaction details": "交易明细",
-  "onboardingValidateSubscribe": "<0>订阅</0>Idena公告（仅限重要更新）",
   "onboardingValidateTest": "在验证之前<0>测试自己</0>",
   "Leaving Idena": "离开Idena",
   "Continue": "继续",

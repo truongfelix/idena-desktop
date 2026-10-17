@@ -13,6 +13,7 @@ import {FollowTopicChip, TopicAvatar} from '../components/topic'
 import {Chip} from '../components/chips'
 import {PAGE_SIZE, Rows, ShowMore} from './common'
 import {TrustButton, TrustLine} from '../components/profile-public'
+import {useKeptState} from '../kept-state'
 
 /**
  * The page of a topic, as the phone app's: its Trust, Follow (its posts join the Following feed), Trust, Block (its
@@ -29,7 +30,7 @@ export function TopicView({name, now, openThread, openProfile}) {
     setTopicBlocked,
   } = useSocial()
   const isBlocked = blockedTopics.includes(name)
-  const [shown, setShown] = React.useState(PAGE_SIZE)
+  const [shown, setShown] = useKeptState(`topic.shown:${name}`, PAGE_SIZE)
   // Without muted accounts' posts and, at Hide, those with a picture (leavesFeeds).
   const posts = React.useMemo(
     () => topicFeed(feedPosts(feed, hidden, me), name),

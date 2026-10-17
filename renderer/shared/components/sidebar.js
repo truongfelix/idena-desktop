@@ -534,11 +534,12 @@ function ActionPanel() {
               >
                 <Stack spacing={5}>
                   <OnboardingPopoverContentIconRow icon={TelegramIcon}>
-                    <Trans i18nKey="onboardingValidateSubscribe" t={t}>
-                      <OnboardingLinkButton href="https://t.me/IdenaAnnouncements">
-                        Subscribe
+                    {/* The community's channel: the original team's announcements channel is not ours (Q-21). */}
+                    <Trans i18nKey="onboardingValidateCommunity" t={t}>
+                      <OnboardingLinkButton href="https://t.me/IdenaNetworkPublic">
+                        Join
                       </OnboardingLinkButton>{' '}
-                      to the Idena Announcements (important updates only)
+                      the Idena community on Telegram
                     </Trans>
                   </OnboardingPopoverContentIconRow>
                   <OnboardingPopoverContentIconRow icon={SyncIcon}>
