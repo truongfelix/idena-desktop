@@ -24,6 +24,7 @@ import {
   Image,
   Icon,
   Portal,
+  useDisclosure,
 } from '@chakra-ui/react'
 import {useIdentityState} from '../providers/identity-context'
 import {useEpochState} from '../providers/epoch-context'
@@ -56,6 +57,7 @@ import {useTimingState} from '../providers/timing-context'
 import {TodoVotingCountBadge} from '../../screens/oracles/components'
 import {socialNewsCount} from '../../screens/social/news-count'
 import {useSocial} from '../../screens/social/provider'
+import {ReleaseNoteDialog} from './release-check'
 import {
   AdsIcon,
   ClockIcon,
@@ -840,9 +842,12 @@ export function Version({
       canUpdateNode,
       canUpdateClient,
       uiRemoteVersion,
+      uiRelease,
     },
     {updateClient, updateNode},
   ] = useAutoUpdate()
+
+  const releaseNote = useDisclosure()
 
   return (
     <Stack spacing="2">
@@ -862,11 +867,17 @@ export function Version({
       </Stack>
       <Stack>
         {!canUpdateNode && canUpdateClient && (
-          // Opens the release page: the app installs nothing by itself.
-          <UpdateButton version={uiRemoteVersion} onClick={updateClient}>
+          // Shows the release note; its Download opens the release page: the app installs nothing by itself.
+          <UpdateButton version={uiRemoteVersion} onClick={releaseNote.onOpen}>
             {t('Update Client Version')}
           </UpdateButton>
         )}
+        <ReleaseNoteDialog
+          release={uiRelease}
+          isOpen={releaseNote.isOpen}
+          onClose={releaseNote.onClose}
+          onDownload={updateClient}
+        />
 
         {nodeUpdating && (
           <Text color="xwhite.050" mx={2}>

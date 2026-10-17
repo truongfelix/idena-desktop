@@ -34,6 +34,7 @@ import {
   LocaleSwitcher,
 } from '../../screens/settings/containers'
 import {PrivateKeyIcon} from '../../shared/components/icons'
+import {useReleaseCheckText} from '../../shared/components/release-check'
 
 const {clear: clearFlips} = global.flipStore || {}
 const inviteDb = global.invitesDb || {}
@@ -49,8 +50,10 @@ function Settings() {
       render: () => <Toast title={title} />,
     })
 
-  const {runInternalNode, useExternalNode, imageSearch} = useSettingsState()
-  const {setImageSearch} = useSettingsDispatch()
+  const {runInternalNode, useExternalNode, imageSearch, releaseCheck} =
+    useSettingsState()
+  const {setImageSearch, setReleaseCheck} = useSettingsDispatch()
+  const releaseCheckText = useReleaseCheckText()
 
   const {
     isOpen: isOpenExportPk,
@@ -91,6 +94,21 @@ function Settings() {
                   'The search sends your words to DuckDuckGo, Openverse and Wikimedia from this computer, so they see its internet address and the words searched.'
                 )}
               </Text>
+            </Box>
+          </Stack>
+        </SettingsSection>
+
+        <SettingsSection title={t('Updates')}>
+          <Stack isInline spacing={3} align="center">
+            <Box>
+              <Switch
+                isChecked={releaseCheck === true}
+                onChange={(e) => setReleaseCheck(e.target.checked)}
+              />
+            </Box>
+            <Box>
+              <Text fontWeight={500}>{t('Tell me of new versions')}</Text>
+              <Text color="muted">{releaseCheckText}</Text>
             </Box>
           </Stack>
         </SettingsSection>

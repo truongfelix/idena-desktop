@@ -16,6 +16,7 @@ const SET_CONNECTION_DETAILS = 'SET_CONNECTION_DETAILS'
 const TOGGLE_AUTO_ACTIVATE_MINING = 'TOGGLE_AUTO_ACTIVATE_MINING'
 const SET_NODE_OPTIONS = 'SET_NODE_OPTIONS'
 const SET_IMAGE_SEARCH = 'SET_IMAGE_SEARCH'
+const SET_RELEASE_CHECK = 'SET_RELEASE_CHECK'
 
 const CHANGE_LANGUAGE = 'CHANGE_LANGUAGE'
 
@@ -116,6 +117,13 @@ function settingsReducer(state, action) {
         imageSearch: action.allowed,
       }
     }
+    // releaseCheck: the user's answer about the check for new releases (ruling Q-50); absent until asked.
+    case SET_RELEASE_CHECK: {
+      return {
+        ...state,
+        releaseCheck: action.enabled,
+      }
+    }
     default:
       return state
   }
@@ -210,6 +218,11 @@ export function SettingsProvider({children}) {
     [dispatch]
   )
 
+  const setReleaseCheck = useCallback(
+    (enabled) => dispatch({type: SET_RELEASE_CHECK, enabled}),
+    [dispatch]
+  )
+
   const setConnectionDetails = useCallback(
     ({url, apiKey}) => {
       dispatch({type: SET_CONNECTION_DETAILS, url, apiKey})
@@ -229,12 +242,14 @@ export function SettingsProvider({children}) {
             toggleAutoActivateMining,
             setNodeOptions,
             setImageSearch,
+            setReleaseCheck,
           }),
           [
             changeLanguage,
             setConnectionDetails,
             setImageSearch,
             setNodeOptions,
+            setReleaseCheck,
             toggleAutoActivateMining,
             toggleRunInternalNode,
             toggleUseExternalNode,

@@ -9,6 +9,7 @@ export const SAVE_EXTERNAL_URL = 'SAVE_EXTERNAL_URL'
 const SHOW_EXTERNAL_UPDATE_MODAL = 'SHOW_EXTERNAL_UPDATE_MODAL'
 const HIDE_EXTERNAL_UPDATE_MODAL = 'HIDE_EXTERNAL_UPDATE_MODAL'
 const UI_UPDATE_READY = 'UI_UPDATE_READY'
+const UI_UPDATE_CLEAR = 'UI_UPDATE_CLEAR'
 const NODE_UPDATE_AVAILABLE = 'NODE_UPDATE_AVAILABLE'
 const NODE_UPDATE_READY = 'NODE_UPDATE_READY'
 const NEW_NODE_VERSION = 'NEW_CURRENT_VERSION'
@@ -53,11 +54,20 @@ function updateReducer(state, action) {
         nodeUpdateReady: true,
         nodeRemoteVersion: action.data,
       }
+    // The newer release (main/app-update-check.js): {tag, version, name, notes, url}.
     case UI_UPDATE_READY:
       return {
         ...state,
         uiUpdateReady: true,
-        uiRemoteVersion: action.data,
+        uiRemoteVersion: action.data.version,
+        uiRelease: action.data,
+      }
+    case UI_UPDATE_CLEAR:
+      return {
+        ...state,
+        uiUpdateReady: false,
+        uiRemoteVersion: undefined,
+        uiRelease: undefined,
       }
     case SHOW_EXTERNAL_UPDATE_MODAL: {
       return {
@@ -143,7 +153,7 @@ export function AutoUpdateProvider({children}) {
         case 'ui-download-progress':
           break
         case 'ui-update-ready':
-          dispatch({type: UI_UPDATE_READY, data: data.version})
+          dispatch({type: UI_UPDATE_READY, data})
           break
         default:
       }
@@ -161,6 +171,15 @@ export function AutoUpdateProvider({children}) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.useExternalNode, settings.url, state.nodeCurrentVersion])
+
+  // The check for new releases runs in the main process only while the user has it on (ruling Q-50).
+  const releaseCheckOn = settings.releaseCheck === true
+  useEffect(() => {
+    global.ipcRenderer.send(AUTO_UPDATE_COMMAND, 'release-check', {
+      enabled: releaseCheckOn,
+    })
+    if (!releaseCheckOn) dispatch({type: UI_UPDATE_CLEAR})
+  }, [releaseCheckOn])
 
   useInterval(
     async () => {

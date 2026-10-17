@@ -1668,5 +1668,14 @@
   "Last report: {{time}}": "Last report: {{time}}",
   "Make a report": "Make a report",
   "Save the last report": "Save the last report",
-  "{{count}} Social news": "{{count}} Social news"
+  "{{count}} Social news": "{{count}} Social news",
+  "Idena {{version}} is ready": "Idena {{version}} is ready",
+  "This release has no note.": "This release has no note.",
+  "Download opens the release page in your browser. Install the new version from there, as the first time.": "Download opens the release page in your browser. Install the new version from there, as the first time.",
+  "Download": "Download",
+  "Once a day the app asks GitHub for the new versions of Idena desktop, and shows a new one with its note. GitHub sees this computer’s internet address. Nothing is downloaded or installed by itself.": "Once a day the app asks GitHub for the new versions of Idena desktop, and shows a new one with its note. GitHub sees this computer’s internet address. Nothing is downloaded or installed by itself.",
+  "Tell you of new versions?": "Tell you of new versions?",
+  "You can change it in Settings › General.": "You can change it in Settings › General.",
+  "Updates": "Updates",
+  "Tell me of new versions": "Tell me of new versions"
 }
