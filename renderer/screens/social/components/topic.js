@@ -48,6 +48,12 @@ export function TopicTag({name}) {
 }
 
 /**
+ * The topic picture of a TopicLine: steps of the theme's size scale (one outside it, 11, was read as pixels: an
+ * 11 px picture on a thread, B-100).
+ */
+export const topicLineAvatarSize = (large) => (large ? 12 : 10)
+
+/**
  * A post's topic in the author's place: its picture, "r/name" and the post's age (`time`, none when null); a click
  * opens the topic. `large`: the thread's line.
  */
@@ -55,7 +61,7 @@ export function TopicLine({name, time = null, now, large = false}) {
   const open = React.useContext(OpenTopicContext)
   return (
     <HStack spacing={large ? 2.5 : 2} align="center" {...openProps(open, name)}>
-      <TopicAvatar name={name} boxSize={large ? 11 : 10} />
+      <TopicAvatar name={name} boxSize={topicLineAvatarSize(large)} />
       <Text fontSize={large ? 'md' : 'sm'} fontWeight={600} noOfLines={1}>
         {topicChannel(name)}
         {time !== null && (
