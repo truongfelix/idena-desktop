@@ -46,7 +46,7 @@ What it changes for users (October 2026):
   (drawn by the app), the oracle votings, the validation report and the hard-fork screen no longer call api.idena.io
   or robohash.idena.io; the oracle To-Do badge reads every 5 minutes, only for validated identities. Still outside:
   translation.idena.io (flip keyword translations), GitHub (new app and node versions) and, only when you search
-  for a picture, DuckDuckGo, Openverse and Wikimedia.
+  for a picture, Openverse and Wikimedia.
 - **Updates**: the app tells you when a newer version is published here and opens its page (pre-releases are
   not announced); it downloads and installs nothing by itself. Help > "Report a problem" opens the issues.
 - **New settings**: Settings > Node > Advanced settings, for the built-in node (the phone app has the same):
@@ -77,7 +77,7 @@ verifies those commits and required files before building.
   compatible renderer dependencies replace the legacy Node 10-era toolchain.
 - Desktop API keys are generated with a cryptographically secure random source
   and private files are created with user-only permissions.
-- The picture search for flips asks DuckDuckGo, Openverse and Wikimedia, only
+- The picture search for flips asks Openverse and Wikimedia, only
   after the user agrees, behind validated, normalized result handling and
   regression tests.
 - The obsolete Fabric-based editor and SDK dependency were removed; the flip

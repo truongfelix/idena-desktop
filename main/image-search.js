@@ -1,10 +1,7 @@
-const https = require('https')
 const axios = require('axios')
 const {version} = require('../package.json')
 
 const SOURCE_TIMEOUT_MS = 8000
-const HTTP_TIMEOUT_MS = 6500
-const MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 const MAX_QUERY_LENGTH = 160
 // Openverse answers anonymous requests of up to 20 results; above that it wants an account (HTTP 401).
 const OPENVERSE_PAGE_SIZE = 20
@@ -63,84 +60,6 @@ function normalizeImageSearchResult(item) {
   return {image, thumbnail}
 }
 
-function requestHttpsText(
-  url,
-  {
-    timeoutMs = HTTP_TIMEOUT_MS,
-    maxBytes = MAX_RESPONSE_BYTES,
-    headers = {},
-  } = {}
-) {
-  const parsedUrl = url instanceof URL ? url : new URL(url)
-  if (parsedUrl.protocol !== 'https:') {
-    return Promise.reject(new Error('Image search request must use HTTPS'))
-  }
-
-  return new Promise((resolve, reject) => {
-    const req = https.request(
-      parsedUrl,
-      {
-        method: 'GET',
-        timeout: timeoutMs,
-        headers: {
-          accept: 'text/html,application/json;q=0.9,*/*;q=0.8',
-          'accept-language': 'en-US,en;q=0.9',
-          'user-agent': 'Mozilla/5.0 (Idena image search)',
-          ...headers,
-        },
-      },
-      (res) => {
-        if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 300) {
-          res.resume()
-          reject(new Error(`Image search HTTP ${res.statusCode || 0}`))
-          return
-        }
-
-        let bytes = 0
-        const chunks = []
-        res.setEncoding('utf8')
-        res.on('data', (chunk) => {
-          bytes += Buffer.byteLength(chunk)
-          if (bytes > maxBytes) {
-            req.destroy(new Error('Image search response too large'))
-            return
-          }
-          chunks.push(chunk)
-        })
-        res.on('end', () => {
-          resolve(chunks.join(''))
-        })
-      }
-    )
-
-    req.on('timeout', () => {
-      req.destroy(new Error('Image search timed out'))
-    })
-    req.on('error', reject)
-    req.end()
-  })
-}
-
-function extractDuckDuckGoVqd(html) {
-  const source = String(html || '')
-  const patterns = [
-    /vqd=["']([^"']+)["']/,
-    /vqd=([^&"'\\]+)&/,
-    /"vqd":"([^"]+)"/,
-    /vqd='([^']+)'/,
-  ]
-
-  for (const pattern of patterns) {
-    const match = pattern.exec(source)
-    const token = match && String(match[1] || '').trim()
-    if (token && token.length <= 128 && /^[A-Za-z0-9-_.]+$/.test(token)) {
-      return token
-    }
-  }
-
-  return null
-}
-
 function withSearchSourceTimeout(
   promise,
   label,
@@ -166,55 +85,6 @@ function withSearchSourceTimeout(
         clearTimeout(timeout)
       }
     })
-}
-
-async function searchDuckDuckGoImages(
-  query,
-  {logger, requestText = requestHttpsText} = {}
-) {
-  try {
-    const landingUrl = new URL('https://duckduckgo.com/')
-    landingUrl.searchParams.set('q', query)
-    landingUrl.searchParams.set('iax', 'images')
-    landingUrl.searchParams.set('ia', 'images')
-
-    const html = await requestText(landingUrl, {
-      timeoutMs: 5000,
-      maxBytes: 512 * 1024,
-    })
-    const vqd = extractDuckDuckGoVqd(html)
-    if (!vqd) return []
-
-    const apiUrl = new URL('https://duckduckgo.com/i.js')
-    apiUrl.searchParams.set('l', 'us-en')
-    apiUrl.searchParams.set('o', 'json')
-    apiUrl.searchParams.set('q', query)
-    apiUrl.searchParams.set('vqd', vqd)
-    apiUrl.searchParams.set('f', ',,,')
-    apiUrl.searchParams.set('p', '1')
-
-    const json = await requestText(apiUrl, {
-      headers: {
-        accept: 'application/json,text/plain,*/*',
-        referer: landingUrl.href,
-      },
-    })
-    const data = JSON.parse(json)
-    const results = Array.isArray(data && data.results) ? data.results : []
-
-    return results
-      .slice(0, 30)
-      .map((item) =>
-        normalizeImageSearchResult({
-          image: item && item.image,
-          thumbnail: (item && (item.thumbnail || item.image)) || null,
-        })
-      )
-      .filter(Boolean)
-  } catch (error) {
-    logWarn(logger, 'duckduckgo image search failed', error)
-    return []
-  }
 }
 
 async function searchOpenverseImages(query, {logger, get = axios.get} = {}) {
@@ -317,7 +187,6 @@ function normalizeImageSearchQuery(query) {
 
 // The sources, by the name the renderer asks for one of them with (B-33: each one's pictures shown as it answers).
 const IMAGE_SOURCES = {
-  duckduckgo: searchDuckDuckGoImages,
   openverse: searchOpenverseImages,
   wikimedia: searchWikimediaImages,
 }
@@ -360,11 +229,9 @@ module.exports = {
   searchImages,
   _internals: {
     dedupeSearchResults,
-    extractDuckDuckGoVqd,
     normalizeImageSearchQuery,
     normalizeImageSearchResult,
     normalizeImageSearchUrl,
-    searchDuckDuckGoImages,
     searchOpenverseImages,
     searchWikimediaImages,
   },

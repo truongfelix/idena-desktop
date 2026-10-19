@@ -3,7 +3,7 @@ import {log} from 'xstate/lib/actions'
 
 // The web picture sources, as main/image-search.js names them: each one is asked on its own, so its pictures show
 // as soon as it answers (B-33), not after the slowest one.
-export const IMAGE_SOURCES = ['duckduckgo', 'openverse', 'wikimedia']
+export const IMAGE_SOURCES = ['openverse', 'wikimedia']
 
 const MAX_IMAGES = 64
 

@@ -36,7 +36,7 @@ function ImageSearchConsentText() {
     <Stack spacing={3}>
       <Text>
         {t(
-          'The search sends your words to DuckDuckGo, Openverse and Wikimedia from this computer, so they see its internet address and the words searched.'
+          'The search sends your words to Openverse and Wikimedia from this computer, so they see its internet address and the words searched.'
         )}
       </Text>
       <Text>
