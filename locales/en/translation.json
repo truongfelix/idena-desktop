@@ -1678,5 +1678,6 @@
   "Tell you of new versions?": "Tell you of new versions?",
   "You can change it in Settings › General.": "You can change it in Settings › General.",
   "Updates": "Updates",
-  "Tell me of new versions": "Tell me of new versions"
+  "Tell me of new versions": "Tell me of new versions",
+  "Your node can now help phones connect: keep it running at home, and share its peer code with your phone and your friends. They add it in Direct peers to connect to it first.": "Your node can now help phones connect: keep it running at home, and share its peer code with your phone and your friends. They add it in Direct peers to connect to it first."
 }

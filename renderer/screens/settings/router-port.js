@@ -1,6 +1,13 @@
 /* eslint-disable react/prop-types */
 import * as React from 'react'
-import {Box, Radio, RadioGroup, Stack, Text} from '@chakra-ui/react'
+import {
+  Box,
+  Radio,
+  RadioGroup,
+  Stack,
+  Text,
+  useClipboard,
+} from '@chakra-ui/react'
 import {useTranslation} from 'react-i18next'
 import {PrimaryButton, SecondaryButton} from '../../shared/components/button'
 import {
@@ -11,6 +18,8 @@ import {
 } from '../../shared/components/components'
 import {InfoIcon} from '../../shared/components/icons'
 import {useInterval} from '../../shared/hooks/use-interval'
+import {callRpc} from '../../shared/utils/utils'
+import {ownPeerId, peerCode} from '../../../main/direct-peers'
 import {useEpochState} from '../../shared/providers/epoch-context'
 import {useNodeState} from '../../shared/providers/node-context'
 import {useSettingsState} from '../../shared/providers/settings-context'
@@ -45,7 +54,8 @@ export const QUIET_HINT_MS = 10 * 60 * 1000
 /**
  * What the Router port row says for `status` (main/router-port-service.js) at `nowMs`, in which color, which
  * button it offers ('look', 'search-again', 'try-again', 'open', 'close' or none) and, for an opening no peer
- * from outside has used for QUIET_HINT_MS while the node runs (`nodeStarted`), a `hint`. `t` translates.
+ * from outside has used for QUIET_HINT_MS while the node runs (`nodeStarted`), a `hint`. `anchor` is true while the
+ * port is open for this computer: the row then says the node can help phones connect (B-129). `t` translates.
  */
 export function routerPortView(status, t, nowMs, {nodeStarted = false} = {}) {
   switch (status.state) {
@@ -136,7 +146,13 @@ export function routerPortView(status, t, nowMs, {nodeStarted = false} = {}) {
             {minutes: Math.floor(quietMs / 60000), port}
           )
         : null
-    return {line: until + incoming, color: 'muted', action: 'close', hint}
+    return {
+      line: until + incoming,
+      color: 'muted',
+      action: 'close',
+      hint,
+      anchor: true,
+    }
   }
   if (owner === 'pc-before') {
     return {
@@ -209,9 +225,14 @@ export function RouterPortSettings({isDisabled}) {
 
   if (isDisabled || !status) return null
 
-  const {line, color, action, hint} = routerPortView(status, t, Date.now(), {
-    nodeStarted,
-  })
+  const {line, color, action, hint, anchor} = routerPortView(
+    status,
+    t,
+    Date.now(),
+    {
+      nodeStarted,
+    }
+  )
   const button = {
     look: () => run('search-again'),
     'search-again': () => run('search-again'),
@@ -256,6 +277,7 @@ export function RouterPortSettings({isDisabled}) {
         )}
       </Stack>
       {hint && <Text color="orange.500">{hint}</Text>}
+      {anchor && nodeStarted && <HomeAnchor />}
       {status.error && (
         <Text color="red.500">
           {t('Router: {{message}}', {message: status.error, nsSeparator: '!!'})}
@@ -358,5 +380,46 @@ function OpenPortDialog({name, validationMs, onClose, onOpen}) {
         </PrimaryButton>
       </DialogFooter>
     </Dialog>
+  )
+}
+
+/**
+ * While the router port is open for this computer (B-129): the node can help phones connect, so the row says to keep
+ * it running and to share its peer code (Direct peers), with the code to copy. It explains; nothing is sent.
+ */
+function HomeAnchor() {
+  const {t} = useTranslation()
+  const settings = useSettingsState()
+  const [ownId, setOwnId] = React.useState(null)
+  React.useEffect(() => {
+    let alive = true
+    callRpc('net_ipfsAddress')
+      .then((address) => alive && setOwnId(ownPeerId(address)))
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [])
+  const code = ownId ? peerCode(ownId, settings.ownPeerName) : ''
+  const {onCopy, hasCopied} = useClipboard(code)
+  return (
+    <Stack spacing={1}>
+      <Text>
+        {t(
+          'Your node can now help phones connect: keep it running at home, and share its peer code with your phone and your friends. They add it in Direct peers to connect to it first.',
+          {nsSeparator: '|'}
+        )}
+      </Text>
+      {code && (
+        <Stack isInline spacing={2} align="center">
+          <Text fontFamily="mono" fontSize="sm" wordBreak="break-all">
+            {code}
+          </Text>
+          <SecondaryButton onClick={onCopy}>
+            {hasCopied ? t('Copied') : t('Copy')}
+          </SecondaryButton>
+        </Stack>
+      )}
+    </Stack>
   )
 }
