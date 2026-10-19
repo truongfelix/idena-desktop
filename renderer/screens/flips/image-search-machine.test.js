@@ -64,17 +64,14 @@ describe('the picture search (B-33)', () => {
     service.send('PICK', {image: pic('w2').thumbnail})
     expect(service.state.context.selectedImage).toBe(pic('w2').thumbnail)
 
-    await ipc.answer('cat', 'duckduckgo', [pic('w1'), pic('d1')])
-    expect(service.state.value).toBe('searching')
+    await ipc.answer('cat', 'openverse', [pic('w1'), pic('o1')])
+    expect(service.state.value).toBe('done')
     expect(service.state.context.images).toEqual([
       pic('w1'),
       pic('w2'),
-      pic('d1'),
+      pic('o1'),
     ])
-
-    await ipc.answer('cat', 'openverse', [])
-    expect(service.state.value).toBe('done')
-    expect(service.state.context.images).toHaveLength(3)
+    expect(service.state.context.selectedImage).toBe(pic('w2').thumbnail)
     service.stop()
   })
 

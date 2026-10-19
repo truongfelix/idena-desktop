@@ -4,11 +4,9 @@ const {
   searchImages,
   _internals: {
     dedupeSearchResults,
-    extractDuckDuckGoVqd,
     normalizeImageSearchQuery,
     normalizeImageSearchResult,
     normalizeImageSearchUrl,
-    searchDuckDuckGoImages,
     searchOpenverseImages,
     searchWikimediaImages,
   },
@@ -18,14 +16,6 @@ const USER_AGENT_PATTERN =
   /^IdenaDesktop\/\S+ \(https:\/\/github\.com\/truongfelix\/idena-desktop\)$/
 
 describe('image search helpers', () => {
-  test('extracts current DuckDuckGo vqd token shapes', () => {
-    expect(extractDuckDuckGoVqd('vqd="abc-123_ABC.0"')).toBe('abc-123_ABC.0')
-    expect(
-      extractDuckDuckGoVqd('https://duckduckgo.com/i.js?vqd=xyz&x=1')
-    ).toBe('xyz')
-    expect(extractDuckDuckGoVqd('{"vqd":"token_42"}')).toBe('token_42')
-  })
-
   test('rejects unsafe or unusable image URLs', () => {
     expect(normalizeImageSearchUrl('https://example.com/image.png')).toBe(
       'https://example.com/image.png'
@@ -78,51 +68,6 @@ describe('image search helpers', () => {
         thumbnail: 'https://example.com/b-thumb.jpg',
       },
     ])
-  })
-
-  test('uses the DuckDuckGo landing token for a bounded image request', async () => {
-    const requestText = jest
-      .fn()
-      .mockResolvedValueOnce('<html><script>vqd="token-123"</script></html>')
-      .mockResolvedValueOnce(
-        JSON.stringify({
-          results: [
-            {
-              image: 'https://images.example/full.jpg',
-              thumbnail: 'https://images.example/thumb.jpg',
-            },
-            {
-              image: 'http://images.example/insecure.jpg',
-              thumbnail: 'https://images.example/insecure-thumb.jpg',
-            },
-          ],
-        })
-      )
-
-    await expect(
-      searchDuckDuckGoImages('Idena cryptocurrency', {requestText})
-    ).resolves.toEqual([
-      {
-        image: 'https://images.example/full.jpg',
-        thumbnail: 'https://images.example/thumb.jpg',
-      },
-    ])
-
-    expect(requestText).toHaveBeenCalledTimes(2)
-    const [landingUrl, landingOptions] = requestText.mock.calls[0]
-    expect(landingUrl.origin).toBe('https://duckduckgo.com')
-    expect(landingUrl.pathname).toBe('/')
-    expect(landingUrl.searchParams.get('q')).toBe('Idena cryptocurrency')
-    expect(landingOptions).toEqual({
-      timeoutMs: 5000,
-      maxBytes: 512 * 1024,
-    })
-
-    const [apiUrl, apiOptions] = requestText.mock.calls[1]
-    expect(apiUrl.href.startsWith('https://duckduckgo.com/i.js?')).toBe(true)
-    expect(apiUrl.searchParams.get('q')).toBe('Idena cryptocurrency')
-    expect(apiUrl.searchParams.get('vqd')).toBe('token-123')
-    expect(apiOptions.headers.referer).toBe(landingUrl.href)
   })
 
   test('asks Openverse for at most 20 pictures, with a client name', async () => {
@@ -246,7 +191,7 @@ describe('image search by source (B-33)', () => {
     ])
   })
 
-  test('names the three sources the renderer asks', () => {
-    expect(IMAGE_SOURCE_NAMES).toEqual(['duckduckgo', 'openverse', 'wikimedia'])
+  test('names the two sources the renderer asks', () => {
+    expect(IMAGE_SOURCE_NAMES).toEqual(['openverse', 'wikimedia'])
   })
 })
