@@ -107,6 +107,8 @@ describe('the Router port row', () => {
       NOW
     )
     expect(open.action).toBe('close')
+    // B-129: an open port makes this computer a node phones can connect to first.
+    expect(open.anchor).toBe(true)
     expect(open.line).toMatch(
       /^Open on Livebox until .+ · 3 peers connected from outside since$/
     )
