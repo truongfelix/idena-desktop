@@ -161,7 +161,7 @@ export function SocialProvider({children}) {
     if (me) addresses.add(me)
     return addresses
   }, [chats.conversations, feed, me, people])
-  const profiles = useProfiles(shownAddresses)
+  const {profiles, reading: readingProfiles} = useProfiles(shownAddresses)
   const {names, parts: nameParts} = React.useMemo(
     () => socialNames(shownNames(profiles), people, me),
     [me, people, profiles]
@@ -223,6 +223,7 @@ export function SocialProvider({children}) {
     seenThrough,
     notifyKinds,
     names,
+    readingNames: readingProfiles,
     inboxOpen,
   })
 
