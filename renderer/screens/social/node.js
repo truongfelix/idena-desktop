@@ -54,6 +54,20 @@ export const isMissingMethod = (error) =>
   /does not exist|not available/i.test(String(error?.message))
 
 /**
+ * Whether `error` means that the node lacks the method for good: a node that starts answers "does not exist" to
+ * every method at first, so it lacks one only when it answers another (dna_version).
+ */
+export async function lacksMethod(error, call = socialRpc) {
+  if (!isMissingMethod(error)) return false
+  try {
+    await call('dna_version')
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
  * Several calls of one node RPC method in one request (a JSON-RPC batch), one params list each: their results in
  * the same order. Throws when one of them failed.
  */
