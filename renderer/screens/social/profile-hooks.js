@@ -36,8 +36,9 @@ export function feedAddresses(feed) {
 }
 
 /**
- * The profiles (readProfiles) of `addresses`, by lowercase address; {} while they are read, or without a profiles
- * contract. Read again after PROFILE_STALE_MS, or when `refreshProfiles` is called after a change.
+ * The profiles (readProfiles) of `addresses`, by lowercase address (`profiles`; {} before the first read, or without
+ * a profiles contract), and whether they are being read (`reading`: a new address keeps the previous profiles until
+ * the read ends). Read again after PROFILE_STALE_MS, or when `refreshProfiles` is called after a change.
  */
 export function useProfiles(addresses) {
   const list = React.useMemo(
@@ -47,7 +48,7 @@ export function useProfiles(addresses) {
       ].sort(),
     [addresses]
   )
-  const {data} = useQuery(
+  const {data, isFetching} = useQuery(
     ['profiles', list.join(',')],
     () => readProfiles(socialRpcSettled, list),
     {
@@ -57,7 +58,7 @@ export function useProfiles(addresses) {
       retry: 1,
     }
   )
-  return data || {}
+  return {profiles: data || {}, reading: isFetching}
 }
 
 /** The profile of one address (readProfiles), with its loading state and error. */
