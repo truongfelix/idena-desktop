@@ -1,5 +1,5 @@
 import React from 'react'
-import {isMissingMethod, nodeSocialSource, socialRpc} from './node'
+import {lacksMethod, nodeSocialSource, socialRpc} from './node'
 import {
   checkNewBlocks,
   historyDone,
@@ -12,6 +12,80 @@ import {saveSocialCache} from './storage'
 /** A new block comes about every 20 seconds. */
 const NEW_BLOCK_MS = 20 * 1000
 const RETRY_MS = 15 * 1000
+/** A node without the methods is asked again now and then: the user may switch nodes. */
+const MISSING_RETRY_MS = 60 * 1000
+
+/**
+ * The scan's loop, until `stopped()`: see useSocialScan. `report` gets the node's head, its peers, the last error
+ * (null after a good round) and whether the node lacks the methods (`missingMethod`): a node that starts refuses
+ * every method for a moment, so the loop goes on after such an answer and clears it once a call succeeds.
+ */
+export async function runSocialScan({
+  source,
+  rpc = socialRpc,
+  cacheRef,
+  isPageOpen,
+  pause,
+  save,
+  stopped,
+  report,
+}) {
+  while (!stopped()) {
+    const {current} = cacheRef
+    const onPage = isPageOpen()
+    // Away from the page, nothing is read before the history has been read once.
+    if (!onPage && !(current && historyDone(current))) {
+      // eslint-disable-next-line no-await-in-loop
+      await pause(NEW_BLOCK_MS)
+      // eslint-disable-next-line no-continue
+      continue
+    }
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const [nodeHead, nodePeers] = await Promise.all([
+        source.head(),
+        rpc('net_peers').then((list) => (list || []).length),
+      ])
+      if (stopped()) return
+      report.head(nodeHead)
+      report.peers(nodePeers)
+      if (
+        !current ||
+        current.high < nodeHead ||
+        current.authorsHeight < current.high
+      ) {
+        // eslint-disable-next-line no-await-in-loop
+        await checkNewBlocks(current, source, {
+          keepGoing: () => !stopped(),
+          save,
+        })
+      } else if (onPage && messagesPending(current)) {
+        // Once, for a scan made before the app read messages: those of the blocks already read.
+        // eslint-disable-next-line no-await-in-loop
+        await scanOlderMessages(current, source, {save})
+      } else if (onPage && !historyDone(current)) {
+        // eslint-disable-next-line no-await-in-loop
+        await scanOlderBlocks(current, source, {save})
+      } else {
+        // eslint-disable-next-line no-await-in-loop
+        await pause(NEW_BLOCK_MS)
+      }
+      if (!stopped()) {
+        report.error(null)
+        report.missingMethod(false)
+      }
+    } catch (scanError) {
+      if (stopped()) return
+      report.error(scanError)
+      // eslint-disable-next-line no-await-in-loop
+      const lacks = await lacksMethod(scanError, rpc)
+      if (stopped()) return
+      report.missingMethod(lacks)
+      // eslint-disable-next-line no-await-in-loop
+      await pause(lacks ? MISSING_RETRY_MS : RETRY_MS)
+    }
+  }
+}
 
 /**
  * The scan of idena.social, as the phone app's. While the Social page is open (`pageOpen`): the new blocks first
@@ -43,7 +117,7 @@ export function useSocialScan({
   }, [pageOpen])
 
   React.useEffect(() => {
-    if (!ready || !loaded || missingMethod || scanOff) return undefined
+    if (!ready || !loaded || scanOff) return undefined
     const run = {stopped: false}
     const source = nodeSocialSource()
     const save = async (next) => {
@@ -60,66 +134,26 @@ export function useSocialScan({
         }
       })
 
-    ;(async () => {
-      while (!run.stopped) {
-        const {current} = cacheRef
-        const onPage = pageOpenRef.current
-        // Away from the page, nothing is read before the history has been read once.
-        if (!onPage && !(current && historyDone(current))) {
-          // eslint-disable-next-line no-await-in-loop
-          await pause(NEW_BLOCK_MS)
-          // eslint-disable-next-line no-continue
-          continue
-        }
-        try {
-          // eslint-disable-next-line no-await-in-loop
-          const [nodeHead, nodePeers] = await Promise.all([
-            source.head(),
-            socialRpc('net_peers').then((list) => (list || []).length),
-          ])
-          if (run.stopped) return
-          setHead(nodeHead)
-          setPeers(nodePeers)
-          if (
-            !current ||
-            current.high < nodeHead ||
-            current.authorsHeight < current.high
-          ) {
-            // eslint-disable-next-line no-await-in-loop
-            await checkNewBlocks(current, source, {
-              keepGoing: () => !run.stopped,
-              save,
-            })
-          } else if (onPage && messagesPending(current)) {
-            // Once, for a scan made before the app read messages: those of the blocks already read.
-            // eslint-disable-next-line no-await-in-loop
-            await scanOlderMessages(current, source, {save})
-          } else if (onPage && !historyDone(current)) {
-            // eslint-disable-next-line no-await-in-loop
-            await scanOlderBlocks(current, source, {save})
-          } else {
-            // eslint-disable-next-line no-await-in-loop
-            await pause(NEW_BLOCK_MS)
-          }
-          if (!run.stopped) setError(null)
-        } catch (scanError) {
-          if (run.stopped) return
-          setError(scanError)
-          if (isMissingMethod(scanError)) {
-            setMissingMethod(true)
-            return
-          }
-          // eslint-disable-next-line no-await-in-loop
-          await pause(RETRY_MS)
-        }
-      }
-    })()
+    runSocialScan({
+      source,
+      cacheRef,
+      isPageOpen: () => pageOpenRef.current,
+      pause,
+      save,
+      stopped: () => run.stopped,
+      report: {
+        head: setHead,
+        peers: setPeers,
+        error: setError,
+        missingMethod: setMissingMethod,
+      },
+    })
 
     return () => {
       run.stopped = true
       wakeRef.current()
     }
-  }, [cacheRef, loaded, missingMethod, ready, scanOff, setCache])
+  }, [cacheRef, loaded, ready, scanOff, setCache])
 
   // Once something this app sent is in a block: the new blocks at once, even with the scan off (as the phone app).
   const [readOnce, setReadOnce] = React.useState(0)
