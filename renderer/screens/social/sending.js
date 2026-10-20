@@ -2,6 +2,16 @@
 import React from 'react'
 import {useTranslation} from 'react-i18next'
 import {LIKE, SocialCall, makePostArgument} from './contract'
+import {
+  MAX_GROUP_MEMBERS,
+  MAX_GROUP_NAME,
+  encryptGroupPart,
+  groupKeyPlain,
+  groupMessageHash,
+  groupMessagePlain,
+  newGroupId,
+  newGroupKey,
+} from './groups'
 import {keccak256Hex} from './keccak'
 import {MESSAGE_AMOUNT, plainMessage, sendMessageArgument} from './messages'
 import {topicChannel, typedTopic} from './topics'
@@ -174,6 +184,7 @@ export function useSocialSending({
       like: t('Like'),
       tip: t('Tip'),
       message: t('Message'),
+      groupKey: t('Group change'),
       name: t('Name'),
       dropName: t('Drop the name'),
       profile: t('Profile'),
@@ -289,6 +300,91 @@ export function useSocialSending({
         detail: t('A private message to {{count}} people', {
           count: recipientCount(recipients),
         }),
+      }
+    )
+
+  /**
+   * A group's key message (groups.js): the group of `group` (its last key; a new group when null) named `name`, its
+   * `members` besides the account (lowercase) with their public `keys` in the same order, and a new key; with the
+   * same name and members, only the key is new. The account is its admin. Encrypted by the node for the account and
+   * each member (social_encrypt), its hash the first part's.
+   */
+  const prepareGroupKey = (group, name, members, keys, encrypt) =>
+    prepare(
+      'groupKey',
+      async () => {
+        const from = String(
+          await socialRpc('dna_getCoinbaseAddr')
+        ).toLowerCase()
+        const others = [...new Set(members)].filter((m) => m !== from)
+        if (others.length === 0 || others.length > MAX_GROUP_MEMBERS)
+          throw new Error(
+            t('a group holds 1 to {{count}} people besides you', {
+              count: MAX_GROUP_MEMBERS,
+            })
+          )
+        if (keys.length !== others.length)
+          throw new Error('no public key for every member of the group')
+        if (group && group.admin !== from)
+          throw new Error(
+            t('only the person who created the group can change it')
+          )
+        const plain = groupKeyPlain(
+          from,
+          group?.group ?? newGroupId(),
+          (group?.keyId ?? -1) + 1,
+          newGroupKey(),
+          name.trim().slice(0, MAX_GROUP_NAME),
+          [from, ...others]
+        )
+        const parts = await encrypt(keys, plain)
+        if (!Array.isArray(parts) || parts.length !== others.length + 1)
+          throw new Error(
+            `the node encrypted ${parts?.length} parts for ${
+              others.length + 1
+            } members`
+          )
+        const socialCall = {
+          method: 'sendMessage',
+          argument: sendMessageArgument(parts, groupMessageHash(parts)),
+          amount: MESSAGE_AMOUNT,
+        }
+        const fee = await estimateCall(socialRpc, from, socialCall)
+        return {from, socialCall, fee, files: []}
+      },
+      {
+        detail: t("The group's key for {{count}} people and you", {
+          count: members.length,
+        }),
+        privacy: 'group',
+      }
+    )
+
+  /** A message `text` to the group of `key` (its last key), titled `title` here: one part, sealed with its key. */
+  const prepareGroupMessage = (key, text, title) =>
+    prepare(
+      'message',
+      async () => {
+        const from = String(
+          await socialRpc('dna_getCoinbaseAddr')
+        ).toLowerCase()
+        const parts = [
+          await encryptGroupPart(
+            groupMessagePlain(key.admin, key.group, key.keyId, text),
+            key.key
+          ),
+        ]
+        const socialCall = {
+          method: 'sendMessage',
+          argument: sendMessageArgument(parts, groupMessageHash(parts)),
+          amount: MESSAGE_AMOUNT,
+        }
+        const fee = await estimateCall(socialRpc, from, socialCall)
+        return {from, socialCall, fee, files: []}
+      },
+      {
+        detail: t('A message to the group “{{name}}”', {name: title}),
+        privacy: 'group',
       }
     )
 
@@ -468,7 +564,8 @@ export function useSocialSending({
     } finally {
       setBusy(false)
     }
-    if (pending.kind === 'message') setMessagesSent((n) => n + 1)
+    if (pending.kind === 'message' || pending.kind === 'groupKey')
+      setMessagesSent((n) => n + 1)
     if (pending.sentDraft) {
       sentDraftsRef.current.set(hash, pending.sentDraft)
       setDraft(null)
@@ -525,6 +622,8 @@ export function useSocialSending({
     prepareLike,
     prepareTip,
     prepareMessage,
+    prepareGroupKey,
+    prepareGroupMessage,
     prepareProfile,
     prepareTerminate,
     messagesSent,

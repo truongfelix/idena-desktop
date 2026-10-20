@@ -18,9 +18,17 @@ import {ipfsCid} from '../calls'
 import {timeAgo} from '../format'
 import {useIpfsContent} from '../hooks'
 import {decryptIpfsText, unreadCount} from '../messages'
+import {KEY_LINE, isGroupKey, previousKeyLines} from '../groups'
 import {messagesPending} from '../scan'
 import {MUTED} from '../components/theme'
 import {PersonAvatar} from '../components/profile-public'
+import {
+  AddMessageCode,
+  LinkButton,
+  MyMessageCode,
+  NewChatSearch,
+} from './new-chat'
+import {GroupAvatar, GroupEventLine, GroupMembers, groupTitle} from './groups'
 
 /** The most characters of a message written here (the fee grows with the text). */
 const MAX_MESSAGE = 2000
@@ -28,6 +36,12 @@ const MAX_MESSAGE = 2000
 /** The people of a conversation as a title: their names, or short addresses. */
 const othersTitle = (others, names) =>
   others.map((address) => displayName(address, names)).join(', ')
+
+/** A conversation's title: a group's (groupTitle), else its people's names. */
+const titleOf = (conversation, me, names) =>
+  conversation.group
+    ? groupTitle(conversation.group, me, names)
+    : othersTitle(conversation.others, names)
 
 /** One line of a message for the list: its text, or what it is. */
 function preview(message, t) {
@@ -40,13 +54,28 @@ function preview(message, t) {
 /** Why no message can be sent to `addresses`: no public key is known for them. */
 function NoKeyText({addresses, names}) {
   const {t} = useTranslation()
+  const [adding, setAdding] = React.useState(false)
   return (
-    <Text fontSize="sm" color="red.500">
-      {t(
-        '{{names}} cannot receive private messages: no public key is known for them (never an Idena identity, and no transaction they signed on idena.social), so nothing can be encrypted for them.',
-        {names: othersTitle(addresses, names), nsSeparator: '|'}
+    <Stack spacing={1}>
+      <Text fontSize="sm" color="red.500">
+        {t(
+          '{{names}} cannot receive private messages: no public key is known for them (never an Idena identity, and no transaction they signed on idena.social), so nothing can be encrypted for them.',
+          {names: othersTitle(addresses, names), nsSeparator: '|'}
+        )}
+      </Text>
+      {addresses.length === 1 && (
+        <>
+          <LinkButton onClick={() => setAdding(true)}>
+            {t('Add their message code')}
+          </LinkButton>
+          <AddMessageCode
+            address={addresses[0]}
+            isOpen={adding}
+            onClose={() => setAdding(false)}
+          />
+        </>
       )}
-    </Text>
+    </Stack>
   )
 }
 
@@ -54,10 +83,11 @@ function NoKeyText({addresses, names}) {
  * The Inbox's Messages, as the phone app's: the conversations, the latest first, with what was not read; Requests
  * (strangers) behind their own line. A click opens the conversation.
  */
-export function MessagesList({now, openChat}) {
+export function MessagesList({now, openChat, newGroup}) {
   const {t} = useTranslation()
   const {conversations, chatStore, names, me, cache} = useSocial()
   const [requests, setRequests] = React.useState(false)
+  const [showCode, setShowCode] = React.useState(false)
   const waiting = conversations.filter(({isRequest}) => isRequest).length
   const shown = conversations.filter(({isRequest}) => isRequest === requests)
   let empty = t('No conversation yet.')
@@ -86,13 +116,25 @@ export function MessagesList({now, openChat}) {
           {t('Requests ({{count}})', {count: waiting})} ›
         </Button>
       )}
-      <SmallText>
-        {requests
-          ? t(
-              'Messages from people you do not follow and never wrote to. Answer or accept to move them to your conversations.'
-            )
-          : t('To write to someone, open their profile and select ✉.')}
-      </SmallText>
+      {!requests && (
+        <>
+          <NewChatSearch openChat={openChat} />
+          <HStack spacing={4}>
+            <LinkButton onClick={newGroup}>{t('New group')}</LinkButton>
+            <LinkButton onClick={() => setShowCode(true)}>
+              {t('My message code')}
+            </LinkButton>
+          </HStack>
+          <MyMessageCode isOpen={showCode} onClose={() => setShowCode(false)} />
+        </>
+      )}
+      {requests && (
+        <SmallText>
+          {t(
+            'Messages from people you do not follow and never wrote to. Answer or accept to move them to your conversations.'
+          )}
+        </SmallText>
+      )}
       {shown.length === 0 && <SmallText>{empty}</SmallText>}
       {shown.map((conversation) => {
         const unread = unreadCount(
@@ -113,12 +155,16 @@ export function MessagesList({now, openChat}) {
             onClick={() => openChat(conversation.key)}
           >
             <Box position="relative">
-              <PersonAvatar
-                address={conversation.others[0]}
-                boxSize={10}
-                rounded="md"
-              />
-              {conversation.isGroup && (
+              {conversation.group ? (
+                <GroupAvatar boxSize={10} />
+              ) : (
+                <PersonAvatar
+                  address={conversation.others[0]}
+                  boxSize={10}
+                  rounded="md"
+                />
+              )}
+              {conversation.isGroup && !conversation.group && (
                 <Text
                   position="absolute"
                   bottom={-1}
@@ -134,10 +180,12 @@ export function MessagesList({now, openChat}) {
             </Box>
             <Stack spacing={0} flex={1} minW={0}>
               <Text fontWeight={unread > 0 ? 700 : 500} noOfLines={1}>
-                {othersTitle(conversation.others, names)}
+                {titleOf(conversation, me, names)}
               </Text>
               <Text fontSize="sm" color={MUTED} noOfLines={1}>
-                {preview(conversation.last, t)}
+                {conversation.last.kind === KEY_LINE
+                  ? t('Group change')
+                  : preview(conversation.last, t)}
               </Text>
             </Stack>
             <Stack spacing={0.5} align="flex-end">
@@ -243,7 +291,7 @@ function Bubble({message, mine, showSender, names, now}) {
  * The conversation of `chatKey`, as the phone app's: its messages, oldest first, the account's on the right; Accept
  * for a request; and the box to answer, sent to every other participant after the fee is shown.
  */
-export function ChatView({chatKey, now, openProfile}) {
+export function ChatView({chatKey, now, openProfile, editGroup}) {
   const {t} = useTranslation()
   const {
     me,
@@ -253,13 +301,16 @@ export function ChatView({chatKey, now, openProfile}) {
     messageKeys,
     lookUpKeys,
     sendMessage,
+    sendGroupMessage,
     acceptChat,
     sending,
   } = useSocial()
   const conversation = conversations.find(({key}) => key === chatKey)
+  const group = conversation?.group ?? null
+  const isGroupChat = isGroupKey(chatKey)
   let others =
     conversation?.others ??
-    chatKey.split('-').filter((address) => address !== me)
+    (isGroupChat ? [] : chatKey.split('-').filter((a) => a !== me))
   if (others.length === 0) others = [me]
   const messages = conversation?.messages ?? []
   const [draft, setDraft] = React.useState('')
@@ -272,9 +323,9 @@ export function ChatView({chatKey, now, openProfile}) {
     sentRef.current = sending.messagesSent
   }, [sending.messagesSent])
 
-  const othersKey = others.join('-')
+  const othersKey = isGroupChat ? '' : others.join('-')
   React.useEffect(() => {
-    lookUpKeys(othersKey.split('-'))
+    if (othersKey) lookUpKeys(othersKey.split('-'))
     // Once per conversation; a key found missing is asked again after a scan.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [othersKey, messageKeys])
@@ -287,27 +338,58 @@ export function ChatView({chatKey, now, openProfile}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastHash])
 
-  const noKey = others.filter((address) => messageKeys[address] === '')
-  const looking = others.some((address) => messageKeys[address] === undefined)
+  const noKey = isGroupChat
+    ? []
+    : others.filter((address) => messageKeys[address] === '')
+  const looking =
+    !isGroupChat && others.some((address) => messageKeys[address] === undefined)
+  const previous = React.useMemo(
+    () => previousKeyLines(conversation?.messages ?? []),
+    [conversation]
+  )
+
+  if (isGroupChat && !group)
+    return (
+      <SmallText>{t('This group is not in the blocks read so far.')}</SmallText>
+    )
+  const title = group
+    ? groupTitle(group, me, names)
+    : othersTitle(others, names)
 
   return (
     <Stack spacing={3} w="full">
       <HStack spacing={3}>
-        <PersonAvatar
-          address={others[0]}
-          boxSize={10}
-          rounded="md"
-          cursor="pointer"
-          onClick={() => openProfile(others[0])}
-        />
-        <Text fontSize="lg" fontWeight={500} noOfLines={2}>
-          {othersTitle(others, names)}
-        </Text>
+        {group ? (
+          <GroupAvatar boxSize={10} />
+        ) : (
+          <PersonAvatar
+            address={others[0]}
+            boxSize={10}
+            rounded="md"
+            cursor="pointer"
+            onClick={() => openProfile(others[0])}
+          />
+        )}
+        <Stack spacing={0} flex={1} minW={0}>
+          <Text fontSize="lg" fontWeight={500} noOfLines={2}>
+            {title}
+          </Text>
+          {group && <GroupMembers group={group} />}
+        </Stack>
+        {group && group.admin === me && (
+          <SecondaryButton onClick={() => editGroup(chatKey)}>
+            {t('Change the group')}
+          </SecondaryButton>
+        )}
       </HStack>
       <SmallText>
-        {t(
-          'Only the people in the conversation can read the text. Who writes, when, how long the message is and how many people it goes to are public, on the chain for good; who gets it is not.'
-        )}
+        {group
+          ? t(
+              "Only the group's members can read its messages. Who writes and when is public, on the chain for good. The group's name and members are not; how many they are shows each time its creator hands out a key."
+            )
+          : t(
+              'Only the people in the conversation can read the text. Who writes, when, how long the message is and how many people it goes to are public, on the chain for good; who gets it is not.'
+            )}
       </SmallText>
       {conversation?.isRequest && (
         <HStack spacing={3}>
@@ -319,16 +401,24 @@ export function ChatView({chatKey, now, openProfile}) {
       )}
       {messages.length === 0 && <SmallText>{t('No message yet.')}</SmallText>}
       <Stack spacing={2}>
-        {messages.map((message) => (
-          <Bubble
-            key={message.hash}
-            message={message}
-            mine={message.from === me}
-            showSender={others.length > 1}
-            names={names}
-            now={now}
-          />
-        ))}
+        {messages.map((message) =>
+          message.kind === KEY_LINE ? (
+            <GroupEventLine
+              key={message.hash}
+              line={message}
+              previous={previous[message.hash]}
+            />
+          ) : (
+            <Bubble
+              key={message.hash}
+              message={message}
+              mine={message.from === me}
+              showSender={others.length > 1 || Boolean(group)}
+              names={names}
+              now={now}
+            />
+          )
+        )}
         <Box ref={endRef} />
       </Stack>
       {noKey.length > 0 && <NoKeyText addresses={noKey} names={names} />}
@@ -352,7 +442,11 @@ export function ChatView({chatKey, now, openProfile}) {
             noKey.length > 0 ||
             looking
           }
-          onClick={() => sendMessage(others, draft.trim())}
+          onClick={() =>
+            group
+              ? sendGroupMessage(conversation, draft.trim(), title)
+              : sendMessage(others, draft.trim())
+          }
         >
           {t('Send')}
         </PrimaryButton>

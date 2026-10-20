@@ -53,7 +53,7 @@ describe('private messages', () => {
     expect(parsed.messageHash).toBe(m.messageHash)
     expect(parsed.from).toBe(a)
     expect(parsed.time).toBe(140)
-    // Not encrypted, one part, no hash.
+    // Not encrypted, no part, no hash.
     expect(
       parseMessageCall(
         raw(
@@ -63,11 +63,17 @@ describe('private messages', () => {
     ).toBeNull()
     expect(
       parseMessageCall(
+        raw(`{"message":[],"messageHash":"${m.messageHash}","encrypted":true}`)
+      )
+    ).toBeNull()
+    // One part is a group's message (groups.js), kept for the groups' keys; the website reads none of them.
+    expect(
+      parseMessageCall(
         raw(
           `{"message":["x"],"messageHash":"${m.messageHash}","encrypted":true}`
         )
-      )
-    ).toBeNull()
+      ).parts
+    ).toEqual(['x'])
     expect(
       parseMessageCall(raw('{"message":["x","y"],"encrypted":true}'))
     ).toBeNull()

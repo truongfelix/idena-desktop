@@ -2,9 +2,11 @@ import React from 'react'
 import {lacksMethod, nodeSocialSource, socialRpc} from './node'
 import {
   checkNewBlocks,
+  groupsPending,
   historyDone,
   messagesPending,
   scanOlderBlocks,
+  scanOlderGroups,
   scanOlderMessages,
 } from './scan'
 import {saveSocialCache} from './storage'
@@ -63,6 +65,10 @@ export async function runSocialScan({
         // Once, for a scan made before the app read messages: those of the blocks already read.
         // eslint-disable-next-line no-await-in-loop
         await scanOlderMessages(current, source, {save})
+      } else if (onPage && groupsPending(current)) {
+        // Once, for a scan of the build before groups: the one-part calls of the blocks it read.
+        // eslint-disable-next-line no-await-in-loop
+        await scanOlderGroups(current, source, {save})
       } else if (onPage && !historyDone(current)) {
         // eslint-disable-next-line no-await-in-loop
         await scanOlderBlocks(current, source, {save})

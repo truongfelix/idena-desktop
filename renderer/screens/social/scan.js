@@ -9,9 +9,13 @@ import {
 
 /**
  * 1: the first desktop scan (from bcn_contractCalls); 2: the older contracts too (`olderAuthors`); 3: the private
- * messages (still encrypted) and the callers' public keys.
+ * messages (still encrypted) and the callers' public keys; 4: the one-part calls too (groups' messages), which a scan
+ * of version 3 dropped: it reads its blocks from GROUPS_FROM again for them (scanOlderGroups).
  */
-export const CACHE_VERSION = 3
+export const CACHE_VERSION = 4
+
+/** A block before the first group (groups.js) could be sent, as the phone app's. */
+export const GROUPS_FROM = 11460000
 
 /**
  * What the app has scanned, kept so that no block is scanned twice: the blocks low..high (none while high < low),
@@ -46,6 +50,15 @@ export function readCache(saved) {
   )
     return null
   if (saved.version === CACHE_VERSION) return saved
+  if (saved.version === 3)
+    // Its blocks from GROUPS_FROM up are read again for the one-part calls, down to where its own message pass
+    // stands: the blocks below it are still to read by that pass (scanOlderMessages), which keeps them now.
+    return {
+      ...saved,
+      version: CACHE_VERSION,
+      groupsLow: saved.high + 1,
+      groupsFloor: Math.max(GROUPS_FROM, saved.messagesLow),
+    }
   if (saved.version !== 1 && saved.version !== 2) return null
   // An older scan read no messages: those of its blocks are read again once (scanOlderMessages).
   return {
@@ -64,6 +77,13 @@ export function readCache(saved) {
  */
 export const messagesPending = ({messagesLow, low}) =>
   messagesLow > Math.max(low, CURRENT_VERSION.from)
+
+/**
+ * Whether a scan of version 3 still has blocks to read again for the groups' messages (scanOlderGroups): those of
+ * groupsFloor..groupsLow - 1 that it scanned.
+ */
+export const groupsPending = ({groupsLow, groupsFloor, low}) =>
+  Number.isFinite(groupsLow) && groupsLow > Math.max(low, groupsFloor)
 
 /** The messages with `more` added, each once (a backfill may read blocks again), in chain order. */
 export function withMessages(messages, more = []) {
@@ -222,6 +242,24 @@ export async function scanOlderMessages(cache, source, {save = () => {}} = {}) {
     messages: withMessages(cache.messages, read.messages),
     messagesLow: from,
     keys: {...read.keys, ...cache.keys},
+  }
+  await save(next)
+  return next
+}
+
+/**
+ * For a scan of version 3 (groupsPending): one batch of the blocks it read from GROUPS_FROM up, below groupsLow, read
+ * again for the one-part calls it dropped (the other calls come again too: each is kept once), from the newest down.
+ */
+export async function scanOlderGroups(cache, source, {save = () => {}} = {}) {
+  if (!groupsPending(cache)) return cache
+  const bottom = Math.max(cache.low, cache.groupsFloor)
+  const from = Math.max(cache.groupsLow - source.batchSize(), bottom)
+  const read = await source.calls(from, cache.groupsLow - 1)
+  const next = {
+    ...cache,
+    messages: withMessages(cache.messages, read.messages),
+    groupsLow: from,
   }
   await save(next)
   return next

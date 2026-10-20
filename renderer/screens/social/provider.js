@@ -288,11 +288,37 @@ export function SocialProvider({children}) {
     [messageKeys, sending]
   )
 
-  // Takes a conversation out of Requests: its people are marked to message.
+  // A group's key message (groups.js): `group` (its last key; null for a new one) named `name`, with `members`
+  // besides the account, once each one's public key is known.
+  const saveGroup = React.useCallback(
+    (group, name, members) => {
+      const keys = members.map((address) => messageKeys[address] || '')
+      if (keys.some((key) => key === '')) return
+      sending.prepareGroupKey(
+        group,
+        name,
+        members,
+        keys,
+        nodeMessages().encrypt
+      )
+    },
+    [messageKeys, sending]
+  )
+
+  // Sends `text` to the group of `conversation` (its last key), titled `title` here.
+  const sendGroupMessage = React.useCallback(
+    (conversation, text, title) =>
+      sending.prepareGroupMessage(conversation.group, text, title),
+    [sending]
+  )
+
+  // Takes a conversation out of Requests: its people are marked to message (a group's: its admin).
   const acceptChat = React.useCallback(
     (conversation) => {
       let list = people
-      for (const address of conversation.others)
+      for (const address of conversation.group
+        ? [conversation.group.admin]
+        : conversation.others)
         list = withPerson(list, {
           ...(list[address] || person(address)),
           message: true,
@@ -355,10 +381,14 @@ export function SocialProvider({children}) {
       setInboxOpen,
       ...chats,
       sendMessage,
+      saveGroup,
+      sendGroupMessage,
       acceptChat,
     }),
     [
       acceptChat,
+      saveGroup,
+      sendGroupMessage,
       activity,
       blockedTopics,
       cache,

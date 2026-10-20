@@ -7,6 +7,7 @@ import {
   readNewMessages,
   unreadCount,
 } from './messages'
+import {messageCodeFor} from './message-code'
 import {nodeMessages} from './node'
 import {visibleConversations} from './hiding'
 import {callHeightsOf} from './scan'
@@ -85,11 +86,11 @@ export function useChats({me, cache, ready, people, blocked = new Set()}) {
     () =>
       me
         ? visibleConversations(
-            listConversations(store.messages, me, people),
+            listConversations(store.messages, me, people, store.groupKeys),
             blocked
           )
         : [],
-    [blocked, me, people, store.messages]
+    [blocked, me, people, store.messages, store.groupKeys]
   )
 
   const unreadConversations = React.useMemo(
@@ -135,6 +136,7 @@ export function useChats({me, cache, ready, people, blocked = new Set()}) {
             scannedKeys: cache?.keys || {},
             callHeights: cache ? callHeightsOf(cache, address) : [],
             keysAt: node.keysAt,
+            sharedKeys: storeRef.current.sharedKeys,
           })
           setMessageKeys((current) => ({...current, [address]: key || ''}))
         } catch {
@@ -143,6 +145,24 @@ export function useChats({me, cache, ready, people, blocked = new Set()}) {
       }
     },
     [cache, messageKeys]
+  )
+
+  // Keeps the key of a message code `text` for `address` once checked against it (messageCodeFor): it can be
+  // written to from now on, before it signed anything. False for a code of another account.
+  const addMessageCode = React.useCallback(
+    (address, text) => {
+      const lower = String(address).toLowerCase()
+      const key = messageCodeFor(text, lower)
+      if (!key || !me || account !== me) return false
+      if (storeRef.current.sharedKeys?.[lower] !== key)
+        save(me, {
+          ...storeRef.current,
+          sharedKeys: {...storeRef.current.sharedKeys, [lower]: key},
+        })
+      setMessageKeys((current) => ({...current, [lower]: key}))
+      return true
+    },
+    [account, me, save]
   )
 
   const chatKey = React.useCallback(
@@ -158,9 +178,11 @@ export function useChats({me, cache, ready, people, blocked = new Set()}) {
       markChatSeen,
       messageKeys,
       lookUpKeys,
+      addMessageCode,
       chatKey,
     }),
     [
+      addMessageCode,
       chatKey,
       conversations,
       lookUpKeys,

@@ -103,7 +103,13 @@ describe('the store of an account', () => {
     const earlier = {tried: [], messages: [], seen: {k: [10, 0]}}
     const db = fakeDb(earlier)
     const store = await loadChatStore(a, db, now)
-    expect(store).toEqual(earlier)
+    // With no group and no message code yet.
+    expect(store).toEqual({
+      ...earlier,
+      groupKeys: [],
+      groupTried: [],
+      sharedKeys: {},
+    })
     expect('readBefore' in store).toBe(false)
     expect(db.puts).toEqual([])
   })
