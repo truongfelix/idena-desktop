@@ -33,6 +33,9 @@ export const GROUPS_FROM = isTestContract ? SOCIAL_FIRST_BLOCK : 11460000
 /** A group's line that is a key message (`kind`; its `text` is the group's name). */
 export const KEY_LINE = 'key'
 
+/** A group's line that is its admin's notice of a removal (`kind`; its `removed`: who). */
+export const REMOVED_LINE = 'removed'
+
 const GROUP_ID = /^[0-9a-f]{32}$/
 const MEMBER = /^0x[0-9a-f]{40}$/
 
@@ -73,6 +76,20 @@ export const groupMessagePlain = (admin, group, keyId, text) =>
     group,
     keyId,
     text,
+  })
+
+/**
+ * The plain text of a removal notice: sent by the admin right after a change that removes `removed`, sealed with the
+ * key before it (`keyId`), so that the people removed, who never get the new key, read that they were.
+ */
+export const groupNoticePlain = (admin, group, keyId, removed) =>
+  JSON.stringify({
+    idenaGroup: GROUP_FORMAT,
+    type: 'removed',
+    admin,
+    group,
+    keyId,
+    removed,
   })
 
 /** `plain` encrypted with the group's `key` (base64): `iv(12) || ciphertext+tag`, base64 (one part). */
@@ -153,7 +170,9 @@ export const keyConversation = (key) =>
 
 /**
  * `call` as a group message under `key`: one part that `key` opens, naming its group and key, from one of the key's
- * members, with a text; null otherwise. A message as messages.js's acceptMessage gives, with its `group`.
+ * members, with a text; or the admin's removal notice (REMOVED_LINE), naming members of the key other than the admin.
+ * Null otherwise. A message as messages.js's acceptMessage gives, with its `group` (and `kind`, `removed` for a
+ * notice).
  */
 export async function acceptGroupMessage(call, key) {
   if (
@@ -164,7 +183,8 @@ export async function acceptGroupMessage(call, key) {
   const plain = await decryptGroupPart(call.parts[0], key.key)
   if (plain == null) return null
   const json = parseJson(plain)
-  if (!isFormat(json, 'message')) return null
+  const notice = isFormat(json, 'removed')
+  if (!notice && !isFormat(json, 'message')) return null
   if (
     json.admin !== key.admin ||
     json.group !== key.group ||
@@ -172,9 +192,19 @@ export async function acceptGroupMessage(call, key) {
   )
     return null
   if (!key.members.includes(call.from)) return null
-  const text = str(json.text)
-  if (text === '') return null
+  const text = notice ? '' : str(json.text)
+  const {removed} = json
+  if (notice) {
+    if (call.from !== key.admin || !Array.isArray(removed) || !removed.length)
+      return null
+    if (
+      removed.some((m) => m === key.admin || !key.members.includes(m)) ||
+      new Set(removed).size !== removed.length
+    )
+      return null
+  } else if (text === '') return null
   return {
+    ...(notice ? {kind: REMOVED_LINE, removed} : {}),
     hash: call.hash,
     height: call.height,
     time: call.time,
@@ -264,6 +294,17 @@ export function groupConversations(messages, keys, me, people) {
         messages.filter(({group}) => group === id)
       )
       if (!state || lines.length === 0) return null
+      // A removal notice is for the people it names: the others read the change in its key message.
+      const shown = lines.filter(
+        (line) => line.kind !== REMOVED_LINE || line.removed.includes(me)
+      )
+      // Removed: the notice naming `me` came after the last key `me` holds.
+      let removedMe = false
+      for (const line of shown) {
+        if (line.kind === REMOVED_LINE) removedMe = true
+        // Every key `me` holds names `me`: added again.
+        else if (line.kind === KEY_LINE) removedMe = false
+      }
       let others = state.members.filter((m) => m !== me)
       if (others.length === 0) others = [me]
       const known =
@@ -272,12 +313,13 @@ export function groupConversations(messages, keys, me, people) {
       return {
         key: id,
         others,
-        messages: lines,
-        last: lines[lines.length - 1],
+        messages: shown,
+        last: shown[shown.length - 1],
         isGroup: true,
         isRequest:
-          !known && !lines.some(({from, kind}) => from === me && !kind),
+          !known && !shown.some(({from, kind}) => from === me && !kind),
         group: state,
+        removedMe,
       }
     })
     .filter(Boolean)
@@ -289,6 +331,7 @@ export function groupConversations(messages, keys, me, people) {
  * who} and {kind: 'renamed', name}, or [{kind: 'newKey'}] when only the key is new.
  */
 export function groupEvent(line, previous, me) {
+  if (line.kind === REMOVED_LINE) return [{kind: 'removedYou'}]
   if (!previous) return [{kind: line.from === me ? 'created' : 'addedYou'}]
   const changes = []
   const added = line.participants.filter(

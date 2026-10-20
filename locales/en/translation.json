@@ -1721,5 +1721,13 @@
   "The group's key for {{count}} people and you_plural": "The group's key for {{count}} people and you",
   "Message to a group": "Message to a group",
   "Reading the group…": "Reading the group…",
-  "This is not a message code: it starts with idena-key: and holds 130 characters.": "This is not a message code: it starts with idena-key: and holds 130 characters."
+  "This is not a message code: it starts with idena-key: and holds 130 characters.": "This is not a message code: it starts with idena-key: and holds 130 characters.",
+  "Tell the people removed": "Tell the people removed",
+  "Removal notice": "Removal notice",
+  "Tells the people removed from “{{name}}” that they were: they do not get the new key, so nothing else would": "Tells the people removed from “{{name}}” that they were: they do not get the new key, so nothing else would",
+  "{{who}} removed you from the group": "{{who}} removed you from the group",
+  "You were removed from the group": "You were removed from the group",
+  "You were removed from this group: you no longer get its key, and what you would send here no longer counts.": "You were removed from this group: you no longer get its key, and what you would send here no longer counts.",
+  "Reading the latest blocks first…": "Reading the latest blocks first…",
+  "Not sent: the latest blocks could not be read in time, so the group may have a newer key. Try again.": "Not sent: the latest blocks could not be read in time, so the group may have a newer key. Try again."
 }

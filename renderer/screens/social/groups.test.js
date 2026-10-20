@@ -13,6 +13,7 @@ import {
   groupLines,
   groupMessageHash,
   groupMessagePlain,
+  groupNoticePlain,
   keyConversation,
   newGroupKey,
   previousKeyLines,
@@ -405,5 +406,64 @@ describe('group chats with a shared key', () => {
     expect(asked).toEqual([])
     // A build before groups keeps neither the groups nor their messages: they never show as a conversation there.
     expect(next.messages.every(({group: id}) => !id)).toBe(true)
+  })
+
+  it('a removal notice under the old key tells the people removed, and only them', async () => {
+    const k0 = (me) => keyOf('0xk0', 100, 0, [a, b, c], {me})
+    const k1 = (me) => keyOf('0xk1', 110, 1, [a, b], {me})
+    const noticeCall = async (from, key, removed, hash = '0xn') => {
+      const parts = [
+        await encryptGroupPart(
+          groupNoticePlain(key.admin, key.group, key.keyId, removed),
+          key.key
+        ),
+      ]
+      return {
+        hash,
+        height: 111,
+        time: 2220,
+        index: 0,
+        from,
+        parts,
+        messageHash: groupMessageHash(parts),
+      }
+    }
+    // c, removed, holds k0 only: the admin's notice under k0 opens.
+    const kc = k0(c)
+    const notice = await acceptGroupMessage(await noticeCall(a, kc, [c]), kc)
+    expect(notice.kind).toBe('removed')
+    expect(notice.removed).toEqual([c])
+    // From another member, naming the admin, or someone not in the group: refused.
+    expect(
+      await acceptGroupMessage(await noticeCall(b, kc, [c]), kc)
+    ).toBeNull()
+    expect(
+      await acceptGroupMessage(await noticeCall(a, kc, [a]), kc)
+    ).toBeNull()
+    expect(
+      await acceptGroupMessage(await noticeCall(a, kc, [d]), kc)
+    ).toBeNull()
+
+    // For c: the notice is the group's last line, and it is removed.
+    const [forC] = conversations([], c, {}, [kc], [notice])
+    expect(forC.removedMe).toBe(true)
+    expect(forC.last.kind).toBe('removed')
+    expect(groupEvent(forC.last, null, c)).toEqual([{kind: 'removedYou'}])
+    // Added back with a newer key: no longer removed.
+    const k2 = keyOf('0xk2', 120, 2, [a, b, c], {me: c})
+    const [back] = conversations([], c, {}, [kc, k2], [notice])
+    expect(back.removedMe).toBe(false)
+
+    // For b, who stays: the notice (read with k0, which b holds too) is not a line; the key line says it.
+    const kb0 = k0(b)
+    const forB = conversations(
+      [],
+      b,
+      {},
+      [kb0, k1(b)],
+      [{...notice, participants: kb0.members}]
+    )[0]
+    expect(forB.removedMe).toBe(false)
+    expect(forB.messages.map(({kind}) => kind)).toEqual(['key', 'key'])
   })
 })

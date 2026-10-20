@@ -18,7 +18,7 @@ import {ipfsCid} from '../calls'
 import {timeAgo} from '../format'
 import {useIpfsContent} from '../hooks'
 import {decryptIpfsText, unreadCount} from '../messages'
-import {KEY_LINE, isGroupKey, previousKeyLines} from '../groups'
+import {KEY_LINE, REMOVED_LINE, isGroupKey, previousKeyLines} from '../groups'
 import {messagesPending} from '../scan'
 import {MUTED} from '../components/theme'
 import {PersonAvatar} from '../components/profile-public'
@@ -49,6 +49,13 @@ function preview(message, t) {
   if (message.text) return message.text.replace(/\s+/g, ' ')
   if (message.hasMedia) return t('🖼 Picture')
   return '…'
+}
+
+/** A conversation's last line for the list: a group's removal or change, else its last message. */
+function lastLine(conversation, t) {
+  if (conversation.removedMe) return t('You were removed from the group')
+  if (conversation.last.kind === KEY_LINE) return t('Group change')
+  return preview(conversation.last, t)
 }
 
 /** Why no message can be sent to `addresses`: no public key is known for them. */
@@ -183,9 +190,7 @@ export function MessagesList({now, openChat, newGroup}) {
                 {titleOf(conversation, me, names)}
               </Text>
               <Text fontSize="sm" color={MUTED} noOfLines={1}>
-                {conversation.last.kind === KEY_LINE
-                  ? t('Group change')
-                  : preview(conversation.last, t)}
+                {lastLine(conversation, t)}
               </Text>
             </Stack>
             <Stack spacing={0.5} align="flex-end">
@@ -314,6 +319,8 @@ export function ChatView({chatKey, now, openProfile, editGroup}) {
   if (others.length === 0) others = [me]
   const messages = conversation?.messages ?? []
   const [draft, setDraft] = React.useState('')
+  // A group message first reads the newest blocks: meanwhile, and when that fails, what it says.
+  const [groupSend, setGroupSend] = React.useState(null)
   const endRef = React.useRef()
 
   // The text stays until the message is sent (the fee's dialog can be cancelled).
@@ -402,7 +409,7 @@ export function ChatView({chatKey, now, openProfile, editGroup}) {
       {messages.length === 0 && <SmallText>{t('No message yet.')}</SmallText>}
       <Stack spacing={2}>
         {messages.map((message) =>
-          message.kind === KEY_LINE ? (
+          message.kind === KEY_LINE || message.kind === REMOVED_LINE ? (
             <GroupEventLine
               key={message.hash}
               line={message}
@@ -425,7 +432,30 @@ export function ChatView({chatKey, now, openProfile, editGroup}) {
       {noKey.length === 0 && looking && (
         <SmallText>{t('Looking up the keys to encrypt for…')}</SmallText>
       )}
-      <HStack spacing={2} align="flex-end">
+      {conversation?.removedMe && (
+        <Text fontSize="sm" color="red.500">
+          {t(
+            'You were removed from this group: you no longer get its key, and what you would send here no longer counts.',
+            {nsSeparator: '|'}
+          )}
+        </Text>
+      )}
+      {groupSend === 'reading' && (
+        <SmallText>{t('Reading the latest blocks first…')}</SmallText>
+      )}
+      {groupSend === 'behind' && (
+        <Text fontSize="sm" color="red.500">
+          {t(
+            'Not sent: the latest blocks could not be read in time, so the group may have a newer key. Try again.',
+            {nsSeparator: '|'}
+          )}
+        </Text>
+      )}
+      <HStack
+        spacing={2}
+        align="flex-end"
+        display={conversation?.removedMe ? 'none' : 'flex'}
+      >
         <Textarea
           value={draft}
           rows={2}
@@ -440,13 +470,21 @@ export function ChatView({chatKey, now, openProfile, editGroup}) {
             !sending.canAct ||
             draft.trim() === '' ||
             noKey.length > 0 ||
-            looking
+            looking ||
+            groupSend === 'reading'
           }
-          onClick={() =>
-            group
-              ? sendGroupMessage(conversation, draft.trim(), title)
-              : sendMessage(others, draft.trim())
-          }
+          onClick={() => {
+            if (!group) {
+              sendMessage(others, draft.trim())
+              return
+            }
+            setGroupSend('reading')
+            sendGroupMessage(conversation, draft.trim(), title)
+              .then(() => setGroupSend(null))
+              .catch((error) =>
+                setGroupSend(error?.message === 'behind' ? 'behind' : null)
+              )
+          }}
         >
           {t('Send')}
         </PrimaryButton>

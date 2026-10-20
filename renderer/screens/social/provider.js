@@ -28,7 +28,7 @@ import {useActivityNotices} from './notices'
 import {useSocialScan} from './scan-loop'
 import {useSocialSending} from './sending'
 import {useChats} from './chats'
-import {nodeMessages} from './node'
+import {nodeMessages, socialRpc} from './node'
 import {loadSocialCache, loadSocialSettings, saveSocialSetting} from './storage'
 import {
   feedAddresses,
@@ -38,6 +38,9 @@ import {
 } from './profile-hooks'
 import {profilesEnabled, shownNames} from './profiles'
 import {socialNewsCount} from './news-count'
+
+/** How long a group message waits for the blocks up to the node's last one to be read (sendGroupMessage). */
+const CATCH_UP_MS = 90 * 1000
 
 const SocialContext = React.createContext(null)
 
@@ -305,10 +308,33 @@ export function SocialProvider({children}) {
     [messageKeys, sending]
   )
 
-  // Sends `text` to the group of `conversation` (its last key), titled `title` here.
+  // Sends `text` to the group of `conversation`, titled `title` here, with its newest key: the blocks up to the
+  // node's last one are read first, so that a key message of a change is never missed (whoever it removed could
+  // read a message sealed with the key before it). Rejects when they cannot be read in time, or `me` was removed.
+  const {readThrough, latestConversation} = chats
   const sendGroupMessage = React.useCallback(
-    (conversation, text, title) =>
-      sending.prepareGroupMessage(conversation.group, text, title),
+    async (conversation, text, title) => {
+      const last = (await socialRpc('bcn_lastBlock')).height
+      readNewBlocks()
+      const until = Date.now() + CATCH_UP_MS
+      while (readThrough() < last) {
+        if (Date.now() > until) throw new Error('behind')
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((resolve) => {
+          setTimeout(resolve, 1000)
+        })
+      }
+      const latest = latestConversation(conversation.key)
+      if (!latest?.group || latest.removedMe) throw new Error('removed')
+      sending.prepareGroupMessage(latest.group, text, title)
+    },
+    [latestConversation, readNewBlocks, readThrough, sending]
+  )
+
+  // Tells `removed`, taken out of the group of `group` (its key before the change), that they were.
+  const sendGroupNotice = React.useCallback(
+    (group, removed, title) =>
+      sending.prepareGroupNotice(group, removed, title),
     [sending]
   )
 
@@ -383,12 +409,14 @@ export function SocialProvider({children}) {
       sendMessage,
       saveGroup,
       sendGroupMessage,
+      sendGroupNotice,
       acceptChat,
     }),
     [
       acceptChat,
       saveGroup,
       sendGroupMessage,
+      sendGroupNotice,
       activity,
       blockedTopics,
       cache,

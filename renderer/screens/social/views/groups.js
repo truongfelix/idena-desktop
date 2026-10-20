@@ -65,6 +65,8 @@ export function GroupEventLine({line, previous}) {
           who: who(line.from),
           whom: list(change.who),
         })
+      case 'removedYou':
+        return t('{{who}} removed you from the group', {who: who(line.from)})
       case 'renamed':
         return t('{{who}} renamed the group “{{name}}”', {
           who: who(line.from),
@@ -134,7 +136,15 @@ export function GroupEditView({chatKey, onSent}) {
 /** GroupEditView's form, for `group` (its last key; null for a new group) as it stood when the form opened. */
 function GroupForm({group, onSent}) {
   const {t} = useTranslation()
-  const {me, names, messageKeys, lookUpKeys, saveGroup, sending} = useSocial()
+  const {
+    me,
+    names,
+    messageKeys,
+    lookUpKeys,
+    saveGroup,
+    sendGroupNotice,
+    sending,
+  } = useSocial()
   const before = React.useMemo(
     () => (group ? group.members.filter((m) => m !== me) : []),
     [group, me]
@@ -152,10 +162,15 @@ function GroupForm({group, onSent}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chosenKey, messageKeys])
 
-  // The group's call went to the node: back to the conversation.
+  // The group's call went to the node: the notice to the people it removed (its own confirmation, under the key
+  // before the change), then back to the conversation.
   const sentRef = React.useRef(sending.messagesSent)
   React.useEffect(() => {
-    if (sending.messagesSent !== sentRef.current) onSent()
+    if (sending.messagesSent === sentRef.current) return
+    const removed = before.filter((m) => !chosen.includes(m))
+    if (group && removed.length)
+      sendGroupNotice(group, removed, name.trim() || group.name)
+    onSent()
     // On a new send only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sending.messagesSent])

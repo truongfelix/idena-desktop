@@ -9,6 +9,7 @@ import {
   groupKeyPlain,
   groupMessageHash,
   groupMessagePlain,
+  groupNoticePlain,
   newGroupId,
   newGroupKey,
 } from './groups'
@@ -185,6 +186,7 @@ export function useSocialSending({
       tip: t('Tip'),
       message: t('Message'),
       groupKey: t('Group change'),
+      groupNotice: t('Removal notice'),
       name: t('Name'),
       dropName: t('Drop the name'),
       profile: t('Profile'),
@@ -385,6 +387,40 @@ export function useSocialSending({
       {
         title: t('Message to a group'),
         detail: t('A message to the group “{{name}}”', {name: title}),
+        privacy: 'group',
+      }
+    )
+
+  /**
+   * The removal notice of a change of the group of `key` (the key before the change) that removed `removed`: one part
+   * sealed with that key, which the people removed hold.
+   */
+  const prepareGroupNotice = (key, removed, title) =>
+    prepare(
+      'groupNotice',
+      async () => {
+        const from = String(
+          await socialRpc('dna_getCoinbaseAddr')
+        ).toLowerCase()
+        const parts = [
+          await encryptGroupPart(
+            groupNoticePlain(key.admin, key.group, key.keyId, removed),
+            key.key
+          ),
+        ]
+        const socialCall = {
+          method: 'sendMessage',
+          argument: sendMessageArgument(parts, groupMessageHash(parts)),
+          amount: MESSAGE_AMOUNT,
+        }
+        const fee = await estimateCall(socialRpc, from, socialCall)
+        return {from, socialCall, fee, files: []}
+      },
+      {
+        detail: t(
+          'Tells the people removed from “{{name}}” that they were: they do not get the new key, so nothing else would',
+          {name: title, nsSeparator: '|'}
+        ),
         privacy: 'group',
       }
     )
@@ -625,6 +661,7 @@ export function useSocialSending({
     prepareMessage,
     prepareGroupKey,
     prepareGroupMessage,
+    prepareGroupNotice,
     prepareProfile,
     prepareTerminate,
     messagesSent,

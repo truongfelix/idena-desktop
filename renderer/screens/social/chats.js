@@ -60,20 +60,35 @@ export function useChats({me, cache, ready, people, blocked = new Set()}) {
   }, [me])
 
   const calls = cache?.messages
+  const cacheHigh = cache?.high ?? 0
+  // The last block whose calls were read (readThrough), and the scan's last one now.
+  const readThroughRef = React.useRef(0)
+  const cacheHighRef = React.useRef(cacheHigh)
+  cacheHighRef.current = cacheHigh
+  // A read that ended behind the scan reads again at once, not with the next block.
+  const [again, setAgain] = React.useState(0)
   React.useEffect(() => {
-    if (!ready || !account || account !== me || !calls?.length) return
+    if (!ready || !account || account !== me) return
     if (busyRef.current) return
+    if (!calls?.length) {
+      readThroughRef.current = cacheHigh
+      return
+    }
     busyRef.current = true
     readNewMessages(storeRef.current, calls, me, nodeMessages().decrypt)
       .then((next) => {
         if (next !== storeRef.current && account === me) save(me, next)
+        readThroughRef.current = Math.max(readThroughRef.current, cacheHigh)
       })
       // A node that does not answer, or without social_decrypt: tried again with the next scan step.
       .catch(() => {})
       .finally(() => {
         busyRef.current = false
+        if (cacheHighRef.current > cacheHigh) setAgain((n) => n + 1)
       })
-  }, [account, calls, me, ready, save])
+    // `again` asks for one more read.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [account, calls, cacheHigh, me, ready, save, again])
 
   // An address without a key may have signed a call since: looked up again when asked.
   const scannedKeys = cache?.keys
@@ -102,6 +117,16 @@ export function useChats({me, cache, ready, people, blocked = new Set()}) {
           )
         : [],
     [blocked, me, people, store.messages, store.groupKeys, store.groupMessages]
+  )
+
+  const conversationsRef = React.useRef(conversations)
+  conversationsRef.current = conversations
+
+  // How far the messages are read (a block height), and a conversation as it stands now.
+  const readThrough = React.useCallback(() => readThroughRef.current, [])
+  const latestConversation = React.useCallback(
+    (key) => conversationsRef.current.find((one) => one.key === key) ?? null,
+    []
   )
 
   const unreadConversations = React.useMemo(
@@ -195,16 +220,20 @@ export function useChats({me, cache, ready, people, blocked = new Set()}) {
       lookUpKeys,
       addMessageCode,
       chatKey,
+      readThrough,
+      latestConversation,
     }),
     [
       account,
       addMessageCode,
       chatKey,
       conversations,
+      latestConversation,
       lookUpKeys,
       markChatSeen,
       me,
       messageKeys,
+      readThrough,
       store,
       unreadConversations,
     ]
