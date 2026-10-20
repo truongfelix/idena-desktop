@@ -48,6 +48,7 @@ export function ConfirmDialog({pending, onSend, onCancel}) {
     like: t('Like on idena.social'),
     tip: t('Tip on idena.social'),
     message: t('Private message on idena.social'),
+    groupKey: t('Group change'),
     name: t('Your public name'),
     dropName: t('Drop your public name'),
     profile: t('Your public profile'),

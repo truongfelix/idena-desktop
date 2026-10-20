@@ -1684,7 +1684,7 @@
   "Group change": "Group change",
   "a group holds 1 to {{count}} people besides you": "a group holds 1 to {{count}} people besides you",
   "only the person who created the group can change it": "only the person who created the group can change it",
-  "The group's key for {{count}} people and you": "The group's key for {{count}} people and you",
+  "The group's key for {{count}} people and you": "The group's key for {{count}} person and you",
   "A message to the group “{{name}}”": "A message to the group “{{name}}”",
   "You": "You",
   "You created the group “{{name}}”": "You created the group “{{name}}”",
@@ -1717,5 +1717,6 @@
   "Your public key is not known yet: it shows once your account signed a transaction (an invitation activated, or a call to idena.social).": "Your public key is not known yet: it shows once your account signed a transaction (an invitation activated, or a call to idena.social).",
   "Ask them for their message code (Messages, \"My message code\") and paste it here. You can also paste it in the Messages search.": "Ask them for their message code (Messages, \"My message code\") and paste it here. You can also paste it in the Messages search.",
   "Message code": "Message code",
-  "This code is another account's.": "This code is another account's."
+  "This code is another account's.": "This code is another account's.",
+  "The group's key for {{count}} people and you_plural": "The group's key for {{count}} people and you"
 }
