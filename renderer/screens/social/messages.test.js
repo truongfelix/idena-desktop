@@ -168,8 +168,13 @@ describe('conversations', () => {
     })
     expect(accepted.find(({key}) => key === `${a}-${c}`).isRequest).toBe(false)
 
-    expect(unreadCount(list[1], a, null)).toBe(1)
-    expect(unreadCount(list[1], a, [10, 0])).toBe(0)
+    // Answered after it: read.
+    expect(unreadCount(list[1], a, null)).toBe(0)
+    const answered = conversations([...messages, msg(b, [b, a], 14)], a, {})
+    const withB = answered.find(({key}) => key === `${a}-${b}`)
+    // After my answer: unread.
+    expect(unreadCount(withB, a, null)).toBe(1)
+    expect(unreadCount(withB, a, [14, 0])).toBe(0)
   })
 })
 

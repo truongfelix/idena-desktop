@@ -1,7 +1,7 @@
 import {requestDb, subDb} from '../../shared/utils/db'
 import {readCache} from './scan'
 import {cleanTopics} from './topics'
-import {readChatStore} from './messages'
+import {firstChatStore, readChatStore} from './messages'
 import {cleanHiddenPosts, cleanHiddenWords} from './lists'
 import {picturesMode} from './hiding'
 
@@ -77,8 +77,20 @@ export function saveSocialSetting(key, value, db = socialDb()) {
 }
 
 /** The private messages of `address` (lowercase) kept on this computer: those of another account are not shown. */
-export async function loadChatStore(address, db = socialDb()) {
-  return readChatStore(await getOr(db, `messages-${address}`, null))
+/**
+ * `address`'s messages kept on this computer. An account with none yet (imported here, or new) starts with
+ * `firstChatStore` at `now` (seconds), saved at once.
+ */
+export async function loadChatStore(
+  address,
+  db = socialDb(),
+  now = Date.now() / 1000
+) {
+  const saved = await getOr(db, `messages-${address}`, null)
+  if (saved !== null) return readChatStore(saved)
+  const first = firstChatStore(Math.floor(now))
+  await db.put(`messages-${address}`, first)
+  return first
 }
 
 export function saveChatStore(address, store, db = socialDb()) {

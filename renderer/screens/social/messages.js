@@ -204,13 +204,37 @@ export function conversations(messages, me, people) {
     .sort((a, b) => byChainOrder(b.last, a.last))
 }
 
-/** The messages of `conversation` from others after `seen` ([height, index]), the unread ones. */
-export const unreadCount = (conversation, me, seen) =>
-  conversation.messages.filter(
-    ({from, height, index}) =>
-      from !== me &&
-      (!seen || height > seen[0] || (height === seen[0] && index > seen[1]))
-  ).length
+const isAfter = ({height, index}, point) =>
+  height > point[0] || (height === point[0] && index > point[1])
+
+/**
+ * The unread messages of `conversation` for `me`: those from others after `seen` ([height, index]), after `me`'s own
+ * last message (answering is reading), and from `readBefore` on (a block time; null: no such limit).
+ */
+export function unreadMessages(conversation, me, seen, readBefore = null) {
+  const mine = [...conversation.messages]
+    .reverse()
+    .find(({from}) => from === me)
+  const after = [seen, mine && [mine.height, mine.index]]
+    .filter(Boolean)
+    .reduce(
+      (latest, point) =>
+        !latest || isAfter({height: point[0], index: point[1]}, latest)
+          ? point
+          : latest,
+      null
+    )
+  return conversation.messages.filter(
+    (message) =>
+      message.from !== me &&
+      (!after || isAfter(message, after)) &&
+      (readBefore == null || message.time >= readBefore)
+  )
+}
+
+/** How many messages of `conversation` are unread for `me` (`unreadMessages`). */
+export const unreadCount = (conversation, me, seen, readBefore = null) =>
+  unreadMessages(conversation, me, seen, readBefore).length
 
 /**
  * A public key as the node writes it ("0x" optional), in lowercase hex without 0x; null when it is not one (33, 64
@@ -260,6 +284,19 @@ export const DECRYPT_BATCH = 40
  */
 export const emptyChatStore = () => ({tried: [], messages: [], seen: {}})
 
+/** How long before an account's first load on this computer its messages still show as unread: 3 days, in seconds. */
+export const READ_ON_FIRST_LOAD = 3 * 24 * 60 * 60
+
+/**
+ * The store of an account seen for the first time on this computer, at `now` (seconds): its messages older than
+ * `READ_ON_FIRST_LOAD` count as read (`readBefore`, a block time), so that a profile imported here does not show all
+ * its past as unread. The stores saved before it have no `readBefore`: their read points stay as they were.
+ */
+export const firstChatStore = (now) => ({
+  ...emptyChatStore(),
+  readBefore: now - READ_ON_FIRST_LOAD,
+})
+
 /**
  * `store` with the calls of `calls` not tried yet decrypted by `decrypt` (a batch: for each call null, or {indexes,
  * message}) and read as `me` reads them (acceptMessage).
@@ -293,5 +330,8 @@ export function readChatStore(saved) {
     tried: saved.tried,
     messages: saved.messages,
     seen: saved.seen && typeof saved.seen === 'object' ? saved.seen : {},
+    ...(Number.isFinite(saved.readBefore)
+      ? {readBefore: saved.readBefore}
+      : {}),
   }
 }

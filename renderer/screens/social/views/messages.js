@@ -98,7 +98,8 @@ export function MessagesList({now, openChat}) {
         const unread = unreadCount(
           conversation,
           me,
-          chatStore.seen[conversation.key]
+          chatStore.seen[conversation.key],
+          chatStore.readBefore
         )
         return (
           <HStack

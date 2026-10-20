@@ -97,9 +97,14 @@ export function useChats({me, cache, ready, people, blocked = new Set()}) {
       conversations.filter(
         (conversation) =>
           !conversation.isRequest &&
-          unreadCount(conversation, me, store.seen[conversation.key]) > 0
+          unreadCount(
+            conversation,
+            me,
+            store.seen[conversation.key],
+            store.readBefore
+          ) > 0
       ).length,
-    [conversations, me, store.seen]
+    [conversations, me, store.seen, store.readBefore]
   )
 
   const markChatSeen = React.useCallback(
