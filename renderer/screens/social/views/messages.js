@@ -381,7 +381,7 @@ export function ChatView({chatKey, now, openProfile, editGroup}) {
           <Text fontSize="lg" fontWeight={500} noOfLines={2}>
             {title}
           </Text>
-          {group && <GroupMembers group={group} />}
+          {group && !conversation.removedMe && <GroupMembers group={group} />}
         </Stack>
         {group && group.admin === me && (
           <SecondaryButton onClick={() => editGroup(chatKey)}>
