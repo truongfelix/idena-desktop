@@ -1,5 +1,6 @@
 import {keccak256Hex} from './keccak'
 import {
+  GROUPS_FROM,
   GROUP_GRACE_BLOCKS,
   KEY_LINE,
   MAX_GROUP_MEMBERS,
@@ -310,11 +311,12 @@ describe('group chats with a shared key', () => {
       b,
       decrypt
     )
-    expect(store.messages).toEqual([])
+    expect(store.groupMessages).toEqual([])
     // A one-part call never goes to the node.
     expect(asked).toBe(0)
     store = await readNewMessages(store, [message, kCall], b, decrypt)
-    expect(store.messages.map(({text}) => text)).toEqual(['early'])
+    expect(store.groupMessages.map(({text}) => text)).toEqual(['early'])
+    expect(store.messages).toEqual([])
     expect(store.groupKeys).toHaveLength(2)
     expect(await readNewMessages(store, [message, kCall], b, decrypt)).toEqual(
       store
@@ -322,9 +324,13 @@ describe('group chats with a shared key', () => {
     expect(readChatStore(JSON.parse(JSON.stringify(store)))).toEqual(store)
 
     const find = (people) =>
-      conversations(store.messages, b, people, store.groupKeys).find(
-        ({key}) => key === keyConversation(k)
-      )
+      conversations(
+        store.messages,
+        b,
+        people,
+        store.groupKeys,
+        store.groupMessages
+      ).find(({key}) => key === keyConversation(k))
     const conversation = find({})
     expect(conversation.others).toEqual([a, c])
     expect(conversation.messages.map(({kind}) => kind ?? '')).toEqual([
@@ -342,44 +348,62 @@ describe('group chats with a shared key', () => {
     const k = keyOf('0xk', 10, 0, [a, b, c], {me: b})
     const fromC = await acceptGroupMessage(await groupCall('0xc', 11, c, k), k)
     const fromA = await acceptGroupMessage(await groupCall('0xa', 12, a, k), k)
-    const all = conversations([fromC, fromA], b, {}, [k])
+    const all = conversations([], b, {}, [k], [fromC, fromA])
     const [shown] = visibleConversations(all, new Set([c]))
     expect(shown.messages.map(({hash}) => hash)).toEqual(['0xk', '0xa'])
     expect(visibleConversations(all, new Set([a]))).toEqual([])
   })
 
-  it('a store of the app before groups tries its failed calls again', async () => {
+  it('a store of a build before groups tries again its failed calls since groups, once', async () => {
     const members = [a, b, c]
     const plain = groupKeyPlain(a, group, 0, newGroupKey(), 'Family', members)
-    const kCall = keyCall('0xk', 10, a, members)
+    const kCall = keyCall('0xk', GROUPS_FROM + 10, a, members)
     const hi = plainMessage(a, [b], 'hi')
     const oneToOne = {
       hash: '0x1',
-      height: 9,
+      height: GROUPS_FROM + 9,
       time: 180,
       index: 0,
       from: a,
       parts: ['p0', 'p1'],
       messageHash: keccak256Hex(hi),
     }
-    const decrypt = async (chunk) =>
-      chunk.map((one) => {
+    // Another's message, before groups: failed then, never asked again.
+    const before = {
+      ...keyCall('0xold', GROUPS_FROM - 1, c, [c, a]),
+      parts: ['x', 'y'],
+    }
+    const asked = []
+    const decrypt = async (chunk) => {
+      asked.push(...chunk.map(({hash}) => hash))
+      return chunk.map((one) => {
         if (one === kCall) return opened([1], plain)
         if (one === oneToOne) return opened([1], hi)
         return null
       })
-    // As the app before groups saved it: both tried, the key message read as nothing.
-    const read = await readNewMessages(emptyChatStore(), [oneToOne], b, decrypt)
-    const old = {
-      tried: [...read.tried, '0xk'],
-      messages: read.messages,
-      seen: {},
     }
+    // As a build before groups saved it (or saved it again): every call tried, the key message read as nothing,
+    // only the fields it knows.
+    const old = {tried: ['0x1', '0xk', '0xold'], messages: [], seen: {}}
+    old.messages = (
+      await readNewMessages(emptyChatStore(), [oneToOne], b, decrypt)
+    ).messages
+    asked.length = 0
     const store = readChatStore(JSON.parse(JSON.stringify(old)))
-    expect(store.tried).toEqual(['0x1'])
-    const next = await readNewMessages(store, [oneToOne, kCall], b, decrypt)
+    expect(store.retryFrom).toBe(GROUPS_FROM)
+    const calls = [before, oneToOne, kCall]
+    const next = await readNewMessages(store, calls, b, decrypt)
+    // Only the failed call since groups goes to the node again: not the message kept, nor the call before groups.
+    expect(asked).toEqual(['0xk'])
     expect(next.groupKeys.map(({hash}) => hash)).toEqual(['0xk'])
     // The message read once.
     expect(next.messages.map(({text}) => text)).toEqual(['hi'])
+    // Once: the next read asks nothing.
+    expect('retryFrom' in next).toBe(false)
+    asked.length = 0
+    await readNewMessages(next, calls, b, decrypt)
+    expect(asked).toEqual([])
+    // A build before groups keeps neither the groups nor their messages: they never show as a conversation there.
+    expect(next.messages.every(({group: id}) => !id)).toBe(true)
   })
 })

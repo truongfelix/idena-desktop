@@ -383,6 +383,7 @@ export function useSocialSending({
         return {from, socialCall, fee, files: []}
       },
       {
+        title: t('Message to a group'),
         detail: t('A message to the group “{{name}}”', {name: title}),
         privacy: 'group',
       }

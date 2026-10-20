@@ -62,3 +62,15 @@ export function chatCandidates(
     ]),
   ].filter((address) => address !== lowerMe)
 }
+
+/** The most people found shown at once below the members chosen. */
+export const MAX_FOUND_ROWS = 50
+
+/**
+ * The rows of a group's editor: every member `chosen` (up to 64: each can be unticked), then at most `limit` of the
+ * people `found` not chosen.
+ */
+export const editRows = (chosen, found, limit = MAX_FOUND_ROWS) => [
+  ...chosen,
+  ...found.filter((address) => !chosen.includes(address)).slice(0, limit),
+]

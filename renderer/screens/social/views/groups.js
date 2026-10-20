@@ -7,6 +7,7 @@ import {PrimaryButton} from '../../../shared/components/button'
 import {useSocial} from '../provider'
 import {displayName} from '../people'
 import {MAX_GROUP_MEMBERS, MAX_GROUP_NAME, groupEvent} from '../groups'
+import {editRows} from '../candidates'
 import {PersonRow, useCandidates} from './new-chat'
 import {SearchField} from './common'
 
@@ -110,18 +111,30 @@ export function GroupMembers({group}) {
  */
 export function GroupEditView({chatKey, onSent}) {
   const {t} = useTranslation()
-  const {
-    me,
-    names,
-    conversations,
-    messageKeys,
-    lookUpKeys,
-    saveGroup,
-    sending,
-  } = useSocial()
+  const {me, conversations, chatsLoaded} = useSocial()
   const group = chatKey
     ? conversations.find(({key}) => key === chatKey)?.group ?? null
     : null
+  // The form starts from the group as it stands: never before the saved messages give it.
+  if (chatKey && !group)
+    return (
+      <SmallText>
+        {chatsLoaded ? t('No such group.') : t('Reading the group…')}
+      </SmallText>
+    )
+  if (group && group.admin !== me)
+    return (
+      <SmallText>
+        {t('only the person who created the group can change it')}
+      </SmallText>
+    )
+  return <GroupForm key={chatKey ?? 'new'} group={group} onSent={onSent} />
+}
+
+/** GroupEditView's form, for `group` (its last key; null for a new group) as it stood when the form opened. */
+function GroupForm({group, onSent}) {
+  const {t} = useTranslation()
+  const {me, names, messageKeys, lookUpKeys, saveGroup, sending} = useSocial()
   const before = React.useMemo(
     () => (group ? group.members.filter((m) => m !== me) : []),
     [group, me]
@@ -129,7 +142,8 @@ export function GroupEditView({chatKey, onSent}) {
   const [name, setName] = React.useState(group?.name ?? '')
   const [query, setQuery] = React.useState('')
   const [chosen, setChosen] = React.useState(before)
-  const candidates = useCandidates(query, chosen)
+  const found = useCandidates(query)
+  const rows = editRows(chosen, found)
 
   const chosenKey = chosen.join(',')
   React.useEffect(() => {
@@ -145,14 +159,6 @@ export function GroupEditView({chatKey, onSent}) {
     // On a new send only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sending.messagesSent])
-
-  if (chatKey && !group) return <SmallText>{t('No such group.')}</SmallText>
-  if (group && group.admin !== me)
-    return (
-      <SmallText>
-        {t('only the person who created the group can change it')}
-      </SmallText>
-    )
 
   const noKey = chosen.filter((address) => messageKeys[address] === '')
   const looking = chosen.some((address) => messageKeys[address] === undefined)
@@ -212,7 +218,7 @@ export function GroupEditView({chatKey, onSent}) {
         })}
       </Text>
       <Stack spacing={2} maxH="360px" overflowY="auto">
-        {candidates.slice(0, 50).map((address) => (
+        {rows.map((address) => (
           <PersonRow
             key={address}
             address={address}

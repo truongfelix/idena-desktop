@@ -1718,5 +1718,8 @@
   "Ask them for their message code (Messages, \"My message code\") and paste it here. You can also paste it in the Messages search.": "Ask them for their message code (Messages, \"My message code\") and paste it here. You can also paste it in the Messages search.",
   "Message code": "Message code",
   "This code is another account's.": "This code is another account's.",
-  "The group's key for {{count}} people and you_plural": "The group's key for {{count}} people and you"
+  "The group's key for {{count}} people and you_plural": "The group's key for {{count}} people and you",
+  "Message to a group": "Message to a group",
+  "Reading the group…": "Reading the group…",
+  "This is not a message code: it starts with idena-key: and holds 130 characters.": "This is not a message code: it starts with idena-key: and holds 130 characters."
 }

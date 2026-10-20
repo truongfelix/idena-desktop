@@ -46,29 +46,31 @@ export function useNameHolder(query) {
 }
 
 /**
- * Who `query` can be (chatCandidates): a message code pasted gives its account, its key kept (addMessageCode), a
- * name typed its holder in the profiles contract; `extra` (the members chosen) first.
+ * Who `query` can be (chatCandidates): a message code pasted gives its account, its key kept (addMessageCode) once
+ * the account's saved messages are loaded, a name typed its holder in the profiles contract.
  */
-export function useCandidates(query, extra = []) {
-  const {people, conversations, me, names, addMessageCode} = useSocial()
+export function useCandidates(query) {
+  const {people, conversations, me, names, addMessageCode, chatsLoaded} =
+    useSocial()
   const code = parseMessageCode(query)
   const coded = code ? addressOfPublicKey(code) : null
   React.useEffect(() => {
-    if (coded) addMessageCode(coded, query)
-    // Once per code.
+    if (coded && chatsLoaded) addMessageCode(coded, query)
+    // Once per code, and again once the saved messages are loaded (before, it cannot be kept).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [coded])
+  }, [coded, chatsLoaded])
   const holder = useNameHolder(code ? '' : query)
-  return React.useMemo(() => {
-    const found = chatCandidates(code ? '' : query, {
-      people,
-      conversations,
-      me,
-      known: names,
-      found: coded ?? holder,
-    })
-    return [...new Set([...extra, ...found])]
-  }, [code, coded, conversations, extra, holder, me, names, people, query])
+  return React.useMemo(
+    () =>
+      chatCandidates(code ? '' : query, {
+        people,
+        conversations,
+        me,
+        known: names,
+        found: coded ?? holder,
+      }),
+    [code, coded, conversations, holder, me, names, people, query]
+  )
 }
 
 /** A person to write to or to choose: avatar, name, address. */
@@ -142,7 +144,9 @@ export function MyMessageCode({isOpen, onClose}) {
     if (isOpen && me) lookUpKeys([me])
   }, [isOpen, lookUpKeys, me])
   const key = me ? messageKeys[me] : undefined
-  const code = key ? messageCode(key) : ''
+  // Only a whole key (65 bytes) makes a code the other apps read.
+  const whole = key ? parseMessageCode(key) : null
+  const code = whole ? messageCode(whole) : ''
   const {hasCopied, onCopy} = useClipboard(code)
   return (
     <Dialog isOpen={isOpen} onClose={onClose}>
@@ -158,7 +162,7 @@ export function MyMessageCode({isOpen, onClose}) {
           {key === undefined && (
             <SmallText>{t('Looking up your key…')}</SmallText>
           )}
-          {key === '' && (
+          {(key === '' || (key && !whole)) && (
             <Text color="red.500">
               {t(
                 'Your public key is not known yet: it shows once your account signed a transaction (an invitation activated, or a call to idena.social).',
@@ -188,7 +192,9 @@ export function AddMessageCode({address, isOpen, onClose}) {
   const {t} = useTranslation()
   const {addMessageCode} = useSocial()
   const [text, setText] = React.useState('')
-  const wrong = text.trim() !== '' && !messageCodeFor(text, address)
+  const typed = text.trim() !== ''
+  const notCode = typed && !parseMessageCode(text)
+  const wrong = typed && !notCode && !messageCodeFor(text, address)
   return (
     <Dialog isOpen={isOpen} onClose={onClose}>
       <DialogHeader>{t('Add their message code')}</DialogHeader>
@@ -206,6 +212,14 @@ export function AddMessageCode({address, isOpen, onClose}) {
             placeholder={t('Message code')}
             onChange={(e) => setText(e.target.value)}
           />
+          {notCode && (
+            <Text color="red.500">
+              {t(
+                'This is not a message code: it starts with idena-key: and holds 130 characters.',
+                {nsSeparator: '|'}
+              )}
+            </Text>
+          )}
           {wrong && (
             <Text color="red.500">{t("This code is another account's.")}</Text>
           )}
@@ -214,7 +228,7 @@ export function AddMessageCode({address, isOpen, onClose}) {
       <DialogFooter>
         <SecondaryButton onClick={onClose}>{t('Cancel')}</SecondaryButton>
         <PrimaryButton
-          isDisabled={text.trim() === '' || wrong}
+          isDisabled={!typed || notCode || wrong}
           onClick={() => {
             if (addMessageCode(address, text)) onClose()
           }}

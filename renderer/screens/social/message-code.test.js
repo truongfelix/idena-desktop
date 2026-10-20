@@ -4,7 +4,7 @@ import {
   messageCodeFor,
   parseMessageCode,
 } from './message-code'
-import {findPublicKey} from './messages'
+import {findPublicKey, keysToAsk} from './messages'
 
 // Ported from the phone app's MessageCodeTest.kt. The key and its address are the node library's
 // (mobile.PrivateKeyPublicKey and crypto.PubkeyToAddress) for one private key.
@@ -56,5 +56,22 @@ describe('the message code', () => {
     expect(
       await findPublicKey(lower, {...none, sharedKeys: {[lower]: key}})
     ).toBe(key)
+  })
+
+  it('is made only of a whole key: a compressed one gives none', () => {
+    expect(parseMessageCode(`02${key.slice(2, 66)}`)).toBeNull()
+  })
+})
+
+describe('the keys to look up', () => {
+  it('are each asked once at a time, never when known', () => {
+    const asking = new Set(['0xb'])
+    expect(
+      keysToAsk(
+        ['0xA', '0xa', '0xb', '0xc', '0xd'],
+        {'0xc': '', '0xd': key},
+        asking
+      )
+    ).toEqual(['0xa'])
   })
 })

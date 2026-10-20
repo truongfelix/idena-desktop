@@ -23,6 +23,9 @@ export const MAX_GROUP_NAME = 40
  */
 export const GROUP_GRACE_BLOCKS = 30
 
+/** A block before the first group could be sent (the phone app's GROUPS_FROM): no group call is older. */
+export const GROUPS_FROM = 11460000
+
 /** A group's line that is a key message (`kind`; its `text` is the group's name). */
 export const KEY_LINE = 'key'
 

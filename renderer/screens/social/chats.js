@@ -4,6 +4,7 @@ import {
   conversations as listConversations,
   emptyChatStore,
   findPublicKey,
+  keysToAsk,
   readNewMessages,
   unreadCount,
 } from './messages'
@@ -27,6 +28,10 @@ export function useChats({me, cache, ready, people, blocked = new Set()}) {
   const busyRef = React.useRef(false)
   // By address: its public key once looked up, '' when it has none; absent until then.
   const [messageKeys, setMessageKeys] = React.useState({})
+  const messageKeysRef = React.useRef(messageKeys)
+  messageKeysRef.current = messageKeys
+  // The addresses whose key is being looked up: each is asked once at a time, however often the views ask.
+  const askingRef = React.useRef(new Set())
 
   const save = React.useCallback((address, next) => {
     storeRef.current = next
@@ -86,11 +91,17 @@ export function useChats({me, cache, ready, people, blocked = new Set()}) {
     () =>
       me
         ? visibleConversations(
-            listConversations(store.messages, me, people, store.groupKeys),
+            listConversations(
+              store.messages,
+              me,
+              people,
+              store.groupKeys,
+              store.groupMessages
+            ),
             blocked
           )
         : [],
-    [blocked, me, people, store.messages, store.groupKeys]
+    [blocked, me, people, store.messages, store.groupKeys, store.groupMessages]
   )
 
   const unreadConversations = React.useMemo(
@@ -125,9 +136,9 @@ export function useChats({me, cache, ready, people, blocked = new Set()}) {
   const lookUpKeys = React.useCallback(
     async (addresses) => {
       const node = nodeMessages()
-      const todo = [...new Set(addresses.map((a) => a.toLowerCase()))].filter(
-        (address) => messageKeys[address] === undefined
-      )
+      const asking = askingRef.current
+      const todo = keysToAsk(addresses, messageKeysRef.current, asking)
+      todo.forEach((address) => asking.add(address))
       for (const address of todo) {
         try {
           // eslint-disable-next-line no-await-in-loop
@@ -141,10 +152,12 @@ export function useChats({me, cache, ready, people, blocked = new Set()}) {
           setMessageKeys((current) => ({...current, [address]: key || ''}))
         } catch {
           // A node that does not answer leaves it unknown.
+        } finally {
+          asking.delete(address)
         }
       }
     },
-    [cache, messageKeys]
+    [cache]
   )
 
   // Keeps the key of a message code `text` for `address` once checked against it (messageCodeFor): it can be
@@ -173,6 +186,8 @@ export function useChats({me, cache, ready, people, blocked = new Set()}) {
   return React.useMemo(
     () => ({
       chatStore: store,
+      // Whether the account's saved messages are loaded (before, its groups and message codes are not known yet).
+      chatsLoaded: Boolean(me) && account === me,
       conversations,
       unreadConversations,
       markChatSeen,
@@ -182,11 +197,13 @@ export function useChats({me, cache, ready, people, blocked = new Set()}) {
       chatKey,
     }),
     [
+      account,
       addMessageCode,
       chatKey,
       conversations,
       lookUpKeys,
       markChatSeen,
+      me,
       messageKeys,
       store,
       unreadConversations,

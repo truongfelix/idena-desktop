@@ -1,4 +1,4 @@
-import {chatCandidates, claimableName} from './candidates'
+import {chatCandidates, claimableName, editRows} from './candidates'
 import {conversationKey} from './messages'
 import {person} from './people'
 
@@ -79,5 +79,16 @@ describe('who a new conversation can be with', () => {
     expect(claimableName('ab')).toBeNull()
     expect(claimableName('a b')).toBeNull()
     expect(claimableName(alice)).toBeNull()
+  })
+
+  it("a group's editor lists every member chosen, then 50 found", () => {
+    const address = (i) => `0x${i.toString(16).padStart(40, '0')}`
+    const chosen = Array.from({length: 64}, (_, i) => address(i + 1))
+    const found = Array.from({length: 80}, (_, i) => address(i + 30))
+    const rows = editRows(chosen, found)
+    // 64 members, each can be unticked; then the 50 first found not chosen.
+    expect(rows.slice(0, 64)).toEqual(chosen)
+    expect(rows.slice(64)).toEqual(found.slice(35, 85))
+    expect(new Set(rows).size).toBe(rows.length)
   })
 })

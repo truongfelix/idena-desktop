@@ -5,7 +5,12 @@
 // time, the size and the number of parts are public, the participants are not.
 
 import {decryptAesGcm} from './aes'
-import {acceptGroupKey, acceptGroupMessage, groupConversations} from './groups'
+import {
+  GROUPS_FROM,
+  acceptGroupKey,
+  acceptGroupMessage,
+  groupConversations,
+} from './groups'
 import {keccak256Hex} from './keccak'
 
 /** Parts larger than this (base64 characters) are not kept: a message with one is left out. */
@@ -157,15 +162,19 @@ const byChainOrder = (a, b) => a.height - b.height || a.index - b.index
 
 /**
  * The conversations of `messages` for `me`, the latest first: {key, others, messages (oldest first), isRequest,
- * isGroup, last}, and those of the groups of `groupKeys` (groupConversations: with their `group`). One waits in
- * Requests until `me` wrote in it or someone in it is followed or marked to message (a contact's `message`): a
- * stranger's first message does not show among the conversations.
+ * isGroup, last}, and those of the groups of `groupKeys` with their `groupMessages` (groupConversations: with their
+ * `group`). One waits in Requests until `me` wrote in it or someone in it is followed or marked to message (a
+ * contact's `message`): a stranger's first message does not show among the conversations.
  */
-export function conversations(messages, me, people, groupKeys = []) {
+export function conversations(
+  messages,
+  me,
+  people,
+  groupKeys = [],
+  groupMessages = []
+) {
   const byKey = new Map()
   for (const message of messages) {
-    // eslint-disable-next-line no-continue
-    if (message.group) continue
     const key = conversationKey(message.participants)
     if (!byKey.has(key)) byKey.set(key, [])
     byKey.get(key).push(message)
@@ -187,14 +196,7 @@ export function conversations(messages, me, people, groupKeys = []) {
         isRequest: !known && !sorted.some(({from}) => from === me),
       }
     })
-    .concat(
-      groupConversations(
-        messages.filter(({group}) => group),
-        groupKeys,
-        me,
-        people
-      )
-    )
+    .concat(groupConversations(groupMessages, groupKeys, me, people))
     .sort((a, b) => byChainOrder(b.last, a.last))
 }
 
@@ -277,15 +279,17 @@ export const DECRYPT_BATCH = 40
 
 /**
  * What the app keeps of an account's messages: the calls tried (hashes), the messages for it, how far each
- * conversation was read (by key: [height, index] of the last message read), the groups' keys (groups.js) and the
- * one-part calls tried with all of them (`groupTried`), and the public keys shared as message codes (by lowercase
- * address, checked against it).
+ * conversation was read (by key: [height, index] of the last message read), the groups' keys (groups.js), their
+ * messages and the one-part calls tried with all of them (`groupTried`), and the public keys shared as message codes
+ * (by lowercase address, checked against it). The groups' messages are a list of their own: a build before groups
+ * reads only `messages`, and would show them as a conversation of their members.
  */
 export const emptyChatStore = () => ({
   tried: [],
   messages: [],
   seen: {},
   groupKeys: [],
+  groupMessages: [],
   groupTried: [],
   sharedKeys: {},
 })
@@ -306,17 +310,27 @@ export const firstChatStore = (now) => ({
 /**
  * `store` with the calls of `calls` of 2 parts or more not tried yet decrypted by `decrypt` (a batch: for each call
  * null, or {indexes, message}) and read as `me` reads them (acceptMessage, or a group's key message,
- * acceptGroupKey); then the one-part calls opened with the groups' keys (readGroupMessages).
+ * acceptGroupKey); then the one-part calls opened with the groups' keys (readGroupMessages). A store from a build
+ * before groups (`retryFrom`) tries again, once, the calls it failed from that block on: its key messages.
  */
 export async function readNewMessages(store, calls, me, decrypt) {
   const tried = new Set(store.tried)
-  const todo = calls.filter(
-    ({hash, parts}) => parts.length > 1 && !tried.has(hash)
-  )
-  if (todo.length === 0) return readGroupMessages(store, calls, [])
   const messages = [...store.messages]
   const known = new Set(messages.map(({hash}) => hash))
   const knownKeys = new Set(store.groupKeys.map(({hash}) => hash))
+  const retry = store.retryFrom ?? null
+  const todo = calls.filter(
+    ({hash, height, parts}) =>
+      parts.length > 1 &&
+      (!tried.has(hash) ||
+        (retry !== null &&
+          height >= retry &&
+          !known.has(hash) &&
+          !knownKeys.has(hash)))
+  )
+  const {retryFrom, ...rest} = store
+  if (todo.length === 0)
+    return readGroupMessages(retry === null ? store : rest, calls, [])
   const newKeys = []
   for (let i = 0; i < todo.length; i += DECRYPT_BATCH) {
     const chunk = todo.slice(i, i + DECRYPT_BATCH)
@@ -336,7 +350,7 @@ export async function readNewMessages(store, calls, me, decrypt) {
   }
   return readGroupMessages(
     {
-      ...store,
+      ...rest,
       tried: [...tried],
       messages,
       groupKeys: store.groupKeys.concat(newKeys),
@@ -357,12 +371,13 @@ async function openWithKeys(call, keys) {
 }
 
 /**
- * `store` with the one-part calls of `calls` opened by one of its groups' keys (acceptGroupMessage): those not tried
- * yet with every key, and those tried before with the keys just read (`newKeys`) only.
+ * `store` with the one-part calls of `calls` opened by one of its groups' keys (acceptGroupMessage), into its
+ * `groupMessages`: those not tried yet with every key, and those tried before with the keys just read (`newKeys`)
+ * only.
  */
 export async function readGroupMessages(store, calls, newKeys) {
   if (store.groupKeys.length === 0) return store
-  const known = new Set(store.messages.map(({hash}) => hash))
+  const known = new Set(store.groupMessages.map(({hash}) => hash))
   const groupTried = new Set(store.groupTried)
   const single = calls.filter(
     ({hash, parts}) => parts.length === 1 && !known.has(hash)
@@ -386,7 +401,7 @@ export async function readGroupMessages(store, calls, newKeys) {
   if (found.length === 0 && todo.length === 0) return store
   return {
     ...store,
-    messages: store.messages.concat(found),
+    groupMessages: store.groupMessages.concat(found),
     groupTried: store.groupTried.concat(todo.map(({hash}) => hash)),
   }
 }
@@ -394,24 +409,38 @@ export async function readGroupMessages(store, calls, newKeys) {
 const isObject = (value) =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 
+const arrayOr = (value) => (Array.isArray(value) ? value : [])
+
 /**
- * The store as saved, or an empty one when it is not one. A store of a version without groups tried their key
- * messages as messages, and failed: those are tried again (only the hashes of the messages kept stay tried).
+ * The store as saved, or an empty one when it is not one. A store of a build without groups (no `groupKeys`: saved
+ * before them, or again by such a build) tried their key messages as messages, and failed: the calls it failed from
+ * GROUPS_FROM on are tried again once (`retryFrom`).
  */
 export function readChatStore(saved) {
   if (!saved || !Array.isArray(saved.tried) || !Array.isArray(saved.messages))
     return emptyChatStore()
   const withGroups = Array.isArray(saved.groupKeys)
-  const kept = new Set(saved.messages.map(({hash}) => hash))
   return {
-    tried: withGroups ? saved.tried : saved.tried.filter((h) => kept.has(h)),
+    tried: saved.tried,
     messages: saved.messages,
     seen: isObject(saved.seen) ? saved.seen : {},
-    groupKeys: withGroups ? saved.groupKeys : [],
-    groupTried: Array.isArray(saved.groupTried) ? saved.groupTried : [],
+    groupKeys: arrayOr(saved.groupKeys),
+    groupMessages: withGroups ? arrayOr(saved.groupMessages) : [],
+    groupTried: withGroups ? arrayOr(saved.groupTried) : [],
     sharedKeys: isObject(saved.sharedKeys) ? saved.sharedKeys : {},
+    ...(withGroups ? {} : {retryFrom: GROUPS_FROM}),
+    ...(Number.isFinite(saved.retryFrom) ? {retryFrom: saved.retryFrom} : {}),
     ...(Number.isFinite(saved.readBefore)
       ? {readBefore: saved.readBefore}
       : {}),
   }
 }
+
+/**
+ * The addresses of `addresses` whose public key is still to look up: not known yet (`known`, by address: the key, ''
+ * for none) and not asked already (`asking`, a Set), each once.
+ */
+export const keysToAsk = (addresses, known, asking) =>
+  [...new Set(addresses.map((a) => String(a).toLowerCase()))].filter(
+    (address) => known[address] === undefined && !asking.has(address)
+  )
