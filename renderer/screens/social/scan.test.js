@@ -4,6 +4,8 @@ import {
   cacheFeed,
   checkNewBlocks,
   emptyCache,
+  GROUPS_FROM,
+  groupsPending,
   historyDone,
   messagesPending,
   readCache,
@@ -11,6 +13,7 @@ import {
   withMessages,
   scannedShare,
   scanOlderBlocks,
+  scanOlderGroups,
   scanState,
 } from './scan'
 import {a, b, post} from './test-helpers'
@@ -183,7 +186,14 @@ describe('the scan', () => {
     }
     expect(olderAuthors).toEqual({})
     const read = readCache(first)
-    expect(read).toEqual({...first, version: CACHE_VERSION, olderAuthors: {}})
+    expect(read).toEqual({
+      ...first,
+      version: CACHE_VERSION,
+      olderAuthors: {},
+      onePartLow: first.low,
+      onePartTo: first.high,
+      onePartMessagesLow: first.high + 1,
+    })
     expect(historyDone(read)).toBe(false)
     expect(readCache({...cache, contract: '0x0'})).toBeNull()
     expect(readCache(null)).toBeNull()
@@ -340,5 +350,117 @@ describe('the private messages of the scan', () => {
       11999500, 12000005,
     ])
     expect(messagesPending(older)).toBe(false)
+  })
+
+  it('of a version 3 scan: the blocks since groups read again for one part, down to its own pass', async () => {
+    const high = GROUPS_FROM + 2500
+    const base = {
+      ...emptyCache(high),
+      version: 3,
+      low: HISTORY_START,
+      authorsHeight: high,
+      messages: [messageAt(GROUPS_FROM + 2400)],
+    }
+    // Its message pass done: the blocks since groups, newest first, then nothing.
+    let cache = readCache({...base, messagesLow: CURRENT_VERSION.from})
+    expect(cache.version).toBe(CACHE_VERSION)
+    expect(groupsPending(cache)).toBe(true)
+    expect(messagesPending(cache)).toBe(false)
+    const source = messageSource([
+      GROUPS_FROM - 10,
+      GROUPS_FROM + 10,
+      GROUPS_FROM + 2400,
+    ])
+    while (groupsPending(cache))
+      // eslint-disable-next-line no-await-in-loop
+      cache = await scanOlderGroups(cache, source)
+    expect(source.ranges).toEqual([
+      [GROUPS_FROM + 1501, high],
+      [GROUPS_FROM + 501, GROUPS_FROM + 1500],
+      [GROUPS_FROM, GROUPS_FROM + 500],
+    ])
+    // Each message once.
+    expect(cache.messages.map(({height}) => height)).toEqual([
+      GROUPS_FROM + 10,
+      GROUPS_FROM + 2400,
+    ])
+    expect(readCache(JSON.parse(JSON.stringify(cache)))).toEqual(cache)
+
+    // Its message pass still going above GROUPS_FROM: only the blocks above where it stands; that pass reads the
+    // others, one part included.
+    const stood = GROUPS_FROM + 2000
+    let going = readCache({...base, messagesLow: stood})
+    const second = messageSource([])
+    while (groupsPending(going))
+      // eslint-disable-next-line no-await-in-loop
+      going = await scanOlderGroups(going, second)
+    expect(second.ranges).toEqual([[stood, high]])
+    expect(messagesPending(going)).toBe(true)
+
+    // A scan below GROUPS_FROM (a devnet): nothing to read again.
+    expect(
+      groupsPending(readCache({...emptyCache(1000), version: 3, low: 1}))
+    ).toBe(false)
+  })
+
+  it('read by a build before groups in between: only the blocks it added are read again', async () => {
+    const top = GROUPS_FROM + 5000
+    // This build's scan: blocks GROUPS_FROM + 2000..top, its messages all read.
+    const ours = readCache(
+      JSON.parse(
+        JSON.stringify({
+          ...emptyCache(top),
+          low: GROUPS_FROM + 2000,
+          messagesLow: GROUPS_FROM + 2000,
+          onePartLow: GROUPS_FROM + 2000,
+          onePartTo: top,
+          onePartMessagesLow: GROUPS_FROM + 2000,
+        })
+      )
+    )
+    expect(groupsPending(ours)).toBe(false)
+    expect(ours.version).toBe(3)
+    // The build before groups reads the scan (version 3, its own), adds 300 new blocks and 1,000 older ones, its
+    // message pass going along, and keeps the marks as they were.
+    const theirs = {
+      ...ours,
+      high: top + 300,
+      low: GROUPS_FROM + 1000,
+      messagesLow: GROUPS_FROM + 1000,
+    }
+    const back = readCache(JSON.parse(JSON.stringify(theirs)))
+    expect(groupsPending(back)).toBe(true)
+    const source = messageSource([])
+    let cache = back
+    while (groupsPending(cache))
+      // eslint-disable-next-line no-await-in-loop
+      cache = await scanOlderGroups(cache, source)
+    // Its blocks, from the newest down (ours in between are read again with them: one range).
+    expect(source.ranges[0]).toEqual([top - 699, top + 300])
+    expect(source.ranges[source.ranges.length - 1][0]).toBe(GROUPS_FROM + 1000)
+    // Read again, it asks nothing more.
+    expect(groupsPending(readCache(JSON.parse(JSON.stringify(cache))))).toBe(
+      false
+    )
+  })
+
+  it('read by a build before groups whose message pass went on: those blocks are read again', async () => {
+    const top = GROUPS_FROM + 5000
+    // The history read down to GROUPS_FROM, the messages still to read below GROUPS_FROM + 3000.
+    const ours = readCache({
+      ...emptyCache(top),
+      low: GROUPS_FROM,
+      messagesLow: GROUPS_FROM + 3000,
+      onePartLow: GROUPS_FROM,
+      onePartTo: top,
+      onePartMessagesLow: GROUPS_FROM + 3000,
+    })
+    expect(groupsPending(ours)).toBe(false)
+    // The build before groups reads the messages of 1,000 more blocks, dropping the one-part calls.
+    const back = readCache({...ours, messagesLow: GROUPS_FROM + 2000})
+    expect([back.groupsFloor, back.groupsLow]).toEqual([
+      GROUPS_FROM + 2000,
+      GROUPS_FROM + 3000,
+    ])
   })
 })

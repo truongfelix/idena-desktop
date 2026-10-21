@@ -196,11 +196,29 @@ export function threadPost(feed, postId, hidden, me) {
   return visibleFeed([node], hiding({blocked: hidden.blocked}), me)[0] || null
 }
 
-/** The conversations without those where a blocked account takes part. */
+/**
+ * The conversations without those where a blocked account takes part; in a group, the messages of a blocked member
+ * are left out (its key messages stay), and a group whose admin is blocked is left out whole.
+ */
 export const visibleConversations = (conversations, blocked) =>
   blocked.size === 0
     ? conversations
-    : conversations.filter(({others}) => !others.some((a) => blocked.has(a)))
+    : conversations
+        .map((conversation) => {
+          const {group} = conversation
+          if (!group)
+            return conversation.others.some((a) => blocked.has(a))
+              ? null
+              : conversation
+          if (blocked.has(group.admin)) return null
+          const messages = conversation.messages.filter(
+            ({from, kind}) => kind === 'key' || !blocked.has(from)
+          )
+          return messages.length
+            ? {...conversation, messages, last: messages[messages.length - 1]}
+            : null
+        })
+        .filter(Boolean)
 
 /** A transaction hash as the posts carry it: 0x and 64 hex digits, lowercase; null when it is not one. */
 export function txHashOf(text) {

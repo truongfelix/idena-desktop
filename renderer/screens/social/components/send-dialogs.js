@@ -48,6 +48,8 @@ export function ConfirmDialog({pending, onSend, onCancel}) {
     like: t('Like on idena.social'),
     tip: t('Tip on idena.social'),
     message: t('Private message on idena.social'),
+    groupKey: t('Group change'),
+    groupNotice: t('Tell the people removed'),
     name: t('Your public name'),
     dropName: t('Drop your public name'),
     profile: t('Your public profile'),
@@ -78,12 +80,21 @@ export function ConfirmDialog({pending, onSend, onCancel}) {
                 'It is public: anyone can read it, and every version stays in the blockchain history for good, signed by your identity {{address}}.',
                 {address: shortAddress(pending.from), nsSeparator: '|'}
               )}
-            {!isProfile && pending.kind === 'message'
+            {!isProfile &&
+              pending.privacy === 'group' &&
+              t(
+                "Only the group's members can read it. That you sent it, when and its size are public and stay on the blockchain for good, signed by your identity {{address}}; a change of the group also shows how many members get its key.",
+                {address: shortAddress(pending.from)}
+              )}
+            {!isProfile &&
+            pending.privacy !== 'group' &&
+            pending.kind === 'message'
               ? t(
                   'Only the people in the conversation can read it. That you sent a message, when, its size and how many people it goes to are public and stay on the blockchain for good, signed by your identity {{address}}.',
                   {address: shortAddress(pending.from)}
                 )
               : !isProfile &&
+                pending.privacy !== 'group' &&
                 t(
                   'It is public and stays on the blockchain for good, signed by your identity {{address}}.',
                   {address: shortAddress(pending.from)}

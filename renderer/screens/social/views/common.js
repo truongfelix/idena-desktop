@@ -69,7 +69,12 @@ export function Rows({children}) {
 }
 
 /** The rounded search bar; `trailing` (the feed's filter) sits at its end, after ✕ while something is typed. */
-export function SearchField({value, onChange, trailing = null}) {
+export function SearchField({
+  value,
+  onChange,
+  trailing = null,
+  placeholder = null,
+}) {
   const {t} = useTranslation()
   return (
     <InputGroup size="lg">
@@ -82,7 +87,7 @@ export function SearchField({value, onChange, trailing = null}) {
         rounded="full"
         bg="gray.50"
         borderColor="gray.50"
-        placeholder={t('Search')}
+        placeholder={placeholder ?? t('Search')}
         pr={trailing ? 24 : undefined}
         onChange={(e) => onChange(e.target.value)}
       />

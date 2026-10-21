@@ -1,5 +1,6 @@
 import {SOCIAL_CONTRACT} from './contract'
 import {socialFeed, withPrefix} from './feed'
+import {GROUPS_FROM} from './groups'
 import {
   CURRENT_VERSION,
   HISTORY_START,
@@ -9,9 +10,15 @@ import {
 
 /**
  * 1: the first desktop scan (from bcn_contractCalls); 2: the older contracts too (`olderAuthors`); 3: the private
- * messages (still encrypted) and the callers' public keys.
+ * messages (still encrypted) and the callers' public keys. The one-part calls (groups' messages, groups.js) came
+ * later without a new version, so that a build before them still reads the scan (an unknown version would make it
+ * scan the whole history again): a build that keeps them marks what it read (`onePartLow`, `onePartTo` and
+ * `onePartMessagesLow`: its low, high and messagesLow), and the blocks outside, read by a build that dropped them, are
+ * read again (scanOlderGroups).
  */
 export const CACHE_VERSION = 3
+
+export {GROUPS_FROM}
 
 /**
  * What the app has scanned, kept so that no block is scanned twice: the blocks low..high (none while high < low),
@@ -33,7 +40,52 @@ export const emptyCache = (head) => ({
   messages: [],
   messagesLow: head + 1,
   keys: {},
+  onePartLow: head + 1,
+  onePartTo: head,
+  onePartMessagesLow: head + 1,
 })
+
+/**
+ * Whether the scan still has blocks to read again for the groups' messages (scanOlderGroups, withOnePartGaps): those
+ * of groupsFloor..groupsLow - 1 that it scanned.
+ */
+export const groupsPending = ({groupsLow, groupsFloor, low}) =>
+  Number.isFinite(groupsLow) && groupsLow > Math.max(low, groupsFloor)
+
+/**
+ * `cache` (version 3) with the blocks a build that dropped the one-part calls read to read again for them
+ * (groupsPending): from GROUPS_FROM up, and above the message pass's low (below it, that pass reads them, one-part
+ * calls included). Those are all of them for a scan without the marks, else those an older build added: above
+ * onePartTo, below onePartLow, and between messagesLow and onePartMessagesLow (its message pass); merged with a range
+ * still to read. The marks become the scan's own.
+ */
+export function withOnePartGaps(cache) {
+  const {low, high, messagesLow} = cache
+  const floor = Math.max(GROUPS_FROM, messagesLow)
+  const gaps = []
+  const marks = [cache.onePartLow, cache.onePartTo, cache.onePartMessagesLow]
+  if (!marks.every(Number.isFinite)) gaps.push([floor, high])
+  else {
+    gaps.push([Math.max(floor, cache.onePartTo + 1), high])
+    gaps.push([Math.max(floor, low), Math.min(cache.onePartLow - 1, high)])
+    gaps.push([floor, Math.min(cache.onePartMessagesLow - 1, high)])
+  }
+  if (groupsPending(cache))
+    gaps.push([Math.max(low, cache.groupsFloor), cache.groupsLow - 1])
+  const real = gaps.filter(([from, to]) => from <= to)
+  const marked = {
+    ...cache,
+    onePartLow: low,
+    onePartTo: high,
+    onePartMessagesLow: messagesLow,
+  }
+  if (real.length === 0) return marked
+  return {
+    ...marked,
+    groupsFloor: Math.min(...real.map(([from]) => from)),
+    groupsLow: Math.max(...real.map(([, to]) => to)) + 1,
+  }
+}
 
 /**
  * The cache as saved, or null when it is for another contract or an unknown version. A first version's scan holds
@@ -45,9 +97,9 @@ export function readCache(saved) {
     String(saved.contract).toLowerCase() !== SOCIAL_CONTRACT.toLowerCase()
   )
     return null
-  if (saved.version === CACHE_VERSION) return saved
+  if (saved.version === CACHE_VERSION) return withOnePartGaps(saved)
   if (saved.version !== 1 && saved.version !== 2) return null
-  // An older scan read no messages: those of its blocks are read again once (scanOlderMessages).
+  // An older scan read no messages: those of its blocks are read again once (scanOlderMessages), one-part calls too.
   return {
     ...saved,
     version: CACHE_VERSION,
@@ -55,6 +107,9 @@ export function readCache(saved) {
     messages: [],
     messagesLow: saved.high + 1,
     keys: {},
+    onePartLow: saved.low,
+    onePartTo: saved.high,
+    onePartMessagesLow: saved.high + 1,
   }
 }
 
@@ -160,6 +215,7 @@ export async function checkNewBlocks(
         tips: next.tips.concat(found.tips),
         messages: withMessages(next.messages, found.messages),
         keys: {...next.keys, ...found.keys},
+        onePartTo: to,
       }
       // eslint-disable-next-line no-await-in-loop
       await save(next)
@@ -202,7 +258,9 @@ export async function scanOlderBlocks(cache, source, {save = () => {}} = {}) {
     messages: withMessages(cache.messages, older.messages),
     // The messages of these blocks are read, unless older blocks wait for them.
     messagesLow: messagesPending(cache) ? cache.messagesLow : from,
+    onePartMessagesLow: messagesPending(cache) ? cache.messagesLow : from,
     keys: {...older.keys, ...cache.keys},
+    onePartLow: from,
   }
   await save(next)
   return next
@@ -221,7 +279,26 @@ export async function scanOlderMessages(cache, source, {save = () => {}} = {}) {
     ...cache,
     messages: withMessages(cache.messages, read.messages),
     messagesLow: from,
+    onePartMessagesLow: from,
     keys: {...read.keys, ...cache.keys},
+  }
+  await save(next)
+  return next
+}
+
+/**
+ * For a scan read in part by a build that dropped the one-part calls (groupsPending): one batch of those blocks,
+ * below groupsLow, read again for them (the other calls come again too: each is kept once), from the newest down.
+ */
+export async function scanOlderGroups(cache, source, {save = () => {}} = {}) {
+  if (!groupsPending(cache)) return cache
+  const bottom = Math.max(cache.low, cache.groupsFloor)
+  const from = Math.max(cache.groupsLow - source.batchSize(), bottom)
+  const read = await source.calls(from, cache.groupsLow - 1)
+  const next = {
+    ...cache,
+    messages: withMessages(cache.messages, read.messages),
+    groupsLow: from,
   }
   await save(next)
   return next

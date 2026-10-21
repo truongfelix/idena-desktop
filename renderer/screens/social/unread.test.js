@@ -1,3 +1,4 @@
+import {GROUPS_FROM} from './groups'
 import {
   conversations,
   firstChatStore,
@@ -103,7 +104,16 @@ describe('the store of an account', () => {
     const earlier = {tried: [], messages: [], seen: {k: [10, 0]}}
     const db = fakeDb(earlier)
     const store = await loadChatStore(a, db, now)
-    expect(store).toEqual(earlier)
+    // With no group and no message code yet.
+    expect(store).toEqual({
+      ...earlier,
+      groupKeys: [],
+      groupMessages: [],
+      groupTried: [],
+      sharedKeys: {},
+      // The calls it failed since groups are tried again once: its key messages.
+      retryFrom: GROUPS_FROM,
+    })
     expect('readBefore' in store).toBe(false)
     expect(db.puts).toEqual([])
   })

@@ -31,6 +31,7 @@ import {WaitingLine} from '../screens/social/components/waiting-line'
 import {TopicView} from '../screens/social/views/topic'
 import {SettingsTab, SocialSettingsView} from '../screens/social/views/settings'
 import {ChatView, MessagesList} from '../screens/social/views/messages'
+import {GroupEditView} from '../screens/social/views/groups'
 import {OpenTopicContext} from '../screens/social/components/topic'
 import {topicOf, topicChannel} from '../screens/social/topics'
 import {threadPost} from '../screens/social/hiding'
@@ -123,16 +124,20 @@ export default function SocialPage() {
       }),
     [router]
   )
-  // A conversation by its key: its participants, lowercase, sorted, joined by "-".
-  const chatKey =
-    typeof query.chat === 'string' &&
-    /^0x[0-9a-f]{40}(-0x[0-9a-f]{40})*$/.test(query.chat)
-      ? query.chat
-      : null
+  // A conversation by its key: its participants, lowercase, sorted, joined by "-"; or a group's (groups.js).
+  const isChatKey = (key) =>
+    typeof key === 'string' &&
+    (/^0x[0-9a-f]{40}(-0x[0-9a-f]{40})*$/.test(key) ||
+      /^g:0x[0-9a-f]{40}:[0-9a-f]{32}$/.test(key))
+  const chatKey = isChatKey(query.chat) ? query.chat : null
   const openChat = (key) => go({chat: key})
+  // A group to make ("new") or to change (its key).
+  const groupEdit =
+    query.group === 'new' || isChatKey(query.group) ? query.group : null
   const onPage =
     query.list !== undefined ||
     chatKey !== null ||
+    groupEdit !== null ||
     postId !== null ||
     profileAddress !== null ||
     topic !== null ||
@@ -186,8 +191,22 @@ export default function SocialPage() {
           : t('This post is not in the blocks read so far.')}
       </SmallText>
     )
+  else if (groupEdit !== null)
+    content = (
+      <GroupEditView
+        chatKey={groupEdit === 'new' ? null : groupEdit}
+        onSent={() => router.back()}
+      />
+    )
   else if (chatKey !== null)
-    content = <ChatView chatKey={chatKey} now={now} openProfile={openProfile} />
+    content = (
+      <ChatView
+        chatKey={chatKey}
+        now={now}
+        openProfile={openProfile}
+        editGroup={(key) => go({group: key})}
+      />
+    )
   else if (topic !== null)
     content = (
       <TopicView
@@ -248,7 +267,13 @@ export default function SocialPage() {
       />
     )
   else if (view === View.Messages)
-    content = <MessagesList now={now} openChat={openChat} />
+    content = (
+      <MessagesList
+        now={now}
+        openChat={openChat}
+        newGroup={() => go({group: 'new'})}
+      />
+    )
   else if (view === View.Notifications)
     content = (
       <Notifications
