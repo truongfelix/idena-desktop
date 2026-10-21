@@ -298,7 +298,6 @@
   "Please wait...": "请稍等...",
   "Downloading Idena Node...": "正在下载...",
   "Version {{version}}": "版本 {{version}}",
-  "Your {{nodeType}} node is offline": "您的 {{nodeType}} 节点离线",
   "Run the built-in node": "运行内置节点",
   "Idena Node is starting...": "Idena节点正在启动...",
   "Your built-in node is failed": "您的内置节点出现故障",

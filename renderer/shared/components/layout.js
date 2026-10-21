@@ -597,9 +597,9 @@ function OfflineApp() {
       {isExternalNodeOffline && (
         <Stack spacing={5} w={416}>
           <Heading fontSize="lg" fontWeight={500}>
-            {t('Your {{nodeType}} node is offline', {
-              nodeType: useExternalNode ? 'external' : '',
-            })}
+            {useExternalNode
+              ? t('Your external node is offline')
+              : t('Your node is offline')}
           </Heading>
           <Stack spacing={4} align="flex-start">
             <PrimaryButton

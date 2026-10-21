@@ -292,7 +292,6 @@
   "Please wait...": "Пожалуйста, подождите...",
   "Downloading Idena Node...": "Скачиваем ПО Idena узла(ноды)...",
   "Version {{version}}": "Версия {{version}}",
-  "Your {{nodeType}} node is offline": "Ваш {{nodeType}} узел(нода) оффлайн",
   "Run the built-in node": "Запустить встроенный узел(ноду)",
   "Idena Node is starting...": "Idena узел(нода) запускается...",
   "Your built-in node is failed": "Ваш встроенный узел(нода) не работает",

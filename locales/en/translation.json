@@ -317,7 +317,6 @@
   "Please wait...": "Please wait...",
   "Downloading Idena Node...": "Downloading Idena Node...",
   "Version {{version}}": "Version {{version}}",
-  "Your {{nodeType}} node is offline": "Your {{nodeType}} node is offline",
   "Run the built-in node": "Run the built-in node",
   "Idena Node is starting...": "Idena Node is starting...",
   "Your built-in node is failed": "Your built-in node is failed",
@@ -1737,5 +1736,9 @@
   "The node is still starting. The key is imported as soon as it is ready.": "The node is still starting. The key is imported as soon as it is ready.",
   "The built-in node is off. Turn on Run built-in node in Settings > Node to import a key.": "The built-in node is off. Turn on Run built-in node in Settings > Node to import a key.",
   "The built-in node failed to start. Use Try restart in Settings > Node, then import the key.": "The built-in node failed to start. Use Try restart in Settings > Node, then import the key.",
-  "The node did not import the key.": "The node did not import the key."
+  "The node did not import the key.": "The node did not import the key.",
+  "Your external node is offline": "Your external node is offline",
+  "Your node is offline": "Your node is offline",
+  "Block_person": "Block",
+  "Report_validation": "Report"
 }

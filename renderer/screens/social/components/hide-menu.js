@@ -106,7 +106,9 @@ export function BlockDialog({address, onClose}) {
             </PrimaryButton>
           </>
         ) : (
-          <PrimaryButton onClick={block}>{t('Block')}</PrimaryButton>
+          <PrimaryButton onClick={block}>
+            {t('Block', {context: 'person'})}
+          </PrimaryButton>
         )}
       </DialogFooter>
     </Dialog>
@@ -136,7 +138,9 @@ export function ProfileMenu({address, onRename}) {
           <MenuItem onClick={toggleMute}>
             {isMuted ? t('Unmute') : t('Mute')}
           </MenuItem>
-          <MenuItem onClick={() => setIsBlocking(true)}>{t('Block')}</MenuItem>
+          <MenuItem onClick={() => setIsBlocking(true)}>
+            {t('Block', {context: 'person'})}
+          </MenuItem>
         </MenuList>
       </Menu>
       {isBlocking && (

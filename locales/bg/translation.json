@@ -315,7 +315,6 @@
   "Please wait...": "Моля, изчакайте...",
   "Downloading Idena Node...": "Идена ноудът се тегли...",
   "Version {{version}}": "Версия {{version}}",
-  "Your {{nodeType}} node is offline": "Вашият {{nodeType}} ноуд е офлайн",
   "Run the built-in node": "Използване на вградения ноуд",
   "Idena Node is starting...": "Иднеа ноудът стартира...",
   "Your built-in node is failed": "Вграденият ви ноуд е прецакан",

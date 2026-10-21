@@ -298,7 +298,6 @@
   "Please wait...": "Por favor espere...",
   "Downloading Idena Node...": "Descargando Nodo Idena...",
   "Version {{version}}": "Versión {{version}}",
-  "Your {{nodeType}} node is offline": "Su nodo {{nodeType}} está desconectado",
   "Run the built-in node": "Ejecutar nodo integrado",
   "Idena Node is starting...": "Nodo Idena esta iniciando...",
   "Your built-in node is failed": "Su nodo integrado ha fallado",
