@@ -46,7 +46,7 @@ export function TopicView({name, now, openThread, openProfile}) {
       </HStack>
       <SmallText>
         {t(
-          '{{count}} posts in the posts read so far. Anyone can write in any topic; idena.social does not show topic posts.',
+          '{{count}} posts in the posts read so far. Anyone can write in any topic; the Idena Social website does not show topic posts.',
           {count: posts.length}
         )}
       </SmallText>

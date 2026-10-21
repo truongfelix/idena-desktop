@@ -177,7 +177,7 @@ export function SocialThread({node, now, focusId, onProfile}) {
         {node.call.version && (
           <SmallText>
             {t(
-              'From an earlier idena.social contract ({{version}}): read only.',
+              'From an earlier Idena Social contract ({{version}}): read only.',
               {version: node.call.version, nsSeparator: '|'}
             )}
           </SmallText>

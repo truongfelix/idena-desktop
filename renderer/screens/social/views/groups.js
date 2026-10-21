@@ -245,7 +245,7 @@ function GroupForm({group, onSent}) {
       {noKey.length > 0 && (
         <Text fontSize="sm" color="red.500">
           {t(
-            '{{names}} cannot receive private messages: no public key is known for them (never an Idena identity, and no transaction they signed on idena.social), so nothing can be encrypted for them.',
+            '{{names}} cannot receive private messages: no public key is known for them (never an Idena identity, and no transaction they signed on Idena Social), so nothing can be encrypted for them.',
             {
               names: noKey.map((a) => displayName(a, names)).join(', '),
               nsSeparator: '|',

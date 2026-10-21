@@ -42,12 +42,12 @@ const kilobytes = (bytes) => Math.ceil(bytes / 1000)
 export function ConfirmDialog({pending, onSend, onCancel}) {
   const {t} = useTranslation()
   const titles = {
-    post: t('Post on idena.social'),
-    reply: t('Reply on idena.social'),
-    comment: t('Comment on idena.social'),
-    like: t('Like on idena.social'),
-    tip: t('Tip on idena.social'),
-    message: t('Private message on idena.social'),
+    post: t('Post on Idena Social'),
+    reply: t('Reply on Idena Social'),
+    comment: t('Comment on Idena Social'),
+    like: t('Like on Idena Social'),
+    tip: t('Tip on Idena Social'),
+    message: t('Private message on Idena Social'),
     groupKey: t('Group change'),
     groupNotice: t('Tell the people removed'),
     name: t('Your public name'),
@@ -205,7 +205,7 @@ export function TipDialog({name, onClose, onNext}) {
         <Stack spacing={3}>
           <Text color={MUTED}>
             {t(
-              'The tip goes to the author of this post, through the idena.social contract. Whole iDNA only.'
+              'The tip goes to the author of this post, through the Idena Social contract. Whole iDNA only.'
             )}
           </Text>
           {balance !== null && (
