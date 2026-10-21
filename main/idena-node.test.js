@@ -21,6 +21,7 @@ const {
   getBinaryHelp,
   getCurrentVersion,
   getNodeFile,
+  startNode,
   updateNode,
 } = require('./idena-node')
 
@@ -193,5 +194,36 @@ describe('node replacement', () => {
     await fs.remove(installed)
     await updateNode()
     expect(await fs.readFile(installed, 'utf8')).toBe('new node')
+  })
+})
+
+describe('node start', () => {
+  beforeEach(async () => {
+    mockUserData = await fs.mkdtemp(path.join(os.tmpdir(), 'idena-node-'))
+    // --version and --help answer like the bundled node; the node itself starts and stays.
+    spawn.mockImplementation((file, args) => {
+      const child = scriptedChild()
+      setImmediate(() => {
+        if (args[0] === '--version') {
+          child.stdout.emit('data', Buffer.from('idena-go version 1.1.3\n'))
+          child.emit('close', 0, null)
+        } else if (args[0] === '--help') {
+          child.emit('close', 0, null)
+        }
+      })
+      return child
+    })
+  })
+
+  afterEach(async () => {
+    spawn.mockReset()
+    await fs.remove(mockUserData)
+  })
+
+  it('keeps the IPFS port it was given', async () => {
+    await startNode(9009, 40404, 40405, 'key', false, {}, false)
+    const [, args] = spawn.mock.calls.find(([, a]) => a[0] === '--datadir')
+    expect(args[args.indexOf('--ipfsport') + 1]).toBe(40405)
+    expect(args).toContain('--ipfsportstatic')
   })
 })

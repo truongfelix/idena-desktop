@@ -435,6 +435,10 @@ async function startNode(
     tcpPort,
     '--ipfsport',
     ipfsPort,
+    // Keep that port: by default the node moves to the next one after 2 minutes without peers, and a router
+    // opening (router-port.js) would then follow it with another rule change, which can cut every connection
+    // behind some routers again.
+    '--ipfsportstatic',
     '--apikey',
     apiKey,
   ]
