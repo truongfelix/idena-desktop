@@ -310,15 +310,39 @@ describe('Open and Close', () => {
       freePort: 50507,
     })
     env.net.router.mappings.set(50507, other)
+    env.advance(60 * 1000)
     expect(await env.service.status()).toMatchObject({freePort: 50508})
     // Every node port held by other devices: none to offer.
     for (const port of [50508, 50509, 50510])
       env.net.router.mappings.set(port, other)
+    env.advance(60 * 1000)
     expect(await env.service.status()).toMatchObject({
       owner: 'other',
       freePort: null,
     })
     expect(env.net.router.calls).toEqual([])
+  })
+
+  it('skips a port the router does not answer for, and asks again only after a minute', async () => {
+    const env = await found()
+    const other = {client: '192.168.1.30', description: 'idena-desktop node'}
+    env.net.router.mappings.set(50506, other)
+    const answer = env.net.mapping.getMockImplementation()
+    env.net.mapping.mockImplementation(async (gateway, port) => {
+      if (port === 50507) throw new Error('the router did not answer in time')
+      return answer(gateway, port)
+    })
+    expect(await env.service.status()).toMatchObject({
+      state: 'found',
+      owner: 'other',
+      freePort: 50508,
+    })
+    env.net.mapping.mockClear()
+    expect(await env.service.status()).toMatchObject({freePort: 50508})
+    expect(env.net.mapping).toHaveBeenCalledTimes(1)
+    env.advance(60 * 1000)
+    env.net.mapping.mockImplementation(answer)
+    expect(await env.service.status()).toMatchObject({freePort: 50507})
   })
 
   it('looks for no free port while the port is its own or closed', async () => {

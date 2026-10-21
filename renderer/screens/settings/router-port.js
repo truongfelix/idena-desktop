@@ -53,8 +53,8 @@ export const QUIET_HINT_MS = 10 * 60 * 1000
 
 /**
  * What the Router port row says for `status` (main/router-port-service.js) at `nowMs`, in which color, which
- * button it offers ('look', 'search-again', 'try-again', 'open', 'close', 'use-port' or none) and, for an opening no peer
- * from outside has used for QUIET_HINT_MS while the node runs (`nodeStarted`), a `hint`. `anchor` is true while the
+ * button it offers ('look', 'search-again', 'try-again', 'open', 'close', 'use-port' or none) and, for an
+ * opening no peer from outside has used for QUIET_HINT_MS while the node runs (`nodeStarted`), a `hint`. `anchor` is true while the
  * port is open for this computer: the row then says the node can help phones connect (B-129). `t` translates.
  */
 export function routerPortView(status, t, nowMs, {nodeStarted = false} = {}) {

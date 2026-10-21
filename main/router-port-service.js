@@ -21,6 +21,9 @@ const {
 /** The latest end the row accepts: "until the validation + 2 h" is at most an epoch away. */
 const MAX_OPENING_MS = 60 * 24 * 60 * 60 * 1000
 
+/** How long the row keeps a free port found (`freePort`). */
+const FREE_PORT_KEEP_MS = 60 * 1000
+
 /** How often the upkeep runs while the app runs. */
 const UPKEEP_INTERVAL_MS = 5 * 60 * 1000
 
@@ -152,13 +155,31 @@ function createRouterPortService({
       })
   }
 
-  /** The first node port after `taken` (router-port.js freePortCandidates) no other device holds on `found`. */
-  async function freePort(found, taken, opening) {
+  // The last free port found, kept a minute: the row asks every 10 s, and each port is a request to the router.
+  let freeFound = null
+
+  /**
+   * The first node port after `taken` (router-port.js freePortCandidates) no other device holds on `found`; a port
+   * the router does not answer for counts as held.
+   */
+  async function freePort(found, taken, client, opening) {
+    const key = `${found.udn} ${taken} ${client}`
+    if (freeFound?.key === key && now() - freeFound.atMs < FREE_PORT_KEEP_MS)
+      return freeFound.port
+    let free = null
     for (const port of freePortCandidates(taken)) {
-      const {mapping, pcIp} = await net.mapping(found, port)
-      if (mappingOwner(mapping, pcIp, opening) !== 'other') return port
+      try {
+        const {mapping, pcIp} = await net.mapping(found, port)
+        if (mappingOwner(mapping, pcIp, opening) !== 'other') {
+          free = port
+          break
+        }
+      } catch {
+        // Not answered: not offered.
+      }
     }
-    return null
+    freeFound = {key, port: free, atMs: now()}
+    return free
   }
 
   /** What the row shows for the router `found`: its forwarding of the opening's port, else of the node's. */
@@ -179,7 +200,9 @@ function createRouterPortService({
         owner,
         // When another device holds the port: a node port no other device holds there, or null.
         freePort:
-          owner === 'other' ? await freePort(found, port, opening) : null,
+          owner === 'other'
+            ? await freePort(found, port, mapping.client, opening)
+            : null,
         opening: opening && {
           port: opening.port,
           client: opening.client,
