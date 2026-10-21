@@ -994,8 +994,10 @@
   "Your node's code": "Code de votre nœud",
   "The password does not open this key. Check the password the key was exported with.": "Le mot de passe n'ouvre pas cette clé. Vérifiez le mot de passe choisi lors de l'export de la clé.",
   "This is not an exported Idena key. Paste the whole key, as Export gave it.": "Ce n'est pas une clé Idena exportée. Collez la clé entière, telle qu'Exporter l'a donnée.",
-  "The node did not finish starting. Try again once it is synchronized.": "Le nœud n'a pas fini de démarrer. Réessayez une fois qu'il est synchronisé.",
-  "The node did not import the key: {{reason}}": "Le nœud n'a pas importé la clé : {{reason}}",
-  "The node is still starting. The key is imported as soon as it is ready.": "Le nœud démarre encore. La clé sera importée dès qu'il sera prêt.",
-  "The built-in node is off. Turn on Run built-in node in Settings > Node to import a key.": "Le nœud intégré est arrêté. Activez « Lancer le node intégré » dans Paramètres > Node pour importer une clé."
+  "The node did not finish starting. Try again once it is synchronized.": "Le node n'a pas fini de démarrer. Réessayez une fois qu'il est synchronisé.",
+  "The node did not import the key: {{reason}}": "Le node n'a pas importé la clé : {{reason}}",
+  "The node is still starting. The key is imported as soon as it is ready.": "Le node démarre encore. La clé sera importée dès qu'il sera prêt.",
+  "The built-in node is off. Turn on Run built-in node in Settings > Node to import a key.": "Le node intégré est arrêté. Activez « Lancer le node intégré » dans Paramètres > Node pour importer une clé.",
+  "The built-in node failed to start. Use Try restart in Settings > Node, then import the key.": "Le node intégré n'a pu démarrer. Utilisez « Essayer de redémarrer » dans Paramètres > Node, puis importez la clé.",
+  "The node did not import the key.": "Le node n'a pas importé la clé."
 }

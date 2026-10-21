@@ -41,7 +41,11 @@ import {
   useNodeState,
 } from '../../shared/providers/node-context'
 import {importKey} from '../../shared/api/dna'
-import {importKeyErrorText, importKeyWhenReady} from './import-key'
+import {
+  createImportAttempts,
+  importKeyErrorText,
+  importKeyWhenReady,
+} from './import-key'
 import {
   useSettingsDispatch,
   useSettingsState,
@@ -220,6 +224,10 @@ export function ImportPrivateKeyDialog(props) {
 
   const {importNodeKey} = useNodeDispatch()
 
+  const {nodeFailed} = useNodeState()
+  const nodeFailedNow = React.useRef(nodeFailed)
+  nodeFailedNow.current = nodeFailed
+
   const [password, setPassword] = React.useState()
 
   const [key, setKey] = React.useState()
@@ -230,20 +238,29 @@ export function ImportPrivateKeyDialog(props) {
 
   const [isWaitingForNode, setIsWaitingForNode] = React.useState(false)
 
-  // Closing the dialog stops the wait for the node.
-  const cancelled = React.useRef(false)
+  // Closing the dialog or leaving the page ends the import under way: its answer is dropped.
+  const [attempts] = React.useState(createImportAttempts)
+  // eslint-disable-next-line react/destructuring-assignment
+  const {isOpen} = props
   React.useEffect(() => {
-    // eslint-disable-next-line react/destructuring-assignment
-    cancelled.current = !props.isOpen
-    // eslint-disable-next-line react/destructuring-assignment
-  }, [props.isOpen])
+    if (!isOpen) {
+      attempts.endAll()
+      setIsImporting(false)
+      setIsWaitingForNode(false)
+    }
+  }, [attempts, isOpen])
+  React.useEffect(() => () => attempts.endAll(), [attempts])
 
   const submit = async () => {
+    const attempt = attempts.start()
     setIsImporting(true)
+    setIsWaitingForNode(false)
     const result = await importKeyWhenReady(importKey, key, password, {
       onWaiting: () => setIsWaitingForNode(true),
-      isCancelled: () => cancelled.current,
+      isCancelled: () => !attempt.isCurrent(),
+      isNodeFailed: () => nodeFailedNow.current,
     })
+    if (result.reason === 'cancelled') return result
     setIsImporting(false)
     setIsWaitingForNode(false)
     if (result.ok) {

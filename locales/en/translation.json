@@ -1735,5 +1735,7 @@
   "The node did not finish starting. Try again once it is synchronized.": "The node did not finish starting. Try again once it is synchronized.",
   "The node did not import the key: {{reason}}": "The node did not import the key: {{reason}}",
   "The node is still starting. The key is imported as soon as it is ready.": "The node is still starting. The key is imported as soon as it is ready.",
-  "The built-in node is off. Turn on Run built-in node in Settings > Node to import a key.": "The built-in node is off. Turn on Run built-in node in Settings > Node to import a key."
+  "The built-in node is off. Turn on Run built-in node in Settings > Node to import a key.": "The built-in node is off. Turn on Run built-in node in Settings > Node to import a key.",
+  "The built-in node failed to start. Use Try restart in Settings > Node, then import the key.": "The built-in node failed to start. Use Try restart in Settings > Node, then import the key.",
+  "The node did not import the key.": "The node did not import the key."
 }

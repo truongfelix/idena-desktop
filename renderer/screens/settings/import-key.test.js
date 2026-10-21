@@ -1,4 +1,9 @@
-import {importKeyErrorText, importKeyWhenReady} from './import-key'
+import {
+  IMPORT_REQUEST_TIMEOUT_MS,
+  createImportAttempts,
+  importKeyErrorText,
+  importKeyWhenReady,
+} from './import-key'
 
 // Interpolates as i18next does, so that the lines read as the user sees them in English.
 const t = (key, values = {}) =>
@@ -142,5 +147,126 @@ describe('importing a key', () => {
     expect(importKeyErrorText(result, t)).toBe(
       'The node did not import the key: failed to reserve key backup, err: disk full'
     )
+  })
+
+  it('reports an HTTP error the node answered, without waiting', async () => {
+    const badRequest = Object.assign(
+      new Error('Request failed with status code 400'),
+      {response: {status: 400}}
+    )
+    const {importKey} = nodeAnswering(badRequest, IMPORTED)
+
+    const result = await importKeyWhenReady(importKey, 'abc', 'pw', fakeTime())
+
+    expect(result).toEqual({
+      ok: false,
+      reason: 'node',
+      detail: 'Request failed with status code 400',
+    })
+    expect(importKey).toHaveBeenCalledTimes(1)
+  })
+
+  it('bounds each call, and retries one that timed out', async () => {
+    const timedOut = Object.assign(new Error('timeout of 20000ms exceeded'), {
+      code: 'ECONNABORTED',
+    })
+    const {importKey} = nodeAnswering(timedOut, IMPORTED)
+
+    const result = await importKeyWhenReady(importKey, 'abc', 'pw', fakeTime())
+
+    expect(result).toEqual({ok: true})
+    expect(importKey.mock.calls).toEqual([
+      ['abc', 'pw', {timeout: IMPORT_REQUEST_TIMEOUT_MS}],
+      ['abc', 'pw', {timeout: IMPORT_REQUEST_TIMEOUT_MS}],
+    ])
+  })
+
+  it('drops an answer that comes after the dialog closed', async () => {
+    let closed = false
+    const importKey = jest.fn(async () => {
+      closed = true // the user closes the dialog while the call is out
+      return WRONG_PASSWORD
+    })
+
+    const result = await importKeyWhenReady(importKey, 'abc', 'pw', {
+      ...fakeTime(),
+      isCancelled: () => closed,
+    })
+
+    expect(result).toEqual({ok: false, reason: 'cancelled'})
+  })
+
+  it('answers at once when the built-in node failed to start', async () => {
+    const {importKey} = nodeAnswering(new Error('Network Error'), IMPORTED)
+    let failed = false
+
+    const result = await importKeyWhenReady(importKey, 'abc', 'pw', {
+      ...fakeTime(),
+      onWaiting: () => {
+        failed = true
+      },
+      isNodeFailed: () => failed,
+    })
+
+    expect(result).toEqual({ok: false, reason: 'node-failed'})
+    expect(importKey).toHaveBeenCalledTimes(1)
+    expect(importKeyErrorText(result, t)).toBe(
+      'The built-in node failed to start. Use Try restart in Settings > Node, then import the key.'
+    )
+  })
+
+  it('says the node refused when its refusal has no text', async () => {
+    const {importKey} = nodeAnswering({error: {code: -32000}})
+
+    const result = await importKeyWhenReady(importKey, 'abc', 'pw', fakeTime())
+
+    expect(importKeyErrorText(result, t)).toBe(
+      'The node did not import the key.'
+    )
+  })
+})
+
+describe('one import at a time', () => {
+  // The dialog's own use: the attempt's end is the loop's cancel.
+  const run = (attempt, importKey, during) =>
+    importKeyWhenReady(importKey, 'abc', 'pw', {
+      ...fakeTime(),
+      onWaiting: during,
+      isCancelled: () => !attempt.isCurrent(),
+    })
+
+  it('ends the waiting import when the dialog is closed and opened again', async () => {
+    const attempts = createImportAttempts()
+    const {importKey} = nodeAnswering(NOT_SERVED, IMPORTED)
+    const first = attempts.start()
+
+    const result = await run(first, importKey, () => {
+      attempts.endAll() // closed
+      attempts.start() // opened again, Import clicked with another key
+    })
+
+    expect(result).toEqual({ok: false, reason: 'cancelled'})
+    expect(importKey).toHaveBeenCalledTimes(1)
+  })
+
+  it('ends the waiting import when the page is left', async () => {
+    const attempts = createImportAttempts()
+    const {importKey} = nodeAnswering(NOT_SERVED, IMPORTED)
+
+    const result = await run(attempts.start(), importKey, () =>
+      attempts.endAll()
+    )
+
+    expect(result).toEqual({ok: false, reason: 'cancelled'})
+    expect(importKey).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps the latest import going', async () => {
+    const attempts = createImportAttempts()
+    attempts.start()
+    const latest = attempts.start()
+    const {importKey} = nodeAnswering(NOT_SERVED, IMPORTED)
+
+    expect(await run(latest, importKey, () => {})).toEqual({ok: true})
   })
 })
