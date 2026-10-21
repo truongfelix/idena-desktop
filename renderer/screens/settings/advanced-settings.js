@@ -16,6 +16,7 @@ import {
   directPeerIds,
   shortPeerId,
 } from '../../../main/direct-peers'
+import {DEFAULT_NODE_PORT, NODE_PORTS} from '../../../main/router-port'
 
 /** The write buffer size the node runs with unless another is chosen: idena-go's, the phone app's too. */
 export const DEFAULT_WRITE_BUFFER_MIB = 4
@@ -94,6 +95,19 @@ export const IPFS_CONNECTION_CHOICES = IPFS_CONNECTION_LIMITS.map(({high}) => ({
 }))
 
 /**
+ * The node port choices (main/router-port.js NODE_PORTS), and the port saved (`chosen`) when it is another one
+ * (set by hand in an older version): it stays offered.
+ */
+export function nodePortChoices(chosen) {
+  const ports = NODE_PORTS.includes(chosen)
+    ? NODE_PORTS
+    : [...NODE_PORTS, chosen]
+  return ports
+    .filter((port) => Number.isInteger(port))
+    .map((port) => ({value: port, isDefault: port === DEFAULT_NODE_PORT}))
+}
+
+/**
  * Whether the running node uses another setting than the one chosen: it applies at the next start. Never for
  * a node binary without the flag (`supported` false): a restart would not change it.
  */
@@ -152,6 +166,12 @@ export function pendingNodeOptions({
       chosen: settings.ipfsWriteBufferMiB,
       supported: supported?.ipfsWriteBuffer,
       value: `${settings.ipfsWriteBufferMiB} MiB`,
+    },
+    {
+      title: 'Node port',
+      running: running?.ipfsPort,
+      chosen: Number(settings.ipfsPort),
+      value: String(settings.ipfsPort),
     },
     // The node takes the ids only, compared sorted: a renamed peer needs no restart.
     {

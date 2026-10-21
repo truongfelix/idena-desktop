@@ -3,6 +3,7 @@ const {
   DEVICE_NAME_MAX,
   cleanGateway,
   cleanOpening,
+  freePortCandidates,
   inboundPeersSince,
   ipfsAddressPort,
   leaseSeconds,
@@ -19,6 +20,9 @@ const {
 
 /** The latest end the row accepts: "until the validation + 2 h" is at most an epoch away. */
 const MAX_OPENING_MS = 60 * 24 * 60 * 60 * 1000
+
+/** How long the row keeps a free port found (`freePort`). */
+const FREE_PORT_KEEP_MS = 60 * 1000
 
 /** How often the upkeep runs while the app runs. */
 const UPKEEP_INTERVAL_MS = 5 * 60 * 1000
@@ -151,6 +155,33 @@ function createRouterPortService({
       })
   }
 
+  // The last free port found, kept a minute: the row asks every 10 s, and each port is a request to the router.
+  let freeFound = null
+
+  /**
+   * The first node port after `taken` (router-port.js freePortCandidates) no other device holds on `found`; a port
+   * the router does not answer for counts as held.
+   */
+  async function freePort(found, taken, client, opening) {
+    const key = `${found.udn} ${taken} ${client}`
+    if (freeFound?.key === key && now() - freeFound.atMs < FREE_PORT_KEEP_MS)
+      return freeFound.port
+    let free = null
+    for (const port of freePortCandidates(taken)) {
+      try {
+        const {mapping, pcIp} = await net.mapping(found, port)
+        if (mappingOwner(mapping, pcIp, opening) !== 'other') {
+          free = port
+          break
+        }
+      } catch {
+        // Not answered: not offered.
+      }
+    }
+    freeFound = {key, port: free, atMs: now()}
+    return free
+  }
+
   /** What the row shows for the router `found`: its forwarding of the opening's port, else of the node's. */
   async function read(found) {
     const {opening: saved} = load()
@@ -159,13 +190,19 @@ function createRouterPortService({
     if (!port) return {state: 'node-stopped'}
     try {
       const {mapping, pcIp} = await net.mapping(found, port)
+      const owner = mappingOwner(mapping, pcIp, opening)
       return {
         state: 'found',
         name: found.name,
         port,
         pcIp,
         mapping,
-        owner: mappingOwner(mapping, pcIp, opening),
+        owner,
+        // When another device holds the port: a node port no other device holds there, or null.
+        freePort:
+          owner === 'other'
+            ? await freePort(found, port, mapping.client, opening)
+            : null,
         opening: opening && {
           port: opening.port,
           client: opening.client,
@@ -338,13 +375,16 @@ function createRouterPortService({
         case 'move': {
           if (owned) await net.remove(here, opening.port)
           const target = await net.mapping(here, nodePort)
-          await net.open(
-            here,
-            nodePort,
-            pcIp,
-            lease,
-            target.mapping?.client === pcIp
-          )
+          // A port another device holds stays its own: the row then says so, and offers a free one.
+          if (mappingOwner(target.mapping, pcIp, opening) !== 'other') {
+            await net.open(
+              here,
+              nodePort,
+              pcIp,
+              lease,
+              target.mapping?.client === pcIp
+            )
+          }
           save({
             opening: {...opening, ...changed, port: nodePort, retried: false},
           })

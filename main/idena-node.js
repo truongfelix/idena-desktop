@@ -504,6 +504,7 @@ async function startNode(
     // The peer ids, sorted ([] when none were given).
     directPeers:
       directArgs.length > 0 ? directPeerIds(options.directPeers) : [],
+    ipfsPort: Number(ipfsPort),
   }
   idenaNode.nodeOptionsSupported = {
     dbWriteBuffer: nodeSupportsWriteBuffer(help),

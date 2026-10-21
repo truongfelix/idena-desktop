@@ -1,4 +1,6 @@
 const {
+  DEFAULT_NODE_PORT,
+  NODE_PORTS,
   PORT_DURATIONS,
   PORT_MAPPING_DESCRIPTION,
   RETRY_AFTER_MS,
@@ -6,6 +8,7 @@ const {
   addPortMappingArgs,
   cleanOpening,
   durationEnd,
+  freePortCandidates,
   inboundPeersSince,
   ipfsAddressPort,
   isLocalNetworkHost,
@@ -269,6 +272,18 @@ const GATEWAY = {
   controlUrl: 'http://192.168.1.1:49152/ctl/IPConn',
   service: WANIP1,
 }
+
+describe('the node ports', () => {
+  it('are the default and the four after it, and the free one is looked for after the taken one', () => {
+    expect(DEFAULT_NODE_PORT).toBe(50506)
+    expect(NODE_PORTS).toEqual([50506, 50507, 50508, 50509, 50510])
+    expect(freePortCandidates(50506)).toEqual([50507, 50508, 50509, 50510])
+    expect(freePortCandidates(50508)).toEqual([50509, 50510, 50506, 50507])
+    expect(freePortCandidates(50510)).toEqual([50506, 50507, 50508, 50509])
+    // A port set by hand in an older version: all of them.
+    expect(freePortCandidates(40405)).toEqual(NODE_PORTS)
+  })
+})
 
 describe('cleanOpening', () => {
   const opening = {

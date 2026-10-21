@@ -226,4 +226,9 @@ describe('node start', () => {
     expect(args[args.indexOf('--ipfsport') + 1]).toBe(40405)
     expect(args).toContain('--ipfsportstatic')
   })
+
+  it('reports the IPFS port it runs on, for the restart offer', async () => {
+    const node = await startNode(9009, 50505, '50507', 'key', false, {}, false)
+    expect(node.nodeOptions.ipfsPort).toBe(50507)
+  })
 })
