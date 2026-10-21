@@ -325,7 +325,7 @@ export default function SocialPage() {
             {missingMethod && (
               <Text fontSize="sm" color="red.500">
                 {t(
-                  'This node cannot read idena.social. It needs a node version with the bcn_contractCalls method, as the one built into this app.'
+                  'This node cannot read Idena Social. It needs a node version with the bcn_contractCalls method, as the one built into this app.'
                 )}
               </Text>
             )}

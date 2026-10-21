@@ -30,7 +30,7 @@ export const PACKAGE = [
 const credits = (t) => [
   ['idena-network', t('the original Idena code, no longer maintained')],
   ['ubiubi18', t('the forks I started from, and code reviews')],
-  ['N3CR0M4NC3R-dev/idena.social', t('idena.social, the Social tab')],
+  ['N3CR0M4NC3R-dev/idena.social', t('Idena Social, the Social tab')],
 ]
 
 /** Where the community talks (idena.social is the Social tab). */
@@ -135,7 +135,7 @@ export function DevNoteDialog({isOpen, onClose}) {
           </Text>
           <Text fontWeight={600}>
             {t(
-              "The proposal: cut an identity's mining rewards in proportion to its share of reported flips over the last 10 epochs. Also, an identity with 2 or more flips reported in a validation can't mine during the next epoch. If you agree, say so on Telegram, Discord or idena.social.",
+              "The proposal: cut an identity's mining rewards in proportion to its share of reported flips over the last 10 epochs. Also, an identity with 2 or more flips reported in a validation can't mine during the next epoch. If you agree, say so on Telegram, Discord or Idena Social.",
               {nsSeparator: '|'}
             )}
           </Text>
