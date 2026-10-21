@@ -1713,7 +1713,6 @@
   "Your message code": "Your message code",
   "Share it with the people who should be able to write to you: with it they can, even before your first transaction. It holds only your public key, nothing secret.": "Share it with the people who should be able to write to you: with it they can, even before your first transaction. It holds only your public key, nothing secret.",
   "Looking up your key…": "Looking up your key…",
-  "Your public key is not known yet: it shows once your account signed a transaction (an invitation activated, or a call to idena.social).": "Your public key is not known yet: it shows once your account signed a transaction (an invitation activated, or a call to idena.social).",
   "Ask them for their message code (Messages, \"My message code\") and paste it here. You can also paste it in the Messages search.": "Ask them for their message code (Messages, \"My message code\") and paste it here. You can also paste it in the Messages search.",
   "Message code": "Message code",
   "This code is another account's.": "This code is another account's.",
@@ -1740,5 +1739,6 @@
   "Your external node is offline": "Your external node is offline",
   "Your node is offline": "Your node is offline",
   "Block_person": "Block",
-  "Report_validation": "Report"
+  "Report_validation": "Report",
+  "The node did not give your public key. Check that it is running, then open this again.": "The node did not give your public key. Check that it is running, then open this again."
 }

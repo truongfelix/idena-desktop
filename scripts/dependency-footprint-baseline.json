@@ -4,6 +4,7 @@
     "@emotion/react",
     "@emotion/styled",
     "@hello-pangea/dnd",
+    "@noble/curves",
     "@react-hook/hover",
     "@xstate/react",
     "ansi-to-react",

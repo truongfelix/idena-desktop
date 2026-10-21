@@ -30,6 +30,7 @@ import {
   parseMessageCode,
 } from '../message-code'
 import {socialRpcSettled} from '../node'
+import {ownPublicKey} from '../own-key'
 import {PersonAvatar} from '../components/profile-public'
 import {PersonName} from '../components/identity'
 import {SearchField} from './common'
@@ -135,15 +136,30 @@ export function NewChatSearch({openChat}) {
 
 /**
  * The account's message code: its public key, for the people who should be able to write to it before its first
- * transaction. The key is the one the app can find (its identity's, or one it signed in a call the scan read).
+ * transaction. The key comes from the node's signature (own-key.js: any node, no transaction needed), else from the
+ * chain (its identity's, or one it signed in a call the scan read).
  */
 export function MyMessageCode({isOpen, onClose}) {
   const {t} = useTranslation()
   const {me, messageKeys, lookUpKeys} = useSocial()
+  // undefined while the node is asked, null when it gave none.
+  const [signedKey, setSignedKey] = React.useState()
   React.useEffect(() => {
-    if (isOpen && me) lookUpKeys([me])
+    if (!isOpen || !me) return undefined
+    let live = true
+    setSignedKey(undefined)
+    ownPublicKey(me).then(
+      (found) => live && setSignedKey(found),
+      () => live && setSignedKey(null)
+    )
+    lookUpKeys([me])
+    return () => {
+      live = false
+    }
   }, [isOpen, lookUpKeys, me])
-  const key = me ? messageKeys[me] : undefined
+  const chainKey = me ? messageKeys[me] : undefined
+  const key =
+    signedKey || (signedKey === null ? chainKey : chainKey || undefined)
   // Only a whole key (65 bytes) makes a code the other apps read.
   const whole = key ? parseMessageCode(key) : null
   const code = whole ? messageCode(whole) : ''
@@ -165,8 +181,7 @@ export function MyMessageCode({isOpen, onClose}) {
           {(key === '' || (key && !whole)) && (
             <Text color="red.500">
               {t(
-                'Your public key is not known yet: it shows once your account signed a transaction (an invitation activated, or a call to idena.social).',
-                {nsSeparator: '|'}
+                'The node did not give your public key. Check that it is running, then open this again.'
               )}
             </Text>
           )}

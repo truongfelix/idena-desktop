@@ -1721,7 +1721,6 @@
   "Your message code": "Votre code de message",
   "Share it with the people who should be able to write to you: with it they can, even before your first transaction. It holds only your public key, nothing secret.": "Partagez-le avec les personnes qui doivent pouvoir vous écrire : avec lui, elles le peuvent, même avant votre première transaction. Il ne contient que votre clé publique, rien de secret.",
   "Looking up your key…": "Recherche de votre clé…",
-  "Your public key is not known yet: it shows once your account signed a transaction (an invitation activated, or a call to idena.social).": "Votre clé publique n'est pas encore connue : elle s'affiche dès que votre compte a signé une transaction (une invitation activée, ou un appel à idena.social).",
   "Ask them for their message code (Messages, \"My message code\") and paste it here. You can also paste it in the Messages search.": "Demandez-lui son code de message (Messages, « Mon code de message ») et collez-le ici. Vous pouvez aussi le coller dans la recherche de Messages.",
   "Message code": "Code de message",
   "This code is another account's.": "Ce code est celui d'un autre compte.",
@@ -1740,5 +1739,6 @@
   "Your external node is offline": "Votre nœud externe est hors ligne",
   "Your node is offline": "Votre nœud est hors ligne",
   "Block_person": "Bloquer",
-  "Report_validation": "Rapport"
+  "Report_validation": "Rapport",
+  "The node did not give your public key. Check that it is running, then open this again.": "Le nœud n'a pas donné votre clé publique. Vérifiez qu'il est en marche, puis rouvrez cette fenêtre."
 }

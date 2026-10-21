@@ -170,6 +170,7 @@
     "@emotion/react": "^11.0.0",
     "@emotion/styled": "^11.0.0",
     "@hello-pangea/dnd": "^18.0.1",
+    "@noble/curves": "^2.4.0",
     "@react-hook/hover": "^4.0.0",
     "@xstate/react": "^3.2.1",
     "ansi-to-react": "^6.2.6",
