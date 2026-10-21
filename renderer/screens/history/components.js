@@ -155,7 +155,7 @@ export function CeremoniesTab({history, isOwn}) {
                         href={`/validation/report?epoch=${row.epoch}`}
                         fontSize="sm"
                       >
-                        {t('Report')}
+                        {t('Report', {context: 'validation'})}
                       </TextLink>
                     )}
                   </Stack>

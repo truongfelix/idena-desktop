@@ -298,7 +298,6 @@
   "Please wait...": "Молимо сачекајте...",
   "Downloading Idena Node...": "Преузимам Идена нод...",
   "Version {{version}}": "Верзија {{version}}",
-  "Your {{nodeType}} node is offline": "Ваш {{nodeType}} нод није на мрежи",
   "Run the built-in node": "Покрени уграђени нод",
   "Idena Node is starting...": "Идена нод се покреће...",
   "Your built-in node is failed": "Твој уграђени нод је отказао",

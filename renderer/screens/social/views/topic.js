@@ -62,7 +62,7 @@ export function TopicView({name, now, openThread, openProfile}) {
         {!isBlocked && <FollowTopicChip name={name} />}
         <TrustButton target={topicChannel(name)} />
         <Chip onClick={() => setTopicBlocked(name, !isBlocked)}>
-          {isBlocked ? t('Unblock') : t('Block')}
+          {isBlocked ? t('Unblock') : t('Block', {context: 'person'})}
         </Chip>
         <SecondaryButton
           isDisabled={!sending.canAct}

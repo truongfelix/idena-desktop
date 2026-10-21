@@ -292,7 +292,6 @@
   "Please wait...": "Te rog asteaptă...",
   "Downloading Idena Node...": "Se descarcă Idena Node...",
   "Version {{version}}": "Versiune {{version}}",
-  "Your {{nodeType}} node is offline": "Al tău {{nodeType}} nod este deconectat",
   "Run the built-in node": "Rulați nodul încorporat",
   "Idena Node is starting...": "Nodul Idena se deschide...",
   "Your built-in node is failed": "Nodul încorporat a eșuat",

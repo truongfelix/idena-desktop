@@ -312,7 +312,6 @@
   "Please wait...": "Vänligen vänta...",
   "Downloading Idena Node...": "Laddar ner Idena Noden...",
   "Version {{version}}": "Version {{version}}",
-  "Your {{nodeType}} node is offline": "Din {{nodeType}} nod är offline",
   "Run the built-in node": "Kör den inbyggda noden",
   "Idena Node is starting...": "Idena Noden startar...",
   "Your built-in node is failed": "Din inbyggda nod misslyckades",
