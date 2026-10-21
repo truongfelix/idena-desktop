@@ -130,7 +130,13 @@ function Settings() {
                   </SettingsLinkButton>
                 ) : (
                   <Tooltip
-                    label={t('Import is not available for the external node')}
+                    label={
+                      useExternalNode
+                        ? t('Import is not available for the external node')
+                        : t(
+                            'The built-in node is off. Turn on Run built-in node in Settings > Node to import a key.'
+                          )
+                    }
                     placement="top"
                     shouldWrapChildren
                   >
