@@ -7,6 +7,23 @@
 /** How the app names its opening on the router, where the router lists its port forwardings. */
 const PORT_MAPPING_DESCRIPTION = 'idena-desktop node'
 
+/**
+ * The built-in node's IPFS port by default (renderer/shared/providers/settings-context.js), and the ports it can
+ * take in the Advanced settings: one per computer behind a router, since a router forwards a port to one device
+ * only and each node tells its peers the port it listens on.
+ */
+const DEFAULT_NODE_PORT = 50506
+const NODE_PORTS = [50506, 50507, 50508, 50509, 50510]
+
+/**
+ * The node ports to try, in order, for one free on the router when another device holds `taken`: those after it,
+ * then from the first.
+ */
+function freePortCandidates(taken) {
+  const i = NODE_PORTS.indexOf(taken)
+  return [...NODE_PORTS.slice(i + 1), ...NODE_PORTS.slice(0, Math.max(i, 0))]
+}
+
 /** The longest lease UPnP IGD 2 promises; some routers refuse longer ones. */
 const MAX_STANDARD_LEASE_SECONDS = 604800
 
@@ -397,6 +414,9 @@ module.exports = {
   parseDeviceName,
   cleanGateway,
   soapEnvelope,
+  DEFAULT_NODE_PORT,
+  NODE_PORTS,
+  freePortCandidates,
   parseSoap,
   portArgs,
   addPortMappingArgs,

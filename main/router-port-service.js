@@ -3,6 +3,7 @@ const {
   DEVICE_NAME_MAX,
   cleanGateway,
   cleanOpening,
+  freePortCandidates,
   inboundPeersSince,
   ipfsAddressPort,
   leaseSeconds,
@@ -151,6 +152,15 @@ function createRouterPortService({
       })
   }
 
+  /** The first node port after `taken` (router-port.js freePortCandidates) no other device holds on `found`. */
+  async function freePort(found, taken, opening) {
+    for (const port of freePortCandidates(taken)) {
+      const {mapping, pcIp} = await net.mapping(found, port)
+      if (mappingOwner(mapping, pcIp, opening) !== 'other') return port
+    }
+    return null
+  }
+
   /** What the row shows for the router `found`: its forwarding of the opening's port, else of the node's. */
   async function read(found) {
     const {opening: saved} = load()
@@ -159,13 +169,17 @@ function createRouterPortService({
     if (!port) return {state: 'node-stopped'}
     try {
       const {mapping, pcIp} = await net.mapping(found, port)
+      const owner = mappingOwner(mapping, pcIp, opening)
       return {
         state: 'found',
         name: found.name,
         port,
         pcIp,
         mapping,
-        owner: mappingOwner(mapping, pcIp, opening),
+        owner,
+        // When another device holds the port: a node port no other device holds there, or null.
+        freePort:
+          owner === 'other' ? await freePort(found, port, opening) : null,
         opening: opening && {
           port: opening.port,
           client: opening.client,
@@ -338,13 +352,16 @@ function createRouterPortService({
         case 'move': {
           if (owned) await net.remove(here, opening.port)
           const target = await net.mapping(here, nodePort)
-          await net.open(
-            here,
-            nodePort,
-            pcIp,
-            lease,
-            target.mapping?.client === pcIp
-          )
+          // A port another device holds stays its own: the row then says so, and offers a free one.
+          if (mappingOwner(target.mapping, pcIp, opening) !== 'other') {
+            await net.open(
+              here,
+              nodePort,
+              pcIp,
+              lease,
+              target.mapping?.client === pcIp
+            )
+          }
           save({
             opening: {...opening, ...changed, port: nodePort, retried: false},
           })

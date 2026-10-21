@@ -300,6 +300,42 @@ describe('Open and Close', () => {
     expect(env.net.router.mappings.get(50506).client).toBe('192.168.1.30')
   })
 
+  it('offers the next node port no other device holds there', async () => {
+    const env = await found()
+    const other = {client: '192.168.1.30', description: 'idena-desktop node'}
+    env.net.router.mappings.set(50506, other)
+    expect(await env.service.status()).toMatchObject({
+      owner: 'other',
+      port: 50506,
+      freePort: 50507,
+    })
+    env.net.router.mappings.set(50507, other)
+    expect(await env.service.status()).toMatchObject({freePort: 50508})
+    // Every node port held by other devices: none to offer.
+    for (const port of [50508, 50509, 50510])
+      env.net.router.mappings.set(port, other)
+    expect(await env.service.status()).toMatchObject({
+      owner: 'other',
+      freePort: null,
+    })
+    expect(env.net.router.calls).toEqual([])
+  })
+
+  it('looks for no free port while the port is its own or closed', async () => {
+    const env = await found()
+    expect(await env.service.status()).toMatchObject({
+      owner: 'none',
+      freePort: null,
+    })
+    await env.service.open({endMs: NOW + HOUR})
+    env.net.mapping.mockClear()
+    expect(await env.service.status()).toMatchObject({
+      owner: 'pc',
+      freePort: null,
+    })
+    expect(env.net.mapping).toHaveBeenCalledTimes(1)
+  })
+
   it('never changes the router for two requests at once', async () => {
     const env = await found()
     await env.service.open({endMs: NOW + HOUR})
@@ -353,6 +389,27 @@ describe('the upkeep', () => {
       ['open', 50507, PC, 6 * 3600, false],
     ])
     expect(env.saved().opening).toMatchObject({port: 50507, changedAtMs: NOW})
+  })
+
+  it('leaves a node port another device holds to it, and says so', async () => {
+    const env = await opened()
+    env.net.router.mappings.set(50507, {
+      client: '192.168.1.30',
+      description: 'idena-desktop node',
+    })
+    env.node.port = 50507
+    expect(await env.service.upkeep()).toBe('move')
+    expect(env.net.router.calls).toEqual([['remove', 50506]])
+    expect(env.saved().opening).toMatchObject({port: 50507})
+    expect(await env.service.status()).toMatchObject({
+      owner: 'other',
+      port: 50507,
+      freePort: 50508,
+    })
+    // While it holds the port, the upkeep changes nothing.
+    env.net.router.calls.length = 0
+    expect(await env.service.upkeep()).toBe('nothing')
+    expect(env.net.router.calls).toEqual([])
   })
 
   it("keeps only the user's end while the node is stopped", async () => {

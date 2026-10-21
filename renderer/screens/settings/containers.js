@@ -59,6 +59,7 @@ import {
   IPFS_WRITE_BUFFERS,
   PEER_LEVEL_CHOICES,
   WRITE_BUFFER_NOTE,
+  nodePortChoices,
   pendingNodeOptions,
   restartRisk,
 } from './advanced-settings'
@@ -415,8 +416,9 @@ export function LocaleSwitcher() {
 }
 
 /**
- * The built-in node's Advanced settings: its peer level and IPFS connection limit (main/node-peers.js), and
- * the write buffers of its chain database and IPFS datastore (main/node-write-buffer.js). The node takes them
+ * The built-in node's Advanced settings: its peer level and IPFS connection limit (main/node-peers.js), the
+ * write buffers of its chain database and IPFS datastore (main/node-write-buffer.js), and its port
+ * (main/router-port.js NODE_PORTS; the Router port row's "Use port" sets it too). The node takes them
  * at its start: while it runs with others, a line offers a restart (not during the validation), and so does a
  * dialog right after a change. A setting the node binary has no flag for (an official one) is disabled.
  */
@@ -595,7 +597,26 @@ export function AdvancedNodeSettings() {
         }
         options={IPFS_WRITE_BUFFERS.map(bufferOption)}
       />
-      <RouterPortSettings isDisabled={!settings.runInternalNode} />
+      <NodeOptionRow
+        title={t('Node port')}
+        description={t(
+          'The port the node listens on for Idena nodes that connect to this computer. Behind one router each device needs its own port: a router forwards a port to one device only. Pick another one for a second computer or a phone on the same network, then open it in Router port. The node takes the port at its start',
+          {nsSeparator: '!!'}
+        )}
+        value={Number(settings.ipfsPort)}
+        isDisabled={!settings.runInternalNode}
+        onChange={(value) => save('Node port', {ipfsPort: Number(value)})}
+        options={nodePortChoices(Number(settings.ipfsPort)).map(
+          ({value, isDefault}) => ({
+            value,
+            label: isDefault ? `${value} · ${t('default')}` : String(value),
+          })
+        )}
+      />
+      <RouterPortSettings
+        isDisabled={!settings.runInternalNode}
+        onUsePort={(port) => save('Node port', {ipfsPort: port})}
+      />
       <NodeReportsSettings isDisabled={!settings.runInternalNode} />
       <DirectPeersSettings
         isDisabled={!settings.runInternalNode || unsupported('directPeers')}

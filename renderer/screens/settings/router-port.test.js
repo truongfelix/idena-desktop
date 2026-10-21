@@ -149,6 +149,22 @@ describe('the Router port row', () => {
       line: 'Port 50506 on Livebox goes to another device (192.168.1.30)',
       color: 'muted',
     })
+
+    expect(
+      routerPortView(
+        found({
+          owner: 'other',
+          mapping: {client: '192.168.1.30'},
+          freePort: 50507,
+        }),
+        t,
+        NOW
+      )
+    ).toEqual({
+      line: 'Port 50506 on Livebox goes to another device (192.168.1.30). Port 50507 is free there',
+      color: 'muted',
+      action: 'use-port',
+    })
   })
 
   it("points at this computer's firewall when no peer came from outside", () => {

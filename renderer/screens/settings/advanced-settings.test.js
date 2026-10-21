@@ -4,6 +4,7 @@ import {
   IPFS_CONNECTION_CHOICES,
   IPFS_WRITE_BUFFERS,
   PEER_LEVEL_CHOICES,
+  nodePortChoices,
   optionPending,
   pendingNodeOptions,
   restartRisk,
@@ -159,6 +160,40 @@ describe('advanced node settings', () => {
     expect(
       pendingNodeOptions({nodeStarted: false, running: {}, supported, settings})
     ).toEqual([])
+  })
+
+  it('offers a restart for another node port', () => {
+    const running = {...settings, ipfsPort: 50506}
+    expect(
+      pendingNodeOptions({
+        nodeStarted: true,
+        running,
+        supported,
+        settings: {...settings, ipfsPort: 50507},
+      })
+    ).toEqual([{title: 'Node port', value: '50507'}])
+    expect(
+      pendingNodeOptions({
+        nodeStarted: true,
+        running,
+        supported,
+        settings: {...settings, ipfsPort: 50506},
+      })
+    ).toEqual([])
+  })
+
+  it('offers the five node ports, and keeps a port set by hand before', () => {
+    expect(nodePortChoices(50506)).toEqual([
+      {value: 50506, isDefault: true},
+      {value: 50507, isDefault: false},
+      {value: 50508, isDefault: false},
+      {value: 50509, isDefault: false},
+      {value: 50510, isDefault: false},
+    ])
+    expect(nodePortChoices(40405).map(({value}) => value)).toEqual([
+      50506, 50507, 50508, 50509, 50510, 40405,
+    ])
+    expect(nodePortChoices(NaN)).toHaveLength(5)
   })
 
   it('compares the IPFS limit the level can run with', () => {

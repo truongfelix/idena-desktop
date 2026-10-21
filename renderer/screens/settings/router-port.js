@@ -53,7 +53,7 @@ export const QUIET_HINT_MS = 10 * 60 * 1000
 
 /**
  * What the Router port row says for `status` (main/router-port-service.js) at `nowMs`, in which color, which
- * button it offers ('look', 'search-again', 'try-again', 'open', 'close' or none) and, for an opening no peer
+ * button it offers ('look', 'search-again', 'try-again', 'open', 'close', 'use-port' or none) and, for an opening no peer
  * from outside has used for QUIET_HINT_MS while the node runs (`nodeStarted`), a `hint`. `anchor` is true while the
  * port is open for this computer: the row then says the node can help phones connect (B-129). `t` translates.
  */
@@ -165,13 +165,17 @@ export function routerPortView(status, t, nowMs, {nodeStarted = false} = {}) {
     }
   }
   if (owner === 'other') {
+    const taken = t(
+      'Port {{port}} on {{name}} goes to another device ({{client}})',
+      {port, name, client: status.mapping.client}
+    )
+    if (!status.freePort) return {line: taken, color: 'muted'}
     return {
-      line: t('Port {{port}} on {{name}} goes to another device ({{client}})', {
-        port,
-        name,
-        client: status.mapping.client,
-      }),
+      line: `${taken}. ${t('Port {{port}} is free there', {
+        port: status.freePort,
+      })}`,
       color: 'muted',
+      action: 'use-port',
     }
   }
   return {line: t('Closed on {{name}}', {name}), color: 'muted', action: 'open'}
@@ -180,9 +184,10 @@ export function routerPortView(status, t, nowMs, {nodeStarted = false} = {}) {
 /**
  * The Router port row of the Advanced settings (main/router-port-service.js), as in the phone app: the search
  * for the router (on the user's click here, by itself on the phone), a found router's state, and the Open and
- * Close buttons. The main process keeps the opening afterwards.
+ * Close buttons; when another device holds the port, "Use port" for a free one (`onUsePort(port)`: the Node port
+ * setting, taken at the next start). The main process keeps the opening afterwards.
  */
-export function RouterPortSettings({isDisabled}) {
+export function RouterPortSettings({isDisabled, onUsePort}) {
   const {t} = useTranslation()
   const {nodeStarted} = useNodeState()
   const epoch = useEpochState()
@@ -239,6 +244,7 @@ export function RouterPortSettings({isDisabled}) {
     'try-again': () => run('status', {retry: true}),
     open: () => setIsChoosing(true),
     close: () => setIsClosing(true),
+    'use-port': () => onUsePort(status.freePort),
   }[action]
   const buttonText = {
     look: t('Look for the router'),
@@ -246,6 +252,7 @@ export function RouterPortSettings({isDisabled}) {
     'try-again': t('Try again'),
     open: t('Open…'),
     close: t('Close'),
+    'use-port': t('Use port {{port}}', {port: status.freePort}),
   }[action]
 
   return (
