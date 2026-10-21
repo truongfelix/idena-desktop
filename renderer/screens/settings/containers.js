@@ -41,6 +41,7 @@ import {
   useNodeState,
 } from '../../shared/providers/node-context'
 import {importKey} from '../../shared/api/dna'
+import {importKeyErrorText, importKeyWhenReady} from './import-key'
 import {
   useSettingsDispatch,
   useSettingsState,
@@ -225,52 +226,55 @@ export function ImportPrivateKeyDialog(props) {
 
   const [shouldResetNode, setShouldResetNode] = React.useState()
 
+  const [isImporting, setIsImporting] = React.useState(false)
+
+  const [isWaitingForNode, setIsWaitingForNode] = React.useState(false)
+
+  // Closing the dialog stops the wait for the node.
+  const cancelled = React.useRef(false)
+  React.useEffect(() => {
+    // eslint-disable-next-line react/destructuring-assignment
+    cancelled.current = !props.isOpen
+    // eslint-disable-next-line react/destructuring-assignment
+  }, [props.isOpen])
+
   const submit = async () => {
-    try {
-      const {error} = await importKey(key, password)
-      if (error) {
-        toast({
-          status: 'error',
-          // eslint-disable-next-line react/display-name
-          render: () => (
-            <Toast
-              title={t('Error while importing key')}
-              description={error.message}
-              status="error"
-            />
-          ),
-        })
-      } else {
-        importNodeKey(shouldResetNode)
-        toast({
-          // eslint-disable-next-line react/display-name
-          render: () => (
-            <Toast
-              title={t('Success')}
-              description={t(
-                'Key was imported, please, wait, while node is restarting'
-              )}
-            />
-          ),
-        })
-        setKey('')
-        setPassword('')
-      }
-    } catch (e) {
+    setIsImporting(true)
+    const result = await importKeyWhenReady(importKey, key, password, {
+      onWaiting: () => setIsWaitingForNode(true),
+      isCancelled: () => cancelled.current,
+    })
+    setIsImporting(false)
+    setIsWaitingForNode(false)
+    if (result.ok) {
+      importNodeKey(shouldResetNode)
+      toast({
+        // eslint-disable-next-line react/display-name
+        render: () => (
+          <Toast
+            title={t('Success')}
+            description={t(
+              'Key was imported, please, wait, while node is restarting'
+            )}
+          />
+        ),
+      })
+      setKey('')
+      setPassword('')
+    } else if (result.reason !== 'cancelled') {
       toast({
         status: 'error',
         // eslint-disable-next-line react/display-name
         render: () => (
           <Toast
             title={t('Error while importing key')}
-            description={t(
-              'Internal node is not available, try again in a few seconds'
-            )}
+            description={importKeyErrorText(result, t)}
             status="error"
           />
         ),
       })
     }
+    return result
   }
 
   const [revealPassword, setRevealPassword] = React.useState()
@@ -280,9 +284,10 @@ export function ImportPrivateKeyDialog(props) {
       <form
         onSubmit={async (e) => {
           e.preventDefault()
-          await submit()
+          const result = await submit()
+          // A refused key keeps the dialog open, to fix the password or the key.
           // eslint-disable-next-line react/destructuring-assignment
-          props.onClose()
+          if (result.ok) props.onClose()
         }}
       >
         <DialogBody>
@@ -340,6 +345,13 @@ export function ImportPrivateKeyDialog(props) {
                 </Tooltip>
               </Stack>
             </FormControl>
+            {isWaitingForNode && (
+              <Text color="muted" fontSize="sm">
+                {t(
+                  'The node is still starting. The key is imported as soon as it is ready.'
+                )}
+              </Text>
+            )}
           </Stack>
         </DialogBody>
         <DialogFooter>
@@ -347,7 +359,11 @@ export function ImportPrivateKeyDialog(props) {
           <SecondaryButton type="button" onClick={props.onClose}>
             {t('Close')}
           </SecondaryButton>
-          <PrimaryButton type="submit" disabled={!password || !key}>
+          <PrimaryButton
+            type="submit"
+            disabled={!password || !key}
+            isLoading={isImporting}
+          >
             {t('Import')}
           </PrimaryButton>
         </DialogFooter>

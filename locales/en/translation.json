@@ -1729,5 +1729,11 @@
   "You were removed from the group": "You were removed from the group",
   "You were removed from this group: you no longer get its key, and what you would send here no longer counts.": "You were removed from this group: you no longer get its key, and what you would send here no longer counts.",
   "Reading the latest blocks first…": "Reading the latest blocks first…",
-  "Not sent: the latest blocks could not be read in time, so the group may have a newer key. Try again.": "Not sent: the latest blocks could not be read in time, so the group may have a newer key. Try again."
+  "Not sent: the latest blocks could not be read in time, so the group may have a newer key. Try again.": "Not sent: the latest blocks could not be read in time, so the group may have a newer key. Try again.",
+  "The password does not open this key. Check the password the key was exported with.": "The password does not open this key. Check the password the key was exported with.",
+  "This is not an exported Idena key. Paste the whole key, as Export gave it.": "This is not an exported Idena key. Paste the whole key, as Export gave it.",
+  "The node did not finish starting. Try again once it is synchronized.": "The node did not finish starting. Try again once it is synchronized.",
+  "The node did not import the key: {{reason}}": "The node did not import the key: {{reason}}",
+  "The node is still starting. The key is imported as soon as it is ready.": "The node is still starting. The key is imported as soon as it is ready.",
+  "The built-in node is off. Turn on Run built-in node in Settings > Node to import a key.": "The built-in node is off. Turn on Run built-in node in Settings > Node to import a key."
 }
