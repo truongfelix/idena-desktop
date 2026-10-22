@@ -30,7 +30,7 @@ requireCondition(
 )
 requireCondition(
   packageJson.engines &&
-    packageJson.engines.node === '>=24.18.0 <25' &&
+    packageJson.engines.node === '>=24.22.1 <25' &&
     packageJson.engines.npm === '>=11.16.0',
   'package engines must pin the Node 24 / npm 11 runtime'
 )
