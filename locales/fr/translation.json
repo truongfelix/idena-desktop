@@ -1751,5 +1751,11 @@
   "Another node uses this node folder: close it (another Idena app or node still running), or restart the computer.": "Un autre nœud utilise ce dossier du nœud : fermez-le (une autre application ou un autre nœud Idena encore ouvert), ou redémarrez l'ordinateur.",
   "The node cannot read its configuration file (config.json in the node folder): fix it, or delete it to use the default settings.": "Le nœud ne peut pas lire son fichier de configuration (config.json dans le dossier du nœud) : corrigez-le, ou supprimez-le pour revenir aux réglages par défaut.",
   "Why the node stopped": "Pourquoi le nœud s'est arrêté",
-  "Reset node does not fix this: it would only sync the chain again.": "Réinitialiser le nœud ne règle pas ce problème : la chaîne serait seulement synchronisée à nouveau."
+  "Reset node does not fix this: it would only sync the chain again.": "Réinitialiser le nœud ne règle pas ce problème : la chaîne serait seulement synchronisée à nouveau.",
+  "1. Restart": "1. Redémarrer",
+  "Restart the built-in node. If it does not solve the problem try to restart your computer.": "Redémarrez le nœud intégré. Si cela ne règle pas le problème, redémarrez l'ordinateur.",
+  "2. Update": "2. Mettre à jour",
+  "Download the latest version of the Idena node.": "Téléchargez la dernière version du nœud Idena.",
+  "3. Reset": "3. Réinitialiser",
+  "Delete the blockchain data and re-sync it from scratch. This will not affect your private key.": "Supprimez les données de la chaîne et synchronisez-la à nouveau depuis le début. Votre clé privée n'est pas touchée."
 }

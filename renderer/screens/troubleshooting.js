@@ -45,8 +45,10 @@ export function TroubleshootingScreen() {
       <NodeStopReason reason={stopReason} />
       <TroubleshootingList>
         <TroubleshootingListItem
-          title="1. Restart"
-          description="Restart the built-in node. If it does not solve the problem try to restart your computer."
+          title={t('1. Restart')}
+          description={t(
+            'Restart the built-in node. If it does not solve the problem try to restart your computer.'
+          )}
           ActionComponent={
             <TroubleshootingActionButton onClick={restart}>
               {t('Restart node')}
@@ -54,8 +56,8 @@ export function TroubleshootingScreen() {
           }
         />
         <TroubleshootingListItem
-          title="2. Update"
-          description="Download the latest version of the Idena node."
+          title={t('2. Update')}
+          description={t('Download the latest version of the Idena node.')}
           ActionComponent={
             <TroubleshootingActionButton onClick={update}>
               {t('Update node')}
@@ -63,8 +65,10 @@ export function TroubleshootingScreen() {
           }
         />
         <TroubleshootingListItem
-          title="3. Reset"
-          description="Delete the blockchain data and re-sync it from scratch. This will not affect your private key."
+          title={t('3. Reset')}
+          description={t(
+            'Delete the blockchain data and re-sync it from scratch. This will not affect your private key.'
+          )}
           ActionComponent={
             <TroubleshootingActionButton
               variant="danger"
