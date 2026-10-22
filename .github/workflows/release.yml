@@ -164,11 +164,19 @@ jobs:
             exit 1
           fi
           (cd packages && sha256sum -- * > SHA256SUMS.txt)
+          # The developer signs the draft's list and .deb offline (scripts/sign-release.sh) before publishing it.
+          fingerprint=''
+          if [ -f release-signing-key.asc ]; then
+            fingerprint="$(gpg --batch --show-keys --with-colons release-signing-key.asc | awk -F: '$1 == "fpr" { print $10; exit }')"
+            [ -n "${fingerprint}" ] || { echo "release-signing-key.asc holds no key" >&2; exit 1; }
+          fi
           {
             cat .github/release-notes.md
+            if [ -n "${fingerprint}" ]; then cat .github/release-notes-signature.md; fi
             printf '\n## SHA-256\n\n```\n'
             cat packages/SHA256SUMS.txt
             printf '```\n'
+            if [ -n "${fingerprint}" ]; then printf '\nRelease key fingerprint: `%s`\n' "${fingerprint}"; fi
           } > release-notes.md
           prerelease=()
           if [[ "${tag}" == *-* ]]; then prerelease=(--prerelease); fi
