@@ -43,8 +43,8 @@ check it against the release's `SHA256SUMS.txt`:
 - Windows PowerShell: `Get-FileHash <file>`.
 
 A signed release also carries `SHA256SUMS.txt.asc` and `idena-client-linux-<version>.deb.asc`, signatures by the
-developer's release key, whose public half is [`release-signing-key.asc`](release-signing-key.asc): its release notes
-say how to check them with GnuPG.
+developer's release key, whose public half is [`release-signing-key.asc`](release-signing-key.asc) (fingerprint
+`40E978A3E04A9FE44ED5F51F3017CC3386159451`): its release notes say how to check them with GnuPG.
 
 The packages are not signed with a publisher certificate, so macOS and Windows warn before the first start:
 
