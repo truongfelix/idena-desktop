@@ -26,6 +26,7 @@ const {searchImageSource, searchImages} = require('./image-search')
 const {openExternalUrl} = require('./safe-external-url')
 const {RELEASES_API, createReleaseCheck} = require('./app-update-check')
 const {isTrustedIpcSender} = require('./ipc-sender')
+const {refuseBrotli} = require('./refuse-brotli')
 const {
   installRendererProtocol,
   registerRendererScheme,
@@ -100,6 +101,10 @@ const {
   UPKEEP_INTERVAL_MS,
   createRouterPortService,
 } = require('./router-port-service')
+
+// Every request of the main process (node updates, release check, picture search, the node's RPC) refuses Brotli
+// until the app's Node has the fix of CVE-2026-111497 (main/refuse-brotli.js).
+refuseBrotli(axios)
 
 let mainWindow
 let didCreateMainWindow = false
