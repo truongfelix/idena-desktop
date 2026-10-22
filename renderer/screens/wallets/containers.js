@@ -58,7 +58,13 @@ import {useFormatDna} from '../../shared/hooks/hooks'
 import {useIdentityState} from '../../shared/providers/identity-context'
 import {txTypeName} from '../history/utils'
 import {useTransactionDetails} from './hooks'
-import {TxStatus, hasPayload} from './utils'
+import {
+  MAX_COMMENT_BYTES,
+  TxStatus,
+  commentBytes,
+  commentPayload,
+  hasPayload,
+} from './utils'
 
 export function TotalAmount({address, amount}) {
   const {t, i18n} = useTranslation()
@@ -225,7 +231,9 @@ export function SendDnaDrawer({address, onSend, onFail, ...props}) {
 
               dispatch('submit')
 
-              const {from, amount} = Object.fromEntries(new FormData(e.target))
+              const {from, amount, comment} = Object.fromEntries(
+                new FormData(e.target)
+              )
               // "@name" sends to its holder, as shown under the field; an address as typed.
               const to = recipient.address
 
@@ -238,10 +246,21 @@ export function SendDnaDrawer({address, onSend, onFail, ...props}) {
                   throw new Error(`Incorrect Amount: ${amount}`)
                 }
 
+                const bytes = commentBytes(comment)
+                if (bytes?.length > MAX_COMMENT_BYTES) {
+                  throw new Error(
+                    t('The comment is too long: {{count}} bytes at most.', {
+                      count: MAX_COMMENT_BYTES,
+                      nsSeparator: '|',
+                    })
+                  )
+                }
+
                 const result = await callRpc('dna_sendTransaction', {
                   to,
                   from,
                   amount,
+                  payload: commentPayload(bytes),
                 })
                 // eslint-disable-next-line no-unused-expressions
                 onSend?.(result)
@@ -278,6 +297,17 @@ export function SendDnaDrawer({address, onSend, onFail, ...props}) {
                   name="amount"
                   placeholder={t('Enter amount')}
                 />
+              </WalletDrawerFormControl>
+              <WalletDrawerFormControl label={t('Comment (optional)')}>
+                <Input
+                  name="comment"
+                  placeholder={t('For example, an invoice number')}
+                />
+                <Text fontSize="sm" color="muted">
+                  {t(
+                    'Anyone can read it on the chain. A longer comment costs a slightly higher fee.'
+                  )}
+                </Text>
               </WalletDrawerFormControl>
             </Stack>
           </form>
