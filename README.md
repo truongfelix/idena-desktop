@@ -42,6 +42,10 @@ check it against the release's `SHA256SUMS.txt`:
 - macOS: `shasum -a 256 <file>`;
 - Windows PowerShell: `Get-FileHash <file>`.
 
+A signed release also carries `SHA256SUMS.txt.asc` and `idena-client-linux-<version>.deb.asc`, signatures by the
+developer's release key, whose public half is [`release-signing-key.asc`](release-signing-key.asc) (fingerprint
+`40E978A3E04A9FE44ED5F51F3017CC3386159451`): its release notes say how to check them with GnuPG.
+
 The packages are not signed with a publisher certificate, so macOS and Windows warn before the first start:
 
 - **Linux** (64-bit; Ubuntu 22.04, Debian 12 or newer): `sudo apt install ./idena-client-linux-<version>.deb`.
@@ -77,7 +81,8 @@ npm run dist                 # package for this system (dist:win, dist:mac, dist
 ```
 
 A `v*` tag makes the release workflow build every package into a draft release with its `SHA256SUMS.txt`. A tag with
-a hyphen makes a pre-release.
+a hyphen makes a pre-release. Before publishing the draft, the developer signs its list and `.deb` with the release
+key, kept offline: `scripts/sign-release.sh <tag>` (once, `scripts/sign-release.sh new-key` made the key).
 
 Pull requests are welcome. Translations: check your language's plurals [here](https://jsfiddle.net/sm9wgLze).
 
