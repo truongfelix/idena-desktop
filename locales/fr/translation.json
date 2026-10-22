@@ -1744,5 +1744,12 @@
   "Your node is offline": "Votre nœud est hors ligne",
   "Block_person": "Bloquer",
   "Report_validation": "Rapport",
-  "The node did not give your public key. Check that it is running, then open this again.": "Le nœud n'a pas donné votre clé publique. Vérifiez qu'il est en marche, puis rouvrez cette fenêtre."
+  "The node did not give your public key. Check that it is running, then open this again.": "Le nœud n'a pas donné votre clé publique. Vérifiez qu'il est en marche, puis rouvrez cette fenêtre.",
+  "Another program uses the port the app talks to the node on: close it (another Idena node, an older app still running), or restart the computer.": "Un autre programme utilise le port par lequel l'application parle au nœud : fermez-le (un autre nœud Idena, une ancienne application encore ouverte), ou redémarrez l'ordinateur.",
+  "Another program uses the node port: close it (another Idena node), or pick another node port in the Settings.": "Un autre programme utilise le port du nœud : fermez-le (un autre nœud Idena), ou choisissez un autre port du nœud dans les Paramètres.",
+  "Another program uses a port the node needs: close it (another Idena node), or restart the computer.": "Un autre programme utilise un port dont le nœud a besoin : fermez-le (un autre nœud Idena), ou redémarrez l'ordinateur.",
+  "Another node uses this node folder: close it (another Idena app or node still running), or restart the computer.": "Un autre nœud utilise ce dossier du nœud : fermez-le (une autre application ou un autre nœud Idena encore ouvert), ou redémarrez l'ordinateur.",
+  "The node cannot read its configuration file (config.json in the node folder): fix it, or delete it to use the default settings.": "Le nœud ne peut pas lire son fichier de configuration (config.json dans le dossier du nœud) : corrigez-le, ou supprimez-le pour revenir aux réglages par défaut.",
+  "Why the node stopped": "Pourquoi le nœud s'est arrêté",
+  "Reset node does not fix this: it would only sync the chain again.": "Réinitialiser le nœud ne règle pas ce problème : la chaîne serait seulement synchronisée à nouveau."
 }
