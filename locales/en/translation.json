@@ -1757,5 +1757,9 @@
   "2. Update": "2. Update",
   "Download the latest version of the Idena node.": "Download the latest version of the Idena node.",
   "3. Reset": "3. Reset",
-  "Delete the blockchain data and re-sync it from scratch. This will not affect your private key.": "Delete the blockchain data and re-sync it from scratch. This will not affect your private key."
+  "Delete the blockchain data and re-sync it from scratch. This will not affect your private key.": "Delete the blockchain data and re-sync it from scratch. This will not affect your private key.",
+  "Comment (optional)": "Comment (optional)",
+  "For example, an invoice number": "For example, an invoice number",
+  "Anyone can read it on the chain. A longer comment costs a slightly higher fee.": "Anyone can read it on the chain. A longer comment costs a slightly higher fee.",
+  "The comment is too long: {{count}} bytes at most.": "The comment is too long: {{count}} bytes at most."
 }

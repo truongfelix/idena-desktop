@@ -1,6 +1,10 @@
+import {TextEncoder} from 'util'
 import {HASH_IN_MEMPOOL} from '../../shared/utils/utils'
 import {
+  MAX_COMMENT_BYTES,
   TxStatus,
+  commentBytes,
+  commentPayload,
   hasPayload,
   hasReceipt,
   isInMempool,
@@ -73,5 +77,36 @@ describe('hasPayload', () => {
     expect(hasPayload(null)).toBe(false)
     expect(hasPayload(undefined)).toBe(false)
     expect(hasPayload('0x0a1b')).toBe(true)
+  })
+})
+
+describe('comment payload', () => {
+  beforeAll(() => {
+    global.TextEncoder = TextEncoder
+  })
+
+  const payloadOf = (comment) => commentPayload(commentBytes(comment))
+
+  it('sends no payload without a comment', () => {
+    expect(payloadOf(undefined)).toBeUndefined()
+    expect(payloadOf('')).toBeUndefined()
+    expect(payloadOf('  \n ')).toBeUndefined()
+  })
+
+  it('writes the trimmed comment as UTF-8 bytes, as the dna://send link does', () => {
+    const invoice = '3f2504e0-4f89-11d3-9a0c-0305e82c3301'
+    expect(payloadOf(` ${invoice} `)).toBe(
+      `0x${Buffer.from(invoice, 'utf8').toString('hex').toUpperCase()}`
+    )
+    expect(payloadOf('café')).toBe('0x636166C3A9')
+  })
+
+  it('counts bytes, not characters', () => {
+    expect(commentBytes('é'.repeat(MAX_COMMENT_BYTES / 2)).length).toBe(
+      MAX_COMMENT_BYTES
+    )
+    expect(commentBytes('é'.repeat(MAX_COMMENT_BYTES / 2 + 1)).length).toBe(
+      MAX_COMMENT_BYTES + 2
+    )
   })
 })

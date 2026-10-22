@@ -1757,5 +1757,9 @@
   "2. Update": "2. Mettre à jour",
   "Download the latest version of the Idena node.": "Téléchargez la dernière version du nœud Idena.",
   "3. Reset": "3. Réinitialiser",
-  "Delete the blockchain data and re-sync it from scratch. This will not affect your private key.": "Supprimez les données de la chaîne et synchronisez-la à nouveau depuis le début. Votre clé privée n'est pas touchée."
+  "Delete the blockchain data and re-sync it from scratch. This will not affect your private key.": "Supprimez les données de la chaîne et synchronisez-la à nouveau depuis le début. Votre clé privée n'est pas touchée.",
+  "Comment (optional)": "Commentaire (facultatif)",
+  "For example, an invoice number": "Par exemple, un numéro de facture",
+  "Anyone can read it on the chain. A longer comment costs a slightly higher fee.": "Tout le monde peut le lire sur la chaîne. Un commentaire plus long coûte des frais un peu plus élevés.",
+  "The comment is too long: {{count}} bytes at most.": "Le commentaire est trop long : {{count}} octets au maximum."
 }
