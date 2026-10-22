@@ -16,6 +16,7 @@
     "dequal",
     "dexie",
     "extract-colors",
+    "follow-redirects",
     "framer-motion",
     "fs-extra",
     "google-protobuf",
@@ -44,6 +45,6 @@
     "url-regex-safe",
     "xstate"
   ],
-  "maxRootRuntimeDependencies": 43,
+  "maxRootRuntimeDependencies": 44,
   "maxProductionNodeModules": 340
 }
