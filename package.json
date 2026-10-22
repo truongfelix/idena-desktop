@@ -182,6 +182,7 @@
     "dequal": "^1.0.0",
     "dexie": "^3.2.2",
     "extract-colors": "^1.1.22",
+    "follow-redirects": "^1.16.1",
     "framer-motion": "^4.0.0",
     "fs-extra": "^8.1.0",
     "google-protobuf": "^3.14.0",
