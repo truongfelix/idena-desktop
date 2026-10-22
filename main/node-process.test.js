@@ -89,7 +89,8 @@ describe('built-in node process', () => {
     await nodeProcess.start(async () => crashed)
     crashed.exit(2)
     expect(onFailed).toHaveBeenLastCalledWith(
-      `node ${crashed.pid} exited with code 2`
+      `node ${crashed.pid} exited with code 2`,
+      {code: 2, signal: null}
     )
     expect(nodeProcess.current).toBeNull()
 
@@ -97,7 +98,8 @@ describe('built-in node process', () => {
     await nodeProcess.start(async () => killed)
     killed.exit(null, 'SIGKILL')
     expect(onFailed).toHaveBeenLastCalledWith(
-      `node ${killed.pid} exited with code null (SIGKILL)`
+      `node ${killed.pid} exited with code null (SIGKILL)`,
+      {code: null, signal: 'SIGKILL'}
     )
     const quiet = fakeChild()
     await nodeProcess.start(async () => quiet)

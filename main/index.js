@@ -96,6 +96,7 @@ const {createAppBadge} = require('./app-badge')
 const {createNodeReports} = require('./node-reports')
 const {READ_INTERVAL_MS} = require('./node-watch')
 const {createNodeWatchdog} = require('./node-watchdog')
+const {createNodeOutputTail, nodeStopReason} = require('./node-stop-reason')
 const {createRouterNet} = require('./router-net')
 const {
   UPKEEP_INTERVAL_MS,
@@ -113,6 +114,9 @@ let tray
 let e2eSmokeFinished = false
 
 const nodeUpdater = new NodeUpdater(logger)
+
+// The built-in node's last output lines, for the troubleshooting screen's reason (main/node-stop-reason.js).
+const nodeOutput = createNodeOutputTail()
 
 // The built-in node's process (main/node-process.js): one at a time, stops that wait for the exit.
 const nodeProcess = createNodeProcess({
@@ -132,9 +136,13 @@ const nodeProcess = createNodeProcess({
         resolve()
       })
     }),
-  onFailed(message) {
+  onFailed(message, exit) {
     logger.error(message)
-    sendMainWindowMsg(NODE_EVENT, 'node-failed')
+    sendMainWindowMsg(
+      NODE_EVENT,
+      'node-failed',
+      nodeStopReason(nodeOutput.lines, exit)
+    )
   },
   logger,
 })
@@ -788,8 +796,9 @@ ipcMain.on(NODE_COMMAND, async (event, command, data) => {
         ipfsPort: data.ipfsPort,
       }
       nodeProcess
-        .start(() =>
-          startNode(
+        .start(() => {
+          nodeOutput.clear()
+          return startNode(
             data.rpcPort,
             data.tcpPort,
             data.ipfsPort,
@@ -799,10 +808,11 @@ ipcMain.on(NODE_COMMAND, async (event, command, data) => {
             isDev,
             (log) => {
               nodeWatchdog.logged(log)
+              nodeOutput.add(log)
               sendMainWindowMsg(NODE_EVENT, 'node-log', log)
             }
           )
-        )
+        })
         .then(({child, started}) => {
           if (started) nodeWatchdog.started()
           logger.info(
@@ -816,7 +826,11 @@ ipcMain.on(NODE_COMMAND, async (event, command, data) => {
           })
         })
         .catch((e) => {
-          sendMainWindowMsg(NODE_EVENT, 'node-failed')
+          // The node did not start at all (a binary missing or refused): its error is the reason.
+          sendMainWindowMsg(NODE_EVENT, 'node-failed', {
+            cause: null,
+            line: e.toString(),
+          })
           logger.error('error while starting node', e.toString())
         })
       break

@@ -9,7 +9,7 @@ const hasExited = (child) =>
 
 /**
  * `options.signal(child, signal)` sends a signal to the node (tree-kill on Linux and macOS); `onFailed(message)`
- * is called when the node exits without being asked to; `stopTimeoutMs` is how long a stop waits before
+ * (with `{code, signal}`, its exit) is called when the node exits without being asked to; `stopTimeoutMs` is how long a stop waits before
  * killing the node.
  */
 function createNodeProcess({
@@ -34,7 +34,7 @@ function createNodeProcess({
         logger.info(message)
       } else {
         // An exit nobody asked for is a failure, whatever its code: a crash, the OOM killer, a kill.
-        onFailed(message)
+        onFailed(message, {code, signal: exitSignal})
       }
     }
     if (hasExited(child)) {

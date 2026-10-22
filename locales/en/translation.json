@@ -1744,5 +1744,18 @@
   "Your node is offline": "Your node is offline",
   "Block_person": "Block",
   "Report_validation": "Report",
-  "The node did not give your public key. Check that it is running, then open this again.": "The node did not give your public key. Check that it is running, then open this again."
+  "The node did not give your public key. Check that it is running, then open this again.": "The node did not give your public key. Check that it is running, then open this again.",
+  "Another program uses the port the app talks to the node on: close it (another Idena node, an older app still running), or restart the computer.": "Another program uses the port the app talks to the node on: close it (another Idena node, an older app still running), or restart the computer.",
+  "Another program uses the node port: close it (another Idena node), or pick another node port in the Settings.": "Another program uses the node port: close it (another Idena node), or pick another node port in the Settings.",
+  "Another program uses a port the node needs: close it (another Idena node), or restart the computer.": "Another program uses a port the node needs: close it (another Idena node), or restart the computer.",
+  "Another node uses this node folder: close it (another Idena app or node still running), or restart the computer.": "Another node uses this node folder: close it (another Idena app or node still running), or restart the computer.",
+  "The node cannot read its configuration file (config.json in the node folder): fix it, or delete it to use the default settings.": "The node cannot read its configuration file (config.json in the node folder): fix it, or delete it to use the default settings.",
+  "Why the node stopped": "Why the node stopped",
+  "Reset node does not fix this: it would only sync the chain again.": "Reset node does not fix this: it would only sync the chain again.",
+  "1. Restart": "1. Restart",
+  "Restart the built-in node. If it does not solve the problem try to restart your computer.": "Restart the built-in node. If it does not solve the problem try to restart your computer.",
+  "2. Update": "2. Update",
+  "Download the latest version of the Idena node.": "Download the latest version of the Idena node.",
+  "3. Reset": "3. Reset",
+  "Delete the blockchain data and re-sync it from scratch. This will not affect your private key.": "Delete the blockchain data and re-sync it from scratch. This will not affect your private key."
 }

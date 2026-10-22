@@ -14,7 +14,7 @@ const TROUBLESHOOTING_RESTART_NODE = 'TROUBLESHOOTING_RESTART_NODE'
 const TROUBLESHOOTING_UPDATE_NODE = 'TROUBLESHOOTING_UPDATE_NODE'
 const TROUBLESHOOTING_RESET_NODE = 'TROUBLESHOOTING_RESET_NODE'
 
-const initialState = {
+export const initialState = {
   nodeStarted: false,
   nodeReady: false,
   nodeFailed: false,
@@ -22,7 +22,7 @@ const initialState = {
   logs: [],
 }
 
-function nodeReducer(state, action) {
+export function nodeReducer(state, action) {
   switch (action.type) {
     case NODE_FAILED: {
       return {
@@ -30,6 +30,9 @@ function nodeReducer(state, action) {
         nodeFailed: true,
         nodeReady: false,
         nodeStarted: false,
+        // Why it stopped, when the main process knows (main/node-stop-reason.js): {cause, line}. A later failure
+        // without one (a stop that failed) keeps it.
+        stopReason: action.data ?? state.stopReason ?? null,
       }
     }
     case NODE_READY: {
@@ -59,6 +62,7 @@ function nodeReducer(state, action) {
         ...state,
         nodeReady: false,
         nodeFailed: false,
+        stopReason: null,
       }
     }
     case UNSUPPORTED_MACOS_VERSION: {
@@ -73,6 +77,7 @@ function nodeReducer(state, action) {
       return {
         ...state,
         nodeFailed: false,
+        stopReason: null,
         runningTroubleshooter: true,
       }
     }
@@ -115,7 +120,7 @@ export function NodeProvider({children}) {
     const onEvent = (_sender, event, data) => {
       switch (event) {
         case 'node-failed':
-          dispatch({type: NODE_FAILED})
+          dispatch({type: NODE_FAILED, data})
           break
         case 'node-started':
           dispatch({type: NODE_START, data})

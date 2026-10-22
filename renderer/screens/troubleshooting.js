@@ -19,11 +19,14 @@ import {
   DialogFooter,
   HDivider,
 } from '../shared/components/components'
+import {useNodeState} from '../shared/providers/node-context'
 
 export function TroubleshootingScreen() {
   const {t} = useTranslation()
 
   const {restart, update} = useTroubleshooting()
+
+  const {stopReason} = useNodeState()
 
   const resetDisclosure = useDisclosure()
 
@@ -39,10 +42,13 @@ export function TroubleshootingScreen() {
           })}
         </Text>
       </Stack>
+      <NodeStopReason reason={stopReason} />
       <TroubleshootingList>
         <TroubleshootingListItem
-          title="1. Restart"
-          description="Restart the built-in node. If it does not solve the problem try to restart your computer."
+          title={t('1. Restart')}
+          description={t(
+            'Restart the built-in node. If it does not solve the problem try to restart your computer.'
+          )}
           ActionComponent={
             <TroubleshootingActionButton onClick={restart}>
               {t('Restart node')}
@@ -50,8 +56,8 @@ export function TroubleshootingScreen() {
           }
         />
         <TroubleshootingListItem
-          title="2. Update"
-          description="Download the latest version of the Idena node."
+          title={t('2. Update')}
+          description={t('Download the latest version of the Idena node.')}
           ActionComponent={
             <TroubleshootingActionButton onClick={update}>
               {t('Update node')}
@@ -59,8 +65,10 @@ export function TroubleshootingScreen() {
           }
         />
         <TroubleshootingListItem
-          title="3. Reset"
-          description="Delete the blockchain data and re-sync it from scratch. This will not affect your private key."
+          title={t('3. Reset')}
+          description={t(
+            'Delete the blockchain data and re-sync it from scratch. This will not affect your private key.'
+          )}
           ActionComponent={
             <TroubleshootingActionButton
               variant="danger"
@@ -74,6 +82,75 @@ export function TroubleshootingScreen() {
       </TroubleshootingList>
 
       <ResetNodeConfirmationDialog {...resetDisclosure} />
+    </Stack>
+  )
+}
+
+/** The node's known causes (main/node-stop-reason.js), said in the user's language. */
+function useStopCauseText() {
+  const {t} = useTranslation()
+  return {
+    'rpc-port-taken': t(
+      'Another program uses the port the app talks to the node on: close it (another Idena node, an older app still running), or restart the computer.',
+      {nsSeparator: '|'}
+    ),
+    'node-port-taken': t(
+      'Another program uses the node port: close it (another Idena node), or pick another node port in the Settings.',
+      {nsSeparator: '|'}
+    ),
+    'port-taken': t(
+      'Another program uses a port the node needs: close it (another Idena node), or restart the computer.',
+      {nsSeparator: '|'}
+    ),
+    'data-folder-in-use': t(
+      'Another node uses this node folder: close it (another Idena app or node still running), or restart the computer.',
+      {nsSeparator: '|'}
+    ),
+    'config-broken': t(
+      'The node cannot read its configuration file (config.json in the node folder): fix it, or delete it to use the default settings.',
+      {nsSeparator: '|'}
+    ),
+  }
+}
+
+// Known causes the Reset button cannot fix: the screen says so, before the user deletes the chain for nothing.
+const CAUSES_RESET_KEEPS = [
+  'rpc-port-taken',
+  'node-port-taken',
+  'port-taken',
+  'data-folder-in-use',
+  'config-broken',
+]
+
+export function NodeStopReason({reason}) {
+  const {t} = useTranslation()
+  const causeText = useStopCauseText()
+  if (!reason || (!reason.cause && !reason.line)) return null
+  return (
+    <Stack spacing="2" w="md" data-testid="node-stop-reason">
+      <Text fontWeight={500}>{t('Why the node stopped')}</Text>
+      {reason.cause && causeText[reason.cause] && (
+        <Text>{causeText[reason.cause]}</Text>
+      )}
+      {CAUSES_RESET_KEEPS.includes(reason.cause) && (
+        <Text color="muted">
+          {t(
+            'Reset node does not fix this: it would only sync the chain again.',
+            {nsSeparator: '|'}
+          )}
+        </Text>
+      )}
+      {reason.line && (
+        <Text
+          color="muted"
+          fontFamily="mono"
+          fontSize="sm"
+          wordBreak="break-word"
+          userSelect="text"
+        >
+          {reason.line}
+        </Text>
+      )}
     </Stack>
   )
 }
