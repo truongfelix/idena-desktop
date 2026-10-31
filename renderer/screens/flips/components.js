@@ -704,6 +704,7 @@ export function FlipEditorStep({
               idx={num}
               visible={currentIndex === idx}
               src={images[num]}
+              keywords={words}
               adversarialId={adversarialImageId}
               onChange={(url) => {
                 onChangeImage(url, num)

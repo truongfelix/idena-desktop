@@ -3,6 +3,7 @@ import {
   IMAGE_SOURCES,
   addImages,
   imageSearchMachine,
+  searchSuggestions,
 } from './image-search-machine'
 
 const {IMAGE_SOURCE_NAMES} = require('../../../main/image-search')
@@ -96,5 +97,41 @@ describe('the picture search (B-33)', () => {
     ])
     expect(addImages([], many)).toHaveLength(64)
     expect(addImages([pic('a')], null)).toEqual([pic('a')])
+  })
+})
+
+describe("the searches suggested from the flip's keywords (B-170)", () => {
+  afterEach(() => {
+    delete global.ipcRenderer
+  })
+
+  it('offers each keyword, then both together', () => {
+    expect(searchSuggestions([{name: 'cat'}, {name: 'sun'}])).toEqual([
+      'cat',
+      'sun',
+      'cat sun',
+    ])
+  })
+
+  it('leaves out blank and repeated keywords', () => {
+    expect(searchSuggestions([{name: ' cat '}, {name: ''}])).toEqual(['cat'])
+    expect(searchSuggestions([{name: 'cat'}, {name: 'cat'}])).toEqual([
+      'cat',
+      'cat cat',
+    ])
+    expect(searchSuggestions([{name: 'cat'}, undefined])).toEqual(['cat'])
+    expect(searchSuggestions(undefined)).toEqual([])
+  })
+
+  it('a suggestion typed then searched asks for that text', () => {
+    const ipc = fakeIpc()
+    const service = start()
+    service.send('TYPE', {query: 'old words'})
+    service.send('TYPE', {query: 'cat sun'})
+    service.send('SEARCH')
+    expect(ipc.asked).toEqual(
+      IMAGE_SOURCES.map((source) => ['search-image', 'cat sun', source])
+    )
+    service.stop()
   })
 })

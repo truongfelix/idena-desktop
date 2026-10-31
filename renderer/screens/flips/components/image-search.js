@@ -2,6 +2,7 @@
 import React from 'react'
 import {
   Box,
+  Button,
   Center,
   Image,
   InputGroup,
@@ -24,6 +25,7 @@ import {eitherState} from '../../../shared/utils/utils'
 import {FillCenter} from '../../oracles/components'
 import {SearchIcon} from '../../../shared/components/icons'
 import {imageSearchMachine} from '../machines'
+import {searchSuggestions} from '../image-search-machine'
 import {
   useSettingsDispatch,
   useSettingsState,
@@ -112,7 +114,13 @@ export function ImageSearchConsentDialog({onAnswer, ...props}) {
   )
 }
 
-export function ImageSearchDialog({onPick, onClose, onError, ...props}) {
+export function ImageSearchDialog({
+  keywords,
+  onPick,
+  onClose,
+  onError,
+  ...props
+}) {
   const {t} = useTranslation()
 
   const {imageSearch} = useSettingsState()
@@ -127,6 +135,7 @@ export function ImageSearchDialog({onPick, onClose, onError, ...props}) {
   })
 
   const {images, query, selectedImage} = current.context
+  const suggestions = searchSuggestions(keywords)
   // Each source's pictures show as it answers (B-33); the spinner stays while the others still come.
   const searching = eitherState(current, 'searching')
 
@@ -199,6 +208,26 @@ export function ImageSearchDialog({onPick, onClose, onError, ...props}) {
             </InputGroup>
             <PrimaryButton type="submit">{t('Search')}</PrimaryButton>
           </Stack>
+
+          {suggestions.length > 0 && (
+            <Stack isInline spacing={2} flexWrap="wrap" align="center">
+              {suggestions.map((suggestion) => (
+                <Button
+                  key={suggestion}
+                  size="sm"
+                  variant="outline"
+                  borderColor="gray.100"
+                  fontWeight={500}
+                  onClick={() => {
+                    send('TYPE', {query: suggestion})
+                    send('SEARCH')
+                  }}
+                >
+                  {suggestion}
+                </Button>
+              ))}
+            </Stack>
+          )}
 
           {eitherState(current, 'idle') && (
             <FillCenter>

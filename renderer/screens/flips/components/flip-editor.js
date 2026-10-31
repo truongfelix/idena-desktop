@@ -91,6 +91,7 @@ export default function FlipEditor({
   idx = 0,
   src,
   visible,
+  keywords,
   adversarialId,
   onChange,
   onChanging,
@@ -1061,6 +1062,7 @@ export default function FlipEditor({
       </Flex>
 
       <ImageSearchDialog
+        keywords={keywords}
         isOpen={showImageSearch}
         onPick={(url) => {
           // "Select" with nothing picked gives no URL: keep the slot's picture.

@@ -22,6 +22,16 @@ export function addImages(images, found) {
  * Asks every source for `query` (`search(query, source)`: its pictures), sending FOUND with each answer as it comes,
  * then ALL_FOUND once all have answered, or SEARCH_FAILED. Stopping it drops the answers still to come.
  */
+/** The ready searches for a flip's keywords: each keyword, then both together; blank and repeated ones left out. */
+export function searchSuggestions(words) {
+  const names = (words ?? [])
+    .map((word) => (typeof word === 'string' ? word : word?.name))
+    .map((name) => (name ?? '').trim())
+    .filter(Boolean)
+  const suggestions = names.length > 1 ? [...names, names.join(' ')] : names
+  return [...new Set(suggestions)]
+}
+
 export const searchEverySource = (search, query) => (callback) => {
   let stopped = false
   Promise.all(
