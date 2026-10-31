@@ -27,6 +27,7 @@ import {
   validationSummaryStatusText,
 } from '../../screens/validation/report/components'
 import {useValidationReportSummary} from '../../screens/validation/report/hooks'
+import {validationEpochLabel} from '../../screens/history/utils'
 import {
   ValidationResult,
   ValidationSummaryStatus,
@@ -126,7 +127,9 @@ export default function ValidationReport() {
       <Page as={Stack} spacing={8}>
         <Flex justify="space-between" align="center" w="full">
           <PageTitle m={0}>
-            {t('Epoch #{{epochNumber}} validation report', {epochNumber})}
+            {t('Epoch #{{epochNumber}} validation report', {
+              epochNumber: validationEpochLabel(epochNumber),
+            })}
           </PageTitle>
           <CloseButton
             onClick={() =>

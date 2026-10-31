@@ -9,6 +9,7 @@ import {
   parseHistoryTab,
   signedAmount,
   txTypeName,
+  validationEpochLabel,
 } from './utils'
 
 function summary(fields = {}) {
@@ -172,5 +173,18 @@ describe('History page', () => {
     expect(signedAmount({...tx, amount: '0'}, '0xab')).toBe(0)
     expect(counterParty(tx, '0xab')).toBe('0xcd')
     expect(counterParty(tx, '0xcd')).toBe('0xAB')
+  })
+})
+
+describe('validationEpochLabel', () => {
+  it("shows a validation under scan.idena.io's number, the epoch it opens", () => {
+    // The 2026-10-29 ceremony: epoch 234 for the node, 235 on scan.idena.io.
+    expect(validationEpochLabel(234)).toBe(235)
+    expect(validationEpochLabel(0)).toBe(1)
+  })
+
+  it('shows nothing for an unknown epoch', () => {
+    expect(validationEpochLabel(undefined)).toBeUndefined()
+    expect(validationEpochLabel(Number.NaN)).toBeUndefined()
   })
 })

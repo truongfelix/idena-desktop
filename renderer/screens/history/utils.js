@@ -94,6 +94,12 @@ function hasActivity(row) {
 
 // One row per past ceremony the node knows, newest first, starting at the first one where the address shows any
 // activity (older ceremonies say nothing about it).
+// The number scan.idena.io shows for a validation: the epoch the ceremony opens. The node numbers it by the epoch it
+// ends (dna_validationSummary, ?epoch= of the report page), one less: only the label changes.
+export function validationEpochLabel(epoch) {
+  return Number.isInteger(epoch) ? epoch + 1 : undefined
+}
+
 export function ceremonyRows(history) {
   if (!history?.epochs) return []
   const scores = new Map(

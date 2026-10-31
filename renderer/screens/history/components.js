@@ -26,6 +26,7 @@ import {
   signedAmount,
   toNumber,
   txTypeName,
+  validationEpochLabel,
 } from './utils'
 import {ShownName} from '../social/components/profile-public'
 
@@ -149,7 +150,7 @@ export function CeremoniesTab({history, isOwn}) {
               <TableRow key={row.epoch}>
                 <TableCol>
                   <Stack spacing={0}>
-                    <Text>#{row.epoch}</Text>
+                    <Text>#{validationEpochLabel(row.epoch)}</Text>
                     {isOwn && row.summary?.participated && (
                       <TextLink
                         href={`/validation/report?epoch=${row.epoch}`}
