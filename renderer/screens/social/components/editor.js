@@ -155,7 +155,8 @@ function TopicField({value, onChange}) {
  * text on IPFS if wanted, and Post, which shows the fees before anything is sent. Cancel keeps the text and the
  * image for the next draft.
  */
-export function Editor({now, status}) {
+/** The editor of the open draft; `underThread`: pinned under the thread it answers, so it starts smaller. */
+export function Editor({now, status, underThread = false}) {
   const {t} = useTranslation()
   const {names, sending} = useSocial()
   const {
@@ -173,7 +174,11 @@ export function Editor({now, status}) {
   const [imageNote, setImageNote] = React.useState(null)
   const fileRef = React.useRef()
   const textRef = React.useRef()
-  useAutoGrow(textRef, draftText)
+  useAutoGrow(
+    textRef,
+    draftText,
+    underThread ? {min: 96, maxShare: 0.35} : undefined
+  )
 
   const titles = {
     [DraftKind.Post]: t('New post'),

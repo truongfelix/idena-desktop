@@ -35,7 +35,12 @@ import {GroupEditView} from '../screens/social/views/groups'
 import {OpenTopicContext} from '../screens/social/components/topic'
 import {topicOf, topicChannel} from '../screens/social/topics'
 import {threadPost} from '../screens/social/hiding'
-import {editorMove, withCompose} from '../screens/social/editor-history'
+import {
+  editorMove,
+  replyFocusInThread,
+  scrollToShowAbove,
+  withCompose,
+} from '../screens/social/editor-history'
 
 const View = {
   Feed: 'feed',
@@ -171,9 +176,66 @@ export default function SocialPage() {
     </Text>
   )
 
+  // A reply or comment written from the thread it answers: the thread stays and scrolls, the editor stays under it.
+  const replyFocus = replyFocusInThread(
+    sending.draft,
+    postId,
+    Boolean(thread),
+    idKey
+  )
+  const pinnedEditorRef = React.useRef()
+  React.useEffect(() => {
+    // Once the editor's step is in the history (editor-history.js): a new step scrolls the page to its top
+    // (page-scroll.js), which would undo this. Then the answered item shows just above the editor. A timer, not a
+    // frame: a window that draws nothing runs no animation frame.
+    if (replyFocus === null || !hasCompose) return undefined
+    const timer = setTimeout(() => {
+      const editor = pinnedEditorRef.current
+      const item = document.querySelector(
+        `[data-thread-item="${CSS.escape(String(replyFocus))}"]`
+      )
+      const area = scrollingParent(editor)
+      if (!editor || !item || !area) return
+      area.scrollBy(
+        0,
+        scrollToShowAbove(
+          item.getBoundingClientRect(),
+          editor.getBoundingClientRect().top,
+          area.getBoundingClientRect().top
+        )
+      )
+    }, 50)
+    return () => clearTimeout(timer)
+  }, [replyFocus, hasCompose])
+
   let content
-  // The editor takes the page while it is open, as on the phone.
-  if (sending.draft) content = <Editor now={now} status={status} />
+  if (replyFocus !== null)
+    content = (
+      <Stack spacing={4} w="full">
+        <SocialThread
+          node={thread}
+          now={now}
+          focusId={replyFocus}
+          onProfile={openProfile}
+        />
+        {/* Pinned over the scrolling area's 24 px bottom padding too: no strip of the thread shows below it. */}
+        <Box
+          ref={pinnedEditorRef}
+          position="sticky"
+          bottom={-6}
+          zIndex={1}
+          bg="white"
+          borderTopWidth={1}
+          borderColor="gray.100"
+          pt={3}
+          pb={8}
+        >
+          <Editor now={now} status={status} underThread />
+        </Box>
+      </Stack>
+    )
+  // Otherwise the editor takes the page while it is open, as for a new post.
+  else if (sending.draft) content = <Editor now={now} status={status} />
   else if (postId !== null)
     content = thread ? (
       <SocialThread
@@ -411,4 +473,12 @@ export default function SocialPage() {
       </OpenTopicContext.Provider>
     </Layout>
   )
+}
+
+/** The nearest ancestor of `element` that scrolls its content, or null. */
+function scrollingParent(element) {
+  for (let node = element?.parentElement; node; node = node.parentElement) {
+    if (/(auto|scroll)/.test(getComputedStyle(node).overflowY)) return node
+  }
+  return null
 }
