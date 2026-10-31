@@ -4,6 +4,9 @@
 // (scripts/npm-audit-exceptions.json). An exception holds only while it has not expired and the latest
 // published version of its package is still in the advisory's vulnerable range: once a fix ships, or at
 // the expiry date, the audit fails again. Every other advisory fails as before.
+// An exception with `"major": <n>` is for an advisory fixed only in a later major version that the packages
+// needing the library cannot take: it holds while the latest <n>.x is still in the vulnerable range, so a fixed
+// <n>.x ends it like any other fix.
 
 const fs = require('fs')
 const path = require('path')
@@ -40,7 +43,8 @@ function advisoriesOf(report) {
 
 /**
  * Splits the advisories of `report` into allowed (a valid exception) and failures, and lists the
- * exceptions no advisory needs any more. `latestVersion(name)` gives a package's latest published version.
+ * exceptions no advisory needs any more. `latestVersion(name, major)` gives a package's latest published
+ * version, within that major version when `major` is given (the exception's `major`).
  */
 function evaluateAudit(report, exceptions, today, latestVersion) {
   const allowed = []
@@ -58,13 +62,15 @@ function evaluateAudit(report, exceptions, today, latestVersion) {
         reason: `exception expired ${exception.expires}`,
       })
     } else {
-      const latest = latestVersion(advisory.package)
+      const {major} = exception
+      const latest = latestVersion(advisory.package, major)
+      const line = major === undefined ? '' : ` ${major}.x`
       if (!latest || !semver.satisfies(latest, advisory.range)) {
         failures.push({
           advisory,
           reason: latest
             ? `${advisory.package}@${latest} is outside ${advisory.range}: update to the fixed version`
-            : `cannot read the latest version of ${advisory.package}`,
+            : `cannot read the latest${line} version of ${advisory.package}`,
         })
       } else {
         allowed.push({advisory, exception})
@@ -84,7 +90,9 @@ function readExceptions(file = EXCEPTIONS_FILE) {
       !/^GHSA(-[23456789cfghjmpqrvwx]{4}){3}$/u.test(exception.id) ||
       !exception.package ||
       !exception.reason ||
-      !/^\d{4}-\d{2}-\d{2}$/u.test(exception.expires)
+      !/^\d{4}-\d{2}-\d{2}$/u.test(exception.expires) ||
+      (exception.major !== undefined &&
+        !(Number.isInteger(exception.major) && exception.major >= 0))
     ) {
       throw new Error(
         `invalid npm audit exception: ${JSON.stringify(exception)}`
@@ -94,12 +102,23 @@ function readExceptions(file = EXCEPTIONS_FILE) {
   return exceptions
 }
 
-function npmLatestVersion(name) {
-  const result = spawnSync(npmCommand, ['view', name, 'version'], {
+function npmLatestVersion(name, major) {
+  const args =
+    major === undefined
+      ? ['view', name, 'version']
+      : ['view', name, 'versions', '--json']
+  const result = spawnSync(npmCommand, args, {
     encoding: 'utf8',
     shell: process.platform === 'win32',
   })
-  return result.status === 0 ? result.stdout.trim() : null
+  if (result.status !== 0) return null
+  if (major === undefined) return result.stdout.trim()
+  return latestInMajor(JSON.parse(result.stdout), major)
+}
+
+/** The highest stable version of `versions` within major version `major`, or null. */
+function latestInMajor(versions, major) {
+  return semver.maxSatisfying([].concat(versions), `${major}.x`) || null
 }
 
 function main() {
@@ -151,4 +170,4 @@ function main() {
 
 if (require.main === module) main()
 
-module.exports = {advisoriesOf, evaluateAudit, readExceptions}
+module.exports = {advisoriesOf, evaluateAudit, latestInMajor, readExceptions}

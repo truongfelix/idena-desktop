@@ -156,7 +156,7 @@
     }
   },
   "devDependencies": {
-    "electron": "43.7.7",
+    "electron": "43.8.6",
     "electron-builder": "^26.8.2",
     "eslint": "^8.36.0",
     "eslint-config-wesbos": "^3.2.3",
@@ -183,7 +183,7 @@
     "dequal": "^1.0.0",
     "dexie": "^3.2.2",
     "extract-colors": "^1.1.22",
-    "follow-redirects": "^1.16.1",
+    "follow-redirects": "^1.16.2",
     "framer-motion": "^4.0.0",
     "fs-extra": "^8.1.0",
     "google-protobuf": "^3.14.0",
