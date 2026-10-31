@@ -24,6 +24,7 @@ import {defaultSide, encodeImage} from '../image'
 import {IMAGE_TYPE, fromWei, storeFeeHint} from '../posting'
 import {DraftKind} from '../sending'
 import {TOPIC_PREFIX, topicChannel, topicList, typedTopic} from '../topics'
+import {useAutoGrow} from './auto-grow'
 import {Chip} from './chips'
 import {PostText} from './post'
 import {MUTED} from './theme'
@@ -171,6 +172,8 @@ export function Editor({now, status}) {
   const [preparing, setPreparing] = React.useState(false)
   const [imageNote, setImageNote] = React.useState(null)
   const fileRef = React.useRef()
+  const textRef = React.useRef()
+  useAutoGrow(textRef, draftText)
 
   const titles = {
     [DraftKind.Post]: t('New post'),
@@ -234,9 +237,10 @@ export function Editor({now, status}) {
       )}
       {isPost && <TopicField value={draftTopic} onChange={setDraftTopic} />}
       <Textarea
+        ref={textRef}
         autoFocus
         value={draftText}
-        minH="120px"
+        resize="none"
         placeholder={isPost ? t("What's new?") : t('Your answer')}
         onChange={(e) => setDraftText(e.target.value)}
       />
