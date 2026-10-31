@@ -78,7 +78,11 @@ function ThreadItem({
   else if (node.call.hasMedia && !node.call.message) preview = t('🖼 Media')
   return (
     <Stack spacing={0}>
-      <Flex ref={ref} pt={depth === 0 ? 2 : 1}>
+      <Flex
+        ref={ref}
+        data-thread-item={idKey(node.id)}
+        pt={depth === 0 ? 2 : 1}
+      >
         <Flex onClick={() => setFolded(!folded)} cursor="pointer">
           <Rails count={rails} />
         </Flex>
@@ -160,6 +164,7 @@ export function SocialThread({node, now, focusId, onProfile}) {
     <Stack spacing={2} w="full">
       <Stack
         ref={ref}
+        data-thread-item={idKey(node.id)}
         spacing={2}
         bg={focusId === idKey(node.id) ? 'gray.50' : undefined}
         rounded="md"

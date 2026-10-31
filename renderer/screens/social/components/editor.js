@@ -24,6 +24,7 @@ import {defaultSide, encodeImage} from '../image'
 import {IMAGE_TYPE, fromWei, storeFeeHint} from '../posting'
 import {DraftKind} from '../sending'
 import {TOPIC_PREFIX, topicChannel, topicList, typedTopic} from '../topics'
+import {useAutoGrow} from './auto-grow'
 import {Chip} from './chips'
 import {PostText} from './post'
 import {MUTED} from './theme'
@@ -154,7 +155,8 @@ function TopicField({value, onChange}) {
  * text on IPFS if wanted, and Post, which shows the fees before anything is sent. Cancel keeps the text and the
  * image for the next draft.
  */
-export function Editor({now, status}) {
+/** The editor of the open draft; `underThread`: pinned under the thread it answers, so it starts smaller. */
+export function Editor({now, status, underThread = false}) {
   const {t} = useTranslation()
   const {names, sending} = useSocial()
   const {
@@ -171,6 +173,12 @@ export function Editor({now, status}) {
   const [preparing, setPreparing] = React.useState(false)
   const [imageNote, setImageNote] = React.useState(null)
   const fileRef = React.useRef()
+  const textRef = React.useRef()
+  useAutoGrow(
+    textRef,
+    draftText,
+    underThread ? {min: 96, maxShare: 0.35} : undefined
+  )
 
   const titles = {
     [DraftKind.Post]: t('New post'),
@@ -234,9 +242,10 @@ export function Editor({now, status}) {
       )}
       {isPost && <TopicField value={draftTopic} onChange={setDraftTopic} />}
       <Textarea
+        ref={textRef}
         autoFocus
         value={draftText}
-        minH="120px"
+        resize="none"
         placeholder={isPost ? t("What's new?") : t('Your answer')}
         onChange={(e) => setDraftText(e.target.value)}
       />
