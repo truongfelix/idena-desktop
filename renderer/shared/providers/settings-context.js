@@ -20,6 +20,7 @@ const SET_NODE_OPTIONS = 'SET_NODE_OPTIONS'
 const SET_IMAGE_SEARCH = 'SET_IMAGE_SEARCH'
 const SET_RELEASE_CHECK = 'SET_RELEASE_CHECK'
 const SET_THEME = 'SET_THEME'
+const SET_FLIP_KEEP_PROPORTIONS = 'SET_FLIP_KEEP_PROPORTIONS'
 
 const CHANGE_LANGUAGE = 'CHANGE_LANGUAGE'
 
@@ -134,6 +135,13 @@ function settingsReducer(state, action) {
         theme: themeSource(action.theme),
       }
     }
+    // flipKeepProportions: the flip editor's "Keep proportions" box; absent until changed, which keeps them.
+    case SET_FLIP_KEEP_PROPORTIONS: {
+      return {
+        ...state,
+        flipKeepProportions: action.keep,
+      }
+    }
     default:
       return state
   }
@@ -244,6 +252,11 @@ export function SettingsProvider({children}) {
     [dispatch]
   )
 
+  const setFlipKeepProportions = useCallback(
+    (keep) => dispatch({type: SET_FLIP_KEEP_PROPORTIONS, keep: Boolean(keep)}),
+    [dispatch]
+  )
+
   const setConnectionDetails = useCallback(
     ({url, apiKey}) => {
       dispatch({type: SET_CONNECTION_DETAILS, url, apiKey})
@@ -265,6 +278,7 @@ export function SettingsProvider({children}) {
             setImageSearch,
             setReleaseCheck,
             setTheme,
+            setFlipKeepProportions,
           }),
           [
             changeLanguage,
@@ -273,6 +287,7 @@ export function SettingsProvider({children}) {
             setNodeOptions,
             setReleaseCheck,
             setTheme,
+            setFlipKeepProportions,
             toggleAutoActivateMining,
             toggleRunInternalNode,
             toggleUseExternalNode,

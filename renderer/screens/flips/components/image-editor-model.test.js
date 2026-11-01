@@ -2,6 +2,7 @@ import {
   cornerPoint,
   createHistory,
   cropArea,
+  handlePoint,
   hitHandle,
   hitObject,
   hitRect,
@@ -15,6 +16,7 @@ import {
   scaleFromCorner,
   stepBack,
   stepForward,
+  stretchFromHandle,
   toCanvas,
   toLocal,
 } from './image-editor-model'
@@ -86,7 +88,18 @@ describe('hit tests', () => {
     expect(hitHandle(obj, {x: 100, y: 50}, SIZES)).toBe(null)
   })
 
+  it('finds the middle of the sides only when asked', () => {
+    const obj = picture()
+    expect(hitHandle(obj, {x: 120, y: 50}, SIZES)).toBe(null)
+    expect(hitHandle(obj, {x: 120, y: 50}, {...SIZES, sides: true})).toBe('mr')
+    expect(hitHandle(obj, {x: 100, y: 61}, {...SIZES, sides: true})).toBe('mb')
+    expect(hitHandle(obj, {x: 121, y: 61}, {...SIZES, sides: true})).toBe('br')
+  })
+
   it('gives resize cursors that turn with the object', () => {
+    expect(resizeCursor('mr')).toBe('ew-resize')
+    expect(resizeCursor('mt')).toBe('ns-resize')
+    expect(resizeCursor('mt', 90)).toBe('ew-resize')
     expect(resizeCursor('tl')).toBe('nwse-resize')
     expect(resizeCursor('tr')).toBe('nesw-resize')
     expect(resizeCursor('tl', 90)).toBe('nesw-resize')
@@ -121,6 +134,49 @@ describe('scaling from a corner', () => {
   it('cannot shrink an object already smaller than the minimum', () => {
     const dot = picture({width: 4, height: 4})
     expect(scaleFromCorner(dot, 'br', {x: 0, y: 0}, 8).scaleX).toBeCloseTo(1)
+  })
+})
+
+describe('stretching (proportions not kept)', () => {
+  it('stretches width and height apart from a corner, the opposite corner in place', () => {
+    const obj = picture()
+    // The 40x20 picture's top-left corner is (80, 40): dragging br to (180, 50) makes it 100x10.
+    const next = stretchFromHandle(obj, 'br', {x: 180, y: 50}, 8)
+    expect(next.scaleX).toBeCloseTo(2.5)
+    expect(next.scaleY).toBeCloseTo(0.5)
+    close(cornerPoint({...obj, ...next}, 'tl'), cornerPoint(obj, 'tl'))
+  })
+
+  it('stretches one direction from the middle of a side', () => {
+    const obj = picture({scaleX: 1.5, scaleY: 1.5})
+    const wider = stretchFromHandle(obj, 'mr', {x: 170, y: 0}, 8)
+    expect(wider.scaleY).toBeCloseTo(1.5)
+    // The left side stays at x = 70: 100 wide over the unscaled 40.
+    expect(wider.scaleX).toBeCloseTo(2.5)
+    close(handlePoint({...obj, ...wider}, 'ml'), handlePoint(obj, 'ml'))
+
+    const taller = stretchFromHandle(obj, 'mt', {x: 0, y: -10}, 8)
+    expect(taller.scaleX).toBeCloseTo(1.5)
+    // The bottom stays at y = 65: 75 high over the unscaled 20.
+    expect(taller.scaleY).toBeCloseTo(3.75)
+    close(handlePoint({...obj, ...taller}, 'mb'), handlePoint(obj, 'mb'))
+  })
+
+  it('keeps the opposite side of a rotated object in place', () => {
+    const obj = picture({angle: 30, scaleX: 1.2, scaleY: 0.8})
+    const next = stretchFromHandle(obj, 'ml', {x: 40, y: 10}, 8)
+    expect(next.scaleY).toBeCloseTo(0.8)
+    close(handlePoint({...obj, ...next}, 'mr'), handlePoint(obj, 'mr'))
+    close(cornerPoint({...obj, ...next}, 'tr'), cornerPoint(obj, 'tr'))
+  })
+
+  it('does not shrink a side below the minimum size or flip over', () => {
+    const obj = picture()
+    const next = stretchFromHandle(obj, 'br', {x: 0, y: 0}, 8)
+    expect(next.scaleX).toBeCloseTo(8 / 40)
+    expect(next.scaleY).toBeCloseTo(8 / 20)
+    const dot = picture({width: 4, height: 4})
+    expect(stretchFromHandle(dot, 'mr', {x: 0, y: 0}, 8).scaleX).toBeCloseTo(1)
   })
 })
 

@@ -3,9 +3,19 @@
 // degrees (clockwise), width/height are unscaled and scaleX/scaleY apply on top.
 
 export const CORNERS = ['tl', 'tr', 'br', 'bl']
+// The middle of each side: shown when proportions are not kept, they stretch one direction.
+export const SIDES = ['mt', 'mr', 'mb', 'ml']
 
 const CORNER_SIGNS = {tl: [-1, -1], tr: [1, -1], br: [1, 1], bl: [-1, 1]}
+const HANDLE_SIGNS = {
+  ...CORNER_SIGNS,
+  mt: [0, -1],
+  mr: [1, 0],
+  mb: [0, 1],
+  ml: [-1, 0],
+}
 const OPPOSITE = {tl: 'br', tr: 'bl', br: 'tl', bl: 'tr'}
+const OPPOSITE_HANDLE = {...OPPOSITE, mt: 'mb', mr: 'ml', mb: 'mt', ml: 'mr'}
 const RESIZE_CURSORS = ['ew-resize', 'nwse-resize', 'ns-resize', 'nesw-resize']
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max)
@@ -39,6 +49,12 @@ export function cornerPoint(obj, corner) {
   return toCanvas(obj, {x: (sx * obj.width) / 2, y: (sy * obj.height) / 2})
 }
 
+// A corner or the middle of a side.
+export function handlePoint(obj, handle) {
+  const [sx, sy] = HANDLE_SIGNS[handle]
+  return toCanvas(obj, {x: (sx * obj.width) / 2, y: (sy * obj.height) / 2})
+}
+
 export function topMiddlePoint(obj) {
   return toCanvas(obj, {x: 0, y: -obj.height / 2})
 }
@@ -64,17 +80,22 @@ export function hitObject(objects, point) {
   return null
 }
 
-// 'mtr' (rotation), a corner, or null. Sizes are in canvas units.
-export function hitHandle(obj, point, {cornerSize, rotatingPointOffset}) {
+// 'mtr' (rotation), a corner, the middle of a side (with `sides`), or null. Sizes are in canvas units.
+export function hitHandle(
+  obj,
+  point,
+  {cornerSize, rotatingPointOffset, sides = false}
+) {
   const reach = cornerSize / 2 + 2
   const near = (p) =>
     Math.abs(point.x - p.x) <= reach && Math.abs(point.y - p.y) <= reach
   if (near(rotationHandlePoint(obj, rotatingPointOffset))) return 'mtr'
-  return CORNERS.find((corner) => near(cornerPoint(obj, corner))) || null
+  const handles = sides ? [...CORNERS, ...SIDES] : CORNERS
+  return handles.find((handle) => near(handlePoint(obj, handle))) || null
 }
 
-export function resizeCursor(corner, angle = 0) {
-  const [sx, sy] = CORNER_SIGNS[corner]
+export function resizeCursor(handle, angle = 0) {
+  const [sx, sy] = HANDLE_SIGNS[handle]
   const direction = (Math.atan2(sy, sx) * 180) / Math.PI + angle
   const halfTurn = ((direction % 180) + 180) % 180
   return RESIZE_CURSORS[Math.round(halfTurn / 45) % 4]
@@ -121,6 +142,36 @@ export function scaleFromCorner(start, corner, point, minSize) {
     top: anchor.y + half.y,
     scaleX: start.scaleX * ratio,
     scaleY: start.scaleY * ratio,
+  }
+}
+
+// Free scaling from a corner or the middle of a side, the opposite one staying in place: a corner
+// changes width and height apart (the picture stretches), a side changes only its own direction.
+// As scaleFromCorner, a side never shrinks below minSize, unless it already was smaller, nor flips over.
+export function stretchFromHandle(start, handle, point, minSize) {
+  const [sx, sy] = HANDLE_SIGNS[handle]
+  const anchor = handlePoint(start, OPPOSITE_HANDLE[handle])
+  const pointer = rotate(
+    {x: point.x - anchor.x, y: point.y - anchor.y},
+    -(start.angle || 0)
+  )
+  const stretch = (sign, along, size, scale) => {
+    const current = size * scale
+    if (!sign || !size) return {length: current, scale}
+    const length = Math.max(sign * along, Math.min(minSize, current))
+    return {length, scale: length / size}
+  }
+  const x = stretch(sx, pointer.x, start.width, start.scaleX)
+  const y = stretch(sy, pointer.y, start.height, start.scaleY)
+  const half = rotate(
+    {x: (sx * x.length) / 2, y: (sy * y.length) / 2},
+    start.angle || 0
+  )
+  return {
+    left: anchor.x + half.x,
+    top: anchor.y + half.y,
+    scaleX: x.scale,
+    scaleY: y.scale,
   }
 }
 

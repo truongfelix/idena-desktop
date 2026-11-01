@@ -2,10 +2,12 @@
 import React from 'react'
 import {
   CORNERS,
+  SIDES,
   clampPoint,
   cornerPoint,
   createHistory,
   cropArea,
+  handlePoint,
   hitHandle,
   hitObject,
   hitRect,
@@ -22,12 +24,14 @@ import {
   scaleFromCorner,
   stepBack,
   stepForward,
+  stretchFromHandle,
   topMiddlePoint,
 } from './image-editor-model'
 
 // The flip image editor, with the part of toast-ui's API that flip-editor.js uses: pictures and pen
 // strokes are separate objects that can be selected, moved, scaled from a corner, rotated and deleted;
-// a crop zone is drawn by dragging; undo/redo restore whole scenes.
+// a crop zone is drawn by dragging; undo/redo restore whole scenes. With `keepProportions` off, the
+// corners stretch freely and the middle of each side stretches one direction.
 
 const NORMAL = 'NORMAL'
 const FREE_DRAWING = 'FREE_DRAWING'
@@ -156,8 +160,9 @@ function drawHandle(ctx, point, size, fill, stroke, lineWidth) {
 }
 
 // `unit` = canvas units per screen pixel, so handles keep their screen size.
-function drawSelection(ctx, obj, style, unit) {
+function drawSelection(ctx, obj, style, unit, sides) {
   const corners = CORNERS.map((corner) => cornerPoint(obj, corner))
+  const middles = sides ? SIDES.map((side) => handlePoint(obj, side)) : []
   const lineWidth = Number(style.lineWidth) * unit
   const handle = rotationHandlePoint(obj, style.rotatingPointOffset * unit)
   const top = topMiddlePoint(obj)
@@ -171,7 +176,7 @@ function drawSelection(ctx, obj, style, unit) {
   ctx.moveTo(top.x, top.y)
   ctx.lineTo(handle.x, handle.y)
   ctx.stroke()
-  ;[...corners, handle].forEach((p) =>
+  ;[...corners, ...middles, handle].forEach((p) =>
     drawHandle(
       ctx,
       p,
@@ -226,8 +231,14 @@ function drawCropZone(ctx, size, rect, unit) {
 }
 
 const SimpleImageEditor = React.forwardRef(
-  ({cssMaxHeight, cssMaxWidth, selectionStyle}, ref) => {
+  (
+    {cssMaxHeight, cssMaxWidth, selectionStyle, keepProportions = true},
+    ref
+  ) => {
     const canvasRef = React.useRef(null)
+
+    const keepProportionsRef = React.useRef(keepProportions)
+    keepProportionsRef.current = keepProportions
 
     const maxWidth = cssMaxWidth || 440
     const maxHeight = cssMaxHeight || 330
@@ -307,7 +318,13 @@ const SimpleImageEditor = React.forwardRef(
         if (s.mode === CROPPER) {
           drawCropZone(ctx, size, s.cropRect, unit())
         } else if (s.mode === NORMAL && findObject(s.activeId)) {
-          drawSelection(ctx, findObject(s.activeId), styleRef.current, unit())
+          drawSelection(
+            ctx,
+            findObject(s.activeId),
+            styleRef.current,
+            unit(),
+            !keepProportionsRef.current
+          )
         }
       }
 
@@ -518,6 +535,7 @@ const SimpleImageEditor = React.forwardRef(
         return {
           cornerSize: styleRef.current.cornerSize * u,
           rotatingPointOffset: styleRef.current.rotatingPointOffset * u,
+          sides: !keepProportionsRef.current,
         }
       }
 
@@ -563,6 +581,7 @@ const SimpleImageEditor = React.forwardRef(
             s.drag = {
               kind,
               corner: handle,
+              keepProportions: keepProportionsRef.current,
               start: {...findObject(id)},
               startPoint: point,
               changed: false,
@@ -620,12 +639,10 @@ const SimpleImageEditor = React.forwardRef(
             if (drag.kind === 'move') {
               props = movedBy(drag.start, drag.startPoint, point)
             } else if (drag.kind === 'scale') {
-              props = scaleFromCorner(
-                drag.start,
-                drag.corner,
-                point,
-                MIN_OBJECT_SIZE
-              )
+              const scale = drag.keepProportions
+                ? scaleFromCorner
+                : stretchFromHandle
+              props = scale(drag.start, drag.corner, point, MIN_OBJECT_SIZE)
             } else {
               props = {angle: rotationAngle(drag.start, point)}
             }
@@ -678,7 +695,7 @@ const SimpleImageEditor = React.forwardRef(
 
     React.useEffect(() => {
       editorRef.current.render()
-    }, [])
+    }, [keepProportions])
 
     // Delete/Backspace remove the selected object of the editor on screen (hidden editors have no
     // offsetParent), unless the key is typed into a field.
