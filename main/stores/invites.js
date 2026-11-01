@@ -1,10 +1,8 @@
-const low = require('lowdb')
-const FileSync = require('lowdb/adapters/FileSync')
 const {nanoid} = require('nanoid')
-const {dbPath} = require('./setup')
+const {prepareDb} = require('./setup')
 
-const adapter = new FileSync(dbPath('invites.json'))
-const db = low(adapter)
+// Written atomically, a damaged file put aside (main/stores/setup.js, B-177).
+const db = prepareDb('invites')
 
 // Set some defaults (required if your JSON file is empty)
 db.defaults({invites: [], activationTx: '', activationCode: ''}).write()

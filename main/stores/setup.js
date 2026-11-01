@@ -9,7 +9,6 @@ try {
   electron = {}
 }
 const low = require('lowdb')
-const FileSync = require('lowdb/adapters/FileSync')
 const fs = require('fs')
 const {APP_PATH_COMMAND} = require('../channels')
 const {hardenPrivateDirectory, hardenPrivateFile} = require('../private-files')
@@ -38,20 +37,159 @@ function dbPath(fileDb) {
   return path.join(getUserDataPath(), fileDb)
 }
 
-function createPrivateFileAdapter(filePath) {
-  const adapter = new FileSync(filePath)
-  const write = adapter.write.bind(adapter)
-  adapter.write = (data) => {
-    write(data)
-    hardenPrivateFile(filePath)
+// Each store is a JSON file in the user data folder, written whole at every change. lowdb's FileSync wrote it in
+// place: a power cut during a write left it cut or full of NUL bytes, and reading it threw at every start, before the
+// window had anything (B-177: a Windows user's flips.json, cut while a flip was being made). A write now goes to a
+// temporary file, synced, then renamed over the store, so that a cut leaves the old file or the new one; a file
+// damaged anyway (a disk error, a version before this one) is put aside and its store starts empty.
+
+/** The stores this process found damaged and put aside: {file, aside} each, for the window to tell the user. */
+const damagedStores = []
+
+// A temporary file older than this was left by a cut write: no write takes that long.
+const LEFTOVER_TEMP_MS = 10 * 60 * 1000
+
+function pause(ms) {
+  // Sync code (lowdb), in the window too, where Atomics.wait is refused: a few milliseconds at most.
+  const until = Date.now() + ms
+  while (Date.now() < until);
+}
+
+function renameOver(from, to, fileSystem) {
+  // Windows refuses to replace a file another process holds open for a moment (an antivirus, a reader).
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      fileSystem.renameSync(from, to)
+      return
+    } catch (error) {
+      const busy = ['EPERM', 'EACCES', 'EBUSY'].includes(error?.code)
+      if (!busy || attempt >= 5) throw error
+      pause(20 * attempt)
+    }
   }
-  hardenPrivateFile(filePath)
-  return adapter
+}
+
+function syncDirectory(directory, fileSystem) {
+  if (process.platform === 'win32') return
+  try {
+    const fd = fileSystem.openSync(directory, 'r')
+    try {
+      fileSystem.fsyncSync(fd)
+    } finally {
+      fileSystem.closeSync(fd)
+    }
+  } catch {
+    // Best effort: the rename itself is what keeps the file whole.
+  }
+}
+
+/** Writes text to filePath so that a cut at any point leaves the old file or the new one whole. */
+function writeFileAtomic(filePath, text, fileSystem = fs) {
+  // Own name per process: the main process and the window write settings.json both.
+  const temporary = `${filePath}.${process.pid}.tmp`
+  const fd = fileSystem.openSync(temporary, 'w', 0o600)
+  try {
+    fileSystem.writeFileSync(fd, text)
+    fileSystem.fsyncSync(fd)
+  } finally {
+    fileSystem.closeSync(fd)
+  }
+  try {
+    renameOver(temporary, filePath, fileSystem)
+  } catch (error) {
+    try {
+      fileSystem.unlinkSync(temporary)
+    } catch {
+      // Left for removeLeftoverTemporaries.
+    }
+    throw error
+  }
+  syncDirectory(path.dirname(filePath), fileSystem)
+}
+
+function removeLeftoverTemporaries(filePath, fileSystem, now) {
+  const directory = path.dirname(filePath)
+  const prefix = `${path.basename(filePath)}.`
+  let names = []
+  try {
+    names = fileSystem.readdirSync(directory)
+  } catch {
+    return
+  }
+  const leftovers = names.filter(
+    (name) => name.startsWith(prefix) && name.endsWith('.tmp')
+  )
+  for (const name of leftovers) {
+    const temporary = path.join(directory, name)
+    try {
+      if (now - fileSystem.statSync(temporary).mtimeMs > LEFTOVER_TEMP_MS) {
+        fileSystem.unlinkSync(temporary)
+      }
+    } catch {
+      // Another process removed or renamed it.
+    }
+  }
+}
+
+function putAside(filePath, fileSystem, now) {
+  const stamp = new Date(now).toISOString().replace(/[:.]/g, '-')
+  const aside = `${filePath}.broken-${stamp}`
+  try {
+    fileSystem.renameSync(filePath, aside)
+  } catch (error) {
+    // The other process (main or window) put it aside first.
+    if (error?.code === 'ENOENT') return
+    throw error
+  }
+  damagedStores.push({file: path.basename(filePath), aside})
+}
+
+/**
+ * The store's data: {} for a missing or empty file; a file that is not a JSON object (cut, NUL bytes) is put aside
+ * and read as {}. Throws only when the file cannot be read at all (permissions, a disk error).
+ */
+function readStore(filePath, fileSystem = fs, now = Date.now()) {
+  removeLeftoverTemporaries(filePath, fileSystem, now)
+  let text
+  try {
+    text = fileSystem.readFileSync(filePath, 'utf8')
+  } catch (error) {
+    if (error?.code === 'ENOENT') return {}
+    throw error
+  }
+  if (text.trim() === '') return {}
+  try {
+    const data = JSON.parse(text)
+    if (data && typeof data === 'object' && !Array.isArray(data)) return data
+  } catch {
+    // Damaged: put aside below.
+  }
+  putAside(filePath, fileSystem, now)
+  return {}
+}
+
+function createPrivateFileAdapter(filePath, fileSystem = fs) {
+  return {
+    read() {
+      const data = readStore(filePath, fileSystem)
+      hardenPrivateFile(filePath)
+      return data
+    },
+    write(data) {
+      writeFileAtomic(filePath, JSON.stringify(data, null, 2), fileSystem)
+      hardenPrivateFile(filePath)
+    },
+  }
 }
 
 module.exports = {
   dbPath,
   createPrivateFileAdapter,
+  readStore,
+  writeFileAtomic,
+  damagedStores() {
+    return damagedStores.map((store) => ({...store}))
+  },
   prepareDb(name) {
     const adapter = createPrivateFileAdapter(dbPath(`${name}.json`))
     return low(adapter)
