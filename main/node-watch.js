@@ -23,9 +23,13 @@ const MIN_FAILED_READS = 8
 const MAX_RESTARTS = 3
 const RESTART_WINDOW_MS = 6 * 60 * 60 * 1000
 
-// idena-go compacts its database before it opens its RPC: 21 min once on a hard disk (2026-10-16).
-const COMPACTION_START = 'Start compacting DB'
-const COMPACTION_END = 'DB compacted'
+// Work idena-go does before it opens its RPC, each between two log lines: the database compaction (21 min once on
+// a hard disk, 2026-10-16) and, once, the conversion of an IPFS repository the official app left in Badger (B-162:
+// a few GB on a hard disk, maybe longer).
+const BUSY_MARKERS = [
+  ['Start compacting DB', 'DB compacted'],
+  ['Start converting the IPFS repository', 'IPFS repository conversion ended'],
+]
 
 /**
  * Tells a node that stopped answering from one that starts or syncs. Times are a monotonic clock
@@ -35,7 +39,8 @@ const COMPACTION_END = 'DB compacted'
 function createNodeWatch(startedAt) {
   let lastAnswerAt = null
   let failedReads = 0
-  let compacting = false
+  // The node works before its RPC opens (BUSY_MARKERS).
+  let busy = false
 
   const silentFor = (now) => now - (lastAnswerAt ?? startedAt)
 
@@ -45,16 +50,18 @@ function createNodeWatch(startedAt) {
       lastAnswerAt = now
       failedReads = 0
     },
-    /** A read found nothing that answers at `now`: while the node compacts its database, that is its start. */
+    /** A read found nothing that answers at `now`: while the node works before its RPC opens, that is its start. */
     failed(now) {
-      if (compacting) this.answered(now)
+      if (busy) this.answered(now)
       else failedReads += 1
     },
     /** The node wrote these log lines. */
     logged(lines) {
       for (const line of lines) {
-        if (line.includes(COMPACTION_START)) compacting = true
-        if (line.includes(COMPACTION_END)) compacting = false
+        for (const [start, end] of BUSY_MARKERS) {
+          if (line.includes(start)) busy = true
+          if (line.includes(end)) busy = false
+        }
       }
     },
     silentFor,

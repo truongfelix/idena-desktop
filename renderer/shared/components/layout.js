@@ -380,6 +380,12 @@ function SyncingApp() {
 
   const {runInternalNode, useExternalNode} = useSettingsState()
 
+  // The node converts, once, the IPFS data the official app left (main/ipfs-conversion.js): it does not sync
+  // meanwhile, and only says it is at block 0.
+  const [{ipfsConversion}] = useNode()
+  const converting =
+    Boolean(ipfsConversion) && runInternalNode && !useExternalNode
+
   return (
     <FillCenter bg="graphite.500" color="white" position="relative">
       <Flex
@@ -393,7 +399,7 @@ function SyncingApp() {
         left={0}
         w="full"
       >
-        {t('Synchronizing...')}
+        {converting ? t('Preparing the node...') : t('Synchronizing...')}
       </Flex>
       <Stack spacing={10} w="md">
         {Boolean(address) && (
@@ -404,40 +410,44 @@ function SyncingApp() {
             </Heading>
           </Stack>
         )}
-        <Stack spacing={3}>
-          <Flex justify="space-between">
-            <Box>
-              <Heading fontSize="lg" fontWeight={500}>
-                <SyncStepTitle step={step} />
-              </Heading>
-              <Box
-                fontSize="mdx"
-                fontWeight={500}
-                color="muted"
-                style={{fontVariantNumeric: 'tabular-nums'}}
-              >
-                <SyncStepCount step={step} hasTop={Boolean(highestBlock)} />
-              </Box>
-              {speed && (
-                <Box fontSize="mdx" color="muted">
-                  <TimeLeft seconds={stepRemaining(step) / speed} />
+        {converting ? (
+          <IpfsConversionStep conversion={ipfsConversion} />
+        ) : (
+          <Stack spacing={3}>
+            <Flex justify="space-between">
+              <Box>
+                <Heading fontSize="lg" fontWeight={500}>
+                  <SyncStepTitle step={step} />
+                </Heading>
+                <Box
+                  fontSize="mdx"
+                  fontWeight={500}
+                  color="muted"
+                  style={{fontVariantNumeric: 'tabular-nums'}}
+                >
+                  <SyncStepCount step={step} hasTop={Boolean(highestBlock)} />
                 </Box>
-              )}
-            </Box>
-            <Box>
-              <Text as="span" color="muted">
-                {t('Peers connected')}:{' '}
-              </Text>
-              {peers.length}
-            </Box>
-          </Flex>
-          <Progress
-            value={step.phase === SyncPhase.Snapshot ? undefined : step.done}
-            isIndeterminate={step.phase === SyncPhase.Snapshot}
-            min={0}
-            max={step.total || Number.MAX_SAFE_INTEGER}
-          />
-        </Stack>
+                {speed && (
+                  <Box fontSize="mdx" color="muted">
+                    <TimeLeft seconds={stepRemaining(step) / speed} />
+                  </Box>
+                )}
+              </Box>
+              <Box>
+                <Text as="span" color="muted">
+                  {t('Peers connected')}:{' '}
+                </Text>
+                {peers.length}
+              </Box>
+            </Flex>
+            <Progress
+              value={step.phase === SyncPhase.Snapshot ? undefined : step.done}
+              isIndeterminate={step.phase === SyncPhase.Snapshot}
+              min={0}
+              max={step.total || Number.MAX_SAFE_INTEGER}
+            />
+          </Stack>
+        )}
 
         {runInternalNode && !useExternalNode && (
           <Text color="xwhite.040">
@@ -464,6 +474,45 @@ function SyncingApp() {
         )}
       </Stack>
     </FillCenter>
+  )
+}
+
+// The node's one-time conversion of the IPFS data the official app left, with what it means for the user.
+function IpfsConversionStep({conversion: {percent, minutesLeft}}) {
+  const {t} = useTranslation()
+  return (
+    <Stack spacing={3}>
+      <Box>
+        <Heading fontSize="lg" fontWeight={500}>
+          {percent === null
+            ? t('Converting the IPFS data')
+            : t('Converting the IPFS data {{percent}}%', {percent})}
+        </Heading>
+        {minutesLeft !== null && (
+          <Box fontSize="mdx" color="muted">
+            <TimeLeft seconds={minutesLeft * 60} />
+          </Box>
+        )}
+      </Box>
+      <Progress
+        value={percent ?? undefined}
+        isIndeterminate={percent === null}
+        min={0}
+        max={100}
+      />
+      <Text color="xwhite.040">
+        {t(
+          'This happens once: the node moves the data the official Idena app left into a format that uses less memory. It takes up to an hour on a hard disk, and the node does not synchronize meanwhile.',
+          {nsSeparator: '|'}
+        )}
+      </Text>
+      <Text color="xwhite.040">
+        {t(
+          'You can close the app: at the next start, the conversion goes on from where it stopped.',
+          {nsSeparator: '|'}
+        )}
+      </Text>
+    </Stack>
   )
 }
 

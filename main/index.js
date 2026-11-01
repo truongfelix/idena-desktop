@@ -96,6 +96,7 @@ const {createAppBadge} = require('./app-badge')
 const {createNodeReports} = require('./node-reports')
 const {READ_INTERVAL_MS} = require('./node-watch')
 const {createNodeWatchdog} = require('./node-watchdog')
+const {readIpfsConversion} = require('./ipfs-conversion')
 const {createNodeOutputTail, nodeStopReason} = require('./node-stop-reason')
 const {createRouterNet} = require('./router-net')
 const {
@@ -798,6 +799,9 @@ ipcMain.on(NODE_COMMAND, async (event, command, data) => {
       nodeProcess
         .start(() => {
           nodeOutput.clear()
+          // The node's one-time IPFS conversion (main/ipfs-conversion.js), shown on the sync screen.
+          let ipfsConversion = null
+          sendMainWindowMsg(NODE_EVENT, 'ipfs-conversion', ipfsConversion)
           return startNode(
             data.rpcPort,
             data.tcpPort,
@@ -810,6 +814,11 @@ ipcMain.on(NODE_COMMAND, async (event, command, data) => {
               nodeWatchdog.logged(log)
               nodeOutput.add(log)
               sendMainWindowMsg(NODE_EVENT, 'node-log', log)
+              const conversion = readIpfsConversion(ipfsConversion, log)
+              if (conversion !== ipfsConversion) {
+                ipfsConversion = conversion
+                sendMainWindowMsg(NODE_EVENT, 'ipfs-conversion', conversion)
+              }
             }
           )
         })

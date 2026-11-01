@@ -35,6 +35,7 @@ const {
 } = require('./direct-peers')
 const {shouldReplaceInstalledNode, sha256File} = require('./bundled-node')
 const {fetchHardForkInfo} = require('./hard-fork-info')
+const {createLineSplitter} = require('./log-lines')
 
 const idenaBin = 'idena-go'
 const pinnedNodeVersion = '1.1.2'
@@ -474,9 +475,11 @@ async function startNode(
 
   const idenaNode = spawn(getNodeFile(), parameters)
 
+  const stdoutLines = createLineSplitter()
+  const stderrLines = createLineSplitter()
   idenaNode.stdout.on('data', (data) => {
     const str = data.toString()
-    if (onLog) onLog(str.split('\n').filter((x) => x))
+    if (onLog) onLog(stdoutLines.push(data))
     if (useLogging) {
       console.log(str)
     }
@@ -485,7 +488,7 @@ async function startNode(
   idenaNode.stderr.on('data', (err) => {
     const str = err.toString()
     writeError(str)
-    if (onLog) onLog(str.split('\n').filter((x) => x))
+    if (onLog) onLog(stderrLines.push(err))
     if (useLogging) {
       console.error(str)
     }

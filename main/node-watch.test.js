@@ -60,6 +60,21 @@ describe('the node watch', () => {
     expect(watch.frozen(25 * MIN + FROZEN_AFTER_ANSWER_MS - 1)).toBe(false)
     expect(watch.frozen(25 * MIN + FROZEN_AFTER_ANSWER_MS)).toBe(true)
   })
+
+  it('counts the conversion of an IPFS repository from Badger as the start', () => {
+    const watch = createNodeWatch(0)
+    watch.logged([
+      'INFO [10-31|10:00:00.000] Start converting the IPFS repository     attempt=1',
+    ])
+    failReads(watch, 0, 200)
+    expect(watch.frozen(50 * MIN)).toBe(false)
+    watch.logged([
+      'INFO [10-31|10:48:00.000] IPFS repository conversion ended         converted=true keys=412345',
+    ])
+    failReads(watch, 50 * MIN, 19)
+    expect(watch.frozen(50 * MIN + FROZEN_AFTER_ANSWER_MS - 1)).toBe(false)
+    expect(watch.frozen(50 * MIN + FROZEN_AFTER_ANSWER_MS)).toBe(true)
+  })
 })
 
 describe('restarts by the app', () => {
