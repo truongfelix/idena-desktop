@@ -14,9 +14,7 @@ const {
   LOGGER_COMMAND,
   WINDOW_COMMAND,
 } = require('./channels')
-const flips = require('./stores/flips')
-const invites = require('./stores/invites')
-const {prepareDb, dbPath} = require('./stores/setup')
+const {prepareDb, dbPath, damagedStores} = require('./stores/setup')
 const {openExternalUrl} = require('./safe-external-url')
 const {createSafeIpcRenderer} = require('./safe-ipc-renderer')
 const {createSafeImageBridge} = require('./safe-image-bridge')
@@ -26,6 +24,22 @@ const {createRendererLogger} = require('./safe-renderer-logger')
 const {applyPrivateFileCreationMask} = require('./private-files')
 
 applyPrivateFileCreationMask()
+
+// The stores the window opens at once. One that cannot be read at all (permissions, a disk error) must not take the
+// preload down: the window would get nothing and show only "Application error" (B-177). Its calls fail instead.
+const unreadableStores = []
+function loadStore(name, load) {
+  try {
+    return load()
+  } catch (error) {
+    unreadableStores.push({name, error: String(error?.message || error)})
+    return null
+  }
+}
+// eslint-disable-next-line global-require
+const flips = loadStore('flips', () => require('./stores/flips'))
+// eslint-disable-next-line global-require
+const invites = loadStore('invites', () => require('./stores/invites'))
 
 function getAppInfo() {
   try {
@@ -42,7 +56,13 @@ function expose(name, value) {
 function exposeMethods(source, methodNames) {
   return Object.freeze(
     Object.fromEntries(
-      methodNames.map((name) => [name, (...args) => source[name](...args)])
+      methodNames.map((name) => [
+        name,
+        (...args) => {
+          if (!source) throw new Error('This saved data cannot be read')
+          return source[name](...args)
+        },
+      ])
     )
   )
 }
@@ -56,6 +76,9 @@ const isDev =
 const safeIpcRenderer = createSafeIpcRenderer(ipcRenderer)
 const safeImageBridge = createSafeImageBridge({clipboard, nativeImage})
 const rendererLogger = createRendererLogger(ipcRenderer, LOGGER_COMMAND)
+for (const {name, error} of unreadableStores) {
+  rendererLogger.error('A store cannot be read', {name, error})
+}
 
 expose('ipcRenderer', safeIpcRenderer)
 expose('openExternal', (url) => openExternalUrl(shell, url, rendererLogger))
@@ -89,6 +112,8 @@ expose(
   ])
 )
 expose('logger', rendererLogger)
+// The stores found damaged and put aside so far ({file, aside}), for the window to tell the user; logged by it.
+expose('damagedStores', () => damagedStores())
 expose('isDev', isDev)
 expose('isTest', process.env.NODE_ENV === 'e2e')
 expose('isMac', process.platform === 'darwin')
