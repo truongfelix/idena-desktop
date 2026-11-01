@@ -1775,5 +1775,9 @@
   "It held {{what}}; the app goes on without it. Its copy: {{file}}": "It held {{what}}; the app goes on without it. Its copy: {{file}}",
   "The app goes on without it. Its copy: {{file}}": "The app goes on without it. Its copy: {{file}}",
   "Converting the IPFS data...": "Converting the IPFS data...",
-  "Converting": "Converting"
+  "Converting": "Converting",
+  "Appearance": "Appearance",
+  "As the system": "As the system",
+  "Light": "Light",
+  "Dark": "Dark"
 }

@@ -1208,7 +1208,7 @@ export function BadFlipDialog({title, subtitle, isOpen, onClose, ...props}) {
         fontSize="md"
         rounded="lg"
       >
-        <Stack isInline spacing={0} bg="white" borderRadius="8px">
+        <Stack isInline spacing={0} bg="surface" borderRadius="8px">
           <Flex
             justify="center"
             align="center"
@@ -1234,7 +1234,7 @@ export function BadFlipDialog({title, subtitle, isOpen, onClose, ...props}) {
             direction="column"
             justify="space-between"
             spacing={7}
-            bg="white"
+            bg="surface"
             borderRadius="lg"
             p="8"
             w={512}

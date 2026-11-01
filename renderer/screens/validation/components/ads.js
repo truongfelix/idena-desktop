@@ -72,7 +72,7 @@ export function ValidationAdPromotion() {
             transform="translateY(-50%)"
             onClick={prev}
           />
-          <Box bg="gray.500" borderRadius="lg" p="10" w="full">
+          <Box bg="panel" borderRadius="lg" p="10" w="full">
             <Stack direction="row" spacing="8" {...swipeProps}>
               <AdImage
                 src={currentAd?.media}

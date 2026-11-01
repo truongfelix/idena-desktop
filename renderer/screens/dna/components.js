@@ -38,7 +38,7 @@ export function DnaDialogAvatar({address}) {
     <Avatar
       address={address}
       boxSize={10}
-      bg="white"
+      bg="surface"
       borderRadius="md"
       borderWidth={1}
       borderColor="brandGray.016"

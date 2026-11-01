@@ -67,7 +67,7 @@ function ConfirmQuitDialog({onClose, onError, ...props}) {
     >
       <AlertDialogOverlay bg="xblack.080" />
       <AlertDialogContent
-        bg="white"
+        bg="surface"
         color="brandGray.500"
         fontSize="md"
         p={8}

@@ -24,6 +24,7 @@ import {
 import {
   FormLabel,
   HDivider,
+  Select,
   Toast,
   Tooltip,
   VDivider,
@@ -50,9 +51,9 @@ function Settings() {
       render: () => <Toast title={title} />,
     })
 
-  const {runInternalNode, useExternalNode, imageSearch, releaseCheck} =
+  const {runInternalNode, useExternalNode, imageSearch, releaseCheck, theme} =
     useSettingsState()
-  const {setImageSearch, setReleaseCheck} = useSettingsDispatch()
+  const {setImageSearch, setReleaseCheck, setTheme} = useSettingsDispatch()
   const releaseCheckText = useReleaseCheckText()
 
   const {
@@ -76,6 +77,20 @@ function Settings() {
               {t('Language')}
             </FormLabel>
             <LocaleSwitcher />
+          </Flex>
+          <Flex align="center">
+            <FormLabel htmlFor="theme" color="muted" fontWeight="normal" w={32}>
+              {t('Appearance')}
+            </FormLabel>
+            <Select
+              id="theme"
+              value={theme ?? 'system'}
+              onChange={(e) => setTheme(e.target.value)}
+            >
+              <option value="system">{t('As the system')}</option>
+              <option value="light">{t('Light')}</option>
+              <option value="dark">{t('Dark')}</option>
+            </Select>
           </Flex>
         </SettingsSection>
 

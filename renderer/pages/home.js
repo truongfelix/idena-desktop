@@ -278,7 +278,7 @@ export default function ProfilePage() {
                           <PopoverTrigger>
                             <Stack
                               spacing={6}
-                              bg="white"
+                              bg="surface"
                               borderRadius="lg"
                               boxShadow="0 3px 12px 0 rgba(83, 86, 92, 0.1), 0 2px 3px 0 rgba(83, 86, 92, 0.2)"
                               px={10}
@@ -531,7 +531,7 @@ export default function ProfilePage() {
                     >
                       <PopoverTrigger>
                         <Box
-                          bg="white"
+                          bg="surface"
                           position={
                             eitherOnboardingState(
                               onboardingShowingStep(

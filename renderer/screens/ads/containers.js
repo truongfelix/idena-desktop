@@ -563,7 +563,7 @@ function AdPromotion({cid, title, desc, url, media, author}) {
   return (
     <Stack
       spacing="10"
-      bg="white"
+      bg="surface"
       rounded="lg"
       px="10"
       pt="37px"
@@ -1752,7 +1752,7 @@ export function AdPreview({ad, ...props}) {
       <ModalContent w="sm" mb={0} mt="14">
         <Portal>
           <Box
-            bg="white"
+            bg="surface"
             fontSize="md"
             p="2"
             pr="4"

@@ -88,7 +88,7 @@ export default function Sidebar({
       as="section"
       direction="column"
       justify="space-between"
-      bg="brandGray.500"
+      bg="panel"
       color="white"
       px={4}
       py={2}
@@ -926,7 +926,7 @@ export function VersionText(props) {
 export function UpdateButton({version, children, ...props}) {
   return (
     <Button
-      bg="white"
+      bg="surface"
       borderRadius="lg"
       px={4}
       py={2}

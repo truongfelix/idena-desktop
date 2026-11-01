@@ -91,7 +91,7 @@ export function ValidationReportSummary({onClose}) {
   return (
     <Alert
       variant="top-accent"
-      bg="white"
+      bg="surface"
       borderTopColor={
         // eslint-disable-next-line no-nested-ternary
         isLoading

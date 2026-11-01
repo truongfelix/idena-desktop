@@ -202,7 +202,7 @@ export function StakeProtectionBadge({type}) {
         rounded={20}
         p="1"
         pr="3"
-        bg="white"
+        bg="surface"
         borderWidth={1}
         borderColor="rgba(220, 222, 223, 1)"
       >

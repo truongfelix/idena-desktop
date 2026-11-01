@@ -50,7 +50,7 @@ const AUTO_UPDATE_COMMANDS = new Set([
   'update-ui',
 ])
 
-const WINDOW_COMMANDS = new Set(['toggle-full-screen'])
+const WINDOW_COMMANDS = new Set(['toggle-full-screen', 'theme'])
 
 function assertAllowedChannel(channel, allowedChannels, operation) {
   if (!allowedChannels.has(channel)) {

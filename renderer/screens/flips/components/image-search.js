@@ -270,7 +270,7 @@ export function ImageSearchDialog({
                   key={`${image}-${idx}`}
                   h="88px"
                   w="88px"
-                  bg={thumbnail === selectedImage ? 'blue.032' : 'white'}
+                  bg={thumbnail === selectedImage ? 'blue.032' : 'surface'}
                   borderColor={
                     thumbnail === selectedImage ? 'blue.500' : 'gray.50'
                   }

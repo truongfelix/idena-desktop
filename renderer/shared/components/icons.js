@@ -106,7 +106,7 @@ export const LogsIcon = createIcon({
   path: (
     <path
       d="M12.667 12A2.67 2.67 0 0 0 10 9.333 2.67 2.67 0 0 0 7.333 12 2.67 2.67 0 0 0 10 14.667 2.67 2.67 0 0 0 12.667 12zM16 7.667V17c0 .551-.449 1-1 1H5c-.551 0-1-.449-1-1V3c0-.551.449-1 1-1h5.333c.184 0 .334.15.334.333v4c0 .552.448 1 1 1h4c.184 0 .333.15.333.334zM10.5 11a.505.505 0 0 0-1 0l-.137 1.1-.383.547a.507.507 0 0 0 .707.706l.784-.548c.144-.1.22-.273.199-.447l-.003-.025L10.5 11zm.833-4.667V3a.333.333 0 0 1 .57-.236l3.333 3.333a.333.333 0 0 1-.236.57h-3.333a.333.333 0 0 1-.334-.334z"
-      fill="#53565C"
+      fill="currentColor"
       fillRule="nonzero"
     />
   ),
@@ -319,7 +319,6 @@ export const AddImageIcon = createIcon({
   viewBox: '0 0 20 20',
   path: (
     <g fill="none" fillRule="evenodd">
-      <path fill="#FFF" d="M0 0H1080V700H0z" transform="translate(-626 -570)" />
       <g>
         <path
           fill="currentColor"

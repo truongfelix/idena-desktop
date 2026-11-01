@@ -22,7 +22,7 @@ function CountdownItem({value, unit, ...props}) {
   return (
     <Stack spacing="3" align="center" {...props}>
       <Center
-        bg="gray.500"
+        bg="panel"
         borderRadius="lg"
         fontSize="2xl"
         fontWeight={500}

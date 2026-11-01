@@ -81,7 +81,7 @@ export function ProfilePicture({address, profile, boxSize, ...props}) {
         position="absolute"
         right={-0.5}
         bottom={-0.5}
-        bg="white"
+        bg="surface"
         rounded="sm"
         borderWidth={1}
       />
