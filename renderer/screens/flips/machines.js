@@ -75,13 +75,14 @@ export const flipsMachine = Machine(
                   availableKeywords
                 ).map(async ({hash, pair}) => ({
                   hash,
-                  // Unknown pair: no words ("Missing keywords") rather than a guess.
+                  // Unknown pair: no keywords, so that the card says "Missing keywords" (pages/flips/list.js)
+                  // rather than show a guess.
                   keywords: pair
                     ? {
                         id: pair.id,
                         words: await Promise.all(pair.words.map(loadKeyword)),
                       }
-                    : {words: []},
+                    : null,
                   images: Array.from({length: 4}),
                   protectedImages: Array.from({length: 4}),
                   adversarialImages: Array.from({length: 8}),
