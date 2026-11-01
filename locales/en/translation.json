@@ -1762,9 +1762,9 @@
   "For example, an invoice number": "For example, an invoice number",
   "Anyone can read it on the chain. A longer comment costs a slightly higher fee.": "Anyone can read it on the chain. A longer comment costs a slightly higher fee.",
   "The comment is too long: {{count}} bytes at most.": "The comment is too long: {{count}} bytes at most.",
-  "Preparing the node...": "Preparing the node...",
   "Converting the IPFS data": "Converting the IPFS data",
   "Converting the IPFS data {{percent}}%": "Converting the IPFS data {{percent}}%",
   "This happens once: the node moves the data the official Idena app left into a format that uses less memory. It takes up to an hour on a hard disk, and the node does not synchronize meanwhile.": "This happens once: the node moves the data the official Idena app left into a format that uses less memory. It takes up to an hour on a hard disk, and the node does not synchronize meanwhile.",
-  "You can close the app: at the next start, the conversion goes on from where it stopped.": "You can close the app: at the next start, the conversion goes on from where it stopped."
+  "You can close the app: at the next start, the conversion goes on from where it stopped.": "You can close the app: at the next start, the conversion goes on from where it stopped.",
+  "Converting the IPFS data...": "Converting the IPFS data..."
 }
