@@ -87,7 +87,7 @@ export default function Sidebar({
       as="section"
       direction="column"
       justify="space-between"
-      bg="brandGray.500"
+      bg="panel"
       color="white"
       px={4}
       py={2}

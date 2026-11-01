@@ -13,6 +13,8 @@ const THEMED_COLORS = {
   text: ['83 86 92', '225 227 231'],
   strong: ['17 17 17', '240 240 240'],
   graphite: ['69 72 77', '24 25 28'],
+  // Dark boxes with white text (the sidebar, the validation's countdown): the text grey in the light theme.
+  panel: ['83 86 92', '24 25 28'],
 }
 
 function themedVariables(index) {
@@ -54,6 +56,8 @@ export const theme = {
     },
     // The window's background (cards, dialogs, menus): white in the light theme.
     surface: themed('surface'),
+    // A dark box with white text, in both themes (THEMED_COLORS.panel).
+    panel: themed('panel'),
     gray: {
       '016': themed('text', 0.16),
       '030': themed('text', 0.3),
