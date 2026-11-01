@@ -519,6 +519,15 @@ export const theme = {
       },
     },
     Select: {
+      // Chakra's light mode paints the box and its options white: the surface follows the theme.
+      baseStyle: {
+        field: {
+          bg: 'surface',
+          '> option, > optgroup': {
+            bg: 'surface',
+          },
+        },
+      },
       sizes: {
         md: {
           field: {

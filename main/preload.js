@@ -112,8 +112,14 @@ expose(
   ])
 )
 expose('logger', rendererLogger)
-// The stores found damaged and put aside so far ({file, aside}), for the window to tell the user; logged by it.
-expose('damagedStores', () => damagedStores())
+// The stores found damaged and put aside so far ({file, aside}), by the main process before the window opened
+// (app info) and by this one, for the window to tell the user; logged by it.
+const mainDamagedStores = (
+  Array.isArray(appInfo.damagedStores) ? appInfo.damagedStores : []
+).filter(
+  (store) => typeof store?.file === 'string' && typeof store?.aside === 'string'
+)
+expose('damagedStores', () => [...mainDamagedStores, ...damagedStores()])
 expose('isDev', isDev)
 expose('isTest', process.env.NODE_ENV === 'e2e')
 expose('isMac', process.platform === 'darwin')
