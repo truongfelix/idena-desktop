@@ -17,6 +17,7 @@ import {OnboardingProvider} from '../shared/providers/onboarding-context'
 import {DnaLinkProvider} from '../screens/dna/hooks'
 import {SocialProvider} from '../screens/social/provider'
 import {ConfirmQuit} from '../shared/components/confirm-quit'
+import {DamagedStoresNotice} from '../shared/components/damaged-stores-notice'
 import {queryClient} from '../shared/utils/utils'
 import {historyMoveOf} from '../shared/utils/history-keys'
 import {numberHistory} from '../shared/utils/page-history'
@@ -66,6 +67,7 @@ export default function App({Component, ...pageProps}) {
           <AppProviders>
             <Component {...pageProps} />
             <ConfirmQuit />
+            <DamagedStoresNotice />
           </AppProviders>
         </ChakraProvider>
       ) : null}

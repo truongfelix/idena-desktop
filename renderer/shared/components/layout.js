@@ -238,7 +238,6 @@ function LayoutContainer(props) {
   return (
     <Flex
       align="stretch"
-      flexWrap="wrap"
       color="brand.gray"
       fontSize="md"
       minH="100vh"
@@ -311,7 +310,14 @@ function NormalApp({skipBanner, children}) {
   useDnaLinkRedirect(DnaLinkMethod.Vote, ({address}) => viewVotingHref(address))
 
   return (
-    <Flex as="section" direction="column" flex={1} h="100vh" overflowY="auto">
+    <Flex
+      as="section"
+      direction="column"
+      flex={1}
+      minW={0}
+      h="100vh"
+      overflowY="auto"
+    >
       {!skipBanner && <AdBanner />}
 
       {children}
@@ -387,7 +393,7 @@ function SyncingApp() {
     Boolean(ipfsConversion) && runInternalNode && !useExternalNode
 
   return (
-    <FillCenter bg="graphite.500" color="white" position="relative">
+    <FillCenter px={6} bg="graphite.500" color="white" position="relative">
       <Flex
         align="center"
         justify="center"
@@ -399,9 +405,9 @@ function SyncingApp() {
         left={0}
         w="full"
       >
-        {converting ? t('Preparing the node...') : t('Synchronizing...')}
+        {converting ? t('Converting the IPFS data...') : t('Synchronizing...')}
       </Flex>
-      <Stack spacing={10} w="md">
+      <Stack spacing={10} w="full" maxW="md">
         {Boolean(address) && (
           <Stack isInline spacing={6} align="center" py={2}>
             <Avatar address={address} boxSize={20} />
@@ -568,7 +574,7 @@ function LoadingApp() {
   const {t} = useTranslation()
 
   return (
-    <FillCenter bg="graphite.500" color="white" fontWeight={500}>
+    <FillCenter px={6} bg="graphite.500" color="white" fontWeight={500}>
       {t('Please wait...')}
     </FillCenter>
   )
@@ -612,11 +618,11 @@ function OfflineApp() {
     })
 
   return (
-    <FillCenter bg="graphite.500" color="white" position="relative">
+    <FillCenter px={6} bg="graphite.500" color="white" position="relative">
       <OfflineBanner />
 
       {isDownloadingBuiltinNode && (
-        <Stack spacing={3} w="md">
+        <Stack spacing={3} w="full" maxW="md">
           <Stack isInline spacing={4} align="center">
             <Image src="/static/idena_white.svg" alt="logo" boxSize={12} />
             <Stack spacing={1} flex={1}>
@@ -644,7 +650,7 @@ function OfflineApp() {
       )}
 
       {isExternalNodeOffline && (
-        <Stack spacing={5} w={416}>
+        <Stack spacing={5} w="full" maxW={416}>
           <Heading fontSize="lg" fontWeight={500}>
             {useExternalNode
               ? t('Your external node is offline')
@@ -681,7 +687,7 @@ function OfflineApp() {
       {isFailedBuiltinNode && <TroubleshootingScreen />}
 
       {isUnsupportedMacosVersion && (
-        <Stack spacing={5} w={416}>
+        <Stack spacing={5} w="full" maxW={416}>
           <Heading fontSize="mdx" fontWeight={500}>
             {t(
               'Can not start built-in node. The minimum required version is macOS Catalina'
@@ -758,8 +764,8 @@ function HardForkScreen({
 
   return (
     <>
-      <FillCenter bg="graphite.500">
-        <Stack spacing={10} w="md">
+      <FillCenter px={6} bg="graphite.500">
+        <Stack spacing={10} w="full" maxW="md">
           <Stack spacing={6}>
             <Stack spacing={8}>
               <Stack isInline spacing={5} align="center">

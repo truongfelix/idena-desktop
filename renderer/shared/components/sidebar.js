@@ -54,6 +54,7 @@ import {
 } from '../utils/utils'
 import {ExternalLink, Tooltip} from './components'
 import {useTimingState} from '../providers/timing-context'
+import {useNode} from '../providers/node-context'
 import {TodoVotingCountBadge} from '../../screens/oracles/components'
 import {socialNewsCount} from '../../screens/social/news-count'
 import {useSocial} from '../../screens/social/provider'
@@ -215,6 +216,8 @@ function ConnectionBandwidth() {
 
   const {syncing, chainBlock, currentBlock, headTime} = useChainState()
   const {step, isBehind} = useSyncStep()
+  // The node's one-time IPFS conversion (main/ipfs-conversion.js): it does not sync meanwhile.
+  const [{ipfsConversion}] = useNode()
 
   const [{result: peers}] = usePoll(useRpc('net_peers'), 5000)
 
@@ -270,7 +273,9 @@ function ConnectionBandwidth() {
           isSyncing={syncing || isBehind}
         />
         {syncing && (
-          <StatusText color="orange.500">{t('Synchronizing')}</StatusText>
+          <StatusText color="orange.500">
+            {ipfsConversion ? t('Converting') : t('Synchronizing')}
+          </StatusText>
         )}
         {!syncing && isBehind && (
           <StatusText color="orange.500">{t('Behind')}</StatusText>
