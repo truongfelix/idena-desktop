@@ -55,6 +55,7 @@ import {
 import {ExternalLink, Tooltip} from './components'
 import {useTimingState} from '../providers/timing-context'
 import {useNode} from '../providers/node-context'
+import {useSettingsState} from '../providers/settings-context'
 import {TodoVotingCountBadge} from '../../screens/oracles/components'
 import {socialNewsCount} from '../../screens/social/news-count'
 import {useSocial} from '../../screens/social/provider'
@@ -216,8 +217,12 @@ function ConnectionBandwidth() {
 
   const {syncing, chainBlock, currentBlock, headTime} = useChainState()
   const {step, isBehind} = useSyncStep()
-  // The node's one-time IPFS conversion (main/ipfs-conversion.js): it does not sync meanwhile.
+  // The node's one-time IPFS conversion (main/ipfs-conversion.js): it does not sync meanwhile. Only the built-in
+  // node's, as the sync screen shows it (layout.js SyncingApp).
   const [{ipfsConversion}] = useNode()
+  const {runInternalNode, useExternalNode} = useSettingsState()
+  const converting =
+    Boolean(ipfsConversion) && runInternalNode && !useExternalNode
 
   const [{result: peers}] = usePoll(useRpc('net_peers'), 5000)
 
@@ -274,7 +279,7 @@ function ConnectionBandwidth() {
         />
         {syncing && (
           <StatusText color="orange.500">
-            {ipfsConversion ? t('Converting') : t('Synchronizing')}
+            {converting ? t('Converting') : t('Synchronizing')}
           </StatusText>
         )}
         {!syncing && isBehind && (
@@ -585,7 +590,7 @@ function ActionPanel() {
             right="1"
             zIndex="popover"
             _hover={{bg: 'unset'}}
-            _expanded={{bg: 'gray.500'}}
+            _expanded={{bg: 'panel'}}
             _focus={{outline: 0}}
           >
             <MoreIcon boxSize="5" />

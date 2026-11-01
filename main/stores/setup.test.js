@@ -49,7 +49,6 @@ describe('a damaged store file', () => {
       'cut in the middle',
       '{"flips":[{"id":"a","images":["data:image/png;base64,iVBOR',
     ],
-    ['not an object', '[1,2,3]'],
   ]) {
     it(`${kind} is put aside and its store starts empty`, () => {
       const directory = tempDirectory()
@@ -85,6 +84,91 @@ describe('a damaged store file', () => {
       fs.writeFileSync(file, '  \n')
       expect(readStore(file)).toEqual({})
       expect(asideFiles(directory, 'settings.json')).toEqual([])
+    } finally {
+      fs.rmSync(directory, {force: true, recursive: true})
+    }
+  })
+
+  // The window saves some states whole (persistState): the flips' filter as a string, the validation in
+  // progress as null once cleared, at each ceremony. They are sound, not damaged.
+  for (const [name, value] of [
+    ['flipFilter', 'Active'],
+    ['validation2', null],
+    ['list', [1, 2, 3]],
+  ]) {
+    it(`reads back a store saved as ${JSON.stringify(value)}`, () => {
+      const directory = tempDirectory()
+      const file = path.join(directory, `${name}.json`)
+      try {
+        const before = damagedStores().length
+        low(createPrivateFileAdapter(file)).setState(value).write()
+        expect(low(createPrivateFileAdapter(file)).getState()).toEqual(value)
+        expect(asideFiles(directory, `${name}.json`)).toEqual([])
+        expect(damagedStores()).toHaveLength(before)
+      } finally {
+        fs.rmSync(directory, {force: true, recursive: true})
+      }
+    })
+  }
+
+  it('leaves a file the other process replaced meanwhile', () => {
+    const directory = tempDirectory()
+    const file = path.join(directory, 'settings.json')
+    try {
+      fs.writeFileSync(file, Buffer.alloc(64))
+      let reads = 0
+      const replacedMeanwhile = {
+        ...fs,
+        readFileSync: (...args) => {
+          reads += 1
+          // The other process puts the damaged file aside and writes a sound one right after this read.
+          if (reads === 2) fs.writeFileSync(file, '{"lng":"fr"}')
+          return fs.readFileSync(...args)
+        },
+      }
+      // Its data, not an empty store that the next write would put over it.
+      expect(readStore(file, replacedMeanwhile)).toEqual({lng: 'fr'})
+      expect(fs.readFileSync(file, 'utf8')).toBe('{"lng":"fr"}')
+      expect(asideFiles(directory, 'settings.json')).toEqual([])
+    } finally {
+      fs.rmSync(directory, {force: true, recursive: true})
+    }
+  })
+
+  it('reads a file a Windows editor saved with a byte order mark', () => {
+    const directory = tempDirectory()
+    const file = path.join(directory, 'settings.json')
+    try {
+      fs.writeFileSync(file, '\uFEFF{"useExternalNode":true}')
+      expect(readStore(file)).toEqual({useExternalNode: true})
+      expect(asideFiles(directory, 'settings.json')).toEqual([])
+    } finally {
+      fs.rmSync(directory, {force: true, recursive: true})
+    }
+  })
+
+  it('keeps a copy of a damaged file it cannot read again', () => {
+    const directory = tempDirectory()
+    const file = path.join(directory, 'flips.json')
+    const damaged = '{"flips":[{"id":"a","images":["data:image/png;base64,iVBOR'
+    try {
+      fs.writeFileSync(file, damaged)
+      let reads = 0
+      const flaky = {
+        ...fs,
+        readFileSync: (...args) => {
+          reads += 1
+          if (reads === 2)
+            throw Object.assign(new Error('busy'), {code: 'EBUSY'})
+          return fs.readFileSync(...args)
+        },
+      }
+      expect(readStore(file, flaky)).toEqual({})
+      const aside = asideFiles(directory, 'flips.json')
+      expect(aside).toHaveLength(1)
+      expect(fs.readFileSync(path.join(directory, aside[0]), 'utf8')).toBe(
+        damaged
+      )
     } finally {
       fs.rmSync(directory, {force: true, recursive: true})
     }
@@ -149,9 +233,39 @@ describe('a store write', () => {
     })
   })
 
+  it('fails on a full disk without leaving a temporary file', () => {
+    withStore((file, directory) => {
+      const full = {
+        ...fs,
+        fsyncSync: () => {
+          throw Object.assign(new Error('no space'), {code: 'ENOSPC'})
+        },
+      }
+      expect(() => writeFileAtomic(file, '{"flips":[]}', full)).toThrow(
+        'no space'
+      )
+      expect(fs.readFileSync(file, 'utf8')).toBe(OLD)
+      expect(fs.readdirSync(directory)).toEqual(['flips.json'])
+    })
+  })
+
+  it('writes in place when Windows keeps refusing the rename, rather than losing the change', () => {
+    withStore((file, directory) => {
+      const held = {
+        ...fs,
+        renameSync: () => {
+          throw Object.assign(new Error('held open'), {code: 'EPERM'})
+        },
+      }
+      writeFileAtomic(file, '{"flips":[]}', held)
+      expect(fs.readFileSync(file, 'utf8')).toBe('{"flips":[]}')
+      expect(fs.readdirSync(directory)).toEqual(['flips.json'])
+    })
+  })
+
   it('retries a rename Windows refuses for a moment', () => {
     withStore((file) => {
-      let refusals = 2
+      let refusals = 7
       const busy = {
         ...fs,
         renameSync: (from, to) => {

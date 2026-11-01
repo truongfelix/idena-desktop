@@ -21,6 +21,7 @@ const axios = require('axios')
 const kill = require('tree-kill')
 const {zoomIn, zoomOut, resetZoom} = require('./utils')
 const {savedTheme} = require('./stores/settings')
+const {damagedStores} = require('./stores/setup')
 const {themeSource} = require('./theme')
 const loadRoute = require('./utils/routes')
 const {getI18nConfig} = require('./language')
@@ -278,6 +279,8 @@ ipcMain.on(APP_INFO_COMMAND, (event) => {
   event.returnValue = {
     version: appVersion,
     locale: app.getLocale(),
+    // The stores this process put aside (main/stores/setup.js), for the window's notice.
+    damagedStores: damagedStores(),
   }
 })
 
@@ -330,6 +333,11 @@ const createMainWindow = () => {
     nativeTheme.themeSource = themeSource(savedTheme())
   } catch (error) {
     logger.error('cannot read the saved theme', error.toString())
+  }
+  // The main process reads settings.json first: a damaged one is put aside here, and the window tells the user
+  // (APP_INFO_COMMAND damagedStores).
+  for (const store of damagedStores()) {
+    logger.warn('A damaged saved file was put aside', store)
   }
   mainWindow = new BrowserWindow({
     title: app.name,
