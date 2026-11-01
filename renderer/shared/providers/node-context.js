@@ -9,6 +9,7 @@ const NODE_START = 'NODE_START'
 const NODE_STOP = 'NODE_STOP'
 const NODE_REINIT = 'NODE_REINIT'
 const UNSUPPORTED_MACOS_VERSION = 'UNSUPPORTED_MACOS_VERSION'
+const IPFS_CONVERSION = 'IPFS_CONVERSION'
 
 const TROUBLESHOOTING_RESTART_NODE = 'TROUBLESHOOTING_RESTART_NODE'
 const TROUBLESHOOTING_UPDATE_NODE = 'TROUBLESHOOTING_UPDATE_NODE'
@@ -20,6 +21,8 @@ export const initialState = {
   nodeFailed: false,
   runningTroubleshooter: false,
   logs: [],
+  // The node's one-time IPFS conversion (main/ipfs-conversion.js): {percent, minutesLeft} while it runs.
+  ipfsConversion: null,
 }
 
 export function nodeReducer(state, action) {
@@ -30,6 +33,7 @@ export function nodeReducer(state, action) {
         nodeFailed: true,
         nodeReady: false,
         nodeStarted: false,
+        ipfsConversion: null,
         // Why it stopped, when the main process knows (main/node-stop-reason.js): {cause, line}. A later failure
         // without one (a stop that failed) keeps it.
         stopReason: action.data ?? state.stopReason ?? null,
@@ -55,6 +59,13 @@ export function nodeReducer(state, action) {
       return {
         ...state,
         nodeStarted: false,
+        ipfsConversion: null,
+      }
+    }
+    case IPFS_CONVERSION: {
+      return {
+        ...state,
+        ipfsConversion: action.data ?? null,
       }
     }
     case NODE_REINIT: {
@@ -130,6 +141,9 @@ export function NodeProvider({children}) {
           break
         case 'node-ready':
           dispatch({type: NODE_READY, data})
+          break
+        case 'ipfs-conversion':
+          dispatch({type: IPFS_CONVERSION, data})
           break
         case 'restart-node':
         case 'state-cleaned':
