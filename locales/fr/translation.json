@@ -1766,5 +1766,9 @@
   "Converting the IPFS data": "Conversion des données IPFS",
   "Converting the IPFS data {{percent}}%": "Conversion des données IPFS {{percent}} %",
   "This happens once: the node moves the data the official Idena app left into a format that uses less memory. It takes up to an hour on a hard disk, and the node does not synchronize meanwhile.": "Cela n'arrive qu'une fois : le nœud transfère les données laissées par l'appli Idena officielle dans un format qui utilise moins de mémoire. Cela prend jusqu'à une heure sur un disque dur, et le nœud ne se synchronise pas pendant ce temps.",
-  "You can close the app: at the next start, the conversion goes on from where it stopped.": "Vous pouvez fermer l'appli : au prochain démarrage, la conversion reprend là où elle s'était arrêtée."
+  "You can close the app: at the next start, the conversion goes on from where it stopped.": "Vous pouvez fermer l'appli : au prochain démarrage, la conversion reprend là où elle s'était arrêtée.",
+  "Appearance": "Apparence",
+  "As the system": "Comme le système",
+  "Light": "Clair",
+  "Dark": "Sombre"
 }

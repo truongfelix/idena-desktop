@@ -718,7 +718,7 @@ export function WalletTransactionList({txs = [], onOpenTransaction}) {
                   <Avatar
                     address={tx.counterParty}
                     boxSize={8}
-                    bg="white"
+                    bg="surface"
                     border="solid 1px"
                     borderColor="gray.016"
                   />

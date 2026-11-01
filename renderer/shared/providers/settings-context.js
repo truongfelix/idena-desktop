@@ -6,6 +6,8 @@ import {BASE_API_URL, BASE_INTERNAL_API_PORT} from '../api/api-client'
 import useLogger from '../hooks/use-logger'
 import {randomApiKey} from '../utils/random-api-key'
 import {AVAILABLE_LANGS} from '../../i18n'
+import {WINDOW_COMMAND} from '../../../main/channels'
+import {themeSource} from '../../../main/theme'
 
 const SETTINGS_INITIALIZE = 'SETTINGS_INITIALIZE'
 const TOGGLE_USE_EXTERNAL_NODE = 'TOGGLE_USE_EXTERNAL_NODE'
@@ -17,6 +19,7 @@ const TOGGLE_AUTO_ACTIVATE_MINING = 'TOGGLE_AUTO_ACTIVATE_MINING'
 const SET_NODE_OPTIONS = 'SET_NODE_OPTIONS'
 const SET_IMAGE_SEARCH = 'SET_IMAGE_SEARCH'
 const SET_RELEASE_CHECK = 'SET_RELEASE_CHECK'
+const SET_THEME = 'SET_THEME'
 
 const CHANGE_LANGUAGE = 'CHANGE_LANGUAGE'
 
@@ -124,6 +127,13 @@ function settingsReducer(state, action) {
         releaseCheck: action.enabled,
       }
     }
+    // theme: 'system', 'light' or 'dark' (main/theme.js); absent until chosen, which follows the system.
+    case SET_THEME: {
+      return {
+        ...state,
+        theme: themeSource(action.theme),
+      }
+    }
     default:
       return state
   }
@@ -166,6 +176,12 @@ export function SettingsProvider({children}) {
       })
     }
   }, [dispatch, state.initialized])
+
+  // The main process applies the theme (nativeTheme): sent at the start and on each change.
+  const theme = themeSource(state.theme)
+  useEffect(() => {
+    global.ipcRenderer?.send(WINDOW_COMMAND, 'theme', {source: theme})
+  }, [theme])
 
   useEffect(() => {
     if (!state.internalApiKey) {
@@ -223,6 +239,11 @@ export function SettingsProvider({children}) {
     [dispatch]
   )
 
+  const setTheme = useCallback(
+    (choice) => dispatch({type: SET_THEME, theme: choice}),
+    [dispatch]
+  )
+
   const setConnectionDetails = useCallback(
     ({url, apiKey}) => {
       dispatch({type: SET_CONNECTION_DETAILS, url, apiKey})
@@ -243,6 +264,7 @@ export function SettingsProvider({children}) {
             setNodeOptions,
             setImageSearch,
             setReleaseCheck,
+            setTheme,
           }),
           [
             changeLanguage,
@@ -250,6 +272,7 @@ export function SettingsProvider({children}) {
             setImageSearch,
             setNodeOptions,
             setReleaseCheck,
+            setTheme,
             toggleAutoActivateMining,
             toggleRunInternalNode,
             toggleUseExternalNode,

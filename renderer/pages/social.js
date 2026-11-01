@@ -224,7 +224,7 @@ export default function SocialPage() {
           position="sticky"
           bottom={-6}
           zIndex={1}
-          bg="white"
+          bg="surface"
           borderTopWidth={1}
           borderColor="gray.100"
           pt={3}

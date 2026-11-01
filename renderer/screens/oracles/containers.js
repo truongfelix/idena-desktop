@@ -200,7 +200,7 @@ export function VotingCard({votingRef, ...props}) {
           >
             <Avatar
               address={contractHash}
-              bg="white"
+              bg="surface"
               borderColor="brandGray.016"
               borderWidth="1px"
               borderRadius="full"
@@ -1795,7 +1795,7 @@ export function OracleAdDescription({ad}) {
   const {t} = useTranslation()
 
   return (
-    <Stack spacing="7" bg="white" rounded="lg" p="6" pt="4">
+    <Stack spacing="7" bg="surface" rounded="lg" p="6" pt="4">
       <Stack spacing="2">
         <Stack spacing="1">
           <Text fontWeight={500}>{ad.title}</Text>

@@ -193,7 +193,7 @@ export default function FlipListPage() {
                   <IconLink
                     href="/flips/new"
                     icon={<PlusSolidIcon boxSize="5" />}
-                    bg="white"
+                    bg="surface"
                     position="relative"
                     zIndex={2}
                   >

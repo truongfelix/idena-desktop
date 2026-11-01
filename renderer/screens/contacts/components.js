@@ -17,7 +17,7 @@ export function ContactAvatar({address = dummyAddress, ...props}) {
   return (
     <Avatar
       address={address}
-      bg="white"
+      bg="surface"
       borderColor="brandGray.016"
       borderWidth={1}
       {...props}

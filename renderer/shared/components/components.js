@@ -372,7 +372,7 @@ export function Toast({
   return (
     <Alert
       status={status}
-      bg="white"
+      bg="surface"
       boxShadow="0 3px 12px 0 rgba(83, 86, 92, 0.1), 0 2px 3px 0 rgba(83, 86, 92, 0.2)"
       color={color || 'brandGray.500'}
       fontSize="md"
@@ -448,7 +448,7 @@ export function Dialog({
     <Modal isCentered size="sm" {...props}>
       <ModalOverlay />
       <ModalContent
-        bg="white"
+        bg="surface"
         color="brandGray.500"
         fontSize="md"
         p={8}

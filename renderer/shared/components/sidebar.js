@@ -921,7 +921,7 @@ export function VersionText(props) {
 export function UpdateButton({version, children, ...props}) {
   return (
     <Button
-      bg="white"
+      bg="surface"
       borderRadius="lg"
       px={4}
       py={2}

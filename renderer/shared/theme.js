@@ -1,5 +1,34 @@
 import {theme as defaultTheme} from '@chakra-ui/react'
 
+// The colours that change with the theme (B-166): CSS variables, the light value by default and the dark one under
+// prefers-color-scheme: dark, which the main process sets from the user's choice (main/theme.js). The neutral
+// names below (surface, gray, brandGray, graphite) point at them, so a page written with those names follows the
+// theme; colours used on purpose in both themes (blue, red, green, orange, white text on them) stay fixed.
+// Each entry: [light, dark], as "r g b" (rgb(var(--…) / alpha) gives its transparent shades).
+const THEMED_COLORS = {
+  surface: ['255 255 255', '32 33 36'],
+  'gray-50': ['245 246 247', '44 46 50'],
+  'gray-100': ['210 212 217', '72 75 81'],
+  'gray-300': ['232 234 237', '58 61 66'],
+  text: ['83 86 92', '225 227 231'],
+  strong: ['17 17 17', '240 240 240'],
+  graphite: ['69 72 77', '24 25 28'],
+}
+
+function themedVariables(index) {
+  return Object.fromEntries(
+    Object.entries(THEMED_COLORS).map(([name, values]) => [
+      `--idena-${name}`,
+      values[index],
+    ])
+  )
+}
+
+const themed = (name, alpha) =>
+  alpha === undefined
+    ? `rgb(var(--idena-${name}))`
+    : `rgb(var(--idena-${name}) / ${alpha})`
+
 const breakpoints = {
   sm: '30em',
   md: '40em',
@@ -23,22 +52,24 @@ export const theme = {
       500: 'rgb(87, 143, 255)',
       600: 'rgb(87, 143, 255)',
     },
+    // The window's background (cards, dialogs, menus): white in the light theme.
+    surface: themed('surface'),
     gray: {
-      '016': 'rgb(83 86 92 /0.16)',
-      '030': 'rgb(83 86 92 /0.30)',
-      '064': 'rgb(83 86 92 /0.64)',
-      '080': 'rgb(83 86 92 /0.80)',
+      '016': themed('text', 0.16),
+      '030': themed('text', 0.3),
+      '064': themed('text', 0.64),
+      '080': themed('text', 0.8),
       10: 'rgba(255,255,255,0.1)',
-      50: 'rgb(245 246 247)',
-      100: 'rgb(210, 212, 217)',
-      200: 'rgb(210 212 217)',
-      212: 'rgb(210 212 217 /0.12)',
-      300: 'rgb(232, 234, 237)',
-      500: 'rgb(83 86 92)',
-      600: 'rgb(83 86 92)',
-      800: 'rgb(83 86 92)',
-      900: 'rgb(17 17 17)',
-      980: 'rgba(17 17 17 /0.80)',
+      50: themed('gray-50'),
+      100: themed('gray-100'),
+      200: themed('gray-100'),
+      212: themed('gray-100', 0.12),
+      300: themed('gray-300'),
+      500: themed('text'),
+      600: themed('text'),
+      800: themed('text'),
+      900: themed('strong'),
+      980: themed('strong', 0.8),
     },
     red: {
       '010': 'rgb(255 102 102 /0.10)',
@@ -77,16 +108,16 @@ export const theme = {
     },
     muted: 'rgb(150, 153, 158)',
     brand: {
-      gray: 'rgb(83, 86, 92)',
+      gray: themed('text'),
       blue: 'rgb(87, 143, 255)',
     },
     brandGray: {
-      '005': 'rgb(83 86 92 /0.05)',
-      '006': 'rgb(83 86 92 /0.06)',
-      '016': 'rgb(83, 86, 92, 0.16)',
-      '060': 'rgb(83 86 92 /0.6)',
-      '080': 'rgb(83 86 92 /0.8)',
-      500: 'rgb(83, 86, 92)',
+      '005': themed('text', 0.05),
+      '006': themed('text', 0.06),
+      '016': themed('text', 0.16),
+      '060': themed('text', 0.6),
+      '080': themed('text', 0.8),
+      500: themed('text'),
     },
     brandBlue: {
       10: 'rgba(87, 143, 255, 0.12)',
@@ -113,7 +144,19 @@ export const theme = {
       '090': 'rgba(255, 255, 255, 0.9)',
     },
     graphite: {
-      500: 'rgb(69 72 77)',
+      500: themed('graphite'),
+    },
+  },
+  styles: {
+    global: {
+      ':root': themedVariables(0),
+      '@media (prefers-color-scheme: dark)': {
+        ':root': {...themedVariables(1), colorScheme: 'dark'},
+      },
+      body: {
+        bg: 'surface',
+        color: 'gray.800',
+      },
     },
   },
   fonts: {
@@ -144,10 +187,20 @@ export const theme = {
     xl: '0.75rem',
   },
   components: {
+    Popover: {
+      baseStyle: {
+        content: {
+          bg: 'surface',
+        },
+      },
+    },
     Modal: {
       baseStyle: {
         overlay: {
           bg: 'xblack.080',
+        },
+        dialog: {
+          bg: 'surface',
         },
       },
       sizes: {
@@ -188,6 +241,9 @@ export const theme = {
         overlay: {
           bg: 'xblack.080',
         },
+        dialog: {
+          bg: 'surface',
+        },
         footer: {
           borderTopWidth: 1,
           borderTopColor: 'gray.300',
@@ -211,6 +267,7 @@ export const theme = {
           _expanded: {bg: 'gray.50'},
         },
         list: {
+          bg: 'surface',
           border: 'none',
           borderRadius: 'lg',
           py: 2,

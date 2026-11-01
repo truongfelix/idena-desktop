@@ -20,6 +20,8 @@ const macosVersion = require('macos-version')
 const axios = require('axios')
 const kill = require('tree-kill')
 const {zoomIn, zoomOut, resetZoom} = require('./utils')
+const {savedTheme} = require('./stores/settings')
+const {themeSource} = require('./theme')
 const loadRoute = require('./utils/routes')
 const {getI18nConfig} = require('./language')
 const {searchImageSource, searchImages} = require('./image-search')
@@ -323,6 +325,12 @@ if (isFirstInstance) {
 
 const createMainWindow = () => {
   didCreateMainWindow = true
+  // The saved theme before the window opens: a forced light or dark theme does not flash the other one.
+  try {
+    nativeTheme.themeSource = themeSource(savedTheme())
+  } catch (error) {
+    logger.error('cannot read the saved theme', error.toString())
+  }
   mainWindow = new BrowserWindow({
     title: app.name,
     width: 1080,
@@ -651,12 +659,17 @@ app.on('ready', async () => {
   })
 })
 
-ipcMain.on(WINDOW_COMMAND, (event, command) => {
+ipcMain.on(WINDOW_COMMAND, (event, command, data) => {
   if (!acceptIpcSender(event)) return
   switch (command) {
     case 'toggle-full-screen': {
       if (!mainWindow) return
       mainWindow.setFullScreen(!mainWindow.isFullScreen())
+      break
+    }
+    // The user's theme choice (main/theme.js): the window sends it at its start and on each change.
+    case 'theme': {
+      nativeTheme.themeSource = themeSource(data?.source)
       break
     }
     default:

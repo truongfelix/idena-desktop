@@ -88,7 +88,7 @@ export function UserInlineCard({
     <Stack isInline spacing={6} align="center" {...props}>
       <Avatar
         address={address}
-        bg="white"
+        bg="surface"
         borderWidth={1}
         borderColor="gray.016"
       />

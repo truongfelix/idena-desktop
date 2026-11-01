@@ -193,7 +193,7 @@ export function PageFooter(props) {
       as="footer"
       spacing={2}
       justify="flex-end"
-      bg="white"
+      bg="surface"
       borderTop="1px"
       borderTopColor="gray.100"
       px={4}
