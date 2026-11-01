@@ -1762,7 +1762,6 @@
   "For example, an invoice number": "For example, an invoice number",
   "Anyone can read it on the chain. A longer comment costs a slightly higher fee.": "Anyone can read it on the chain. A longer comment costs a slightly higher fee.",
   "The comment is too long: {{count}} bytes at most.": "The comment is too long: {{count}} bytes at most.",
-  "Preparing the node...": "Preparing the node...",
   "Converting the IPFS data": "Converting the IPFS data",
   "Converting the IPFS data {{percent}}%": "Converting the IPFS data {{percent}}%",
   "This happens once: the node moves the data the official Idena app left into a format that uses less memory. It takes up to an hour on a hard disk, and the node does not synchronize meanwhile.": "This happens once: the node moves the data the official Idena app left into a format that uses less memory. It takes up to an hour on a hard disk, and the node does not synchronize meanwhile.",
@@ -1774,5 +1773,7 @@
   "the validation in progress": "the validation in progress",
   "A saved file was damaged, probably by a power cut, and was put aside": "A saved file was damaged, probably by a power cut, and was put aside",
   "It held {{what}}; the app goes on without it. Its copy: {{file}}": "It held {{what}}; the app goes on without it. Its copy: {{file}}",
-  "The app goes on without it. Its copy: {{file}}": "The app goes on without it. Its copy: {{file}}"
+  "The app goes on without it. Its copy: {{file}}": "The app goes on without it. Its copy: {{file}}",
+  "Converting the IPFS data...": "Converting the IPFS data...",
+  "Converting": "Converting"
 }

@@ -385,11 +385,13 @@ export const VotingOption = React.forwardRef(
 )
 VotingOption.displayName = 'VotingOption'
 
+// minW: a FillCenter beside the sidebar shrinks with a narrow window instead of pushing the row wider (B-178).
 export function FillCenter(props) {
   return (
     <Flex
       direction="column"
       flex={1}
+      minW={0}
       align="center"
       justify="center"
       {...props}
