@@ -25,6 +25,8 @@ export function DamagedStoresNotice() {
           aside,
         })
         const what = damagedStoreWhat(file, t)
+        // Next to the store, in the app's data folder; the log has the whole path.
+        const copy = String(aside).split(/[\\/]/).pop()
         toast({
           status: 'warning',
           duration: null,
@@ -39,10 +41,10 @@ export function DamagedStoresNotice() {
                 what
                   ? t(
                       'It held {{what}}; the app goes on without it. Its copy: {{file}}',
-                      {what, file: aside, nsSeparator: '|'}
+                      {what, file: copy, nsSeparator: '|'}
                     )
                   : t('The app goes on without it. Its copy: {{file}}', {
-                      file: aside,
+                      file: copy,
                       nsSeparator: '|',
                     })
               }
