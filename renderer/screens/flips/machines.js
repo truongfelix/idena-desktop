@@ -16,6 +16,7 @@ import {shuffle} from '../../shared/utils/arr'
 import {FlipType, FlipFilter} from '../../shared/types'
 import {deleteFlip} from '../../shared/api/dna'
 import {persistState} from '../../shared/utils/persist'
+import {missingFlipPairs} from './missing-flips'
 
 export const flipsMachine = Machine(
   {
@@ -24,6 +25,7 @@ export const flipsMachine = Machine(
       flips: null,
       epoch: null,
       knownFlips: [],
+      flipsWithPair: [],
       availableKeywords: [],
       canSubmitFlips: undefined,
     },
@@ -41,7 +43,7 @@ export const flipsMachine = Machine(
     states: {
       initializing: {
         invoke: {
-          src: async ({knownFlips, availableKeywords}) => {
+          src: async ({knownFlips, flipsWithPair, availableKeywords}) => {
             handleOutdatedFlips()
 
             const flipDb = global.flipStore
@@ -66,28 +68,26 @@ export const flipsMachine = Machine(
             )
 
             if (missingFlips.length) {
-              const keywords = await Promise.all(
-                availableKeywords
-                  .filter(
-                    ({id, used}) =>
-                      used &&
-                      persistedFlips.some(
-                        ({keywordPairId}) => keywordPairId !== id
-                      )
-                  )
-                  .map(async ({id, words}) => ({
-                    id,
-                    words: await Promise.all(words.map(loadKeyword)),
-                  }))
+              missingFlips = await Promise.all(
+                missingFlipPairs(
+                  missingFlips,
+                  flipsWithPair,
+                  availableKeywords
+                ).map(async ({hash, pair}) => ({
+                  hash,
+                  // Unknown pair: no keywords, so that the card says "Missing keywords" (pages/flips/list.js)
+                  // rather than show a guess.
+                  keywords: pair
+                    ? {
+                        id: pair.id,
+                        words: await Promise.all(pair.words.map(loadKeyword)),
+                      }
+                    : null,
+                  images: Array.from({length: 4}),
+                  protectedImages: Array.from({length: 4}),
+                  adversarialImages: Array.from({length: 8}),
+                }))
               )
-
-              missingFlips = missingFlips.map((hash, idx) => ({
-                hash,
-                keywords: keywords[idx],
-                images: Array.from({length: 4}),
-                protectedImages: Array.from({length: 4}),
-                adversarialImages: Array.from({length: 8}),
-              }))
             }
 
             return {persistedFlips, missingFlips}

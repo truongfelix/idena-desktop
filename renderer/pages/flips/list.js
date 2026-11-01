@@ -82,6 +82,7 @@ export default function FlipListPage() {
   const {syncing, offline, loading} = useChainState()
   const {
     flips: knownFlips,
+    flipsWithPair,
     requiredFlips: requiredFlipsNumber,
     availableFlips: availableFlipsNumber,
     flipKeyWordPairs: availableKeywords,
@@ -101,6 +102,7 @@ export default function FlipListPage() {
   const [current, send] = useMachine(flipsMachine, {
     context: {
       knownFlips: knownFlips || [],
+      flipsWithPair: flipsWithPair || [],
       availableKeywords: availableKeywords || [],
       filter: loadPersistentState('flipFilter') || FlipFilterType.Active,
       canSubmitFlips,
