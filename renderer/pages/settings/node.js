@@ -261,10 +261,10 @@ function NodeSettings() {
                     <IconButton
                       size="xs"
                       icon={revealApiKey ? <EyeOffIcon /> : <EyeIcon />}
-                      bg={revealApiKey ? 'gray.300' : 'white'}
+                      bg={revealApiKey ? 'gray.300' : 'surface'}
                       fontSize={20}
                       _hover={{
-                        bg: revealApiKey ? 'gray.300' : 'white',
+                        bg: revealApiKey ? 'gray.300' : 'surface',
                       }}
                       onClick={() => setRevealApiKey(!revealApiKey)}
                     />

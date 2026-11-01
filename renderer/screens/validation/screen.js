@@ -127,7 +127,7 @@ export function ValidationScreen({
   }, [bestRewardTipOpen, currentFlip])
 
   return (
-    <ValidationScene bg={isShortSession(state) ? 'black' : 'white'}>
+    <ValidationScene bg={isShortSession(state) ? 'black' : 'surface'}>
       {children}
 
       <Header>

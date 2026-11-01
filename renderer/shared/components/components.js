@@ -275,7 +275,7 @@ export function ChainedInput(props) {
   )
 }
 
-export function ChainedInputAddon({isDisabled, bg = 'white', ...props}) {
+export function ChainedInputAddon({isDisabled, bg = 'surface', ...props}) {
   return (
     <InputRightAddon
       bg={isDisabled ? 'gray.50' : bg}

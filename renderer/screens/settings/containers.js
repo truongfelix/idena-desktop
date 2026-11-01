@@ -150,11 +150,11 @@ export function ExportPrivateKeyDialog({onClose, ...props}) {
                   <IconButton
                     icon={revealPassword ? <EyeOffIcon /> : <EyeIcon />}
                     size="xs"
-                    bg={revealPassword ? 'gray.300' : 'white'}
+                    bg={revealPassword ? 'gray.300' : 'surface'}
                     fontSize={20}
                     w={8}
                     _hover={{
-                      bg: revealPassword ? 'gray.300' : 'white',
+                      bg: revealPassword ? 'gray.300' : 'surface',
                     }}
                     onClick={() => setRevealPassword(!revealPassword)}
                   />
@@ -331,10 +331,10 @@ export function ImportPrivateKeyDialog(props) {
                   <IconButton
                     icon={revealPassword ? <EyeOffIcon /> : <EyeIcon />}
                     size="xs"
-                    bg={revealPassword ? 'gray.300' : 'white'}
+                    bg={revealPassword ? 'gray.300' : 'surface'}
                     w={8}
                     _hover={{
-                      bg: revealPassword ? 'gray.300' : 'white',
+                      bg: revealPassword ? 'gray.300' : 'surface',
                     }}
                     onClick={() => {
                       setRevealPassword(!revealPassword)
