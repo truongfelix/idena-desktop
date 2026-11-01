@@ -27,6 +27,7 @@ import {
   DialogBody,
   DialogFooter,
   DialogHeader,
+  Checkbox,
   HDivider,
   Toast,
   Tooltip,
@@ -43,6 +44,10 @@ import {colorPickerColor} from '../utils'
 import {useSuccessToast} from '../../../shared/hooks/use-toast'
 import {resizeImageToDataUrl} from '../../../shared/utils/image-canvas'
 import ImageEditor from './simple-image-editor'
+import {
+  useSettingsDispatch,
+  useSettingsState,
+} from '../../../shared/providers/settings-context'
 import {
   AddImageIcon,
   BasketIcon,
@@ -98,6 +103,10 @@ export default function FlipEditor({
   onChangeAdversarial,
 }) {
   const {t} = useTranslation()
+
+  const {flipKeepProportions} = useSettingsState()
+  const {setFlipKeepProportions} = useSettingsDispatch()
+  const keepProportions = flipKeepProportions !== false
 
   const toast = useToast()
 
@@ -687,6 +696,7 @@ export default function FlipEditor({
                 borderColor: colors.blue[500],
               }}
               usageStatistics={false}
+              keepProportions={keepProportions}
             />
             {idx === adversarialId && (
               <Flex
@@ -904,6 +914,18 @@ export default function FlipEditor({
                 onClick={handleOnClear}
               />
             </Stack>
+          )}
+
+          {bottomMenuPanel === BottomMenu.Main && (
+            <Checkbox
+              mt={2}
+              size="sm"
+              color="muted"
+              isChecked={keepProportions}
+              onChange={(e) => setFlipKeepProportions(e.target.checked)}
+            >
+              {t('Keep proportions')}
+            </Checkbox>
           )}
 
           {bottomMenuPanel === BottomMenu.Crop && (
