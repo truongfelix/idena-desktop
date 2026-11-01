@@ -110,7 +110,10 @@ function writeFileAtomic(filePath, text, fileSystem = fs) {
     renameOver(temporary, filePath, fileSystem)
   } catch (error) {
     removeTemporary()
-    throw error
+    // Windows refused the rename for a second (another program holds the store open without letting it be
+    // replaced): written in place, as before atomic writes, rather than losing the change.
+    if (!['EPERM', 'EACCES', 'EBUSY'].includes(error?.code)) throw error
+    fileSystem.writeFileSync(filePath, text)
   }
   syncDirectory(path.dirname(filePath), fileSystem)
 }
@@ -144,23 +147,48 @@ function removeLeftoverTemporaries(filePath, fileSystem, now) {
   }
 }
 
+// Strips the byte order mark some Windows editors put first: FileSync's trim() did, JSON.parse refuses it.
+const withoutBom = (text) => text.replace(/^\uFEFF/, '')
+
+/**
+ * Puts a damaged store file aside; returns the store's data: {} for the damaged one, or the data of a sound file the
+ * other process (main or window) wrote meanwhile, which stays.
+ */
 function putAside(filePath, damagedText, fileSystem, now) {
-  // The other process (main or window) may have put it aside and written a sound one meanwhile: that one stays.
-  try {
-    if (fileSystem.readFileSync(filePath, 'utf8') !== damagedText) return
-  } catch {
-    return
-  }
   const stamp = new Date(now).toISOString().replace(/[:.]/g, '-')
   const aside = `${filePath}.broken-${stamp}`
+  let current
   try {
-    fileSystem.renameSync(filePath, aside)
+    current = fileSystem.readFileSync(filePath, 'utf8')
+  } catch (error) {
+    // Gone: the other process put it aside first. Not readable again for a moment: a copy of what was read is kept
+    // all the same, so that the next write does not take the only one.
+    if (error?.code !== 'ENOENT') {
+      try {
+        fileSystem.writeFileSync(aside, damagedText)
+        damagedStores.push({file: path.basename(filePath), aside})
+      } catch {
+        // Nothing more to do: the store starts empty.
+      }
+    }
+    return {}
+  }
+  if (current !== damagedText) {
+    try {
+      return JSON.parse(withoutBom(current))
+    } catch {
+      return {}
+    }
+  }
+  try {
+    renameOver(filePath, aside, fileSystem)
   } catch (error) {
     // The other process (main or window) put it aside first.
-    if (error?.code === 'ENOENT') return
+    if (error?.code === 'ENOENT') return {}
     throw error
   }
   damagedStores.push({file: path.basename(filePath), aside})
+  return {}
 }
 
 /**
@@ -180,10 +208,9 @@ function readStore(filePath, fileSystem = fs, now = Date.now()) {
   }
   if (text.trim() === '') return {}
   try {
-    return JSON.parse(text)
+    return JSON.parse(withoutBom(text))
   } catch {
-    putAside(filePath, text, fileSystem, now)
-    return {}
+    return putAside(filePath, text, fileSystem, now)
   }
 }
 
