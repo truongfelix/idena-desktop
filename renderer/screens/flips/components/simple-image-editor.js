@@ -26,6 +26,8 @@ import {
   stepForward,
   stretchFromHandle,
   topMiddlePoint,
+  objectFilter,
+  clampBrightness,
 } from './image-editor-model'
 
 // The flip image editor, with the part of toast-ui's API that flip-editor.js uses: pictures and pen
@@ -113,6 +115,7 @@ function drawObject(ctx, obj) {
   if (obj.type === 'path') {
     drawStroke(ctx, obj.points, obj.color, obj.strokeWidth)
   } else if (obj.img) {
+    ctx.filter = objectFilter(obj)
     // As fabric: width/height frame the picture at its own size, a larger frame does not stretch it.
     const sw = Math.min(obj.width, obj.img.naturalWidth || obj.img.width)
     const sh = Math.min(obj.height, obj.img.naturalHeight || obj.img.height)
@@ -476,6 +479,13 @@ const SimpleImageEditor = React.forwardRef(
           emit('undoStackChanged')
           emit('redoStackChanged')
         },
+        // One undo step for a change made in several quiet steps (the brightness slider's drag).
+        recordUndoStep: () => {
+          recordUndo(s.history, s.scene)
+          emit('undoStackChanged')
+          // recordUndo empties the redo stack: the Redo button follows.
+          emit('redoStackChanged')
+        },
         removeActiveObject: () => {
           if (s.activeId) removeObject(s.activeId)
         },
@@ -492,6 +502,9 @@ const SimpleImageEditor = React.forwardRef(
           SETTABLE_PROPS.forEach((name) => {
             if (Number.isFinite(props[name])) obj[name] = props[name]
           })
+          if (Number.isFinite(props.brightness)) {
+            obj.brightness = clampBrightness(props.brightness)
+          }
           render()
           return true
         },

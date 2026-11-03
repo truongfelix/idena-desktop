@@ -1,4 +1,7 @@
 import {
+  clampBrightness,
+  cloneScene,
+  objectFilter,
   cornerPoint,
   createHistory,
   cropArea,
@@ -325,5 +328,42 @@ describe('undo history', () => {
     const history = createHistory()
     expect(stepBack(history, scene([]))).toBe(null)
     expect(stepForward(history, scene([]))).toBe(null)
+  })
+})
+
+describe('brightness of a picture (B-198)', () => {
+  it('draws a brighter or darker picture through a canvas filter', () => {
+    expect(objectFilter(picture({type: 'image', brightness: 1.5}))).toBe(
+      'brightness(150%)'
+    )
+    expect(objectFilter(picture({type: 'image', brightness: 0.4}))).toBe(
+      'brightness(40%)'
+    )
+  })
+
+  it('leaves an unchanged picture, an old one and a stroke unfiltered', () => {
+    expect(objectFilter(picture({type: 'image', brightness: 1}))).toBe('none')
+    expect(objectFilter(picture({type: 'image'}))).toBe('none')
+    expect(objectFilter({type: 'path', brightness: 1.5})).toBe('none')
+  })
+
+  it('keeps the brightness within the slider range', () => {
+    expect(clampBrightness(5)).toBe(1.8)
+    expect(clampBrightness(0)).toBe(0.2)
+    expect(clampBrightness(undefined)).toBe(1)
+    expect(clampBrightness(NaN)).toBe(1)
+  })
+
+  it('undo brings the earlier brightness back', () => {
+    const history = createHistory()
+    const scene = {
+      size: {width: 440, height: 330},
+      objects: [picture({type: 'image', brightness: 1})],
+    }
+    recordUndo(history, scene)
+    scene.objects[0].brightness = 1.6
+    const previous = stepBack(history, cloneScene(scene))
+    expect(previous.objects[0].brightness).toBe(1)
+    expect(history.redo[0].objects[0].brightness).toBe(1.6)
   })
 })

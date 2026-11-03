@@ -20,6 +20,10 @@ import {
   useTheme,
   Icon,
   useDisclosure,
+  Slider,
+  SliderTrack,
+  SliderFilledTrack,
+  SliderThumb,
 } from '@chakra-ui/react'
 import {useInterval} from '../../../shared/hooks/use-interval'
 import {
@@ -44,7 +48,13 @@ import {colorPickerColor} from '../utils'
 import {useSuccessToast} from '../../../shared/hooks/use-toast'
 import {resizeImageToDataUrl} from '../../../shared/utils/image-canvas'
 import ImageEditor from './simple-image-editor'
-import {fitInFrame} from './image-editor-model'
+import {
+  BRIGHTNESS_MAX,
+  BRIGHTNESS_MIN,
+  clampBrightness,
+  fitInFrame,
+  objectFilter,
+} from './image-editor-model'
 import {
   useSettingsDispatch,
   useSettingsState,
@@ -92,6 +102,22 @@ const BLANK_IMAGE =
     IMAGE_WIDTH,
     IMAGE_HEIGHT
   )
+
+// `url` drawn with `brightness` applied, as a PNG data URL; `url` itself when the brightness is unchanged.
+async function withBrightness(url, brightness) {
+  const filter = objectFilter({brightness})
+  if (filter === 'none') return url
+  const img = new Image()
+  img.src = url
+  await img.decode()
+  const canvas = document.createElement('canvas')
+  canvas.width = img.naturalWidth
+  canvas.height = img.naturalHeight
+  const ctx = canvas.getContext('2d')
+  ctx.filter = filter
+  ctx.drawImage(img, 0, 0)
+  return canvas.toDataURL('image/png')
+}
 
 export default function FlipEditor({
   idx = 0,
@@ -144,6 +170,11 @@ export default function FlipEditor({
   const [isSelectionCreated, setIsSelectionCreated] = useState(null)
   const [activeObjectUrl, setActiveObjectUrl] = useState(null)
   const [activeObjectId, setActiveObjectId] = useState(null)
+
+  // The selected picture's brightness (B-198), read again after a selection, an undo or a redo.
+  const [brightness, setBrightness] = useState(1)
+  const [historyVersion, setHistoryVersion] = useState(0)
+  const brightnessDragRef = useRef(false)
 
   // Postponed onChange() triggering
   const NOCHANGES = 0
@@ -200,8 +231,9 @@ export default function FlipEditor({
         if (data.replaceObjectId) {
           replaceObjectProps = editors[idx].getObjectProperties(
             data.replaceObjectId,
-            // Not the scale: the eraser's result is already drawn at the picture's shown size.
-            ['left', 'top', 'angle']
+            // Not the scale: the eraser's result is already drawn at the picture's shown size. The
+            // brightness: the eraser works on the picture's own pixels.
+            ['left', 'top', 'angle', 'brightness']
           )
           editors[idx].execute('removeObject', data.replaceObjectId)
         }
@@ -347,8 +379,13 @@ export default function FlipEditor({
 
   const successToast = useSuccessToast()
 
-  const handleOnCopy = () => {
-    const url = activeObjectUrl || (editors[idx] && editors[idx].toDataURL())
+  const handleOnCopy = async () => {
+    let url = activeObjectUrl || (editors[idx] && editors[idx].toDataURL())
+    if (url && activeObjectUrl) {
+      // The picture as it is shown: its brightness applied (B-198).
+      const props = getEditorObjectProps(editors[idx], activeObjectId)
+      url = await withBrightness(url, props?.brightness).catch(() => url)
+    }
     if (url) {
       writeImageURLToClipboard(url)
       successToast(t('Copied'))
@@ -464,6 +501,7 @@ export default function FlipEditor({
         angle: obj.angle,
         scaleX: obj.scaleX,
         scaleY: obj.scaleY,
+        brightness: obj.brightness,
       }
     }
     return null
@@ -507,6 +545,7 @@ export default function FlipEditor({
       })
       e.on({
         undoStackChanged() {
+          setHistoryVersion((v) => v + 1)
           const editor = getEditorInstance()
           const objId = getEditorActiveObjectId(editor)
           const url = getEditorObjectUrl(editor, objId)
@@ -519,6 +558,7 @@ export default function FlipEditor({
       })
       e.on({
         redoStackChanged() {
+          setHistoryVersion((v) => v + 1)
           const editor = getEditorInstance()
           const objId = getEditorActiveObjectId(editor)
           const url = getEditorObjectUrl(editor, objId)
@@ -599,6 +639,21 @@ export default function FlipEditor({
   }, [editorRefs, src, idx])
 
   const [showImageSearch, setShowImageSearch] = React.useState()
+
+  // A slider removed during a drag (Delete, undo) never ends its gesture: a new selection does.
+  React.useEffect(() => {
+    brightnessDragRef.current = false
+  }, [activeObjectId])
+
+  React.useEffect(() => {
+    if (brightnessDragRef.current) return
+    const editor = editors[idx]
+    const value =
+      editor && activeObjectId
+        ? editor.getObjectProperties(activeObjectId, ['brightness']).brightness
+        : 1
+    setBrightness(clampBrightness(value))
+  }, [activeObjectId, editors, historyVersion, idx])
 
   React.useEffect(() => {
     if (showImageSearch || !visible) {
@@ -896,6 +951,47 @@ export default function FlipEditor({
               {t('Keep proportions')}
             </Checkbox>
           )}
+
+          {bottomMenuPanel === BottomMenu.Main &&
+            activeObjectUrl &&
+            idx !== adversarialId && (
+              <Flex mt={2} align="center" w={rem(IMAGE_WIDTH)}>
+                <Text fontSize="sm" color="muted" mr={3} flexShrink={0}>
+                  {t('Brightness')}
+                </Text>
+                <Slider
+                  aria-label={t('Brightness')}
+                  min={BRIGHTNESS_MIN}
+                  max={BRIGHTNESS_MAX}
+                  step={0.05}
+                  value={brightness}
+                  focusThumbOnChange={false}
+                  onChange={(value) => {
+                    setBrightness(value)
+                    if (editors[idx] && activeObjectId) {
+                      // One undo step per gesture: the first change of a drag (Chakra calls onChange before
+                      // onChangeStart) or each arrow key (onChangeEnd follows every key).
+                      if (!brightnessDragRef.current) {
+                        brightnessDragRef.current = true
+                        editors[idx].recordUndoStep()
+                      }
+                      editors[idx].setObjectPropertiesQuietly(activeObjectId, {
+                        brightness: value,
+                      })
+                    }
+                  }}
+                  onChangeEnd={() => {
+                    brightnessDragRef.current = false
+                    handleOnChanged()
+                  }}
+                >
+                  <SliderTrack>
+                    <SliderFilledTrack />
+                  </SliderTrack>
+                  <SliderThumb />
+                </Slider>
+              </Flex>
+            )}
 
           {bottomMenuPanel === BottomMenu.Crop && (
             <ApplyChangesBottomPanel
@@ -1366,6 +1462,10 @@ function ImageEraseEditor({
             left={`${left}px`}
             top={`${top}px`}
             transform={`rotate(${angle}deg)`}
+            // Shown as the picture is drawn; the eraser works on its own pixels (B-198).
+            style={{
+              filter: objectFilter({brightness: imageObjectProps?.brightness}),
+            }}
             onMouseMove={(e) => handleMouseMove(e)}
           />
         </Box>
