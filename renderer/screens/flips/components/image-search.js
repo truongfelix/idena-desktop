@@ -14,6 +14,7 @@ import {
 } from '@chakra-ui/react'
 import {useTranslation} from 'react-i18next'
 import {useMachine} from '@xstate/react'
+import {adversarialSearchNeeded} from '../utils'
 import {PrimaryButton, SecondaryButton} from '../../../shared/components/button'
 import {
   Dialog,
@@ -54,17 +55,19 @@ function ImageSearchConsentText() {
 /**
  * The web search for the nonsense picture's sources when a flip's pictures step opens (`loadAdversarial`):
  * it runs if the user allowed the search, waits for the answer to `consent` (the question's dialog) if never
- * asked, and is skipped if the search is off.
+ * asked, and is skipped if the search is off, or if the nonsense picture is made from the story pictures only
+ * (`force`: the protect step's choice just moved away from them).
  */
 export function useAdversarialSearch(currentSearch, sendSearch) {
-  const {imageSearch} = useSettingsState()
+  const {imageSearch, flipAdversarialSource} = useSettingsState()
   const {setImageSearch} = useSettingsDispatch()
   const [pendingQuery, setPendingQuery] = React.useState(null)
 
-  const loadAdversarial = async (flip) => {
+  const loadAdversarial = async (flip, {force = false} = {}) => {
     if (
       flip.adversarialImages.some((x) => x) ||
-      eitherState(currentSearch, 'searching')
+      eitherState(currentSearch, 'searching') ||
+      (!force && !adversarialSearchNeeded(flipAdversarialSource))
     ) {
       return
     }

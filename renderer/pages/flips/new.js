@@ -389,6 +389,9 @@ export default function NewFlipPage() {
                   onShowAdversarialShuffle={() =>
                     setDidShowShuffleAdversarial(true)
                   }
+                  onLoadSearchPictures={() =>
+                    loadAdversarial(current.context, {force: true})
+                  }
                 />
               )}
               {is('shuffle') && (

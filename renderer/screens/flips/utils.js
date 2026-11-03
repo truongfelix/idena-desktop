@@ -985,6 +985,12 @@ export function adversarialSourceChoice(value) {
   return ADVERSARIAL_SOURCES.includes(value) ? value : 'both'
 }
 
+// Whether the nonsense picture can use the picture search: not with 'story' (My pictures), so the search sites
+// are not asked for pictures that would not be used.
+export function adversarialSearchNeeded(source) {
+  return adversarialSourceChoice(source) !== 'story'
+}
+
 /**
  * The pictures the nonsense picture is made from, by `source` (`adversarialSourceChoice`):
  * - 'search': the web search's; when it found fewer than four (search off, no results, no connection) those

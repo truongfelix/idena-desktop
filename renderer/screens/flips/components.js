@@ -40,6 +40,7 @@ import {useActor} from '@xstate/react'
 import FlipEditor from './components/flip-editor'
 import {Step} from './types'
 import {
+  adversarialSearchNeeded,
   adversarialSourceChoice,
   adversarialSources,
   formatKeywords,
@@ -738,6 +739,7 @@ export function FlipProtectStep({
   onProtectImage,
   onChangeAdversarial,
   onShowAdversarialShuffle,
+  onLoadSearchPictures,
 }) {
   const {t} = useTranslation()
   const BLANK_IMAGE_DATAURL =
@@ -821,6 +823,29 @@ export function FlipProtectStep({
       originalOrder,
     ]
   )
+
+  // A choice waiting for the search's pictures (see the choice's onChange): they arrive one by one, so the
+  // nonsense picture is made again once none came for a second, if it is still the picture shown.
+  const awaitedSourceRef = React.useRef(null)
+  const searchPictures = adversarialImages.filter(Boolean).length
+  useEffect(() => {
+    const source = awaitedSourceRef.current
+    if (!source || !searchPictures) return undefined
+    const timer = setTimeout(() => {
+      if (awaitedSourceRef.current !== source) return
+      awaitedSourceRef.current = null
+      if (originalOrder[currentIndex] === adversarialImageId) {
+        regenerateImage(source)
+      }
+    }, 1000)
+    return () => clearTimeout(timer)
+  }, [
+    adversarialImageId,
+    currentIndex,
+    originalOrder,
+    regenerateImage,
+    searchPictures,
+  ])
 
   useEffect(() => {
     if (!didShowShuffleAdversarial) {
@@ -939,6 +964,17 @@ export function FlipProtectStep({
                 onChange={(value) => {
                   setFlipAdversarialSource(value)
                   regenerateImage(value)
+                  // With My pictures the search did not run for this flip: run it now, and make the nonsense
+                  // picture again once its pictures are in.
+                  if (
+                    adversarialSearchNeeded(value) &&
+                    !adversarialImages.some(Boolean)
+                  ) {
+                    awaitedSourceRef.current = value
+                    if (onLoadSearchPictures) onLoadSearchPictures()
+                  } else {
+                    awaitedSourceRef.current = null
+                  }
                 }}
               >
                 <Stack isInline spacing={6}>

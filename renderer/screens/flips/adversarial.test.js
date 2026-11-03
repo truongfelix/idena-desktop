@@ -1,4 +1,5 @@
 import {
+  adversarialSearchNeeded,
   adversarialSourceChoice,
   adversarialSources,
   pickAdversarialSources,
@@ -123,5 +124,16 @@ describe('adversarialSources', () => {
       expect(adversarialSourceChoice(undefined)).toBe('both')
       expect(adversarialSourceChoice('later')).toBe('both')
     })
+  })
+})
+
+describe('adversarialSearchNeeded', () => {
+  it('skips the picture search for My pictures only', () => {
+    expect(adversarialSearchNeeded('story')).toBe(false)
+    expect(adversarialSearchNeeded('search')).toBe(true)
+    expect(adversarialSearchNeeded('both')).toBe(true)
+    // Never chosen, or a later version's choice: both, which uses the search.
+    expect(adversarialSearchNeeded(undefined)).toBe(true)
+    expect(adversarialSearchNeeded('later')).toBe(true)
   })
 })
