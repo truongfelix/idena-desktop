@@ -53,6 +53,7 @@ import {
   BRIGHTNESS_MIN,
   clampBrightness,
   fitInFrame,
+  objectFilter,
 } from './image-editor-model'
 import {
   useSettingsDispatch,
@@ -101,6 +102,22 @@ const BLANK_IMAGE =
     IMAGE_WIDTH,
     IMAGE_HEIGHT
   )
+
+// `url` drawn with `brightness` applied, as a PNG data URL; `url` itself when the brightness is unchanged.
+async function withBrightness(url, brightness) {
+  const filter = objectFilter({brightness})
+  if (filter === 'none') return url
+  const img = new Image()
+  img.src = url
+  await img.decode()
+  const canvas = document.createElement('canvas')
+  canvas.width = img.naturalWidth
+  canvas.height = img.naturalHeight
+  const ctx = canvas.getContext('2d')
+  ctx.filter = filter
+  ctx.drawImage(img, 0, 0)
+  return canvas.toDataURL('image/png')
+}
 
 export default function FlipEditor({
   idx = 0,
@@ -362,8 +379,13 @@ export default function FlipEditor({
 
   const successToast = useSuccessToast()
 
-  const handleOnCopy = () => {
-    const url = activeObjectUrl || (editors[idx] && editors[idx].toDataURL())
+  const handleOnCopy = async () => {
+    let url = activeObjectUrl || (editors[idx] && editors[idx].toDataURL())
+    if (url && activeObjectUrl) {
+      // The picture as it is shown: its brightness applied (B-198).
+      const props = getEditorObjectProps(editors[idx], activeObjectId)
+      url = await withBrightness(url, props?.brightness).catch(() => url)
+    }
     if (url) {
       writeImageURLToClipboard(url)
       successToast(t('Copied'))
@@ -479,6 +501,7 @@ export default function FlipEditor({
         angle: obj.angle,
         scaleX: obj.scaleX,
         scaleY: obj.scaleY,
+        brightness: obj.brightness,
       }
     }
     return null
@@ -616,6 +639,11 @@ export default function FlipEditor({
   }, [editorRefs, src, idx])
 
   const [showImageSearch, setShowImageSearch] = React.useState()
+
+  // A slider removed during a drag (Delete, undo) never ends its gesture: a new selection does.
+  React.useEffect(() => {
+    brightnessDragRef.current = false
+  }, [activeObjectId])
 
   React.useEffect(() => {
     if (brightnessDragRef.current) return
@@ -1434,6 +1462,10 @@ function ImageEraseEditor({
             left={`${left}px`}
             top={`${top}px`}
             transform={`rotate(${angle}deg)`}
+            // Shown as the picture is drawn; the eraser works on its own pixels (B-198).
+            style={{
+              filter: objectFilter({brightness: imageObjectProps?.brightness}),
+            }}
             onMouseMove={(e) => handleMouseMove(e)}
           />
         </Box>
