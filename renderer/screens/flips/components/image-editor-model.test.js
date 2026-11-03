@@ -2,6 +2,7 @@ import {
   cornerPoint,
   createHistory,
   cropArea,
+  fitInFrame,
   handlePoint,
   hitHandle,
   hitObject,
@@ -134,6 +135,33 @@ describe('scaling from a corner', () => {
   it('cannot shrink an object already smaller than the minimum', () => {
     const dot = picture({width: 4, height: 4})
     expect(scaleFromCorner(dot, 'br', {x: 0, y: 0}, 8).scaleX).toBeCloseTo(1)
+  })
+})
+
+describe('a new picture', () => {
+  const frame = {width: 440, height: 330}
+
+  it('grows to the frame, keeping its shape, centred', () => {
+    // 160x40 is wider than the frame's shape: it fills the width.
+    expect(fitInFrame(picture({width: 160, height: 40}), frame)).toEqual({
+      left: 220,
+      top: 165,
+      scaleX: 2.75,
+      scaleY: 2.75,
+    })
+  })
+
+  it('shrinks to the frame when larger, filling the height of a tall picture', () => {
+    const next = fitInFrame(picture({width: 300, height: 660}), frame)
+    expect(next.scaleX).toBeCloseTo(0.5)
+    expect(next.scaleY).toBeCloseTo(0.5)
+  })
+
+  it("fills the whole frame when it has the frame's shape", () => {
+    const obj = picture({width: 160, height: 120})
+    const next = fitInFrame(obj, frame)
+    close(cornerPoint({...obj, ...next}, 'tl'), {x: 0, y: 0})
+    close(cornerPoint({...obj, ...next}, 'br'), {x: 440, y: 330})
   })
 })
 

@@ -145,6 +145,20 @@ export function scaleFromCorner(start, corner, point, minSize) {
   }
 }
 
+// A new picture, centred and scaled up or down to touch the frame's edges, keeping its shape: the whole picture
+// shows and fills the frame in one direction.
+export function fitInFrame(obj, frame) {
+  const width = obj.width || 1
+  const height = obj.height || 1
+  const scale = Math.min(frame.width / width, frame.height / height)
+  return {
+    left: frame.width / 2,
+    top: frame.height / 2,
+    scaleX: scale,
+    scaleY: scale,
+  }
+}
+
 // Free scaling from a corner or the middle of a side, the opposite one staying in place: a corner
 // changes width and height apart (the picture stretches), a side changes only its own direction.
 // As scaleFromCorner, a side never shrinks below minSize, unless it already was smaller, nor flips over.

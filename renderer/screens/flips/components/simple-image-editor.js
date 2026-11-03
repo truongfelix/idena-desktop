@@ -432,6 +432,7 @@ const SimpleImageEditor = React.forwardRef(
           if (command === 'removeObject') removeObject(id)
         },
         getCropzoneRect: () => cropArea(s.cropRect, s.scene.size),
+        getSceneSize: () => ({...s.scene.size}),
         getDrawingMode: () => s.mode,
         getObjectProperties: (id, keys) => {
           const obj = findObject(id)
@@ -739,17 +740,23 @@ const SimpleImageEditor = React.forwardRef(
       editorRef.current.pointerDown(canvasPoint(event))
     }
 
+    // The pointer is read on the container, exactly the canvas's size and square: flip-editor rounds the
+    // canvas's corners, and the browser leaves a rounded-off corner to the element below, where the corner
+    // handles of a picture filling the frame are drawn (B-186).
     return (
-      <div className="tui-image-editor-canvas-container">
+      <div
+        className="tui-image-editor-canvas-container"
+        onPointerDown={handlePointerDown}
+        onPointerMove={(event) =>
+          editorRef.current.pointerMove(canvasPoint(event))
+        }
+        onPointerUp={() => editorRef.current.pointerUp()}
+        onLostPointerCapture={() => editorRef.current.pointerUp()}
+        style={{width: 'max-content', touchAction: 'none'}}
+      >
         <canvas
           ref={canvasRef}
           className="lower-canvas"
-          onPointerDown={handlePointerDown}
-          onPointerMove={(event) =>
-            editorRef.current.pointerMove(canvasPoint(event))
-          }
-          onPointerUp={() => editorRef.current.pointerUp()}
-          onLostPointerCapture={() => editorRef.current.pointerUp()}
           style={{display: 'block', touchAction: 'none'}}
         />
       </div>

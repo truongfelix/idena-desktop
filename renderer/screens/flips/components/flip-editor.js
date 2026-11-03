@@ -44,6 +44,7 @@ import {colorPickerColor} from '../utils'
 import {useSuccessToast} from '../../../shared/hooks/use-toast'
 import {resizeImageToDataUrl} from '../../../shared/utils/image-canvas'
 import ImageEditor from './simple-image-editor'
+import {fitInFrame} from './image-editor-model'
 import {
   useSettingsDispatch,
   useSettingsState,
@@ -177,7 +178,9 @@ export default function FlipEditor({
   const setImageUrl = useCallback(
     (data, onDone = null) => {
       const {url, insertMode, customEditor} = data
-      const nextInsertMode = insertMode || insertImageMode
+      // Every new picture is a movable one (B-186); the background mode is left to the crop.
+      const nextInsertMode =
+        insertMode || insertImageMode || INSERT_OBJECT_IMAGE
       const editor = customEditor || editors[idx]
 
       if (!editor) return
@@ -197,6 +200,7 @@ export default function FlipEditor({
         if (data.replaceObjectId) {
           replaceObjectProps = editors[idx].getObjectProperties(
             data.replaceObjectId,
+            // Not the scale: the eraser's result is already drawn at the picture's shown size.
             ['left', 'top', 'angle']
           )
           editors[idx].execute('removeObject', data.replaceObjectId)
@@ -218,6 +222,12 @@ export default function FlipEditor({
               editors[idx].setObjectPropertiesQuietly(
                 objectProps.id,
                 replaceObjectProps
+              )
+            } else {
+              editor.setObjectPropertiesQuietly(
+                objectProps.id,
+                // The frame as it is now: a crop makes it smaller than 440x330.
+                fitInFrame(objectProps, editor.getSceneSize())
               )
             }
 
@@ -331,24 +341,7 @@ export default function FlipEditor({
   const handleImageFromClipboard = (insertMode = null) => {
     const url = getImageURLFromClipboard(IMAGE_WIDTH, IMAGE_HEIGHT)
     if (url) {
-      if (insertMode) {
-        setImageUrl({url, insertMode})
-      } else {
-        // Auto detect insert mode by image size
-        let img = new Image()
-        img.src = url
-        img.onload = function () {
-          if (img.width === IMAGE_WIDTH && img.height === IMAGE_HEIGHT) {
-            setImageUrl({url, insertMode: INSERT_BACKGROUND_IMAGE})
-          } else {
-            setImageUrl({
-              url,
-              insertMode: INSERT_OBJECT_IMAGE,
-            })
-          }
-          img = null
-        }
-      }
+      setImageUrl({url, insertMode: insertMode || INSERT_OBJECT_IMAGE})
     }
   }
 
@@ -740,18 +733,6 @@ export default function FlipEditor({
 
           {bottomMenuPanel === BottomMenu.Main && (
             <Stack isInline align="center" spacing={3} mt={3}>
-              <FlipEditorIcon
-                tooltip={t('Search on web')}
-                icon={<SearchIcon />}
-                onClick={() => {
-                  if (rightMenuPanel === RightMenu.Erase) {
-                    setRightMenuPanel(RightMenu.None)
-                  }
-                  setInsertImageMode(INSERT_BACKGROUND_IMAGE)
-                  setShowImageSearch(true)
-                }}
-              />
-
               {showArrowHint && (
                 <Portal containerRef={leftArrowPortalRef}>
                   <ArrowHint
@@ -760,20 +741,6 @@ export default function FlipEditor({
                   />
                 </Portal>
               )}
-
-              <Box ref={leftArrowPortalRef} position="relative">
-                <FlipEditorIcon
-                  tooltip={t('Select file')}
-                  icon={<FolderIcon />}
-                  onClick={() => {
-                    if (rightMenuPanel === RightMenu.Erase) {
-                      setRightMenuPanel(RightMenu.None)
-                    }
-                    setInsertImageMode(INSERT_BACKGROUND_IMAGE)
-                    uploaderRef.current.click()
-                  }}
-                />
-              </Box>
 
               <VisuallyHidden>
                 <input
@@ -785,49 +752,51 @@ export default function FlipEditor({
                 />
               </VisuallyHidden>
 
-              <Menu autoSelect={false}>
-                <MenuButton>
-                  <FlipEditorIcon
-                    tooltip={t('Add image')}
-                    icon={<AddImageIcon />}
-                    onClick={() => {
-                      if (rightMenuPanel === RightMenu.Erase) {
+              <Box ref={leftArrowPortalRef} position="relative">
+                <Menu autoSelect={false}>
+                  <MenuButton>
+                    <FlipEditorIcon
+                      tooltip={t('Add image')}
+                      icon={<AddImageIcon />}
+                      onClick={() => {
+                        if (rightMenuPanel === RightMenu.Erase) {
+                          setRightMenuPanel(RightMenu.None)
+                        }
+                        editors[idx].stopDrawingMode()
                         setRightMenuPanel(RightMenu.None)
-                      }
-                      editors[idx].stopDrawingMode()
-                      setRightMenuPanel(RightMenu.None)
-                    }}
-                  />
-                </MenuButton>
-                <FlipEditorMenuList zIndex="popover">
-                  <FlipEditorMenuItem
-                    onClick={async () => {
-                      setInsertImageMode(INSERT_OBJECT_IMAGE)
-                      setShowImageSearch(true)
-                    }}
-                  >
-                    <FlipEditorMenuItemIcon as={SearchIcon} />
-                    {t('Search on web')}
-                  </FlipEditorMenuItem>
-                  <FlipEditorMenuItem
-                    onClick={async () => {
-                      setInsertImageMode(INSERT_OBJECT_IMAGE)
-                      uploaderRef.current.click()
-                    }}
-                  >
-                    <FlipEditorMenuItemIcon as={FolderIcon} />
-                    {t('Select file')}
-                  </FlipEditorMenuItem>
-                  <FlipEditorMenuItem
-                    onClick={async () => {
-                      handleImageFromClipboard(INSERT_OBJECT_IMAGE)
-                    }}
-                  >
-                    <FlipEditorMenuItemIcon as={ClipboardIcon} />
-                    {t('Paste image')}
-                  </FlipEditorMenuItem>
-                </FlipEditorMenuList>
-              </Menu>
+                      }}
+                    />
+                  </MenuButton>
+                  <FlipEditorMenuList zIndex="popover">
+                    <FlipEditorMenuItem
+                      onClick={async () => {
+                        setInsertImageMode(INSERT_OBJECT_IMAGE)
+                        setShowImageSearch(true)
+                      }}
+                    >
+                      <FlipEditorMenuItemIcon as={SearchIcon} />
+                      {t('Search on web')}
+                    </FlipEditorMenuItem>
+                    <FlipEditorMenuItem
+                      onClick={async () => {
+                        setInsertImageMode(INSERT_OBJECT_IMAGE)
+                        uploaderRef.current.click()
+                      }}
+                    >
+                      <FlipEditorMenuItemIcon as={FolderIcon} />
+                      {t('Select file')}
+                    </FlipEditorMenuItem>
+                    <FlipEditorMenuItem
+                      onClick={async () => {
+                        handleImageFromClipboard(INSERT_OBJECT_IMAGE)
+                      }}
+                    >
+                      <FlipEditorMenuItemIcon as={ClipboardIcon} />
+                      {t('Paste image')}
+                    </FlipEditorMenuItem>
+                  </FlipEditorMenuList>
+                </Menu>
+              </Box>
 
               <VDivider h={5} />
 
