@@ -200,7 +200,8 @@ export default function FlipEditor({
         if (data.replaceObjectId) {
           replaceObjectProps = editors[idx].getObjectProperties(
             data.replaceObjectId,
-            ['left', 'top', 'angle']
+            // The scale too: a new picture is scaled to fill the frame (B-186).
+            ['left', 'top', 'angle', 'scaleX', 'scaleY']
           )
           editors[idx].execute('removeObject', data.replaceObjectId)
         }
@@ -225,10 +226,8 @@ export default function FlipEditor({
             } else {
               editor.setObjectPropertiesQuietly(
                 objectProps.id,
-                fitInFrame(objectProps, {
-                  width: IMAGE_WIDTH,
-                  height: IMAGE_HEIGHT,
-                })
+                // The frame as it is now: a crop makes it smaller than 440x330.
+                fitInFrame(objectProps, editor.getSceneSize())
               )
             }
 

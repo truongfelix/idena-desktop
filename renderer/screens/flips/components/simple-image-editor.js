@@ -432,6 +432,7 @@ const SimpleImageEditor = React.forwardRef(
           if (command === 'removeObject') removeObject(id)
         },
         getCropzoneRect: () => cropArea(s.cropRect, s.scene.size),
+        getSceneSize: () => ({...s.scene.size}),
         getDrawingMode: () => s.mode,
         getObjectProperties: (id, keys) => {
           const obj = findObject(id)
