@@ -750,16 +750,19 @@ export function FlipProtectStep({
   const adversarialSource = adversarialSourceChoice(flipAdversarialSource)
 
   // `source`: a new choice of what the nonsense picture is made from, before the settings show it.
-  // The latest regeneration: an earlier one that ends after it (two quick choices) is dropped.
-  const regenerationRef = React.useRef(0)
+  // The latest regeneration of each picture: an earlier one of the same picture that ends after it (two quick
+  // choices) is dropped, its failure included.
+  const regenerationRef = React.useRef({})
 
   const regenerateImage = React.useCallback(
     async (source) => {
       if (!images.some((x) => x)) {
         return
       }
-      regenerationRef.current += 1
-      const regeneration = regenerationRef.current
+      const picture = originalOrder[currentIndex]
+      const regeneration = (regenerationRef.current[picture] || 0) + 1
+      regenerationRef.current[picture] = regeneration
+      const isLatest = () => regenerationRef.current[picture] === regeneration
       onProtecting()
       try {
         let advImageScr
@@ -776,7 +779,7 @@ export function FlipProtectStep({
         }
 
         if (!imageSrc) {
-          onProtectFailed()
+          if (isLatest()) onProtectFailed()
           return
         }
 
@@ -792,7 +795,7 @@ export function FlipProtectStep({
             exact: true,
           }
         )
-        if (regeneration !== regenerationRef.current) return
+        if (!isLatest()) return
         if (advImageScr) {
           onChangeAdversarial(advImageScr)
         }
@@ -802,7 +805,7 @@ export function FlipProtectStep({
           'error while protecting a flip image',
           error?.message
         )
-        onProtectFailed()
+        if (isLatest()) onProtectFailed()
       }
     },
     [
