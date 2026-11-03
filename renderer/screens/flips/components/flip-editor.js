@@ -214,7 +214,8 @@ export default function FlipEditor({
         if (data.replaceObjectId) {
           replaceObjectProps = editors[idx].getObjectProperties(
             data.replaceObjectId,
-            ['left', 'top', 'angle', 'brightness']
+            // The scale too: a new picture is scaled to fill the frame (B-186).
+            ['left', 'top', 'angle', 'scaleX', 'scaleY', 'brightness']
           )
           editors[idx].execute('removeObject', data.replaceObjectId)
         }
@@ -239,10 +240,8 @@ export default function FlipEditor({
             } else {
               editor.setObjectPropertiesQuietly(
                 objectProps.id,
-                fitInFrame(objectProps, {
-                  width: IMAGE_WIDTH,
-                  height: IMAGE_HEIGHT,
-                })
+                // The frame as it is now: a crop makes it smaller than 440x330.
+                fitInFrame(objectProps, editor.getSceneSize())
               )
             }
 
@@ -938,15 +937,15 @@ export default function FlipEditor({
                   step={0.05}
                   value={brightness}
                   focusThumbOnChange={false}
-                  onChangeStart={() => {
-                    if (editors[idx] && activeObjectId) {
-                      brightnessDragRef.current = true
-                      editors[idx].recordUndoStep()
-                    }
-                  }}
                   onChange={(value) => {
                     setBrightness(value)
                     if (editors[idx] && activeObjectId) {
+                      // One undo step per gesture: the first change of a drag (Chakra calls onChange before
+                      // onChangeStart) or each arrow key (onChangeEnd follows every key).
+                      if (!brightnessDragRef.current) {
+                        brightnessDragRef.current = true
+                        editors[idx].recordUndoStep()
+                      }
                       editors[idx].setObjectPropertiesQuietly(activeObjectId, {
                         brightness: value,
                       })

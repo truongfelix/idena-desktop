@@ -50,7 +50,6 @@ const SETTABLE_PROPS = [
   'opacity',
   'scaleX',
   'scaleY',
-  'brightness',
 ]
 
 const DEFAULT_SELECTION_STYLE = {
@@ -436,6 +435,7 @@ const SimpleImageEditor = React.forwardRef(
           if (command === 'removeObject') removeObject(id)
         },
         getCropzoneRect: () => cropArea(s.cropRect, s.scene.size),
+        getSceneSize: () => ({...s.scene.size}),
         getDrawingMode: () => s.mode,
         getObjectProperties: (id, keys) => {
           const obj = findObject(id)
@@ -483,6 +483,8 @@ const SimpleImageEditor = React.forwardRef(
         recordUndoStep: () => {
           recordUndo(s.history, s.scene)
           emit('undoStackChanged')
+          // recordUndo empties the redo stack: the Redo button follows.
+          emit('redoStackChanged')
         },
         removeActiveObject: () => {
           if (s.activeId) removeObject(s.activeId)
