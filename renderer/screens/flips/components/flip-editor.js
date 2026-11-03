@@ -937,15 +937,15 @@ export default function FlipEditor({
                   step={0.05}
                   value={brightness}
                   focusThumbOnChange={false}
-                  onChangeStart={() => {
-                    if (editors[idx] && activeObjectId) {
-                      brightnessDragRef.current = true
-                      editors[idx].recordUndoStep()
-                    }
-                  }}
                   onChange={(value) => {
                     setBrightness(value)
                     if (editors[idx] && activeObjectId) {
+                      // One undo step per gesture: the first change of a drag (Chakra calls onChange before
+                      // onChangeStart) or each arrow key (onChangeEnd follows every key).
+                      if (!brightnessDragRef.current) {
+                        brightnessDragRef.current = true
+                        editors[idx].recordUndoStep()
+                      }
                       editors[idx].setObjectPropertiesQuietly(activeObjectId, {
                         brightness: value,
                       })

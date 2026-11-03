@@ -50,7 +50,6 @@ const SETTABLE_PROPS = [
   'opacity',
   'scaleX',
   'scaleY',
-  'brightness',
 ]
 
 const DEFAULT_SELECTION_STYLE = {
@@ -484,6 +483,8 @@ const SimpleImageEditor = React.forwardRef(
         recordUndoStep: () => {
           recordUndo(s.history, s.scene)
           emit('undoStackChanged')
+          // recordUndo empties the redo stack: the Redo button follows.
+          emit('redoStackChanged')
         },
         removeActiveObject: () => {
           if (s.activeId) removeObject(s.activeId)
