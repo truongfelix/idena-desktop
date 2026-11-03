@@ -200,8 +200,8 @@ export default function FlipEditor({
         if (data.replaceObjectId) {
           replaceObjectProps = editors[idx].getObjectProperties(
             data.replaceObjectId,
-            // The scale too: a new picture is scaled to fill the frame (B-186).
-            ['left', 'top', 'angle', 'scaleX', 'scaleY']
+            // Not the scale: the eraser's result is already drawn at the picture's shown size.
+            ['left', 'top', 'angle']
           )
           editors[idx].execute('removeObject', data.replaceObjectId)
         }
