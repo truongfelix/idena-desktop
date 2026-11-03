@@ -189,6 +189,25 @@ export function stretchFromHandle(start, handle, point, minSize) {
   }
 }
 
+// Brightness of a picture, a factor: 1 leaves it as it is, 0 is black, 2 twice as bright (B-198).
+export const BRIGHTNESS_MIN = 0.2
+export const BRIGHTNESS_MAX = 1.8
+
+export function clampBrightness(value) {
+  return Number.isFinite(value)
+    ? clamp(value, BRIGHTNESS_MIN, BRIGHTNESS_MAX)
+    : 1
+}
+
+// The canvas filter a picture is drawn with: its brightness, or 'none' (strokes, an unchanged picture).
+export function objectFilter(obj) {
+  if (!obj || obj.type === 'path') return 'none'
+  const brightness = clampBrightness(obj.brightness)
+  return brightness === 1
+    ? 'none'
+    : `brightness(${Math.round(brightness * 100)}%)`
+}
+
 // Angle that points the rotation handle at the pointer; snaps to a quarter turn within snapDeg.
 export function rotationAngle(obj, point, snapDeg = 4) {
   const deg =

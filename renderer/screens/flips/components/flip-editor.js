@@ -20,6 +20,10 @@ import {
   useTheme,
   Icon,
   useDisclosure,
+  Slider,
+  SliderTrack,
+  SliderFilledTrack,
+  SliderThumb,
 } from '@chakra-ui/react'
 import {useInterval} from '../../../shared/hooks/use-interval'
 import {
@@ -44,7 +48,12 @@ import {colorPickerColor} from '../utils'
 import {useSuccessToast} from '../../../shared/hooks/use-toast'
 import {resizeImageToDataUrl} from '../../../shared/utils/image-canvas'
 import ImageEditor from './simple-image-editor'
-import {fitInFrame} from './image-editor-model'
+import {
+  BRIGHTNESS_MAX,
+  BRIGHTNESS_MIN,
+  clampBrightness,
+  fitInFrame,
+} from './image-editor-model'
 import {
   useSettingsDispatch,
   useSettingsState,
@@ -145,6 +154,11 @@ export default function FlipEditor({
   const [activeObjectUrl, setActiveObjectUrl] = useState(null)
   const [activeObjectId, setActiveObjectId] = useState(null)
 
+  // The selected picture's brightness (B-198), read again after a selection, an undo or a redo.
+  const [brightness, setBrightness] = useState(1)
+  const [historyVersion, setHistoryVersion] = useState(0)
+  const brightnessDragRef = useRef(false)
+
   // Postponed onChange() triggering
   const NOCHANGES = 0
   const NEWCHANGES = 1
@@ -200,7 +214,7 @@ export default function FlipEditor({
         if (data.replaceObjectId) {
           replaceObjectProps = editors[idx].getObjectProperties(
             data.replaceObjectId,
-            ['left', 'top', 'angle']
+            ['left', 'top', 'angle', 'brightness']
           )
           editors[idx].execute('removeObject', data.replaceObjectId)
         }
@@ -508,6 +522,7 @@ export default function FlipEditor({
       })
       e.on({
         undoStackChanged() {
+          setHistoryVersion((v) => v + 1)
           const editor = getEditorInstance()
           const objId = getEditorActiveObjectId(editor)
           const url = getEditorObjectUrl(editor, objId)
@@ -520,6 +535,7 @@ export default function FlipEditor({
       })
       e.on({
         redoStackChanged() {
+          setHistoryVersion((v) => v + 1)
           const editor = getEditorInstance()
           const objId = getEditorActiveObjectId(editor)
           const url = getEditorObjectUrl(editor, objId)
@@ -600,6 +616,16 @@ export default function FlipEditor({
   }, [editorRefs, src, idx])
 
   const [showImageSearch, setShowImageSearch] = React.useState()
+
+  React.useEffect(() => {
+    if (brightnessDragRef.current) return
+    const editor = editors[idx]
+    const value =
+      editor && activeObjectId
+        ? editor.getObjectProperties(activeObjectId, ['brightness']).brightness
+        : 1
+    setBrightness(clampBrightness(value))
+  }, [activeObjectId, editors, historyVersion, idx])
 
   React.useEffect(() => {
     if (showImageSearch || !visible) {
@@ -897,6 +923,47 @@ export default function FlipEditor({
               {t('Keep proportions')}
             </Checkbox>
           )}
+
+          {bottomMenuPanel === BottomMenu.Main &&
+            activeObjectUrl &&
+            idx !== adversarialId && (
+              <Flex mt={2} align="center" w={rem(IMAGE_WIDTH)}>
+                <Text fontSize="sm" color="muted" mr={3} flexShrink={0}>
+                  {t('Brightness')}
+                </Text>
+                <Slider
+                  aria-label={t('Brightness')}
+                  min={BRIGHTNESS_MIN}
+                  max={BRIGHTNESS_MAX}
+                  step={0.05}
+                  value={brightness}
+                  focusThumbOnChange={false}
+                  onChangeStart={() => {
+                    if (editors[idx] && activeObjectId) {
+                      brightnessDragRef.current = true
+                      editors[idx].recordUndoStep()
+                    }
+                  }}
+                  onChange={(value) => {
+                    setBrightness(value)
+                    if (editors[idx] && activeObjectId) {
+                      editors[idx].setObjectPropertiesQuietly(activeObjectId, {
+                        brightness: value,
+                      })
+                    }
+                  }}
+                  onChangeEnd={() => {
+                    brightnessDragRef.current = false
+                    handleOnChanged()
+                  }}
+                >
+                  <SliderTrack>
+                    <SliderFilledTrack />
+                  </SliderTrack>
+                  <SliderThumb />
+                </Slider>
+              </Flex>
+            )}
 
           {bottomMenuPanel === BottomMenu.Crop && (
             <ApplyChangesBottomPanel
