@@ -750,11 +750,16 @@ export function FlipProtectStep({
   const adversarialSource = adversarialSourceChoice(flipAdversarialSource)
 
   // `source`: a new choice of what the nonsense picture is made from, before the settings show it.
+  // The latest regeneration: an earlier one that ends after it (two quick choices) is dropped.
+  const regenerationRef = React.useRef(0)
+
   const regenerateImage = React.useCallback(
     async (source) => {
       if (!images.some((x) => x)) {
         return
       }
+      regenerationRef.current += 1
+      const regeneration = regenerationRef.current
       onProtecting()
       try {
         let advImageScr
@@ -787,6 +792,7 @@ export function FlipProtectStep({
             exact: true,
           }
         )
+        if (regeneration !== regenerationRef.current) return
         if (advImageScr) {
           onChangeAdversarial(advImageScr)
         }
@@ -933,9 +939,20 @@ export function FlipProtectStep({
                 }}
               >
                 <Stack isInline spacing={6}>
-                  <Radio value="story">{t('My pictures')}</Radio>
-                  <Radio value="search">{t('Search pictures')}</Radio>
-                  <Radio value="both">{t('Both')}</Radio>
+                  {[
+                    ['story', t('My pictures')],
+                    ['search', t('Search pictures')],
+                    ['both', t('Both')],
+                  ].map(([value, label]) => (
+                    // Not before the step's first nonsense picture is shown: it would replace the chosen one.
+                    <Radio
+                      key={value}
+                      value={value}
+                      isDisabled={!protectedImages[adversarialImageId]}
+                    >
+                      {label}
+                    </Radio>
+                  ))}
                 </Stack>
               </RadioGroup>
             </Box>

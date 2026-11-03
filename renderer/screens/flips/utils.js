@@ -1011,11 +1011,11 @@ export async function adversarialSources(
       sources = [...story]
       break
     default: {
-      const fromSearch = shuffle(found)
-      const fromStory = shuffle(story)
-      sources = fromSearch.slice(0, 2)
-      sources = sources.concat(fromStory.slice(0, 4 - sources.length))
-      sources = sources.concat(fromSearch.slice(2, 2 + 4 - sources.length))
+      // Two search pictures, story pictures up to four, then more search pictures if the story lacks some.
+      const [searchA, searchB, ...moreSearch] = shuffle(found)
+      sources = [searchA, searchB].filter(Boolean)
+      sources.push(...shuffle(story).slice(0, 4 - sources.length))
+      sources.push(...moreSearch.slice(0, 4 - sources.length))
     }
   }
   for (let i = 0; story.length && sources.length < 4; i++) {
