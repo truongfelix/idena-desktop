@@ -31,6 +31,8 @@ import {
   useRadioGroup,
   Wrap,
   WrapItem,
+  Radio,
+  RadioGroup,
 } from '@chakra-ui/react'
 import {DragDropContext, Droppable, Draggable} from '@hello-pangea/dnd'
 import {useTranslation} from 'react-i18next'
@@ -38,6 +40,8 @@ import {useActor} from '@xstate/react'
 import FlipEditor from './components/flip-editor'
 import {Step} from './types'
 import {
+  adversarialSearchNeeded,
+  adversarialSourceChoice,
   adversarialSources,
   formatKeywords,
   getAdversarialImage,
@@ -86,6 +90,10 @@ import {
   UpvoteIcon,
 } from '../../shared/components/icons'
 import {AdDrawer} from '../ads/containers'
+import {
+  useSettingsDispatch,
+  useSettingsState,
+} from '../../shared/providers/settings-context'
 
 export function FlipPageTitle({onClose, ...props}) {
   return (
@@ -731,6 +739,7 @@ export function FlipProtectStep({
   onProtectImage,
   onChangeAdversarial,
   onShowAdversarialShuffle,
+  onLoadSearchPictures,
 }) {
   const {t} = useTranslation()
   const BLANK_IMAGE_DATAURL =
@@ -738,58 +747,104 @@ export function FlipProtectStep({
 
   const [currentIndex, setCurrentIdx] = React.useState(0)
 
-  const regenerateImage = React.useCallback(async () => {
-    if (!images.some((x) => x)) {
-      return
-    }
-    onProtecting()
-    try {
-      let advImageScr
-      let imageSrc
-      if (originalOrder[currentIndex] === adversarialImageId) {
-        advImageScr = await getAdversarialImage(
-          await adversarialSources(adversarialImages, images)
-        )
-        imageSrc = advImageScr.slice()
-      } else {
-        imageSrc = images[originalOrder[currentIndex]]
-      }
+  const {flipAdversarialSource} = useSettingsState()
+  const {setFlipAdversarialSource} = useSettingsDispatch()
+  const adversarialSource = adversarialSourceChoice(flipAdversarialSource)
 
-      if (!imageSrc) {
-        onProtectFailed()
+  // `source`: a new choice of what the nonsense picture is made from, before the settings show it.
+  // The latest regeneration of each picture: an earlier one of the same picture that ends after it (two quick
+  // choices) is dropped, its failure included.
+  const regenerationRef = React.useRef({})
+
+  const regenerateImage = React.useCallback(
+    async (source) => {
+      if (!images.some((x) => x)) {
         return
       }
+      const picture = originalOrder[currentIndex]
+      const regeneration = (regenerationRef.current[picture] || 0) + 1
+      regenerationRef.current[picture] = regeneration
+      const isLatest = () => regenerationRef.current[picture] === regeneration
+      onProtecting()
+      try {
+        let advImageScr
+        let imageSrc
+        if (originalOrder[currentIndex] === adversarialImageId) {
+          advImageScr = await getAdversarialImage(
+            await adversarialSources(adversarialImages, images, {
+              source: typeof source === 'string' ? source : adversarialSource,
+            })
+          )
+          imageSrc = advImageScr.slice()
+        } else {
+          imageSrc = images[originalOrder[currentIndex]]
+        }
 
-      const regeneratedImageSrc = await protectFlipImage(imageSrc)
+        if (!imageSrc) {
+          if (isLatest()) onProtectFailed()
+          return
+        }
 
-      const compressedImage = await resizeImageToDataUrl(regeneratedImageSrc, {
-        width: 240,
-        height: 180,
-        type: 'image/jpeg',
-        quality: 0.6,
-        exact: true,
-      })
-      if (advImageScr) {
-        onChangeAdversarial(advImageScr)
+        const regeneratedImageSrc = await protectFlipImage(imageSrc)
+
+        const compressedImage = await resizeImageToDataUrl(
+          regeneratedImageSrc,
+          {
+            width: 240,
+            height: 180,
+            type: 'image/jpeg',
+            quality: 0.6,
+            exact: true,
+          }
+        )
+        if (!isLatest()) return
+        if (advImageScr) {
+          onChangeAdversarial(advImageScr)
+        }
+        onProtectImage(compressedImage, originalOrder[currentIndex])
+      } catch (error) {
+        global.logger?.error?.(
+          'error while protecting a flip image',
+          error?.message
+        )
+        if (isLatest()) onProtectFailed()
       }
-      onProtectImage(compressedImage, originalOrder[currentIndex])
-    } catch (error) {
-      global.logger?.error?.(
-        'error while protecting a flip image',
-        error?.message
-      )
-      onProtectFailed()
-    }
+    },
+    [
+      adversarialImageId,
+      adversarialImages,
+      adversarialSource,
+      currentIndex,
+      images,
+      onChangeAdversarial,
+      onProtectFailed,
+      onProtectImage,
+      onProtecting,
+      originalOrder,
+    ]
+  )
+
+  // A choice waiting for the search's pictures (see the choice's onChange): they arrive one by one, so the
+  // nonsense picture is made again once none came for a second, if it is still the picture shown.
+  const awaitedSourceRef = React.useRef(null)
+  const searchPictures = adversarialImages.filter(Boolean).length
+  useEffect(() => {
+    const source = awaitedSourceRef.current
+    if (!source || !searchPictures) return undefined
+    const timer = setTimeout(() => {
+      if (awaitedSourceRef.current !== source) return
+      awaitedSourceRef.current = null
+      if (originalOrder[currentIndex] === adversarialImageId) {
+        regenerateImage(source)
+      }
+    }, 1000)
+    return () => clearTimeout(timer)
   }, [
     adversarialImageId,
-    adversarialImages,
     currentIndex,
-    images,
-    onChangeAdversarial,
-    onProtectFailed,
-    onProtectImage,
-    onProtecting,
     originalOrder,
+    regenerateImage,
+    searchPictures,
   ])
 
   useEffect(() => {
@@ -887,7 +942,11 @@ export function FlipProtectStep({
                   : t('Regenerate adversarial noise')
               }
             >
-              <Flex onClick={regenerateImage} align="center" cursor="pointer">
+              <Flex
+                onClick={() => regenerateImage()}
+                align="center"
+                cursor="pointer"
+              >
                 <FlatCycleIcon boxSize={3} color="blue.500" />
                 <Text ml="6px" fontSize="md" fontWeight={500} color="blue.500">
                   {t('Regenerate')}
@@ -895,6 +954,48 @@ export function FlipProtectStep({
               </Flex>
             </Tooltip>
           </Flex>
+          {originalOrder[currentIndex] === adversarialImageId && (
+            <Box mt={3}>
+              <Text fontSize="md" color="muted" mb={1}>
+                {t('Made from')}
+              </Text>
+              <RadioGroup
+                value={adversarialSource}
+                onChange={(value) => {
+                  setFlipAdversarialSource(value)
+                  regenerateImage(value)
+                  // With My pictures the search did not run for this flip: run it now, and make the nonsense
+                  // picture again once its pictures are in.
+                  if (
+                    adversarialSearchNeeded(value) &&
+                    !adversarialImages.some(Boolean)
+                  ) {
+                    awaitedSourceRef.current = value
+                    if (onLoadSearchPictures) onLoadSearchPictures()
+                  } else {
+                    awaitedSourceRef.current = null
+                  }
+                }}
+              >
+                <Stack isInline spacing={6}>
+                  {[
+                    ['story', t('My pictures')],
+                    ['search', t('Search pictures')],
+                    ['both', t('Both')],
+                  ].map(([value, label]) => (
+                    // Not before the step's first nonsense picture is shown: it would replace the chosen one.
+                    <Radio
+                      key={value}
+                      value={value}
+                      isDisabled={!protectedImages[adversarialImageId]}
+                    >
+                      {label}
+                    </Radio>
+                  ))}
+                </Stack>
+              </RadioGroup>
+            </Box>
+          )}
         </Box>
       </Stack>
     </FlipStep>
