@@ -50,6 +50,7 @@ import {
 import {Toast, FloatDebug, Page} from '../../shared/components/components'
 import Layout from '../../shared/components/layout'
 import {useChainState} from '../../shared/providers/chain-context'
+import {useSettingsState} from '../../shared/providers/settings-context'
 import {BadFlipDialog} from '../../screens/validation/components'
 import {requestDb, subDb} from '../../shared/utils/db'
 import {useFailToast} from '../../shared/hooks/use-toast'
@@ -69,6 +70,8 @@ export default function NewFlipPage() {
   const {flipKeyWordPairs} = useIdentityState()
 
   const failToast = useFailToast()
+
+  const {flipAdversarialSource} = useSettingsState()
 
   const [didShowShuffleAdversarial, setDidShowShuffleAdversarial] =
     useState(false)
@@ -123,7 +126,8 @@ export default function NewFlipPage() {
 
         return {keywordPairId, availableKeywords, didShowBadFlip}
       },
-      protectFlip: async (flip) => protectFlip(flip),
+      protectFlip: async (flip) =>
+        protectFlip({...flip, adversarialSource: flipAdversarialSource}),
       loadAdversarial,
       shuffleAdversarial: async (flip) =>
         shuffleAdversarial(flip, setDidShowShuffleAdversarial),

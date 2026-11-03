@@ -31,6 +31,8 @@ import {
   useRadioGroup,
   Wrap,
   WrapItem,
+  Radio,
+  RadioGroup,
 } from '@chakra-ui/react'
 import {DragDropContext, Droppable, Draggable} from '@hello-pangea/dnd'
 import {useTranslation} from 'react-i18next'
@@ -38,6 +40,7 @@ import {useActor} from '@xstate/react'
 import FlipEditor from './components/flip-editor'
 import {Step} from './types'
 import {
+  adversarialSourceChoice,
   adversarialSources,
   formatKeywords,
   getAdversarialImage,
@@ -86,6 +89,10 @@ import {
   UpvoteIcon,
 } from '../../shared/components/icons'
 import {AdDrawer} from '../ads/containers'
+import {
+  useSettingsDispatch,
+  useSettingsState,
+} from '../../shared/providers/settings-context'
 
 export function FlipPageTitle({onClose, ...props}) {
   return (
@@ -738,59 +745,73 @@ export function FlipProtectStep({
 
   const [currentIndex, setCurrentIdx] = React.useState(0)
 
-  const regenerateImage = React.useCallback(async () => {
-    if (!images.some((x) => x)) {
-      return
-    }
-    onProtecting()
-    try {
-      let advImageScr
-      let imageSrc
-      if (originalOrder[currentIndex] === adversarialImageId) {
-        advImageScr = await getAdversarialImage(
-          await adversarialSources(adversarialImages, images)
-        )
-        imageSrc = advImageScr.slice()
-      } else {
-        imageSrc = images[originalOrder[currentIndex]]
-      }
+  const {flipAdversarialSource} = useSettingsState()
+  const {setFlipAdversarialSource} = useSettingsDispatch()
+  const adversarialSource = adversarialSourceChoice(flipAdversarialSource)
 
-      if (!imageSrc) {
-        onProtectFailed()
+  // `source`: a new choice of what the nonsense picture is made from, before the settings show it.
+  const regenerateImage = React.useCallback(
+    async (source) => {
+      if (!images.some((x) => x)) {
         return
       }
+      onProtecting()
+      try {
+        let advImageScr
+        let imageSrc
+        if (originalOrder[currentIndex] === adversarialImageId) {
+          advImageScr = await getAdversarialImage(
+            await adversarialSources(adversarialImages, images, {
+              source: typeof source === 'string' ? source : adversarialSource,
+            })
+          )
+          imageSrc = advImageScr.slice()
+        } else {
+          imageSrc = images[originalOrder[currentIndex]]
+        }
 
-      const regeneratedImageSrc = await protectFlipImage(imageSrc)
+        if (!imageSrc) {
+          onProtectFailed()
+          return
+        }
 
-      const compressedImage = await resizeImageToDataUrl(regeneratedImageSrc, {
-        width: 240,
-        height: 180,
-        type: 'image/jpeg',
-        quality: 0.6,
-        exact: true,
-      })
-      if (advImageScr) {
-        onChangeAdversarial(advImageScr)
+        const regeneratedImageSrc = await protectFlipImage(imageSrc)
+
+        const compressedImage = await resizeImageToDataUrl(
+          regeneratedImageSrc,
+          {
+            width: 240,
+            height: 180,
+            type: 'image/jpeg',
+            quality: 0.6,
+            exact: true,
+          }
+        )
+        if (advImageScr) {
+          onChangeAdversarial(advImageScr)
+        }
+        onProtectImage(compressedImage, originalOrder[currentIndex])
+      } catch (error) {
+        global.logger?.error?.(
+          'error while protecting a flip image',
+          error?.message
+        )
+        onProtectFailed()
       }
-      onProtectImage(compressedImage, originalOrder[currentIndex])
-    } catch (error) {
-      global.logger?.error?.(
-        'error while protecting a flip image',
-        error?.message
-      )
-      onProtectFailed()
-    }
-  }, [
-    adversarialImageId,
-    adversarialImages,
-    currentIndex,
-    images,
-    onChangeAdversarial,
-    onProtectFailed,
-    onProtectImage,
-    onProtecting,
-    originalOrder,
-  ])
+    },
+    [
+      adversarialImageId,
+      adversarialImages,
+      adversarialSource,
+      currentIndex,
+      images,
+      onChangeAdversarial,
+      onProtectFailed,
+      onProtectImage,
+      onProtecting,
+      originalOrder,
+    ]
+  )
 
   useEffect(() => {
     if (!didShowShuffleAdversarial) {
@@ -887,7 +908,11 @@ export function FlipProtectStep({
                   : t('Regenerate adversarial noise')
               }
             >
-              <Flex onClick={regenerateImage} align="center" cursor="pointer">
+              <Flex
+                onClick={() => regenerateImage()}
+                align="center"
+                cursor="pointer"
+              >
                 <FlatCycleIcon boxSize={3} color="blue.500" />
                 <Text ml="6px" fontSize="md" fontWeight={500} color="blue.500">
                   {t('Regenerate')}
@@ -895,6 +920,26 @@ export function FlipProtectStep({
               </Flex>
             </Tooltip>
           </Flex>
+          {originalOrder[currentIndex] === adversarialImageId && (
+            <Box mt={3}>
+              <Text fontSize="md" color="muted" mb={1}>
+                {t('Made from')}
+              </Text>
+              <RadioGroup
+                value={adversarialSource}
+                onChange={(value) => {
+                  setFlipAdversarialSource(value)
+                  regenerateImage(value)
+                }}
+              >
+                <Stack isInline spacing={6}>
+                  <Radio value="story">{t('My pictures')}</Radio>
+                  <Radio value="search">{t('Search pictures')}</Radio>
+                  <Radio value="both">{t('Both')}</Radio>
+                </Stack>
+              </RadioGroup>
+            </Box>
+          )}
         </Box>
       </Stack>
     </FlipStep>

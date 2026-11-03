@@ -21,6 +21,7 @@ const SET_IMAGE_SEARCH = 'SET_IMAGE_SEARCH'
 const SET_RELEASE_CHECK = 'SET_RELEASE_CHECK'
 const SET_THEME = 'SET_THEME'
 const SET_FLIP_KEEP_PROPORTIONS = 'SET_FLIP_KEEP_PROPORTIONS'
+const SET_FLIP_ADVERSARIAL_SOURCE = 'SET_FLIP_ADVERSARIAL_SOURCE'
 
 const CHANGE_LANGUAGE = 'CHANGE_LANGUAGE'
 
@@ -142,6 +143,14 @@ function settingsReducer(state, action) {
         flipKeepProportions: action.keep,
       }
     }
+    // flipAdversarialSource: what the nonsense picture is made from (protect step, B-199): 'story', 'search'
+    // or 'both'; absent until changed, which reads as 'both' (adversarialSourceChoice).
+    case SET_FLIP_ADVERSARIAL_SOURCE: {
+      return {
+        ...state,
+        flipAdversarialSource: action.source,
+      }
+    }
     default:
       return state
   }
@@ -257,6 +266,11 @@ export function SettingsProvider({children}) {
     [dispatch]
   )
 
+  const setFlipAdversarialSource = useCallback(
+    (source) => dispatch({type: SET_FLIP_ADVERSARIAL_SOURCE, source}),
+    [dispatch]
+  )
+
   const setConnectionDetails = useCallback(
     ({url, apiKey}) => {
       dispatch({type: SET_CONNECTION_DETAILS, url, apiKey})
@@ -279,6 +293,7 @@ export function SettingsProvider({children}) {
             setReleaseCheck,
             setTheme,
             setFlipKeepProportions,
+            setFlipAdversarialSource,
           }),
           [
             changeLanguage,
@@ -288,6 +303,7 @@ export function SettingsProvider({children}) {
             setReleaseCheck,
             setTheme,
             setFlipKeepProportions,
+            setFlipAdversarialSource,
             toggleAutoActivateMining,
             toggleRunInternalNode,
             toggleUseExternalNode,

@@ -51,6 +51,7 @@ import Layout from '../../shared/components/layout'
 import {BadFlipDialog} from '../../screens/validation/components'
 import {useFailToast} from '../../shared/hooks/use-toast'
 import {useChainState} from '../../shared/providers/chain-context'
+import {useSettingsState} from '../../shared/providers/settings-context'
 import {InfoIcon, RefreshIcon} from '../../shared/components/icons'
 import {useRpc, useTrackTx} from '../../screens/ads/hooks'
 import {eitherState} from '../../shared/utils/utils'
@@ -69,6 +70,8 @@ export default function EditFlipPage() {
   const {flipKeyWordPairs} = useIdentityState()
 
   const failToast = useFailToast()
+
+  const {flipAdversarialSource} = useSettingsState()
 
   const [didShowShuffleAdversarial, setDidShowShuffleAdversarial] =
     useState(false)
@@ -123,7 +126,8 @@ export default function EditFlipPage() {
           hint,
         }
       },
-      protectFlip: async (flip) => protectFlip(flip),
+      protectFlip: async (flip) =>
+        protectFlip({...flip, adversarialSource: flipAdversarialSource}),
       loadAdversarial,
       shuffleAdversarial: async (flip) =>
         shuffleAdversarial(flip, setDidShowShuffleAdversarial),

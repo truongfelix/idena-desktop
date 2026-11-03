@@ -876,6 +876,7 @@ export async function protectFlip({
   adversarialImageId,
   adversarialImage,
   adversarialImages,
+  adversarialSource,
 }) {
   const protectedFlips = []
   let adversarialImg = ''
@@ -893,7 +894,9 @@ export async function protectFlip({
         adversarialImageSrc = adversarialImage
       } else {
         adversarialImageSrc = await getAdversarialImage(
-          await adversarialSources(adversarialImages, images)
+          await adversarialSources(adversarialImages, images, {
+            source: adversarialSource,
+          })
         )
         adversarialImg = adversarialImageSrc?.slice()
       }
@@ -974,20 +977,49 @@ async function mirrorImage(src) {
   return canvas.toDataURL()
 }
 
+// Where the nonsense picture's sources come from (B-199), the protect step's choice: the story pictures, the
+// web search's, or both mixed (the default, also for a choice saved by a later version).
+export const ADVERSARIAL_SOURCES = ['both', 'search', 'story']
+
+export function adversarialSourceChoice(value) {
+  return ADVERSARIAL_SOURCES.includes(value) ? value : 'both'
+}
+
 /**
- * The pictures the nonsense picture is made from: the web search's, or when it found fewer than four (search
- * off, no results, no connection) those plus the story pictures, mirrored copies making up four (as the
- * Android app does).
+ * The pictures the nonsense picture is made from, by `source` (`adversarialSourceChoice`):
+ * - 'search': the web search's; when it found fewer than four (search off, no results, no connection) those
+ *   plus the story pictures;
+ * - 'story': the story pictures; the search's only when there is no story picture;
+ * - 'both': two of each, at random; what one side lacks is taken from the other.
+ * Mirrored copies of the story pictures make up four (as the Android app does).
  */
-export async function adversarialSources(adversarialImages, storyImages) {
+export async function adversarialSources(
+  adversarialImages,
+  storyImages,
+  {source = 'both', mirror = mirrorImage} = {}
+) {
   const found = (adversarialImages ?? []).filter(Boolean)
-  if (found.length >= 4) {
-    return found
-  }
   const story = (storyImages ?? []).filter(Boolean)
-  const sources = found.concat(story)
+  let sources
+  switch (adversarialSourceChoice(source)) {
+    case 'search':
+      if (found.length >= 4) return found
+      sources = found.concat(story)
+      break
+    case 'story':
+      if (!story.length) return found
+      sources = [...story]
+      break
+    default: {
+      const fromSearch = shuffle(found)
+      const fromStory = shuffle(story)
+      sources = fromSearch.slice(0, 2)
+      sources = sources.concat(fromStory.slice(0, 4 - sources.length))
+      sources = sources.concat(fromSearch.slice(2, 2 + 4 - sources.length))
+    }
+  }
   for (let i = 0; story.length && sources.length < 4; i++) {
-    sources.push(await mirrorImage(story[i % story.length]))
+    sources.push(await mirror(story[i % story.length]))
   }
   return sources
 }
