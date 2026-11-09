@@ -794,7 +794,7 @@ export function FlipProtectStep({
 
         if (!imageSrc) {
           if (isLatest()) onProtectFailed()
-          return
+          return false
         }
 
         const nextEffects = effects || randomNoiseEffects()
@@ -813,7 +813,7 @@ export function FlipProtectStep({
             exact: true,
           }
         )
-        if (!isLatest()) return
+        if (!isLatest()) return false
         if (advImageScr) {
           onChangeAdversarial(advImageScr)
         }
@@ -822,12 +822,14 @@ export function FlipProtectStep({
           originalOrder[currentIndex],
           nextEffects
         )
+        return true
       } catch (error) {
         global.logger?.error?.(
           'error while protecting a flip image',
           error?.message
         )
         if (isLatest()) onProtectFailed()
+        return false
       }
     },
     [
@@ -976,8 +978,15 @@ export function FlipProtectStep({
             </Tooltip>
           </Flex>
           <NoiseControls
+            key={originalOrder[currentIndex]}
             effects={noise?.[originalOrder[currentIndex]]}
-            isDisabled={!protectedImages[originalOrder[currentIndex]]}
+            // Unknown effects (a draft of an older version) or nonsense picture: Regenerate first.
+            isDisabled={
+              !protectedImages[originalOrder[currentIndex]] ||
+              !noise?.[originalOrder[currentIndex]] ||
+              (originalOrder[currentIndex] === adversarialImageId &&
+                !adversarialImage)
+            }
             onChange={(effects) => regenerateImage(undefined, effects)}
           />
           {originalOrder[currentIndex] === adversarialImageId && (

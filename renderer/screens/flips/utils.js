@@ -808,11 +808,10 @@ export async function protectFlipImage(imgSrc, effects = randomNoiseEffects()) {
   const protectedImage = getImageFromImageData(resultImageData)
   // eslint-disable-next-line no-promise-executor-return
   await new Promise((resolve) => (protectedImage.onload = resolve))
-  const flip = mirror
-  resultCanvasContext.scale(flip ? -1 : 1, 1)
+  resultCanvasContext.scale(mirror ? -1 : 1, 1)
   resultCanvasContext.drawImage(
     protectedImage,
-    flip ? resultImageData.width * -1 : 0,
+    mirror ? resultImageData.width * -1 : 0,
     0,
     resultImageData.width,
     resultImageData.height

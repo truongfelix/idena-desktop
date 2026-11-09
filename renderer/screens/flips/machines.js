@@ -738,6 +738,8 @@ export const flipMasterMachine = Machine(
                       image,
                       ...images.slice(currentIndex + 1),
                     ],
+                    // The nonsense picture may be made of the story pictures: made again after a change (B-213).
+                    adversarialImage: '',
                   }),
                   log(),
                 ],
@@ -811,10 +813,11 @@ export const flipMasterMachine = Machine(
                       image,
                       ...protectedImages.slice(currentIndex + 1),
                     ],
-                    noise: ({noise}, {effects, currentIndex}) =>
-                      Array.from({length: 4}, (_, idx) =>
-                        idx === currentIndex ? effects ?? null : noise?.[idx]
-                      ),
+                    noise: ({noise = []}, {effects, currentIndex}) => [
+                      ...noise.slice(0, currentIndex),
+                      effects ?? null,
+                      ...noise.slice(currentIndex + 1),
+                    ],
                   }),
                   log(),
                 ],
@@ -1047,6 +1050,7 @@ export const flipMasterMachine = Machine(
             orderPermutations,
             images,
             protectedImages,
+            noise,
             adversarialImageId,
             keywords,
             type,
@@ -1071,6 +1075,7 @@ export const flipMasterMachine = Machine(
               orderPermutations,
               images,
               protectedImages,
+              noise,
               adversarialImageId,
               keywords,
             }

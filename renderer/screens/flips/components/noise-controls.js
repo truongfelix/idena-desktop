@@ -15,19 +15,32 @@ import {NOISE_LIMITS, noiseEffects} from '../noise'
 
 // The Protect step's control for each effect of the adversarial noise on the picture shown (B-213). They start at
 // what the automatic noise chose; each change makes the picture's noise again with the new values (on release for a
-// slider). No minimum: the noise is the author's choice.
+// slider), and the controls wait for it. `onChange` resolves to false when the picture did not change: the controls
+// go back to its effects. No minimum: the noise is the author's choice (owner 2026-11-09).
 export function NoiseControls({effects, isDisabled, onChange}) {
   const {t} = useTranslation()
   const [values, setValues] = React.useState(() => noiseEffects(effects))
+  const [isBusy, setIsBusy] = React.useState(false)
 
   React.useEffect(() => {
     setValues(noiseEffects(effects))
   }, [effects])
 
-  const commit = (next) => {
+  const commit = async (next) => {
+    const current = noiseEffects(effects)
+    if (Object.keys(next).every((key) => next[key] === current[key])) {
+      setValues(current)
+      return
+    }
     setValues(next)
-    onChange(next)
+    setIsBusy(true)
+    try {
+      if (!(await onChange(next))) setValues(noiseEffects(effects))
+    } finally {
+      setIsBusy(false)
+    }
   }
+  const disabled = isDisabled || isBusy
 
   const slider = (key, label, unit) => (
     <Flex align="center" key={key}>
@@ -40,7 +53,7 @@ export function NoiseControls({effects, isDisabled, onChange}) {
         max={NOISE_LIMITS[key].max}
         step={1}
         value={values[key]}
-        isDisabled={isDisabled}
+        isDisabled={disabled}
         focusThumbOnChange={false}
         onChange={(value) => setValues((v) => ({...v, [key]: value}))}
         onChangeEnd={(value) => commit({...values, [key]: value})}
@@ -66,7 +79,7 @@ export function NoiseControls({effects, isDisabled, onChange}) {
         <Switch
           aria-label={t('Mirror')}
           isChecked={values.mirror}
-          isDisabled={isDisabled}
+          isDisabled={disabled}
           onChange={(e) => commit({...values, mirror: e.target.checked})}
         />
       </Flex>
