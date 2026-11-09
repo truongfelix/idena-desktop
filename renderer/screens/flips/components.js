@@ -892,7 +892,7 @@ export function FlipProtectStep({
                       protectedImages.some((x) => x) &&
                       images.some((x) => x)
                     }
-                    label="Nonsense image is successfully generated and shuffled"
+                    label="Nonsense image is successfully generated"
                     fontSize="mdx"
                     fontWeight={400}
                     mt={[2, 0]}

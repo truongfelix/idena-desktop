@@ -35,7 +35,6 @@ import {
   isPendingKeywordPair,
   protectFlip,
   prepareAdversarialImages,
-  shuffleAdversarial,
 } from '../../screens/flips/utils'
 import {Step} from '../../screens/flips/types'
 import {
@@ -130,8 +129,6 @@ export default function EditFlipPage() {
       protectFlip: async (flip) =>
         protectFlip({...flip, adversarialSource: flipAdversarialSource}),
       loadAdversarial,
-      shuffleAdversarial: async (flip) =>
-        shuffleAdversarial(flip, setDidShowShuffleAdversarial),
       submitFlip: async (flip) => publishFlip(flip),
     },
     actions: {

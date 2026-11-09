@@ -10,6 +10,7 @@ import {
   DEFAULT_FLIP_ORDER,
   updateFlipTypeByHash,
   handleOutdatedFlips,
+  placeAdversarial,
 } from './utils'
 import {callRpc, HASH_IN_MEMPOOL, loadKeyword} from '../../shared/utils/utils'
 import {shuffle} from '../../shared/utils/arr'
@@ -550,6 +551,8 @@ export const flipMasterMachine = Machine(
       order: DEFAULT_FLIP_ORDER,
       orderPermutations: DEFAULT_FLIP_ORDER,
       adversarialImageId: 3,
+      // The nonsense picture got its slot (B-210): it is placed once, on the way into the editor, and never moved after.
+      adversarialPlaced: false,
       didShowBadFlip: true,
     },
     on: {
@@ -726,6 +729,7 @@ export const flipMasterMachine = Machine(
             },
           },
           images: {
+            entry: ['assignAdversarialSlot'],
             on: {
               CHANGE_IMAGES: {
                 target: '.persisting',
@@ -847,7 +851,7 @@ export const flipMasterMachine = Machine(
                 on: {
                   '': [
                     {
-                      target: 'shuffling',
+                      target: 'preparing',
                       cond: ({images, protectedImages}) =>
                         images.some((x) => x) &&
                         !protectedImages.some((x) => x),
@@ -856,21 +860,6 @@ export const flipMasterMachine = Machine(
                 },
               },
               protecting: {},
-              shuffling: {
-                invoke: {
-                  src: 'shuffleAdversarial',
-                  onDone: {
-                    target: 'preparing',
-                    actions: [
-                      assign({
-                        originalOrder: (_, {data: {order}}) => order,
-                        order: (_, {data: {order}}) => order,
-                      }),
-                      log(),
-                    ],
-                  },
-                },
-              },
               preparing: {
                 invoke: {
                   src: 'protectFlip',
@@ -1041,6 +1030,7 @@ export const flipMasterMachine = Machine(
             images,
             protectedImages,
             adversarialImageId,
+            adversarialPlaced,
             keywords,
             type,
             createdAt,
@@ -1065,6 +1055,7 @@ export const flipMasterMachine = Machine(
               images,
               protectedImages,
               adversarialImageId,
+              adversarialPlaced,
               keywords,
             }
 
@@ -1113,6 +1104,22 @@ export const flipMasterMachine = Machine(
       },
       assignEpochNumber: assign({
         epochNumber: (_, {epochNumber}) => epochNumber,
+      }),
+      // Once per flip (B-210). A draft of an older version already shuffled keeps its order: moving the picture
+      // there would drop the user's shuffle.
+      assignAdversarialSlot: assign((context) => {
+        if (context.adversarialPlaced) return {}
+        const shuffled =
+          JSON.stringify(context.order) !==
+          JSON.stringify(context.originalOrder)
+        const placed = shuffled ? {} : placeAdversarial(context)
+        return {
+          ...placed,
+          ...(placed.order && {
+            orderPermutations: placed.order.map((_, idx) => idx),
+          }),
+          adversarialPlaced: true,
+        }
       }),
     },
   }
