@@ -343,3 +343,72 @@ export function stepForward(history, scene) {
   history.undo.push(cloneScene(scene))
   return next
 }
+
+// A frame's scene saved with the draft (B-211), so its pictures stay editable after the user goes back to the editor
+// or reopens the draft. Plain JSON: the background and each picture as their data URL (`savedUrl`, a compact copy,
+// when the editor made one), strokes as points; no loaded images. `backgroundUrl` gives the background's saved URL
+// (a crop's background has no other).
+export const SAVED_SCENE_VERSION = 1
+
+export function savedScene(scene, backgroundUrl) {
+  const {background} = scene
+  return {
+    version: SAVED_SCENE_VERSION,
+    size: {...scene.size},
+    background: background
+      ? backgroundUrl(background) || background.url || null
+      : null,
+    objects: scene.objects.map(({img, savedUrl, ...obj}) => ({
+      ...obj,
+      ...(savedUrl && {url: savedUrl}),
+      ...(obj.points && {points: obj.points.map((p) => ({...p}))}),
+    })),
+  }
+}
+
+// A saved scene the editor can load: its version, its size and each object's kind are checked, so a damaged or
+// foreign value opens the flat picture instead.
+export function isLoadableScene(saved) {
+  if (!saved || saved.version !== SAVED_SCENE_VERSION) return false
+  const {size, objects} = saved
+  if (!size || !(size.width > 0) || !(size.height > 0)) return false
+  if (saved.background !== null && !isPictureData(saved.background)) {
+    return false
+  }
+  return (
+    Array.isArray(objects) &&
+    objects.every(
+      (obj) =>
+        obj &&
+        typeof obj.id === 'string' &&
+        ((obj.type === 'image' && isPictureData(obj.url)) ||
+          (obj.type === 'path' && Array.isArray(obj.points)))
+    )
+  )
+}
+
+// Only pictures held in the draft itself: a saved scene never makes the editor fetch an address.
+function isPictureData(url) {
+  return typeof url === 'string' && url.startsWith('data:image/')
+}
+
+// The next free object id after a loaded scene's ("object-7" -> 8).
+export function nextIdAfter(objects) {
+  return (
+    objects.reduce((max, {id}) => {
+      const n = Number(/^object-(\d+)$/.exec(id)?.[1])
+      return Number.isFinite(n) && n > max ? n : max
+    }, 0) + 1
+  )
+}
+
+// A short fingerprint of the frame's flat picture: a saved scene is used only for the picture it made (an older
+// version of the app editing the draft changes the picture and leaves the scene behind).
+export function pictureKey(url) {
+  if (typeof url !== 'string') return null
+  let hash = 7
+  for (let i = 0; i < url.length; i += 1) {
+    hash = (hash * 31 + url.charCodeAt(i)) % 4294967291
+  }
+  return `${url.length}:${hash.toString(16)}`
+}

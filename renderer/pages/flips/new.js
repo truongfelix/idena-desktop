@@ -42,7 +42,6 @@ import {
   newFlipKeywords,
   protectFlip,
   prepareAdversarialImages,
-  shuffleAdversarial,
 } from '../../screens/flips/utils'
 import {Step} from '../../screens/flips/types'
 import {
@@ -119,8 +118,6 @@ export default function NewFlipPage() {
       protectFlip: async (flip) =>
         protectFlip({...flip, adversarialSource: flipAdversarialSource}),
       loadAdversarial,
-      shuffleAdversarial: async (flip) =>
-        shuffleAdversarial(flip, setDidShowShuffleAdversarial),
       submitFlip: async (flip) => publishFlip(flip),
     },
     actions: {
@@ -153,6 +150,7 @@ export default function NewFlipPage() {
     keywordPairId,
     keywords,
     images,
+    scenes,
     protectedImages,
     adversarialImages,
     adversarialImage,
@@ -365,9 +363,10 @@ export default function NewFlipPage() {
                   showTranslation={showTranslation}
                   originalOrder={originalOrder}
                   images={images}
+                  scenes={scenes}
                   adversarialImageId={adversarialImageId}
-                  onChangeImage={(image, currentIndex) =>
-                    send('CHANGE_IMAGES', {image, currentIndex})
+                  onChangeImage={(image, currentIndex, scene) =>
+                    send('CHANGE_IMAGES', {image, currentIndex, scene})
                   }
                   // eslint-disable-next-line no-shadow
                   onChangeOriginalOrder={(order) =>

@@ -620,6 +620,7 @@ export function FlipEditorStep({
   originalOrder,
   images,
   adversarialImageId,
+  scenes,
   onChangeImage,
   onChangeOriginalOrder,
   onPainting,
@@ -714,10 +715,11 @@ export function FlipEditorStep({
               idx={num}
               visible={currentIndex === idx}
               src={images[num]}
+              scene={scenes?.[num]}
               keywords={words}
               adversarialId={adversarialImageId}
-              onChange={(url) => {
-                onChangeImage(url, num)
+              onChange={(url, scene) => {
+                onChangeImage(url, num, scene)
               }}
               onChanging={onPainting}
               onChangeAdversarial={onChangeAdversarialId}
@@ -915,7 +917,7 @@ export function FlipProtectStep({
                       protectedImages.some((x) => x) &&
                       images.some((x) => x)
                     }
-                    label="Nonsense image is successfully generated and shuffled"
+                    label="Nonsense image is successfully generated"
                     fontSize="mdx"
                     fontWeight={400}
                     mt={[2, 0]}

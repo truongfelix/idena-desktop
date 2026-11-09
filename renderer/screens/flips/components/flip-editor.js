@@ -54,6 +54,7 @@ import {
   clampBrightness,
   fitInFrame,
   objectFilter,
+  pictureKey,
 } from './image-editor-model'
 import {
   useSettingsDispatch,
@@ -122,6 +123,7 @@ async function withBrightness(url, brightness) {
 export default function FlipEditor({
   idx = 0,
   src,
+  scene,
   visible,
   keywords,
   adversarialId,
@@ -200,7 +202,9 @@ export default function FlipEditor({
     if (changesCnt >= CHANGED) {
       setChangesCnt(NOCHANGES)
       const url = editors[idx].toDataURL()
-      onChange(url)
+      // The frame's pictures go with its flat picture, so they stay editable later (B-211).
+      const saved = editors[idx].getScene()
+      onChange(url, saved && {...saved, picture: pictureKey(url)})
     }
   }, 200)
 
@@ -219,7 +223,7 @@ export default function FlipEditor({
       if (!url) {
         editor.loadImageFromURL(BLANK_IMAGE, 'blank').then(() => {
           setChangesCnt(NOCHANGES)
-          onChange(null)
+          onChange(null, null)
         })
         return
       }
@@ -617,11 +621,20 @@ export default function FlipEditor({
         newEditor.setBrush({width: brush, color: brushColor})
 
         if (src) {
-          newEditor.loadImageFromURL(src, 'src').then(() => {
-            newEditor.clearUndoStack()
-            newEditor.clearRedoStack()
-            updateEvents(newEditor)
-          })
+          // The frame's saved pictures when they made this very picture (B-211), else the flat picture.
+          const loadSaved = () =>
+            scene && scene.picture === pictureKey(src)
+              ? newEditor.loadScene(scene)
+              : Promise.resolve(false)
+          loadSaved()
+            .then((loaded) =>
+              loaded ? null : newEditor.loadImageFromURL(src, 'src')
+            )
+            .then(() => {
+              newEditor.clearUndoStack()
+              newEditor.clearRedoStack()
+              updateEvents(newEditor)
+            })
         } else {
           newEditor.loadImageFromURL(BLANK_IMAGE, 'blank').then(() => {
             newEditor.clearUndoStack()
