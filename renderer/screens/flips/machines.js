@@ -729,7 +729,7 @@ export const flipMasterMachine = Machine(
             },
           },
           images: {
-            entry: ['placeAdversarial'],
+            entry: ['assignAdversarialSlot'],
             on: {
               CHANGE_IMAGES: {
                 target: '.persisting',
@@ -1105,14 +1105,22 @@ export const flipMasterMachine = Machine(
       assignEpochNumber: assign({
         epochNumber: (_, {epochNumber}) => epochNumber,
       }),
-      placeAdversarial: assign((context) =>
-        context.adversarialPlaced
-          ? {}
-          : {
-              ...placeAdversarial(context),
-              adversarialPlaced: true,
-            }
-      ),
+      // Once per flip (B-210). A draft of an older version already shuffled keeps its order: moving the picture
+      // there would drop the user's shuffle.
+      assignAdversarialSlot: assign((context) => {
+        if (context.adversarialPlaced) return {}
+        const shuffled =
+          JSON.stringify(context.order) !==
+          JSON.stringify(context.originalOrder)
+        const placed = shuffled ? {} : placeAdversarial(context)
+        return {
+          ...placed,
+          ...(placed.order && {
+            orderPermutations: placed.order.map((_, idx) => idx),
+          }),
+          adversarialPlaced: true,
+        }
+      }),
     },
   }
 )

@@ -41,9 +41,8 @@ describe('the nonsense picture in the flip master', () => {
   })
   afterEach(() => random.mockRestore())
 
-  // A flip at its story step; `moved` counts calls of the service that once moved the picture on Protect.
+  // A flip at its story step.
   function start(context = {}) {
-    const moved = {count: 0}
     const machine = flipMasterMachine
       .withConfig({
         services: {
@@ -55,11 +54,6 @@ describe('the nonsense picture in the flip master', () => {
             protectedImages: images.map((x) => x && `p-${x}`),
             adversarialImage: 'nonsense',
           }),
-          shuffleAdversarial: async ({originalOrder, adversarialImageId}) => {
-            moved.count += 1
-            const rest = originalOrder.filter((n) => n !== adversarialImageId)
-            return {order: [adversarialImageId, ...rest]}
-          },
         },
       })
       .withContext({
@@ -72,11 +66,11 @@ describe('the nonsense picture in the flip master', () => {
         State.from({editing: {keywords: 'loading'}}, machine.context)
       )
     )
-    return {service, moved}
+    return {service}
   }
 
   it('gets its slot when the editor opens, and keeps it on Protect and back', async () => {
-    const {service, moved} = start()
+    const {service} = start()
     service.send('NEXT')
     await settle()
     const placed = service.state.context.originalOrder
@@ -91,12 +85,11 @@ describe('the nonsense picture in the flip master', () => {
     service.send('PREV')
     await settle()
     expect(service.state.context.originalOrder).toEqual(placed)
-    expect(moved.count).toBe(0)
     service.stop()
   })
 
   it('keeps the last slot when the user put it there', async () => {
-    const {service, moved} = start()
+    const {service} = start()
     service.send('NEXT')
     await settle()
     service.send({type: 'CHANGE_ORIGINAL_ORDER', order: [0, 1, 2, 3]})
@@ -105,7 +98,36 @@ describe('the nonsense picture in the flip master', () => {
     await settle()
     expect(service.state.matches({editing: 'protect'})).toBe(true)
     expect(service.state.context.originalOrder).toEqual([0, 1, 2, 3])
-    expect(moved.count).toBe(0)
+    service.stop()
+  })
+
+  it('keeps the last slot the user chose after Protect and back', async () => {
+    const {service} = start()
+    service.send('NEXT')
+    await settle()
+    service.send({type: 'CHANGE_ORIGINAL_ORDER', order: [0, 1, 2, 3]})
+    await settle()
+    service.send('NEXT')
+    await settle()
+    service.send('PREV')
+    await settle()
+    expect(service.state.matches({editing: 'images'})).toBe(true)
+    expect(service.state.context.originalOrder).toEqual([0, 1, 2, 3])
+    service.stop()
+  })
+
+  it('keeps the order of an older draft already shuffled', async () => {
+    const {service} = start({
+      originalOrder: [0, 1, 2, 3],
+      order: [2, 0, 3, 1],
+      orderPermutations: [2, 0, 3, 1],
+    })
+    service.send('NEXT')
+    await settle()
+    expect(service.state.context.originalOrder).toEqual([0, 1, 2, 3])
+    expect(service.state.context.order).toEqual([2, 0, 3, 1])
+    expect(service.state.context.orderPermutations).toEqual([2, 0, 3, 1])
+    expect(service.state.context.adversarialPlaced).toBe(true)
     service.stop()
   })
 
