@@ -47,7 +47,9 @@ function deleteDraft(id) {
     .set(
       keyName,
       drafts.map((flip) =>
-        flip.id === id ? {...flip, type: 'Removed', images: null} : flip
+        flip.id === id
+          ? {...flip, type: 'Removed', images: null, scenes: null}
+          : flip
       )
     )
     .write()
