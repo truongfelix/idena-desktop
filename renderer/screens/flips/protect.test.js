@@ -36,3 +36,19 @@ describe('flip Protect step', () => {
     expect(next.context.protectedImages[1]).toBe('pb')
   })
 })
+
+// B-213: the Protect step's controls start at each picture's noise.
+describe('the noise of each protected picture', () => {
+  it('keeps the effects that came with a changed picture, and leaves the others', () => {
+    const {machine, state} = protectingState()
+    const effects = {mirror: true, grain: 35, hue: 10, brightness: 120}
+    const next = machine.transition(state, {
+      type: 'CHANGE_PROTECTED_IMAGES',
+      image: 'pb',
+      currentIndex: 1,
+      effects,
+    })
+    expect(next.context.noise[1]).toEqual(effects)
+    expect(next.context.noise[0]).toBeUndefined()
+  })
+})

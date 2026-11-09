@@ -544,6 +544,8 @@ export const flipMasterMachine = Machine(
       },
       images: Array.from({length: 4}),
       protectedImages: Array.from({length: 4}),
+      // Each protected picture's noise effects (B-213), for the Protect step's controls.
+      noise: Array.from({length: 4}),
       adversarialImage: '',
       adversarialImages: Array.from({length: 8}),
       originalOrder: DEFAULT_FLIP_ORDER,
@@ -809,6 +811,10 @@ export const flipMasterMachine = Machine(
                       image,
                       ...protectedImages.slice(currentIndex + 1),
                     ],
+                    noise: ({noise}, {effects, currentIndex}) =>
+                      Array.from({length: 4}, (_, idx) =>
+                        idx === currentIndex ? effects ?? null : noise?.[idx]
+                      ),
                   }),
                   log(),
                 ],
@@ -880,11 +886,12 @@ export const flipMasterMachine = Machine(
                       assign(
                         (
                           context,
-                          {data: {protectedImages, adversarialImage}}
+                          {data: {protectedImages, adversarialImage, noise}}
                         ) => ({
                           ...context,
                           protectedImages,
                           adversarialImage,
+                          noise,
                         })
                       ),
                       log(),
