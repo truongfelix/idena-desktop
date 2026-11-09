@@ -345,8 +345,9 @@ export function stepForward(history, scene) {
 }
 
 // A frame's scene saved with the draft (B-211), so its pictures stay editable after the user goes back to the editor
-// or reopens the draft. Plain JSON: the background and each picture as their data URL, strokes as points; no
-// loaded images. `backgroundUrl` gives the URL of a background that has none (a crop draws one on a canvas).
+// or reopens the draft. Plain JSON: the background and each picture as their data URL (`savedUrl`, a compact copy,
+// when the editor made one), strokes as points; no loaded images. `backgroundUrl` gives the background's saved URL
+// (a crop's background has no other).
 export const SAVED_SCENE_VERSION = 1
 
 export function savedScene(scene, backgroundUrl) {
@@ -354,9 +355,12 @@ export function savedScene(scene, backgroundUrl) {
   return {
     version: SAVED_SCENE_VERSION,
     size: {...scene.size},
-    background: background ? background.url || backgroundUrl(background) : null,
-    objects: scene.objects.map(({img, ...obj}) => ({
+    background: background
+      ? backgroundUrl(background) || background.url || null
+      : null,
+    objects: scene.objects.map(({img, savedUrl, ...obj}) => ({
       ...obj,
+      ...(savedUrl && {url: savedUrl}),
       ...(obj.points && {points: obj.points.map((p) => ({...p}))}),
     })),
   }
@@ -368,7 +372,7 @@ export function isLoadableScene(saved) {
   if (!saved || saved.version !== SAVED_SCENE_VERSION) return false
   const {size, objects} = saved
   if (!size || !(size.width > 0) || !(size.height > 0)) return false
-  if (saved.background !== null && typeof saved.background !== 'string') {
+  if (saved.background !== null && !isPictureData(saved.background)) {
     return false
   }
   return (
@@ -377,10 +381,15 @@ export function isLoadableScene(saved) {
       (obj) =>
         obj &&
         typeof obj.id === 'string' &&
-        ((obj.type === 'image' && typeof obj.url === 'string') ||
+        ((obj.type === 'image' && isPictureData(obj.url)) ||
           (obj.type === 'path' && Array.isArray(obj.points)))
     )
   )
+}
+
+// Only pictures held in the draft itself: a saved scene never makes the editor fetch an address.
+function isPictureData(url) {
+  return typeof url === 'string' && url.startsWith('data:image/')
 }
 
 // The next free object id after a loaded scene's ("object-7" -> 8).

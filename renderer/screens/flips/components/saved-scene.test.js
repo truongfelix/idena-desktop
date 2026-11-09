@@ -50,7 +50,7 @@ function editorScene() {
 
 describe('savedScene (B-211)', () => {
   it('keeps every picture and stroke with its place, size, angle and brightness, without loaded images', () => {
-    const saved = savedScene(editorScene(), () => 'unused')
+    const saved = savedScene(editorScene(), () => undefined)
     expect(saved.version).toBe(SAVED_SCENE_VERSION)
     expect(saved.background).toBe('data:image/png;base64,BG')
     expect(saved.objects[0]).toEqual({
@@ -71,6 +71,15 @@ describe('savedScene (B-211)', () => {
     expect(saved.objects[1].points).toHaveLength(2)
     expect(JSON.parse(JSON.stringify(saved))).toEqual(saved)
     expect(isLoadableScene(JSON.parse(JSON.stringify(saved)))).toBe(true)
+  })
+
+  it('saves the compact copy of each picture and of the background when there is one', () => {
+    const scene = editorScene()
+    scene.objects[0].savedUrl = 'data:image/webp;base64,A'
+    const saved = savedScene(scene, () => 'data:image/webp;base64,BG')
+    expect(saved.background).toBe('data:image/webp;base64,BG')
+    expect(saved.objects[0].url).toBe('data:image/webp;base64,A')
+    expect(saved.objects[0]).not.toHaveProperty('savedUrl')
   })
 
   it('draws a background without URL (a crop) for its URL', () => {
@@ -101,6 +110,19 @@ describe('isLoadableScene', () => {
       {...good(), objects: [{id: 'object-1', type: 'image'}]},
     ],
     ['an unknown kind', {...good(), objects: [{id: 'object-1', type: 'text'}]}],
+    [
+      'a picture at a web address',
+      {
+        ...good(),
+        objects: [
+          {id: 'object-1', type: 'image', url: 'https://example.com/x.png'},
+        ],
+      },
+    ],
+    [
+      'a background at a web address',
+      {...good(), background: 'https://example.com/b.png'},
+    ],
   ])('refuses %s', (_, value) => {
     expect(isLoadableScene(value)).toBe(false)
   })

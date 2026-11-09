@@ -73,6 +73,28 @@ const loadImage = (url) =>
     img.src = url
   })
 
+// Each loaded picture's saved copy (B-211), by the picture itself: undo snapshots share it, so a picture is
+// encoded once whatever the history does.
+const compactUrls = new WeakMap()
+
+// A picture as a WebP data URL (quality 0.92, transparency kept) for the saved draft, at `size` or its own size;
+// `fallback` (its PNG) when WebP is not smaller or not supported; undefined when it cannot be drawn at all.
+function compactDataUrl(img, fallback, size) {
+  try {
+    const canvas = document.createElement('canvas')
+    canvas.width = size?.width || img.naturalWidth || img.width
+    canvas.height = size?.height || img.naturalHeight || img.height
+    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
+    const webp = canvas.toDataURL('image/webp', 0.92)
+    if (!webp.startsWith('data:image/webp')) {
+      return fallback || canvas.toDataURL('image/png')
+    }
+    return fallback && fallback.length <= webp.length ? fallback : webp
+  } catch {
+    return fallback?.startsWith('data:image/') ? fallback : undefined
+  }
+}
+
 const withHash = (color) => (color.startsWith('#') ? color : `#${color}`)
 
 function fitSize(size, maxWidth, maxHeight) {
@@ -449,28 +471,50 @@ const SimpleImageEditor = React.forwardRef(
             return acc
           }, {})
         },
-        // The scene as saved with the draft (B-211).
-        getScene: () =>
-          savedScene(s.scene, ({img}) => {
-            const canvas = document.createElement('canvas')
-            canvas.width = s.scene.size.width
-            canvas.height = s.scene.size.height
-            canvas
-              .getContext('2d')
-              .drawImage(img, 0, 0, canvas.width, canvas.height)
-            return canvas.toDataURL('image/png')
-          }),
+        // The scene as saved with the draft (B-211). Each picture and the background are saved as WebP, encoded
+        // once per picture (compactUrls), so saving again never encodes a picture twice.
+        // null when a picture cannot be saved: the frame then opens flat, as before.
+        getScene: () => {
+          const compact = (img, url, size) => {
+            if (!compactUrls.has(img)) {
+              compactUrls.set(img, compactDataUrl(img, url, size))
+            }
+            return compactUrls.get(img)
+          }
+          let complete = true
+          s.scene.objects.forEach((obj) => {
+            if (obj.type === 'image' && obj.img) {
+              obj.savedUrl = compact(obj.img, obj.url)
+              if (!obj.savedUrl) complete = false
+            }
+          })
+          const {background} = s.scene
+          if (background) {
+            background.savedUrl = compact(
+              background.img,
+              background.url,
+              s.scene.size
+            )
+            if (!background.savedUrl) complete = false
+          }
+          return complete ? savedScene(s.scene, (bg) => bg.savedUrl) : null
+        },
         // A saved scene back in the editor, with a fresh history; false when it cannot be loaded.
         loadScene: async (saved) => {
           if (!isLoadableScene(saved)) return false
           try {
+            const loaded = async (url) => {
+              const img = await loadImage(url)
+              compactUrls.set(img, url)
+              return img
+            }
             const background = saved.background
-              ? {img: await loadImage(saved.background), url: saved.background}
+              ? {img: await loaded(saved.background), url: saved.background}
               : null
             const objects = await Promise.all(
               saved.objects.map(async (obj) =>
                 obj.type === 'image'
-                  ? {...obj, img: await loadImage(obj.url)}
+                  ? {...obj, img: await loaded(obj.url)}
                   : {...obj}
               )
             )

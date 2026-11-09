@@ -203,7 +203,8 @@ export default function FlipEditor({
       setChangesCnt(NOCHANGES)
       const url = editors[idx].toDataURL()
       // The frame's pictures go with its flat picture, so they stay editable later (B-211).
-      onChange(url, {...editors[idx].getScene(), picture: pictureKey(url)})
+      const saved = editors[idx].getScene()
+      onChange(url, saved && {...saved, picture: pictureKey(url)})
     }
   }, 200)
 

@@ -981,6 +981,8 @@ export const flipMasterMachine = Machine(
                         txHash,
                         hash,
                         type: FlipType.Publishing,
+                        // The editable frames are not needed once the flip is sent (B-211).
+                        scenes: null,
                       })),
                       'persistFlip',
                     ],

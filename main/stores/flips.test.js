@@ -37,14 +37,14 @@ describe('flip store', () => {
 
   it('marks only the selected draft as removed', () => {
     flips.saveFlips([
-      {id: 'one', type: 'Draft', images: ['first']},
+      {id: 'one', type: 'Draft', images: ['first'], scenes: [{}, null]},
       {id: 'two', type: 'Draft', images: ['second']},
     ])
 
     flips.deleteDraft('one')
 
     expect(flips.getFlips()).toEqual([
-      {id: 'one', type: 'Removed', images: null},
+      {id: 'one', type: 'Removed', images: null, scenes: null},
       {id: 'two', type: 'Draft', images: ['second']},
     ])
   })
