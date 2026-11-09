@@ -1379,37 +1379,25 @@ export async function getAdversarialImage(images) {
   return resultImageSrc
 }
 
-export async function shuffleAdversarial(
+// The nonsense picture's slot, picked once when the editor opens (B-210): from the last slot, where a new flip has it,
+// to a random one, so bots cannot count on it being last; a slot the user chose (any other) is kept. Gives the new
+// `originalOrder` and `order`, the same order.
+export function placeAdversarial(
   {originalOrder, adversarialImageId},
-  setDidShowShuffleAdversarial
+  random = Math.random
 ) {
-  if (adversarialImageId === -1) {
-    return Promise.resolve({order: originalOrder})
-  }
-
   const position = originalOrder.findIndex(
     (elem) => elem === adversarialImageId
   )
-  if (position !== 3) {
-    setDidShowShuffleAdversarial(true)
-    return Promise.resolve({order: originalOrder})
+  if (adversarialImageId === -1 || position !== originalOrder.length - 1) {
+    return {}
   }
-
-  const newPosition = Math.floor(Math.random() * 4)
-
-  if (newPosition === position) {
-    return Promise.resolve({order: originalOrder})
-  }
-
-  const userImages = [
-    ...originalOrder.slice(0, position),
-    ...originalOrder.slice(position + 1),
-  ]
+  const newPosition = Math.floor(random() * originalOrder.length)
+  const userImages = originalOrder.filter((_, idx) => idx !== position)
   const newOrder = [
     ...userImages.slice(0, newPosition),
     adversarialImageId,
     ...userImages.slice(newPosition),
   ]
-
-  return Promise.resolve({order: newOrder})
+  return {originalOrder: newOrder, order: newOrder}
 }
