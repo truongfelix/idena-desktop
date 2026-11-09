@@ -182,6 +182,9 @@ export default function NewFlipPage() {
   // are undefined (B-201).
   const [epochNumber, setEpochNumber] = useState(null)
   useRpc('dna_epoch', [], {
+    // A node just started answers only bcn_ calls for a few seconds: ask until it answers, or the page stays blank.
+    retry: true,
+    retryDelay: 2000,
     onSuccess: (data) => {
       setEpochNumber(data.epoch)
     },
