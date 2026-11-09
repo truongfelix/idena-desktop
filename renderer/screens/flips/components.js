@@ -47,6 +47,8 @@ import {
   getAdversarialImage,
   protectFlipImage,
 } from './utils'
+import {randomNoiseEffects} from './noise'
+import {NoiseControls} from './components/noise-controls'
 import {resizeImageToDataUrl} from '../../shared/utils/image-canvas'
 import {
   PrimaryButton,
@@ -734,6 +736,8 @@ export function FlipProtectStep({
   images,
   protectedImages,
   adversarialImages,
+  adversarialImage,
+  noise,
   adversarialImageId,
   didShowShuffleAdversarial,
   onProtecting,
@@ -758,8 +762,10 @@ export function FlipProtectStep({
   // choices) is dropped, its failure included.
   const regenerationRef = React.useRef({})
 
+  // `effects`: the noise chosen with the controls (B-213), on the same picture (the nonsense one included); without
+  // them, new random noise and, for the nonsense picture, a new picture.
   const regenerateImage = React.useCallback(
-    async (source) => {
+    async (source, effects) => {
       if (!images.some((x) => x)) {
         return
       }
@@ -771,7 +777,13 @@ export function FlipProtectStep({
       try {
         let advImageScr
         let imageSrc
-        if (originalOrder[currentIndex] === adversarialImageId) {
+        if (
+          originalOrder[currentIndex] === adversarialImageId &&
+          effects &&
+          adversarialImage
+        ) {
+          imageSrc = adversarialImage
+        } else if (originalOrder[currentIndex] === adversarialImageId) {
           advImageScr = await getAdversarialImage(
             await adversarialSources(adversarialImages, images, {
               source: typeof source === 'string' ? source : adversarialSource,
@@ -784,10 +796,14 @@ export function FlipProtectStep({
 
         if (!imageSrc) {
           if (isLatest()) onProtectFailed()
-          return
+          return false
         }
 
-        const regeneratedImageSrc = await protectFlipImage(imageSrc)
+        const nextEffects = effects || randomNoiseEffects()
+        const regeneratedImageSrc = await protectFlipImage(
+          imageSrc,
+          nextEffects
+        )
 
         const compressedImage = await resizeImageToDataUrl(
           regeneratedImageSrc,
@@ -799,20 +815,27 @@ export function FlipProtectStep({
             exact: true,
           }
         )
-        if (!isLatest()) return
+        if (!isLatest()) return false
         if (advImageScr) {
           onChangeAdversarial(advImageScr)
         }
-        onProtectImage(compressedImage, originalOrder[currentIndex])
+        onProtectImage(
+          compressedImage,
+          originalOrder[currentIndex],
+          nextEffects
+        )
+        return true
       } catch (error) {
         global.logger?.error?.(
           'error while protecting a flip image',
           error?.message
         )
         if (isLatest()) onProtectFailed()
+        return false
       }
     },
     [
+      adversarialImage,
       adversarialImageId,
       adversarialImages,
       adversarialSource,
@@ -956,6 +979,18 @@ export function FlipProtectStep({
               </Flex>
             </Tooltip>
           </Flex>
+          <NoiseControls
+            key={originalOrder[currentIndex]}
+            effects={noise?.[originalOrder[currentIndex]]}
+            // Unknown effects (a draft of an older version) or nonsense picture: Regenerate first.
+            isDisabled={
+              !protectedImages[originalOrder[currentIndex]] ||
+              !noise?.[originalOrder[currentIndex]] ||
+              (originalOrder[currentIndex] === adversarialImageId &&
+                !adversarialImage)
+            }
+            onChange={(effects) => regenerateImage(undefined, effects)}
+          />
           {originalOrder[currentIndex] === adversarialImageId && (
             <Box mt={3}>
               <Text fontSize="md" color="muted" mb={1}>

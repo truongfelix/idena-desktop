@@ -18,9 +18,15 @@ import {submitFlip} from '../../shared/api/dna'
 import {signNonce} from '../dna/utils'
 import i18n from '../../i18n'
 import ImageAccess from './ImageAccess'
+import {
+  applyBrightness,
+  applyGrain,
+  applyHue,
+  noiseEffects,
+  randomNoiseEffects,
+} from './noise'
 import {resizeImageToDataUrl} from '../../shared/utils/image-canvas'
 
-const convert = require('color-convert')
 const StackBlur = require('stackblur-canvas')
 
 export const FLIP_LENGTH = 4
@@ -726,7 +732,9 @@ const getImageDataFromImage = (image) => {
   return ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height)
 }
 
-export async function protectFlipImage(imgSrc) {
+// The picture with the adversarial noise: `effects` (noise.js) are the controls' values, random when left out.
+export async function protectFlipImage(imgSrc, effects = randomNoiseEffects()) {
+  const {mirror, grain, hue, brightness} = noiseEffects(effects)
   const blurValue = 2
 
   let palette = []
@@ -736,40 +744,6 @@ export async function protectFlipImage(imgSrc) {
     palette = await extractColors(imgSrc)
     // eslint-disable-next-line no-empty
   } catch (e) {}
-
-  const mergeMeshPixels = (sourceImageData, meshImageData) => {
-    const pixels = sourceImageData.data
-    const mesh = meshImageData.data
-    for (let i = 0; i < pixels.length; i += 4) {
-      const isRecolor = Math.random() * 100 + 1 < 21
-      const isWhite = mesh[i] > 0 && mesh[i + 1] > 0 && mesh[i + 2] > 0
-      if (isRecolor && isWhite) {
-        const newColorId =
-          palette.length === 1
-            ? 0
-            : Math.floor(Math.random() * (palette.length - 1)) + 1
-        pixels[i] = palette[newColorId].red
-        pixels[i + 1] = palette[newColorId].green
-        pixels[i + 2] = palette[newColorId].blue
-      }
-    }
-  }
-
-  const modifyImageHue = (imageData) => {
-    const pixels = imageData.data
-    const rnd = Math.floor(Math.random() * 30) + 20
-    for (let i = 0; i < pixels.length; i += 4) {
-      const hsvImage = convert.rgb.hsv(pixels[i], pixels[i + 1], pixels[i + 2])
-      const newRgbImage = convert.hsv.rgb(
-        hsvImage[0] + rnd,
-        hsvImage[1],
-        hsvImage[2]
-      )
-      pixels[i] = newRgbImage[0]
-      pixels[i + 1] = newRgbImage[1]
-      pixels[i + 2] = newRgbImage[2]
-    }
-  }
 
   const watershed = (image, imgW, imgH) => {
     const getOverlayImg = (image) => {
@@ -821,10 +795,9 @@ export async function protectFlipImage(imgSrc) {
 
   // Create mesh
   const watershedImageData = watershed(blurredImage, img.width, img.height)
-  mergeMeshPixels(resultImageData, watershedImageData)
-
-  // Modify image hue
-  modifyImageHue(resultImageData)
+  applyGrain(resultImageData.data, watershedImageData.data, palette, grain)
+  applyHue(resultImageData.data, hue)
+  applyBrightness(resultImageData.data, brightness)
 
   // Draw it
   const resultCanvas = document.createElement('canvas')
@@ -835,11 +808,10 @@ export async function protectFlipImage(imgSrc) {
   const protectedImage = getImageFromImageData(resultImageData)
   // eslint-disable-next-line no-promise-executor-return
   await new Promise((resolve) => (protectedImage.onload = resolve))
-  const flip = Math.floor(Math.random() * 2) === 0
-  resultCanvasContext.scale(flip ? -1 : 1, 1)
+  resultCanvasContext.scale(mirror ? -1 : 1, 1)
   resultCanvasContext.drawImage(
     protectedImage,
-    flip ? resultImageData.width * -1 : 0,
+    mirror ? resultImageData.width * -1 : 0,
     0,
     resultImageData.width,
     resultImageData.height
@@ -893,6 +865,8 @@ export async function protectFlip({
   adversarialSource,
 }) {
   const protectedFlips = []
+  // Each picture's noise, for the Protect step's controls (B-213).
+  const effects = []
   let adversarialImg = ''
   const adversarialIndex = originalOrder.findIndex(
     (idx) => idx === adversarialImageId
@@ -900,7 +874,8 @@ export async function protectFlip({
 
   for (let i = 0; i < images.length; i++) {
     if (images[i]) {
-      const protectedImageSrc = await protectFlipImage(images[i])
+      effects[i] = randomNoiseEffects()
+      const protectedImageSrc = await protectFlipImage(images[i], effects[i])
       protectedFlips[i] = protectedImageSrc
     } else if (i === originalOrder[adversarialIndex]) {
       let adversarialImageSrc
@@ -915,7 +890,11 @@ export async function protectFlip({
         adversarialImg = adversarialImageSrc?.slice()
       }
       if (adversarialImageSrc) {
-        protectedFlips[i] = await protectFlipImage(adversarialImageSrc)
+        effects[i] = randomNoiseEffects()
+        protectedFlips[i] = await protectFlipImage(
+          adversarialImageSrc,
+          effects[i]
+        )
       } else {
         protectedFlips[i] = undefined
       }
@@ -940,7 +919,9 @@ export async function protectFlip({
 
   return {
     protectedImages: compressedImages,
-    adversarialImage: adversarialImg,
+    // The nonsense picture's source, kept (or new): its noise can be changed later without a new picture (B-213).
+    adversarialImage: adversarialImg || adversarialImage || '',
+    noise: Array.from({length: images.length}, (_, i) => effects[i] ?? null),
   }
 }
 

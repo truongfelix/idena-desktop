@@ -547,6 +547,8 @@ export const flipMasterMachine = Machine(
       // Each frame's pictures, kept editable (B-211): see savedScene in image-editor-model.js.
       scenes: Array.from({length: 4}),
       protectedImages: Array.from({length: 4}),
+      // Each protected picture's noise effects (B-213), for the Protect step's controls.
+      noise: Array.from({length: 4}),
       adversarialImage: '',
       adversarialImages: Array.from({length: 8}),
       originalOrder: DEFAULT_FLIP_ORDER,
@@ -748,6 +750,8 @@ export const flipMasterMachine = Machine(
                         (_, idx) =>
                           (idx === currentIndex ? scene : scenes?.[idx]) ?? null
                       ),
+                    // The nonsense picture may be made of the story pictures: made again after a change (B-213).
+                    adversarialImage: '',
                   }),
                   log(),
                 ],
@@ -821,6 +825,11 @@ export const flipMasterMachine = Machine(
                       image,
                       ...protectedImages.slice(currentIndex + 1),
                     ],
+                    noise: ({noise = []}, {effects, currentIndex}) => [
+                      ...noise.slice(0, currentIndex),
+                      effects ?? null,
+                      ...noise.slice(currentIndex + 1),
+                    ],
                   }),
                   log(),
                 ],
@@ -877,11 +886,12 @@ export const flipMasterMachine = Machine(
                       assign(
                         (
                           context,
-                          {data: {protectedImages, adversarialImage}}
+                          {data: {protectedImages, adversarialImage, noise}}
                         ) => ({
                           ...context,
                           protectedImages,
                           adversarialImage,
+                          noise,
                         })
                       ),
                       log(),
@@ -1040,6 +1050,7 @@ export const flipMasterMachine = Machine(
             images,
             scenes,
             protectedImages,
+            noise,
             adversarialImageId,
             adversarialPlaced,
             keywords,
@@ -1066,6 +1077,7 @@ export const flipMasterMachine = Machine(
               images,
               scenes,
               protectedImages,
+              noise,
               adversarialImageId,
               adversarialPlaced,
               keywords,

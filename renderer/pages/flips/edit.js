@@ -157,6 +157,8 @@ export default function EditFlipPage() {
     scenes,
     protectedImages,
     adversarialImages,
+    adversarialImage,
+    noise,
     adversarialImageId,
     originalOrder,
     order,
@@ -377,12 +379,18 @@ export default function EditFlipPage() {
                   images={images}
                   protectedImages={protectedImages}
                   adversarialImages={adversarialImages}
+                  adversarialImage={adversarialImage}
+                  noise={noise}
                   adversarialImageId={adversarialImageId}
                   didShowShuffleAdversarial={didShowShuffleAdversarial}
                   onProtecting={() => send('PROTECTING')}
                   onProtectFailed={() => send('PROTECT_FAILED')}
-                  onProtectImage={(image, currentIndex) =>
-                    send('CHANGE_PROTECTED_IMAGES', {image, currentIndex})
+                  onProtectImage={(image, currentIndex, effects) =>
+                    send('CHANGE_PROTECTED_IMAGES', {
+                      image,
+                      currentIndex,
+                      effects,
+                    })
                   }
                   onChangeAdversarial={(image) =>
                     send('CHANGE_ADVERSARIAL_IMAGE', {image})

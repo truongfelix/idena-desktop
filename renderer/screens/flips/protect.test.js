@@ -36,3 +36,53 @@ describe('flip Protect step', () => {
     expect(next.context.protectedImages[1]).toBe('pb')
   })
 })
+
+// B-213: the Protect step's controls start at each picture's noise.
+describe('the noise of each protected picture', () => {
+  it('keeps the effects that came with a changed picture, and leaves the others', () => {
+    const {machine, state} = protectingState()
+    const effects = {mirror: true, grain: 35, hue: 10, brightness: 120}
+    const next = machine.transition(state, {
+      type: 'CHANGE_PROTECTED_IMAGES',
+      image: 'pb',
+      currentIndex: 1,
+      effects,
+    })
+    expect(next.context.noise[1]).toEqual(effects)
+    expect(next.context.noise[0]).toBeUndefined()
+  })
+})
+
+describe('the nonsense picture and the noise in the draft', () => {
+  it('drops the nonsense source when a story picture changes', () => {
+    const machine = flipMasterMachine.withContext({
+      ...flipMasterMachine.context,
+      adversarialImage: 'old-nonsense',
+    })
+    const state = machine.resolveState(
+      State.from({editing: {images: 'idle'}}, machine.context)
+    )
+    const next = machine.transition(state, {
+      type: 'CHANGE_IMAGES',
+      image: 'new-picture',
+      currentIndex: 0,
+    })
+    expect(next.context.adversarialImage).toBe('')
+  })
+
+  it('saves each picture noise with the draft', () => {
+    const saved = []
+    global.flipStore = {
+      updateDraft: (flip) => saved.push(flip),
+      addDraft: (flip) => saved.push(flip),
+      getFlips: () => [],
+    }
+    const noise = [{mirror: true, grain: 5, hue: 0, brightness: 100}]
+    const persist = flipMasterMachine.options.services.persistFlip(
+      {...flipMasterMachine.context, id: 'f1', noise},
+      {type: 'CHANGE_ORDER'}
+    )
+    persist(() => {})
+    expect(saved.at(-1).noise).toEqual(noise)
+  })
+})
