@@ -23,6 +23,7 @@ import {
   CommunityTranslationUnavailable,
   PublishFlipDrawer,
   FlipProtectStep,
+  FlipPrepareFailed,
 } from '../../screens/flips/components'
 import {useIdentityState} from '../../shared/providers/identity-context'
 import {
@@ -187,11 +188,20 @@ export default function EditFlipPage() {
     }, [send]),
   })
 
+  // The flip is prepared once the epoch and the identity are known: before the identity loads, its keyword pairs
+  // are undefined (B-201).
+  const [epochNumber, setEpochNumber] = useState(null)
   useRpc('dna_epoch', [], {
     onSuccess: (data) => {
-      send({type: 'SET_EPOCH_NUMBER', epochNumber: data.epoch})
+      setEpochNumber(data.epoch)
     },
   })
+  const isIdentityLoaded = flipKeyWordPairs !== undefined
+  useEffect(() => {
+    if (epochNumber !== null && isIdentityLoaded) {
+      send({type: 'SET_EPOCH_NUMBER', epochNumber})
+    }
+  }, [epochNumber, isIdentityLoaded, send])
 
   return (
     <Layout>
@@ -219,6 +229,9 @@ export default function EditFlipPage() {
           >
             {t('Edit flip')}
           </FlipPageTitle>
+          {current.matches('prepareFailed') && (
+            <FlipPrepareFailed onRetry={() => send('RETRY')} />
+          )}
           {current.matches('editing') && (
             <FlipMaster>
               <FlipMasterNavbar>

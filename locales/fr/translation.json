@@ -973,6 +973,7 @@
   "Closed on {{name}}": "Fermé sur {{name}}",
   "Look for the router": "Chercher le routeur",
   "Search again": "Chercher à nouveau",
+  "This flip could not be opened.": "Ce flip n'a pas pu être ouvert.",
   "Try again": "Réessayer",
   "Open…": "Ouvrir…",
   "Router port": "Port du routeur",

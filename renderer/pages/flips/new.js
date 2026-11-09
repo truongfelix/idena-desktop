@@ -23,6 +23,7 @@ import {
   CommunityTranslationUnavailable,
   FlipProtectStep,
   PublishFlipDrawer,
+  FlipPrepareFailed,
 } from '../../screens/flips/components'
 import {useIdentityState} from '../../shared/providers/identity-context'
 import {
@@ -31,8 +32,7 @@ import {
 } from '../../screens/flips/machines'
 import {
   publishFlip,
-  isPendingKeywordPair,
-  getRandomKeywordPair,
+  newFlipKeywords,
   protectFlip,
   prepareAdversarialImages,
   shuffleAdversarial,
@@ -104,27 +104,10 @@ export default function NewFlipPage() {
           didShowBadFlip = false
         }
 
-        if (
-          flipKeyWordPairs === null ||
-          flipKeyWordPairs.every(({used}) => used)
-        )
-          return {
-            keywordPairId: 0,
-            availableKeywords: [getRandomKeywordPair()],
-            didShowBadFlip,
-          }
-
-        const persistedFlips = global.flipStore?.getFlips()
-
-        // eslint-disable-next-line no-shadow
-        const availableKeywords = flipKeyWordPairs.filter(
-          ({id, used}) => !used && !isPendingKeywordPair(persistedFlips, id)
-        )
-
-        // eslint-disable-next-line no-shadow
-        const [{id: keywordPairId}] = availableKeywords
-
-        return {keywordPairId, availableKeywords, didShowBadFlip}
+        return {
+          ...newFlipKeywords(flipKeyWordPairs, global.flipStore?.getFlips()),
+          didShowBadFlip,
+        }
       },
       protectFlip: async (flip) =>
         protectFlip({...flip, adversarialSource: flipAdversarialSource}),
@@ -195,11 +178,20 @@ export default function NewFlipPage() {
     }, [send]),
   })
 
+  // The flip is prepared once the epoch and the identity are known: before the identity loads, its keyword pairs
+  // are undefined (B-201).
+  const [epochNumber, setEpochNumber] = useState(null)
   useRpc('dna_epoch', [], {
     onSuccess: (data) => {
-      send({type: 'SET_EPOCH_NUMBER', epochNumber: data.epoch})
+      setEpochNumber(data.epoch)
     },
   })
+  const isIdentityLoaded = flipKeyWordPairs !== undefined
+  useEffect(() => {
+    if (epochNumber !== null && isIdentityLoaded) {
+      send({type: 'SET_EPOCH_NUMBER', epochNumber})
+    }
+  }, [epochNumber, isIdentityLoaded, send])
 
   return (
     <Layout>
@@ -227,6 +219,9 @@ export default function NewFlipPage() {
           >
             {t('New flip')}
           </FlipPageTitle>
+          {current.matches('prepareFailed') && (
+            <FlipPrepareFailed onRetry={() => send('RETRY')} />
+          )}
           {current.matches('editing') && (
             <FlipMaster>
               <FlipMasterNavbar>
