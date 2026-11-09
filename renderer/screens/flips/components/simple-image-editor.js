@@ -28,6 +28,9 @@ import {
   topMiddlePoint,
   objectFilter,
   clampBrightness,
+  savedScene,
+  isLoadableScene,
+  nextIdAfter,
 } from './image-editor-model'
 
 // The flip image editor, with the part of toast-ui's API that flip-editor.js uses: pictures and pen
@@ -445,6 +448,40 @@ const SimpleImageEditor = React.forwardRef(
             acc[name] = obj[name]
             return acc
           }, {})
+        },
+        // The scene as saved with the draft (B-211).
+        getScene: () =>
+          savedScene(s.scene, ({img}) => {
+            const canvas = document.createElement('canvas')
+            canvas.width = s.scene.size.width
+            canvas.height = s.scene.size.height
+            canvas
+              .getContext('2d')
+              .drawImage(img, 0, 0, canvas.width, canvas.height)
+            return canvas.toDataURL('image/png')
+          }),
+        // A saved scene back in the editor, with a fresh history; false when it cannot be loaded.
+        loadScene: async (saved) => {
+          if (!isLoadableScene(saved)) return false
+          try {
+            const background = saved.background
+              ? {img: await loadImage(saved.background), url: saved.background}
+              : null
+            const objects = await Promise.all(
+              saved.objects.map(async (obj) =>
+                obj.type === 'image'
+                  ? {...obj, img: await loadImage(obj.url)}
+                  : {...obj}
+              )
+            )
+            s.history = createHistory()
+            s.cropRect = null
+            s.nextId = nextIdAfter(objects)
+            replaceScene({size: {...saved.size}, background, objects})
+            return true
+          } catch {
+            return false
+          }
         },
         isEmptyRedoStack: () => s.history.redo.length === 0,
         isEmptyUndoStack: () => s.history.undo.length === 0,

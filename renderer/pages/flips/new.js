@@ -153,6 +153,7 @@ export default function NewFlipPage() {
     keywordPairId,
     keywords,
     images,
+    scenes,
     protectedImages,
     adversarialImages,
     adversarialImageId,
@@ -363,9 +364,10 @@ export default function NewFlipPage() {
                   showTranslation={showTranslation}
                   originalOrder={originalOrder}
                   images={images}
+                  scenes={scenes}
                   adversarialImageId={adversarialImageId}
-                  onChangeImage={(image, currentIndex) =>
-                    send('CHANGE_IMAGES', {image, currentIndex})
+                  onChangeImage={(image, currentIndex, scene) =>
+                    send('CHANGE_IMAGES', {image, currentIndex, scene})
                   }
                   // eslint-disable-next-line no-shadow
                   onChangeOriginalOrder={(order) =>

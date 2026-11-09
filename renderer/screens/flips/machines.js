@@ -543,6 +543,8 @@ export const flipMasterMachine = Machine(
         translations: [[], []],
       },
       images: Array.from({length: 4}),
+      // Each frame's pictures, kept editable (B-211): see savedScene in image-editor-model.js.
+      scenes: Array.from({length: 4}),
       protectedImages: Array.from({length: 4}),
       adversarialImage: '',
       adversarialImages: Array.from({length: 8}),
@@ -736,6 +738,12 @@ export const flipMasterMachine = Machine(
                       image,
                       ...images.slice(currentIndex + 1),
                     ],
+                    scenes: ({scenes}, {scene, currentIndex}) =>
+                      Array.from(
+                        {length: 4},
+                        (_, idx) =>
+                          (idx === currentIndex ? scene : scenes?.[idx]) ?? null
+                      ),
                   }),
                   log(),
                 ],
@@ -1039,6 +1047,7 @@ export const flipMasterMachine = Machine(
             order,
             orderPermutations,
             images,
+            scenes,
             protectedImages,
             adversarialImageId,
             keywords,
@@ -1063,6 +1072,7 @@ export const flipMasterMachine = Machine(
               order,
               orderPermutations,
               images,
+              scenes,
               protectedImages,
               adversarialImageId,
               keywords,

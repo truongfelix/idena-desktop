@@ -618,6 +618,7 @@ export function FlipEditorStep({
   originalOrder,
   images,
   adversarialImageId,
+  scenes,
   onChangeImage,
   onChangeOriginalOrder,
   onPainting,
@@ -712,10 +713,11 @@ export function FlipEditorStep({
               idx={num}
               visible={currentIndex === idx}
               src={images[num]}
+              scene={scenes?.[num]}
               keywords={words}
               adversarialId={adversarialImageId}
-              onChange={(url) => {
-                onChangeImage(url, num)
+              onChange={(url, scene) => {
+                onChangeImage(url, num, scene)
               }}
               onChanging={onPainting}
               onChangeAdversarial={onChangeAdversarialId}
