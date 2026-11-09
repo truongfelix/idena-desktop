@@ -1,6 +1,13 @@
 import React, {useEffect, useState} from 'react'
 import {useRouter} from 'next/router'
-import {Box, Flex, useToast, Divider, useDisclosure} from '@chakra-ui/react'
+import {
+  Box,
+  Flex,
+  useToast,
+  Divider,
+  useDisclosure,
+  Spinner,
+} from '@chakra-ui/react'
 import {useTranslation} from 'react-i18next'
 import {useMachine} from '@xstate/react'
 import {
@@ -67,7 +74,7 @@ export default function NewFlipPage() {
 
   const {syncing, offline} = useChainState()
 
-  const {flipKeyWordPairs} = useIdentityState()
+  const {address, flipKeyWordPairs} = useIdentityState()
 
   const failToast = useFailToast()
 
@@ -178,8 +185,7 @@ export default function NewFlipPage() {
     }, [send]),
   })
 
-  // The flip is prepared once the epoch and the identity are known: before the identity loads, its keyword pairs
-  // are undefined (B-201).
+  // The flip is prepared once the epoch and the identity are known: its keyword pairs come with the identity (B-201).
   const [epochNumber, setEpochNumber] = useState(null)
   useRpc('dna_epoch', [], {
     // A node just started answers only bcn_ calls for a few seconds: ask until it answers, or the page stays blank.
@@ -189,7 +195,7 @@ export default function NewFlipPage() {
       setEpochNumber(data.epoch)
     },
   })
-  const isIdentityLoaded = flipKeyWordPairs !== undefined
+  const isIdentityLoaded = Boolean(address)
   useEffect(() => {
     if (epochNumber !== null && isIdentityLoaded) {
       send({type: 'SET_EPOCH_NUMBER', epochNumber})
@@ -222,6 +228,11 @@ export default function NewFlipPage() {
           >
             {t('New flip')}
           </FlipPageTitle>
+          {(current.matches('idle') || current.matches('prepare')) && (
+            <Flex justify="center" mt={20}>
+              <Spinner color="muted" />
+            </Flex>
+          )}
           {current.matches('prepareFailed') && (
             <FlipPrepareFailed onRetry={() => send('RETRY')} />
           )}

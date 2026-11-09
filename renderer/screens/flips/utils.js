@@ -38,20 +38,18 @@ export function getRandomKeywordPair() {
   return {id: 0, words: [getRandomInt(3300, 3939), getRandomInt(3300, 3939)]}
 }
 
-// The keyword pairs a new flip can use: `flipKeyWordPairs` is the identity's (null when it has none), undefined while
-// the identity is not loaded yet, which throws: the page waits for it (B-201).
-export function newFlipKeywords(flipKeyWordPairs, persistedFlips) {
-  if (flipKeyWordPairs === undefined) {
-    throw new Error('The identity is not loaded yet')
-  }
-  if (flipKeyWordPairs === null || flipKeyWordPairs.every(({used}) => used)) {
+// The keyword pairs a new flip can use, from the identity's pairs (the page waits for the identity, B-201): those
+// neither used nor in a flip being published; a random pair when none is left (or the identity has none).
+export function newFlipKeywords(flipKeyWordPairs, persistedFlips = []) {
+  const availableKeywords = (
+    Array.isArray(flipKeyWordPairs) ? flipKeyWordPairs : []
+  ).filter(
+    ({id, used}) => !used && !isPendingKeywordPair(persistedFlips ?? [], id)
+  )
+  if (availableKeywords.length === 0) {
     return {keywordPairId: 0, availableKeywords: [getRandomKeywordPair()]}
   }
-  const availableKeywords = flipKeyWordPairs.filter(
-    ({id, used}) => !used && !isPendingKeywordPair(persistedFlips, id)
-  )
-  const [{id: keywordPairId}] = availableKeywords
-  return {keywordPairId, availableKeywords}
+  return {keywordPairId: availableKeywords[0].id, availableKeywords}
 }
 
 export function isPendingKeywordPair(flips, id) {

@@ -1527,7 +1527,7 @@ export function VoteButton(props) {
   )
 }
 
-// The flip could not be prepared (B-201): its error, and a way to try again.
+// The flip could not be prepared (B-201): a message, and a way to try again (the error is in the log).
 export function FlipPrepareFailed({onRetry}) {
   const {t} = useTranslation()
   return (

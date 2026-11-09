@@ -188,8 +188,7 @@ export default function EditFlipPage() {
     }, [send]),
   })
 
-  // The flip is prepared once the epoch and the identity are known: before the identity loads, its keyword pairs
-  // are undefined (B-201).
+  // The flip is prepared once the epoch is known (B-201); it needs no identity (its own words are the fallback).
   const [epochNumber, setEpochNumber] = useState(null)
   useRpc('dna_epoch', [], {
     // A node just started answers only bcn_ calls for a few seconds: ask until it answers, or the page stays blank.
@@ -199,12 +198,11 @@ export default function EditFlipPage() {
       setEpochNumber(data.epoch)
     },
   })
-  const isIdentityLoaded = flipKeyWordPairs !== undefined
   useEffect(() => {
-    if (epochNumber !== null && isIdentityLoaded) {
+    if (epochNumber !== null) {
       send({type: 'SET_EPOCH_NUMBER', epochNumber})
     }
-  }, [epochNumber, isIdentityLoaded, send])
+  }, [epochNumber, send])
 
   return (
     <Layout>

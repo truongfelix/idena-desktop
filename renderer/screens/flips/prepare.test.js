@@ -44,14 +44,25 @@ describe('newFlipKeywords', () => {
     {id: 3, used: false},
   ]
 
-  it('refuses keyword pairs not loaded yet', () => {
-    expect(() => newFlipKeywords(undefined, [])).toThrow(
-      'The identity is not loaded yet'
+  it('gives a random pair when no pair is left', () => {
+    const pendingBoth = [
+      {type: FlipType.Publishing, keywordPairId: 2},
+      {type: FlipType.Publishing, keywordPairId: 3},
+    ]
+    const {keywordPairId, availableKeywords} = newFlipKeywords(
+      pairs,
+      pendingBoth
     )
+    expect(keywordPairId).toBe(0)
+    expect(availableKeywords).toHaveLength(1)
+  })
+
+  it('reads a missing flip list as empty', () => {
+    expect(newFlipKeywords(pairs, undefined).keywordPairId).toBe(2)
   })
 
   it('gives a random pair to an identity without pairs', () => {
-    for (const none of [null, [{id: 1, used: true}]]) {
+    for (const none of [null, undefined, [{id: 1, used: true}]]) {
       const {keywordPairId, availableKeywords} = newFlipKeywords(none, [])
       expect(keywordPairId).toBe(0)
       expect(availableKeywords).toHaveLength(1)
