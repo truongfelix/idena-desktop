@@ -975,6 +975,7 @@
   "Staking and mining, if the identity validates and mines itself; flip and invitation rewards are not counted": "Staking and mining, if the identity validates and mines itself; flip and invitation rewards are not counted",
   "Please validate your account to earn the staking rewards": "Please validate your account to earn the staking rewards",
   "Calculator": "Calculator",
+  "This flip could not be opened.": "This flip could not be opened.",
   "Try again": "Try again",
   "Cannot get the voting parameters from the node: {{error}}": "Cannot get the voting parameters from the node: {{error}}",
   "This oracle voting cannot be shown": "This oracle voting cannot be shown",

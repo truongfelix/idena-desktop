@@ -23,6 +23,7 @@ import {
   CommunityTranslationUnavailable,
   PublishFlipDrawer,
   FlipProtectStep,
+  FlipPrepareFailed,
 } from '../../screens/flips/components'
 import {useIdentityState} from '../../shared/providers/identity-context'
 import {
@@ -187,11 +188,21 @@ export default function EditFlipPage() {
     }, [send]),
   })
 
+  // The flip is prepared once the epoch is known (B-201); it needs no identity (its own words are the fallback).
+  const [epochNumber, setEpochNumber] = useState(null)
   useRpc('dna_epoch', [], {
+    // A node just started answers only bcn_ calls for a few seconds: ask until it answers, or the page stays blank.
+    retry: true,
+    retryDelay: 2000,
     onSuccess: (data) => {
-      send({type: 'SET_EPOCH_NUMBER', epochNumber: data.epoch})
+      setEpochNumber(data.epoch)
     },
   })
+  useEffect(() => {
+    if (epochNumber !== null) {
+      send({type: 'SET_EPOCH_NUMBER', epochNumber})
+    }
+  }, [epochNumber, send])
 
   return (
     <Layout>
@@ -219,6 +230,9 @@ export default function EditFlipPage() {
           >
             {t('Edit flip')}
           </FlipPageTitle>
+          {current.matches('prepareFailed') && (
+            <FlipPrepareFailed onRetry={() => send('RETRY')} />
+          )}
           {current.matches('editing') && (
             <FlipMaster>
               <FlipMasterNavbar>

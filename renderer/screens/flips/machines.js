@@ -587,9 +587,16 @@ export const flipMasterMachine = Machine(
               log(),
             ],
           },
+          // A failed prepare shows its error and a retry (B-201): it used to stay here, a blank page.
           onError: {
+            target: 'prepareFailed',
             actions: [log()],
           },
+        },
+      },
+      prepareFailed: {
+        on: {
+          RETRY: 'prepare',
         },
       },
       editing: {

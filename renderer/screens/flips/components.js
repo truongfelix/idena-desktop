@@ -1527,6 +1527,17 @@ export function VoteButton(props) {
   )
 }
 
+// The flip could not be prepared (B-201): a message, and a way to try again (the error is in the log).
+export function FlipPrepareFailed({onRetry}) {
+  const {t} = useTranslation()
+  return (
+    <Stack spacing={4} align="center" mt={20}>
+      <Text color="muted">{t('This flip could not be opened.')}</Text>
+      <SecondaryButton onClick={onRetry}>{t('Try again')}</SecondaryButton>
+    </Stack>
+  )
+}
+
 export function CommunityTranslationUnavailable() {
   const {t} = useTranslation()
   return (
