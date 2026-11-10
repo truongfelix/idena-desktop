@@ -35,32 +35,6 @@ export function noiseEffects(effects) {
   }
 }
 
-// Whether a picture's saved noise keeps the rules: none saved (a build before B-213 always drew 20% and 20 to 49
-// degrees), or values within the limits and no brightness (B-213's master builds allowed less, and a brightness).
-export function isNoiseWithinRules(effects) {
-  if (effects === null || effects === undefined) return true
-  const {grain, hue, brightness} = effects
-  const within = (value, {min, max}) =>
-    Number.isFinite(value) && value >= min && value <= max
-  return (
-    within(grain, NOISE_LIMITS.grain) &&
-    within(hue, NOISE_LIMITS.hue) &&
-    (brightness === undefined || brightness === 100)
-  )
-}
-
-// A saved draft's protected pictures and their noise, as the Protect step takes them: dropped when one picture's noise
-// breaks the rules (L-64), so that the step protects the pictures again with the automatic noise.
-export function draftProtection({protectedImages, noise}) {
-  const kept = !Array.isArray(noise) || noise.every(isNoiseWithinRules)
-  return kept
-    ? {protectedImages, noise}
-    : {
-        protectedImages: Array.from({length: 4}),
-        noise: Array.from({length: 4}),
-      }
-}
-
 // Grain: each outline pixel (white in `mesh`) is recoloured, with the chance `percent`, by a colour of `palette`.
 export function applyGrain(
   pixels,

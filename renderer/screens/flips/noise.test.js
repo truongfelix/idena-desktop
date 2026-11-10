@@ -2,8 +2,6 @@ import {
   NOISE_LIMITS,
   applyGrain,
   applyHue,
-  draftProtection,
-  isNoiseWithinRules,
   noiseEffects,
   randomNoiseEffects,
 } from './noise'
@@ -198,46 +196,5 @@ describe('noiseEffects', () => {
     expect(
       noiseEffects({mirror: true, grain: 5, hue: 0, brightness: 120})
     ).toEqual({mirror: true, grain: 20, hue: 20})
-  })
-})
-
-describe('a saved draft protected with noise the rules no longer allow (B-217, L-64)', () => {
-  const pictures = ['p0', 'p1', 'p2', 'p3']
-
-  it('keeps pictures whose noise keeps the rules, or that have none saved', () => {
-    for (const noise of [
-      undefined,
-      Array.from({length: 4}),
-      [
-        {mirror: true, grain: 20, hue: 20},
-        {mirror: false, grain: 40, hue: 60},
-        null,
-        {grain: 30, hue: 33, brightness: 100},
-      ],
-    ]) {
-      expect(draftProtection({protectedImages: pictures, noise})).toEqual({
-        protectedImages: pictures,
-        noise,
-      })
-    }
-  })
-
-  it('protects them again when one picture has less noise or a brightness (master builds of B-213)', () => {
-    for (const bad of [
-      {mirror: true, grain: 5, hue: 30},
-      {mirror: true, grain: 25, hue: 0},
-      {grain: 25, hue: 30, brightness: 50},
-      {grain: 41, hue: 30},
-      {grain: 'x', hue: 30},
-    ]) {
-      expect(isNoiseWithinRules(bad)).toBe(false)
-      const next = draftProtection({
-        protectedImages: pictures,
-        noise: [{grain: 20, hue: 20}, bad, null, null],
-      })
-      expect(next.protectedImages.some(Boolean)).toBe(false)
-      expect(next.noise.some(Boolean)).toBe(false)
-      expect(next.protectedImages).toHaveLength(4)
-    }
   })
 })
