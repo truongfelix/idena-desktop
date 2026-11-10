@@ -1,35 +1,37 @@
 // The adversarial noise of a flip picture, effect by effect (B-213): the Protect step shows a control for each, and
-// Regenerate draws them at random as before. Pure functions on RGBA pixel arrays.
+// Regenerate draws them at random. Never weaker than the noise always sent: a grain of at least 20% and a colour
+// shift of at least 20 degrees; the brightness is the picture editor's, not the noise's (owner 2026-11-10, B-217, as
+// the phone's B-215). Pure functions on RGBA pixel arrays.
 const convert = require('color-convert')
 
+// Each effect's limits, and the automatic noise's top (it draws from `min` to `automaticMax`).
 export const NOISE_LIMITS = {
-  grain: {min: 0, max: 40}, // % of the outline pixels recoloured from the picture's palette
-  hue: {min: 0, max: 60}, // degrees of colour shift
-  brightness: {min: 50, max: 150}, // % of the picture's brightness
+  grain: {min: 20, max: 40, automaticMax: 30}, // % of the outline pixels recoloured from the picture's palette
+  hue: {min: 20, max: 60, automaticMax: 60}, // degrees of colour shift
 }
 
 const clamp = (value, {min, max}) =>
   Math.min(max, Math.max(min, Number.isFinite(value) ? value : min))
 
-// The effects as the automatic noise always chose them: mirrored half the time, 20% grain, a colour shift of 20 to
-// 49 degrees, the brightness unchanged.
+// The automatic noise's effects: mirrored half the time, a grain of 20 to 30%, a colour shift of 20 to 60 degrees.
 export function randomNoiseEffects(random = Math.random) {
+  const draw = ({min, automaticMax}) =>
+    min + Math.floor(random() * (automaticMax - min + 1))
   return {
     mirror: Math.floor(random() * 2) === 0,
-    grain: 20,
-    hue: Math.floor(random() * 30) + 20,
-    brightness: 100,
+    grain: draw(NOISE_LIMITS.grain),
+    hue: draw(NOISE_LIMITS.hue),
   }
 }
 
-// Effects read from a control or a saved value: each within its limits.
+// Effects read from a control or a saved value: each within its limits. A brightness saved by an earlier build
+// (B-213) is not read: the noise has none.
 export function noiseEffects(effects) {
-  const {mirror, grain, hue, brightness} = effects || {}
+  const {mirror, grain, hue} = effects || {}
   return {
     mirror: Boolean(mirror),
     grain: clamp(grain, NOISE_LIMITS.grain),
     hue: clamp(hue, NOISE_LIMITS.hue),
-    brightness: clamp(brightness ?? 100, NOISE_LIMITS.brightness),
   }
 }
 
@@ -67,16 +69,5 @@ export function applyHue(pixels, degrees) {
     pixels[i] = r
     pixels[i + 1] = g
     pixels[i + 2] = b
-  }
-}
-
-// Brightness: every colour scaled by `percent` / 100, kept within 0..255.
-export function applyBrightness(pixels, percent) {
-  if (percent === 100) return
-  const k = percent / 100
-  for (let i = 0; i < pixels.length; i += 4) {
-    pixels[i] = Math.min(255, Math.round(pixels[i] * k))
-    pixels[i + 1] = Math.min(255, Math.round(pixels[i + 1] * k))
-    pixels[i + 2] = Math.min(255, Math.round(pixels[i + 2] * k))
   }
 }

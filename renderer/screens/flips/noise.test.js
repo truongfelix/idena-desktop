@@ -1,6 +1,5 @@
 import {
   NOISE_LIMITS,
-  applyBrightness,
   applyGrain,
   applyHue,
   noiseEffects,
@@ -65,7 +64,7 @@ function oldModifyImageHue(pixels, rnd) {
 
 /* eslint-enable prefer-destructuring, no-nested-ternary */
 
-describe('the automatic noise is unchanged (B-213)', () => {
+describe('the noise matches the old one with the same values; the automatic draws (B-217)', () => {
   it('grain at 20% recolours exactly the pixels the old noise did', () => {
     for (let seed = 1; seed <= 20; seed += 1) {
       const mesh = pixelsOf(2000, seed + 100).map((v, i) =>
@@ -81,7 +80,7 @@ describe('the automatic noise is unchanged (B-213)', () => {
   })
 
   it('the colour shift turns every pixel as the old one, for each of its values', () => {
-    for (let rnd = 20; rnd <= 49; rnd += 1) {
+    for (let rnd = 20; rnd <= NOISE_LIMITS.hue.max; rnd += 1) {
       const before = pixelsOf(500, rnd)
       const oldPixels = before.slice()
       const newPixels = before.slice()
@@ -91,20 +90,36 @@ describe('the automatic noise is unchanged (B-213)', () => {
     }
   })
 
-  it('random effects are drawn as before: mirrored half the time, 20% grain, a shift of 20 to 49, no brightness change', () => {
+  it('the automatic effects (B-217): mirrored half the time, a grain of 20 to 30%, a shift of 20 to 60, no brightness', () => {
     const next = seeded(3)
-    const seen = {mirror: new Set(), hue: new Set()}
-    for (let i = 0; i < 2000; i += 1) {
+    const seen = {mirror: new Set(), grain: new Set(), hue: new Set()}
+    for (let i = 0; i < 5000; i += 1) {
       const e = randomNoiseEffects(next)
       seen.mirror.add(e.mirror)
+      seen.grain.add(e.grain)
       seen.hue.add(e.hue)
-      expect(e.grain).toBe(20)
-      expect(e.brightness).toBe(100)
-      expect(e.hue).toBeGreaterThanOrEqual(20)
-      expect(e.hue).toBeLessThanOrEqual(49)
+      expect(Object.keys(e).sort()).toEqual(['grain', 'hue', 'mirror'])
     }
     expect([...seen.mirror].sort()).toEqual([false, true])
-    expect(seen.hue.size).toBe(30)
+    expect([...seen.grain].sort((a, b) => a - b)).toEqual(
+      Array.from({length: 11}, (_, i) => 20 + i)
+    )
+    expect([...seen.hue].sort((a, b) => a - b)).toEqual(
+      Array.from({length: 41}, (_, i) => 20 + i)
+    )
+  })
+
+  it('the automatic effects at the ends of a random draw', () => {
+    expect(randomNoiseEffects(() => 0)).toEqual({
+      mirror: true,
+      grain: 20,
+      hue: 20,
+    })
+    expect(randomNoiseEffects(() => 0.999999)).toEqual({
+      mirror: false,
+      grain: 30,
+      hue: 60,
+    })
   })
 })
 
@@ -148,41 +163,38 @@ describe('each effect at its bounds', () => {
     applyHue(pixels, 0)
     expect(pixels).toEqual(before)
   })
-
-  it('brightness 100 changes nothing, 50 halves, 150 brightens within 255', () => {
-    const before = Uint8ClampedArray.from([200, 100, 10, 255])
-    const same = before.slice()
-    applyBrightness(same, 100)
-    expect([...same]).toEqual([200, 100, 10, 255])
-    const darker = before.slice()
-    applyBrightness(darker, 50)
-    expect([...darker]).toEqual([100, 50, 5, 255])
-    const brighter = before.slice()
-    applyBrightness(brighter, 150)
-    expect([...brighter]).toEqual([255, 150, 15, 255])
-  })
 })
 
 describe('noiseEffects', () => {
-  it('keeps each value within its limits', () => {
-    expect(
-      noiseEffects({mirror: 1, grain: 99, hue: -5, brightness: 1000})
-    ).toEqual({
+  it('keeps each value within its limits: never below the noise always sent (B-217)', () => {
+    expect(NOISE_LIMITS).toEqual({
+      grain: {min: 20, max: 40, automaticMax: 30},
+      hue: {min: 20, max: 60, automaticMax: 60},
+    })
+    expect(noiseEffects({mirror: 1, grain: 99, hue: -5})).toEqual({
       mirror: true,
-      grain: NOISE_LIMITS.grain.max,
-      hue: NOISE_LIMITS.hue.min,
-      brightness: NOISE_LIMITS.brightness.max,
+      grain: 40,
+      hue: 20,
+    })
+    expect(noiseEffects({mirror: false, grain: 0, hue: 0})).toEqual({
+      mirror: false,
+      grain: 20,
+      hue: 20,
+    })
+    expect(noiseEffects({grain: 19, hue: 61})).toEqual({
+      mirror: false,
+      grain: 20,
+      hue: 60,
     })
   })
 
-  it('reads nothing as no noise and an unchanged brightness', () => {
+  it('reads nothing as the least noise, and drops a brightness an earlier build saved', () => {
     for (const none of [null, undefined, {}]) {
-      expect(noiseEffects(none)).toEqual({
-        mirror: false,
-        grain: 0,
-        hue: 0,
-        brightness: 100,
-      })
+      expect(noiseEffects(none)).toEqual({mirror: false, grain: 20, hue: 20})
     }
+    // A draft saved by a build of B-213 (master 71eff2f) kept a brightness and maybe no noise at all.
+    expect(
+      noiseEffects({mirror: true, grain: 5, hue: 0, brightness: 120})
+    ).toEqual({mirror: true, grain: 20, hue: 20})
   })
 })
