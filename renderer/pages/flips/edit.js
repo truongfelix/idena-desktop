@@ -30,6 +30,7 @@ import {
   flipMasterMachine,
   imageSearchMachine,
 } from '../../screens/flips/machines'
+import {draftProtection} from '../../screens/flips/noise'
 import {
   publishFlip,
   isPendingKeywordPair,
@@ -103,11 +104,17 @@ export default function EditFlipPage() {
           // eslint-disable-next-line no-shadow
           images = compressedPics || pics,
           // eslint-disable-next-line no-shadow
-          protectedImages,
+          protectedImages: savedProtectedImages,
+          noise: savedNoise,
           hint,
           keywordPairId = hint ? Math.max(hint.id, 0) : 0,
           ...flip
         } = persistedFlips.find(({id: flipId}) => flipId === id)
+        // Protected with noise the rules no longer allow (B-217): protected again at the Protect step.
+        const protection = draftProtection({
+          protectedImages: savedProtectedImages,
+          noise: savedNoise,
+        })
 
         // eslint-disable-next-line no-shadow
         const availableKeywords = Array.isArray(flipKeyWordPairs)
@@ -120,7 +127,8 @@ export default function EditFlipPage() {
         return {
           ...flip,
           images,
-          protectedImages,
+          protectedImages: protection.protectedImages,
+          noise: protection.noise,
           keywordPairId,
           availableKeywords,
           hint,

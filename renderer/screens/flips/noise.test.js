@@ -1,8 +1,9 @@
 import {
-  AUTOMATIC_GRAIN_MAX,
   NOISE_LIMITS,
   applyGrain,
   applyHue,
+  draftProtection,
+  isNoiseWithinRules,
   noiseEffects,
   randomNoiseEffects,
 } from './noise'
@@ -65,7 +66,7 @@ function oldModifyImageHue(pixels, rnd) {
 
 /* eslint-enable prefer-destructuring, no-nested-ternary */
 
-describe('the automatic noise is unchanged (B-213)', () => {
+describe('the noise matches the old one with the same values; the automatic draws (B-217)', () => {
   it('grain at 20% recolours exactly the pixels the old noise did', () => {
     for (let seed = 1; seed <= 20; seed += 1) {
       const mesh = pixelsOf(2000, seed + 100).map((v, i) =>
@@ -81,7 +82,7 @@ describe('the automatic noise is unchanged (B-213)', () => {
   })
 
   it('the colour shift turns every pixel as the old one, for each of its values', () => {
-    for (let rnd = 20; rnd <= 49; rnd += 1) {
+    for (let rnd = 20; rnd <= NOISE_LIMITS.hue.max; rnd += 1) {
       const before = pixelsOf(500, rnd)
       const oldPixels = before.slice()
       const newPixels = before.slice()
@@ -108,7 +109,6 @@ describe('the automatic noise is unchanged (B-213)', () => {
     expect([...seen.hue].sort((a, b) => a - b)).toEqual(
       Array.from({length: 41}, (_, i) => 20 + i)
     )
-    expect(AUTOMATIC_GRAIN_MAX).toBe(30)
   })
 
   it('the automatic effects at the ends of a random draw', () => {
@@ -170,8 +170,8 @@ describe('each effect at its bounds', () => {
 describe('noiseEffects', () => {
   it('keeps each value within its limits: never below the noise always sent (B-217)', () => {
     expect(NOISE_LIMITS).toEqual({
-      grain: {min: 20, max: 40},
-      hue: {min: 20, max: 60},
+      grain: {min: 20, max: 40, automaticMax: 30},
+      hue: {min: 20, max: 60, automaticMax: 60},
     })
     expect(noiseEffects({mirror: 1, grain: 99, hue: -5})).toEqual({
       mirror: true,
@@ -198,5 +198,46 @@ describe('noiseEffects', () => {
     expect(
       noiseEffects({mirror: true, grain: 5, hue: 0, brightness: 120})
     ).toEqual({mirror: true, grain: 20, hue: 20})
+  })
+})
+
+describe('a saved draft protected with noise the rules no longer allow (B-217, L-64)', () => {
+  const pictures = ['p0', 'p1', 'p2', 'p3']
+
+  it('keeps pictures whose noise keeps the rules, or that have none saved', () => {
+    for (const noise of [
+      undefined,
+      Array.from({length: 4}),
+      [
+        {mirror: true, grain: 20, hue: 20},
+        {mirror: false, grain: 40, hue: 60},
+        null,
+        {grain: 30, hue: 33, brightness: 100},
+      ],
+    ]) {
+      expect(draftProtection({protectedImages: pictures, noise})).toEqual({
+        protectedImages: pictures,
+        noise,
+      })
+    }
+  })
+
+  it('protects them again when one picture has less noise or a brightness (master builds of B-213)', () => {
+    for (const bad of [
+      {mirror: true, grain: 5, hue: 30},
+      {mirror: true, grain: 25, hue: 0},
+      {grain: 25, hue: 30, brightness: 50},
+      {grain: 41, hue: 30},
+      {grain: 'x', hue: 30},
+    ]) {
+      expect(isNoiseWithinRules(bad)).toBe(false)
+      const next = draftProtection({
+        protectedImages: pictures,
+        noise: [{grain: 20, hue: 20}, bad, null, null],
+      })
+      expect(next.protectedImages.some(Boolean)).toBe(false)
+      expect(next.noise.some(Boolean)).toBe(false)
+      expect(next.protectedImages).toHaveLength(4)
+    }
   })
 })
