@@ -16,7 +16,8 @@ import {NOISE_LIMITS, noiseEffects} from '../noise'
 // The Protect step's control for each effect of the adversarial noise on the picture shown (B-213). They start at
 // what the automatic noise chose; each change makes the picture's noise again with the new values (on release for a
 // slider), and the controls wait for it. `onChange` resolves to false when the picture did not change: the controls
-// go back to its effects. No minimum: the noise is the author's choice (owner 2026-11-09).
+// go back to its effects. Grain and colour shift start at the noise always sent (20% and 20 degrees, owner 2026-11-10,
+// B-217); the brightness is the picture editor's.
 export function NoiseControls({effects, isDisabled, onChange}) {
   const {t} = useTranslation()
   const [values, setValues] = React.useState(() => noiseEffects(effects))
@@ -85,7 +86,6 @@ export function NoiseControls({effects, isDisabled, onChange}) {
       </Flex>
       {slider('grain', t('Grain'), '%')}
       {slider('hue', t('Color shift'), '°')}
-      {slider('brightness', t('Brightness'), '%')}
     </Stack>
   )
 }

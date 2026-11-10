@@ -18,13 +18,7 @@ import {submitFlip} from '../../shared/api/dna'
 import {signNonce} from '../dna/utils'
 import i18n from '../../i18n'
 import ImageAccess from './ImageAccess'
-import {
-  applyBrightness,
-  applyGrain,
-  applyHue,
-  noiseEffects,
-  randomNoiseEffects,
-} from './noise'
+import {applyGrain, applyHue, noiseEffects, randomNoiseEffects} from './noise'
 import {resizeImageToDataUrl} from '../../shared/utils/image-canvas'
 
 const StackBlur = require('stackblur-canvas')
@@ -734,7 +728,7 @@ const getImageDataFromImage = (image) => {
 
 // The picture with the adversarial noise: `effects` (noise.js) are the controls' values, random when left out.
 export async function protectFlipImage(imgSrc, effects = randomNoiseEffects()) {
-  const {mirror, grain, hue, brightness} = noiseEffects(effects)
+  const {mirror, grain, hue} = noiseEffects(effects)
   const blurValue = 2
 
   let palette = []
@@ -797,7 +791,6 @@ export async function protectFlipImage(imgSrc, effects = randomNoiseEffects()) {
   const watershedImageData = watershed(blurredImage, img.width, img.height)
   applyGrain(resultImageData.data, watershedImageData.data, palette, grain)
   applyHue(resultImageData.data, hue)
-  applyBrightness(resultImageData.data, brightness)
 
   // Draw it
   const resultCanvas = document.createElement('canvas')

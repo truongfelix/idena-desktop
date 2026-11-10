@@ -41,7 +41,7 @@ describe('flip Protect step', () => {
 describe('the noise of each protected picture', () => {
   it('keeps the effects that came with a changed picture, and leaves the others', () => {
     const {machine, state} = protectingState()
-    const effects = {mirror: true, grain: 35, hue: 10, brightness: 120}
+    const effects = {mirror: true, grain: 35, hue: 25}
     const next = machine.transition(state, {
       type: 'CHANGE_PROTECTED_IMAGES',
       image: 'pb',
@@ -77,7 +77,7 @@ describe('the nonsense picture and the noise in the draft', () => {
       addDraft: (flip) => saved.push(flip),
       getFlips: () => [],
     }
-    const noise = [{mirror: true, grain: 5, hue: 0, brightness: 100}]
+    const noise = [{mirror: true, grain: 25, hue: 40}]
     const persist = flipMasterMachine.options.services.persistFlip(
       {...flipMasterMachine.context, id: 'f1', noise},
       {type: 'CHANGE_ORDER'}
