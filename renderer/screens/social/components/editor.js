@@ -23,7 +23,12 @@ import {timeAgo} from '../format'
 import {pickMedia} from '../image'
 import {IMAGE_TYPE, fromWei, storeFeeHint} from '../posting'
 import {MediaKind, kindOfType} from '../media-type'
-import {playTime, useVoiceRecorder} from '../voice'
+import {
+  MAX_VOICE_BYTES,
+  MAX_VOICE_MS,
+  playTime,
+  useVoiceRecorder,
+} from '../voice'
 import {DraftKind} from '../sending'
 import {TOPIC_PREFIX, topicChannel, topicList, typedTopic} from '../topics'
 import {useAutoGrow} from './auto-grow'
@@ -286,7 +291,6 @@ export function Editor({now, status, underThread = false}) {
     sending.canAct &&
     topicValid &&
     (draftText.trim() !== '' || draftImage !== null) &&
-    imageNote === null &&
     !preparing &&
     !voice.recording
 
@@ -355,14 +359,15 @@ export function Editor({now, status, underThread = false}) {
       {draftImage?.voiceLimit === 'size' && (
         <SmallText>
           {t(
-            'The recording stopped at its limit: the 900 KB a post can store.',
-            {nsSeparator: '|'}
+            'The recording stopped at its limit: the {{size}} KB a voice note can hold.',
+            {size: Math.floor(MAX_VOICE_BYTES / 1000), nsSeparator: '|'}
           )}
         </SmallText>
       )}
       {draftImage?.voiceLimit === 'time' && (
         <SmallText>
-          {t('The recording stopped at its limit: 5 minutes.', {
+          {t('The recording stopped at its limit: {{minutes}} minutes.', {
+            minutes: MAX_VOICE_MS / 60000,
             nsSeparator: '|',
           })}
         </SmallText>

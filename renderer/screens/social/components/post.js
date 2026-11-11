@@ -70,6 +70,59 @@ export function PostText({message, lines}) {
 const stop = (e) => e.stopPropagation()
 
 /**
+ * A post's video (B-229): its first frame (loaded at once: the file is already in memory) with a round ▶ in its middle
+ * while paused, as other social apps do; the browser's controls stay for the bar and the volume.
+ */
+function VideoPlayer({src, maxH}) {
+  const {t} = useTranslation()
+  const ref = React.useRef()
+  const [paused, setPaused] = React.useState(true)
+  return (
+    <Box position="relative" alignSelf="flex-start" maxW="full" onClick={stop}>
+      <Box
+        as="video"
+        ref={ref}
+        src={src}
+        controls
+        preload="auto"
+        display="block"
+        maxH={maxH}
+        maxW="full"
+        rounded="lg"
+        onPlay={() => setPaused(false)}
+        onPause={() => setPaused(true)}
+      />
+      {paused && (
+        <Box
+          as="button"
+          type="button"
+          aria-label={t('Play the video')}
+          position="absolute"
+          top="50%"
+          left="50%"
+          transform="translate(-50%, -50%)"
+          w="64px"
+          h="64px"
+          rounded="full"
+          bg="blackAlpha.600"
+          color="white"
+          fontSize="28px"
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+          onClick={(e) => {
+            e.stopPropagation()
+            ref.current?.play()
+          }}
+        >
+          ▶
+        </Box>
+      )}
+    </Box>
+  )
+}
+
+/**
  * A post's media from `src`: a picture (a GIF or an animated WebP moves), or a video or a sound in the browser's
  * player, never playing by itself, and only when its file `bytes` is what the post declares (B-222).
  */
@@ -88,17 +141,7 @@ function MediaElement({src, type, maxH, bytes}) {
         </SmallText>
       )
     return playable === MediaKind.Video ? (
-      <Box
-        as="video"
-        src={src}
-        controls
-        preload="metadata"
-        maxH={maxH}
-        maxW="full"
-        rounded="lg"
-        alignSelf="flex-start"
-        onClick={stop}
-      />
+      <VideoPlayer src={src} maxH={maxH} />
     ) : (
       <Box as="audio" src={src} controls w="full" maxW="md" onClick={stop} />
     )

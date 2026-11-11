@@ -1813,7 +1813,8 @@
   "The sound is already stored on IPFS: no new fee.": "Le son est déjà stocké sur IPFS : pas de nouveaux frais.",
   "Storing the video on IPFS ({{size}} KB): about {{fee}} iDNA (at most {{most}}).": "Enregistrement de la vidéo sur IPFS ({{size}} Ko) : environ {{fee}} iDNA (au plus {{most}}).",
   "Storing the sound on IPFS ({{size}} KB): about {{fee}} iDNA (at most {{most}}).": "Enregistrement du son sur IPFS ({{size}} Ko) : environ {{fee}} iDNA (au plus {{most}}).",
-  "The recording stopped at its limit: the 900 KB a post can store.": "L'enregistrement s'est arrêté à sa limite : les 900 Ko qu'une publication peut stocker.",
-  "The recording stopped at its limit: 5 minutes.": "L'enregistrement s'est arrêté à sa limite : 5 minutes.",
-  "It is stored on IPFS (a storeToIpfs transaction): {{fee}}, on top of the post's fee. The file is sent as it is; an MP4 or M4A file is sent without its details (place, camera, title), another file keeps its own.": "Il est stocké sur IPFS (une transaction storeToIpfs) : {{fee}}, en plus des frais de la publication. Le fichier est envoyé tel quel ; un fichier MP4 ou M4A est envoyé sans ses détails (lieu, appareil, titre), un autre garde les siens."
+  "It is stored on IPFS (a storeToIpfs transaction): {{fee}}, on top of the post's fee. The file is sent as it is; an MP4 or M4A file is sent without its details (place, camera, title), another file keeps its own.": "Il est stocké sur IPFS (une transaction storeToIpfs) : {{fee}}, en plus des frais de la publication. Le fichier est envoyé tel quel ; un fichier MP4 ou M4A est envoyé sans ses détails (lieu, appareil, titre), un autre garde les siens.",
+  "The recording stopped at its limit: the {{size}} KB a voice note can hold.": "L'enregistrement s'est arrêté à sa limite : les {{size}} Ko qu'une note vocale peut contenir.",
+  "The recording stopped at its limit: {{minutes}} minutes.": "L'enregistrement s'est arrêté à sa limite : {{minutes}} minutes.",
+  "Play the video": "Lire la vidéo"
 }
