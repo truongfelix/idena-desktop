@@ -15,6 +15,7 @@ import {postTopic} from '../topics'
 import {PicturesMode} from '../hiding'
 import {TopicTag} from './topic'
 import {PersonAvatar} from './profile-public'
+import {MediaKind, kindOfType, playableKind} from '../media-type'
 
 const textDecoder = new TextDecoder()
 
@@ -65,7 +66,43 @@ export function PostText({message, lines}) {
   )
 }
 
-function MediaElement({src, type, maxH}) {
+// A click on a player plays it, and does not open the post.
+const stop = (e) => e.stopPropagation()
+
+/**
+ * A post's media from `src`: a picture (a GIF or an animated WebP moves), or a video or a sound in the browser's
+ * player, never playing by itself, and only when its file `bytes` is what the post declares (B-222).
+ */
+function MediaElement({src, type, maxH, bytes}) {
+  const {t} = useTranslation()
+  const kind = kindOfType(type)
+  if (kind === MediaKind.Video || kind === MediaKind.Audio) {
+    const playable = playableKind(type, bytes)
+    if (!playable)
+      return (
+        <SmallText>
+          {t(
+            '🎞 This file is not the video or sound the post says: it is not played.',
+            {nsSeparator: '|'}
+          )}
+        </SmallText>
+      )
+    return playable === MediaKind.Video ? (
+      <Box
+        as="video"
+        src={src}
+        controls
+        preload="metadata"
+        maxH={maxH}
+        maxW="full"
+        rounded="lg"
+        alignSelf="flex-start"
+        onClick={stop}
+      />
+    ) : (
+      <Box as="audio" src={src} controls w="full" maxW="md" onClick={stop} />
+    )
+  }
   if (type.startsWith('image/'))
     return (
       <Image
@@ -92,7 +129,10 @@ function IpfsMedia({cid, type, maxH}) {
   if (isLoading)
     return (
       <SmallText>
-        {t('Loading the image from IPFS through the node…')}
+        {kindOfType(type) === MediaKind.Picture ||
+        kindOfType(type) === MediaKind.Animation
+          ? t('Loading the image from IPFS through the node…')
+          : t('Loading from IPFS through the node…')}
       </SmallText>
     )
   if (isError || !url)
@@ -115,7 +155,7 @@ function IpfsMedia({cid, type, maxH}) {
         </Button>
       </HStack>
     )
-  return <MediaElement src={url} type={type} maxH={maxH} />
+  return <MediaElement src={url} type={type} maxH={maxH} bytes={data} />
 }
 
 /** A post's first media: inline (base64) or on IPFS. */
@@ -125,18 +165,31 @@ export function PostMedia({call: {hasMedia, media, mediaType}, maxH}) {
   const type = String(mediaType).toLowerCase()
   if (type === 'image/svg+xml')
     return <SmallText>{t('🖼 SVG image, not shown here.')}</SmallText>
-  if (type.startsWith('video/') || type.startsWith('audio/'))
-    return <SmallText>{t('🎞 Video or audio, not shown here.')}</SmallText>
-  if (!type.startsWith('image/') || !media)
+  const kind = kindOfType(type)
+  const playable = kind === MediaKind.Video || kind === MediaKind.Audio
+  if ((!type.startsWith('image/') && !playable) || !media)
     return <SmallText>{t('🖼 Media')}</SmallText>
   const cid = ipfsCid(media)
   if (cid) return <IpfsMedia cid={cid} type={type} maxH={maxH} />
   if (media.startsWith('ipfs://')) return null
+  return <InlineMedia media={media} type={type} maxH={maxH} />
+}
+
+/** Media written in the post itself (base64): its bytes for the type check. */
+function InlineMedia({media, type, maxH}) {
+  const bytes = React.useMemo(() => {
+    try {
+      return Uint8Array.from(atob(media), (c) => c.charCodeAt(0))
+    } catch {
+      return null
+    }
+  }, [media])
   return (
     <MediaElement
       src={`data:${type};base64,${media}`}
       type={type}
       maxH={maxH}
+      bytes={bytes}
     />
   )
 }
@@ -149,10 +202,17 @@ function TapToShowMedia({call, maxH, inThread}) {
   const {t} = useTranslation()
   const [shown, setShown] = React.useState(false)
   if (shown) return <PostMedia call={call} maxH={maxH} />
+  const kind = kindOfType(call.mediaType)
   if (!inThread)
     return (
       <SmallText>
-        {t('🖼 A picture: open the post to show it.', {nsSeparator: '|'})}
+        {kind === MediaKind.Video &&
+          t('🎞 A video: open the post to play it.', {nsSeparator: '|'})}
+        {kind === MediaKind.Audio &&
+          t('🎵 A sound: open the post to play it.', {nsSeparator: '|'})}
+        {kind !== MediaKind.Video &&
+          kind !== MediaKind.Audio &&
+          t('🖼 A picture: open the post to show it.', {nsSeparator: '|'})}
       </SmallText>
     )
   return (
@@ -165,7 +225,11 @@ function TapToShowMedia({call, maxH, inThread}) {
         setShown(true)
       }}
     >
-      {t('🖼 A picture. Click to show it.')}
+      {kind === MediaKind.Video && t('🎞 A video. Click to show it.')}
+      {kind === MediaKind.Audio && t('🎵 A sound. Click to show it.')}
+      {kind !== MediaKind.Video &&
+        kind !== MediaKind.Audio &&
+        t('🖼 A picture. Click to show it.')}
     </Button>
   )
 }

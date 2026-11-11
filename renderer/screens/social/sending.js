@@ -25,7 +25,9 @@ import {
   withCallbackGas,
 } from './profiles'
 import {memberExtraFor} from './vouching'
+import {mediaWhat} from './media-type'
 import {
+  IMAGE_TYPE,
   prepareFile,
   estimateCall,
   prepareCall,
@@ -486,6 +488,8 @@ export function useSocialSending({
             text: draftText,
             textOnIpfs,
             image: draftImage?.bytes || null,
+            mediaType: draftImage?.type || IMAGE_TYPE,
+            mediaWhat: mediaWhat(draftImage?.type),
             target: draftTarget(draft.target, draftTopic),
           },
           storedRef.current
