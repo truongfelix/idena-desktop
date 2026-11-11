@@ -1,9 +1,1 @@
-[
-  {
-    "id": "GHSA-g3hv-75wg-m249",
-    "package": "minimatch",
-    "major": 3,
-    "reason": "Fixed only in 11.0.1; every user here needs 3.x (eslint 8 and its plugins, glob 7 in jest and electron-builder, and in the app react-query 3's broadcast-channel cleanup through rimraf 3, which gets no outside pattern). Holds while no fixed 3.x exists.",
-    "expires": "2026-12-02"
-  }
-]
+[]
