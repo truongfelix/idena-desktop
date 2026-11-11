@@ -22,7 +22,7 @@ export function voiceFormat(isTypeSupported) {
 
 /**
  * One voice note at a time: `start` asks for the microphone and records; `stop` ends it, and `onDone` gets
- * {bytes, type, limited} (`limited`: stopped at its size or time limit) or {error}. `elapsed` is the time recorded.
+ * {bytes, type, limited} (`limited`: null, or 'size' / 'time' when it stopped at that limit) or {error}. `elapsed` is the time recorded.
  */
 export function useVoiceRecorder(onDone) {
   const [recording, setRecording] = React.useState(false)
@@ -31,56 +31,73 @@ export function useVoiceRecorder(onDone) {
   const done = React.useRef(onDone)
   done.current = onDone
 
+  // `limited`: null (Stop), 'size' or 'time'.
   const finish = React.useCallback((limited) => {
     const {current} = ref
-    if (!current || current.recorder.state === 'inactive') return
+    if (!current?.recorder || current.recorder.state === 'inactive') return
     current.limited = limited
     current.recorder.stop()
   }, [])
 
   const start = React.useCallback(async () => {
     if (ref.current) return
+    // Taken before the microphone opens: a second click waits, and leaving the editor meanwhile cancels.
+    const current = {chunks: [], size: 0, limited: null, started: 0}
+    ref.current = current
     let stream
     try {
       stream = await navigator.mediaDevices.getUserMedia({audio: true})
     } catch {
+      ref.current = null
       done.current({error: 'the microphone is not available or not allowed'})
       return
     }
-    const format = voiceFormat((type) => MediaRecorder.isTypeSupported(type))
-    const recorder = new MediaRecorder(stream, {
-      mimeType: format.mimeType,
-      audioBitsPerSecond: VOICE_BIT_RATE,
-    })
-    const current = {
-      recorder,
-      chunks: [],
-      size: 0,
-      limited: false,
-      started: Date.now(),
+    const release = () => stream.getTracks().forEach((track) => track.stop())
+    if (current.cancelled) {
+      release()
+      return
     }
-    ref.current = current
+    const format = voiceFormat((type) => MediaRecorder.isTypeSupported(type))
+    let recorder
+    try {
+      recorder = new MediaRecorder(stream, {
+        mimeType: format.mimeType,
+        audioBitsPerSecond: VOICE_BIT_RATE,
+      })
+      recorder.start(1000)
+    } catch {
+      release()
+      ref.current = null
+      done.current({error: 'this computer cannot record a voice note'})
+      return
+    }
+    current.recorder = recorder
+    current.started = Date.now()
     recorder.ondataavailable = ({data}) => {
       if (!data || data.size === 0) return
       current.chunks.push(data)
       current.size += data.size
-      if (current.size >= MAX_VOICE_BYTES) finish(true)
+      if (current.size >= MAX_VOICE_BYTES) finish('size')
     }
     recorder.onstop = async () => {
-      stream.getTracks().forEach((track) => track.stop())
-      ref.current = null
-      setRecording(false)
-      if (current.cancelled) return
+      release()
+      if (current.cancelled) {
+        ref.current = null
+        setRecording(false)
+        return
+      }
       const bytes = new Uint8Array(
         await new Blob(current.chunks, {type: format.type}).arrayBuffer()
       )
+      // The draft holds the note before Record and Post come back.
       done.current(
         bytes.length === 0
           ? {error: 'nothing was recorded'}
           : {bytes, type: format.type, limited: current.limited}
       )
+      ref.current = null
+      setRecording(false)
     }
-    recorder.start(1000)
     setElapsed(0)
     setRecording(true)
   }, [finish])
@@ -90,10 +107,10 @@ export function useVoiceRecorder(onDone) {
     if (!recording) return undefined
     const timer = setInterval(() => {
       const {current} = ref
-      if (!current) return
+      if (!current?.started) return
       const ms = Date.now() - current.started
       setElapsed(ms)
-      if (ms >= MAX_VOICE_MS) finish(true)
+      if (ms >= MAX_VOICE_MS) finish('time')
     }, 500)
     return () => clearInterval(timer)
   }, [recording, finish])
@@ -104,13 +121,14 @@ export function useVoiceRecorder(onDone) {
       const {current} = ref
       if (current) {
         current.cancelled = true
-        if (current.recorder.state !== 'inactive') current.recorder.stop()
+        if (current.recorder && current.recorder.state !== 'inactive')
+          current.recorder.stop()
       }
     },
     []
   )
 
-  return {recording, elapsed, start, stop: () => finish(false)}
+  return {recording, elapsed, start, stop: () => finish(null)}
 }
 
 /** `ms` as minutes and seconds ("1:05"). */

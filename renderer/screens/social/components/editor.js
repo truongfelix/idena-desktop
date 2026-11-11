@@ -84,7 +84,7 @@ function DraftFile({image, url, feePerGas, onRemove}) {
       </HStack>
       <SmallText>
         {t(
-          "It is stored on IPFS (a storeToIpfs transaction): {{fee}}, on top of the post's fee. The file is sent as it is: the place where a video was taken is removed, its other details (title, date) stay.",
+          "It is stored on IPFS (a storeToIpfs transaction): {{fee}}, on top of the post's fee. The file is sent as it is; an MP4 or M4A file is sent without its details (place, camera, title), another file keeps its own.",
           {
             fee:
               feePerGas === null
@@ -254,14 +254,17 @@ export function Editor({now, status, underThread = false}) {
   const [imageNote, setImageNote] = React.useState(null)
   const fileRef = React.useRef()
   const audioRef = React.useRef()
-  // A voice note's limit reached: said under the editor, the note stays postable.
-  const [voiceLimit, setVoiceLimit] = React.useState(0)
   const voice = useVoiceRecorder((result) => {
     if (result.error) setImageNote(result.error)
     else {
       setImageNote(null)
-      setVoiceLimit(result.limited ? Math.floor(result.bytes.length / 1000) : 0)
-      setDraftImage({asIs: true, type: result.type, bytes: result.bytes})
+      // A limit reached is said under the editor while this note is the draft's (`voiceLimit`).
+      setDraftImage({
+        asIs: true,
+        type: result.type,
+        bytes: result.bytes,
+        voiceLimit: result.limited,
+      })
     }
   })
   const textRef = React.useRef()
@@ -349,12 +352,19 @@ export function Editor({now, status, underThread = false}) {
         />
       )}
       {preparing && <SmallText>{t('Preparing the image…')}</SmallText>}
-      {voiceLimit > 0 && (
+      {draftImage?.voiceLimit === 'size' && (
         <SmallText>
           {t(
-            'The recording stopped at its limit ({{size}} KB, the most a post can store).',
-            {size: voiceLimit}
+            'The recording stopped at its limit: the 900 KB a post can store.',
+            {nsSeparator: '|'}
           )}
+        </SmallText>
+      )}
+      {draftImage?.voiceLimit === 'time' && (
+        <SmallText>
+          {t('The recording stopped at its limit: 5 minutes.', {
+            nsSeparator: '|',
+          })}
         </SmallText>
       )}
       {imageNote && (
@@ -414,7 +424,6 @@ export function Editor({now, status, underThread = false}) {
           isDisabled={preparing || (!voice.recording && draftImage !== null)}
           onClick={() => {
             setImageNote(null)
-            setVoiceLimit(0)
             if (voice.recording) voice.stop()
             else voice.start()
           }}

@@ -137,6 +137,8 @@ export async function pickMedia(file, {audio = false} = {}) {
     throw new Error(
       'only MP4 and WebM videos, and MP3, M4A, Ogg and WebM sounds, can be sent'
     )
+  // A picture picked as a sound is not one.
+  if (audio) throw new Error('this file is not a sound')
   const sides = await encodeImage(file)
   const side = defaultSide(sides.map((item) => item.side))
   return {

@@ -158,8 +158,15 @@ function IpfsMedia({cid, type, maxH}) {
   return <MediaElement src={url} type={type} maxH={maxH} bytes={data} />
 }
 
-/** A post's first media: inline (base64) or on IPFS. */
-export function PostMedia({call: {hasMedia, media, mediaType}, maxH}) {
+/**
+ * A post's first media: inline (base64) or on IPFS. A video or a sound plays in its thread only (`inThread`): in a
+ * list, a line says to open the post, and nothing is fetched.
+ */
+export function PostMedia({
+  call: {hasMedia, media, mediaType},
+  maxH,
+  inThread = false,
+}) {
   const {t} = useTranslation()
   if (!hasMedia) return null
   const type = String(mediaType).toLowerCase()
@@ -169,21 +176,32 @@ export function PostMedia({call: {hasMedia, media, mediaType}, maxH}) {
   const playable = kind === MediaKind.Video || kind === MediaKind.Audio
   if ((!type.startsWith('image/') && !playable) || !media)
     return <SmallText>{t('🖼 Media')}</SmallText>
+  if (playable && !inThread)
+    return (
+      <SmallText>
+        {kind === MediaKind.Video
+          ? t('🎞 A video: open the post to play it.', {nsSeparator: '|'})
+          : t('🎵 A sound: open the post to play it.', {nsSeparator: '|'})}
+      </SmallText>
+    )
   const cid = ipfsCid(media)
   if (cid) return <IpfsMedia cid={cid} type={type} maxH={maxH} />
   if (media.startsWith('ipfs://')) return null
   return <InlineMedia media={media} type={type} maxH={maxH} />
 }
 
-/** Media written in the post itself (base64): its bytes for the type check. */
+/** Media written in the post itself (base64); a video's or a sound's first bytes for the type check. */
 function InlineMedia({media, type, maxH}) {
   const bytes = React.useMemo(() => {
+    const kind = kindOfType(type)
+    if (kind !== MediaKind.Video && kind !== MediaKind.Audio) return null
     try {
-      return Uint8Array.from(atob(media), (c) => c.charCodeAt(0))
+      // 88 base64 characters: 66 bytes, what sniffFormat reads (a WebM's type within 64).
+      return Uint8Array.from(atob(media.slice(0, 88)), (c) => c.charCodeAt(0))
     } catch {
       return null
     }
-  }, [media])
+  }, [media, type])
   return (
     <MediaElement
       src={`data:${type};base64,${media}`}
@@ -201,7 +219,7 @@ function InlineMedia({media, type, maxH}) {
 function TapToShowMedia({call, maxH, inThread}) {
   const {t} = useTranslation()
   const [shown, setShown] = React.useState(false)
-  if (shown) return <PostMedia call={call} maxH={maxH} />
+  if (shown) return <PostMedia call={call} maxH={maxH} inThread={inThread} />
   const kind = kindOfType(call.mediaType)
   if (!inThread)
     return (
@@ -260,7 +278,7 @@ export function PostBody({call, lines, maxH, media = true, inThread = false}) {
         (hidden.pictures === PicturesMode.TapToShow && !own && call.hasMedia ? (
           <TapToShowMedia call={call} maxH={maxH} inThread={inThread} />
         ) : (
-          <PostMedia call={call} maxH={maxH} />
+          <PostMedia call={call} maxH={maxH} inThread={inThread} />
         ))}
     </>
   )

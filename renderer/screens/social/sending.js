@@ -587,15 +587,24 @@ export function useSocialSending({
         : await sendPrepared(socialRpc, pending, {
             onFile: (file) =>
               show(
-                file === 'text'
-                  ? t('{{what}}: storing the text on IPFS…', {
-                      what,
-                      nsSeparator: '|',
-                    })
-                  : t('{{what}}: storing the image on IPFS…', {
-                      what,
-                      nsSeparator: '|',
-                    })
+                {
+                  text: t('{{what}}: storing the text on IPFS…', {
+                    what,
+                    nsSeparator: '|',
+                  }),
+                  video: t('{{what}}: storing the video on IPFS…', {
+                    what,
+                    nsSeparator: '|',
+                  }),
+                  sound: t('{{what}}: storing the sound on IPFS…', {
+                    what,
+                    nsSeparator: '|',
+                  }),
+                }[file] ||
+                  t('{{what}}: storing the image on IPFS…', {
+                    what,
+                    nsSeparator: '|',
+                  })
               ),
             onStored: (cid) => storedRef.current.add(cid),
           })
