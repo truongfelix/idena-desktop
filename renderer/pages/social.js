@@ -28,6 +28,7 @@ import {Home} from '../screens/social/views/home'
 import {Notifications} from '../screens/social/views/inbox'
 import {ProfileView} from '../screens/social/views/profile'
 import {WaitingLine} from '../screens/social/components/waiting-line'
+import {BackToTop} from '../screens/social/components/back-to-top'
 import {TopicView} from '../screens/social/views/topic'
 import {SettingsTab, SocialSettingsView} from '../screens/social/views/settings'
 import {ChatView, MessagesList} from '../screens/social/views/messages'
@@ -184,6 +185,12 @@ export default function SocialPage() {
     idKey
   )
   const pinnedEditorRef = React.useRef()
+  // The pinned tabs row; the ↑ button scrolls the page that holds it (B-175).
+  const headerRef = React.useRef()
+  const scrollArea = React.useCallback(
+    () => scrollingParent(headerRef.current),
+    []
+  )
   React.useEffect(() => {
     // Once the editor's step is in the history (editor-history.js): a new step scrolls the page to its top
     // (page-scroll.js), which would undo this. Then the answered item shows just above the editor. A timer, not a
@@ -400,55 +407,69 @@ export default function SocialPage() {
                     })}
               </SmallText>
             )}
-            {!sending.draft &&
-              (onPage ? (
-                <Button
-                  variant="link"
-                  alignSelf="flex-start"
-                  onClick={() => router.back()}
-                >
-                  ← {t('Back')}
-                </Button>
-              ) : (
-                <HStack spacing={1}>
-                  <TabButton
-                    isActive={view === View.Feed}
-                    onClick={() => go({view: View.Feed})}
+            {/* Pinned at the top while the page scrolls, over the scrolling area's 24 px top padding too (B-175). */}
+            {!sending.draft && (
+              <Box
+                ref={headerRef}
+                position="sticky"
+                top={-6}
+                zIndex={2}
+                bg="surface"
+                py={2}
+              >
+                {onPage ? (
+                  <Button
+                    variant="link"
+                    alignSelf="flex-start"
+                    onClick={() => router.back()}
                   >
-                    {t('Feed')}
-                  </TabButton>
-                  <TabButton
-                    isActive={view === View.Messages}
-                    badge={unreadConversations}
-                    onClick={() => go({view: View.Messages})}
-                  >
-                    {t('Messages')}
-                  </TabButton>
-                  <TabButton
-                    isActive={view === View.Notifications}
-                    badge={unread.length + offersTo.length}
-                    onClick={() => go({view: View.Notifications})}
-                  >
-                    {t('Notifications')}
-                  </TabButton>
-                  <TabButton
-                    isActive={view === View.Profile}
-                    onClick={() => go({view: View.Profile})}
-                  >
-                    {t('Profile')}
-                  </TabButton>
-                  <Box flex={1} />
-                  <PrimaryButton
-                    isDisabled={!sending.canAct}
-                    onClick={() => sending.startDraft(PostTarget.newPost())}
-                  >
-                    {t('Post')}
-                  </PrimaryButton>
-                </HStack>
-              ))}
+                    ← {t('Back')}
+                  </Button>
+                ) : (
+                  <HStack spacing={1}>
+                    <TabButton
+                      isActive={view === View.Feed}
+                      onClick={() => go({view: View.Feed})}
+                    >
+                      {t('Feed')}
+                    </TabButton>
+                    <TabButton
+                      isActive={view === View.Messages}
+                      badge={unreadConversations}
+                      onClick={() => go({view: View.Messages})}
+                    >
+                      {t('Messages')}
+                    </TabButton>
+                    <TabButton
+                      isActive={view === View.Notifications}
+                      badge={unread.length + offersTo.length}
+                      onClick={() => go({view: View.Notifications})}
+                    >
+                      {t('Notifications')}
+                    </TabButton>
+                    <TabButton
+                      isActive={view === View.Profile}
+                      onClick={() => go({view: View.Profile})}
+                    >
+                      {t('Profile')}
+                    </TabButton>
+                    <Box flex={1} />
+                    <PrimaryButton
+                      isDisabled={!sending.canAct}
+                      onClick={() => sending.startDraft(PostTarget.newPost())}
+                    >
+                      {t('Post')}
+                    </PrimaryButton>
+                  </HStack>
+                )}
+              </Box>
+            )}
             {!sending.draft && status}
             {content}
           </Stack>
+          {!sending.draft && postId === null && (
+            <BackToTop areaOf={scrollArea} />
+          )}
           {isInfoOpen && (
             <SocialInfoDialog
               state={state}
