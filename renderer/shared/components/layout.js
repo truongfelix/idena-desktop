@@ -234,7 +234,9 @@ export default function Layout({
   )
 }
 
-function LayoutContainer(props) {
+// The row of the sidebar and the page. It never wraps: a wrapping row put the sync and offline screens below the
+// sidebar in a window under ~650 px wide (#128, B-178; layout.test.js).
+export function LayoutContainer(props) {
   return (
     <Flex
       align="stretch"
