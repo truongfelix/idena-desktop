@@ -88,6 +88,8 @@ async function isAnimation(bytes, type) {
   // eslint-disable-next-line no-undef
   const decoder = new ImageDecoder({data: bytes, type})
   try {
+    // The track list fills only once `tracks.ready` resolves: read before it, it is empty (0 frames).
+    await decoder.tracks.ready
     await decoder.completed
     return decoder.tracks.selectedTrack?.frameCount > 1
   } catch {
