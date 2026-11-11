@@ -118,6 +118,9 @@ export async function pickMedia(file, {audio = false} = {}) {
       format === MediaFormat.Gif ? 'image/gif' : 'image/webp'
     ))
   const picked = pickedAs(format, moving, bytes.length, asSound)
+  // A file picked as a sound must be one (a moving GIF would be posted as itself).
+  if (audio && picked.asIs && !picked.asIs.startsWith('audio/'))
+    throw new Error('this file is not a sound')
   if (picked.asIs) {
     const sent = withoutMp4Details(bytes)
     if (!sent)

@@ -77,8 +77,12 @@ function VideoPlayer({src, maxH}) {
   const {t} = useTranslation()
   const ref = React.useRef()
   const [paused, setPaused] = React.useState(true)
+  const [refused, setRefused] = React.useState(false)
   return (
     <Box position="relative" alignSelf="flex-start" maxW="full" onClick={stop}>
+      {refused && (
+        <SmallText>{t('🎞 This computer cannot play this video.')}</SmallText>
+      )}
       <Box
         as="video"
         ref={ref}
@@ -112,7 +116,8 @@ function VideoPlayer({src, maxH}) {
           justifyContent="center"
           onClick={(e) => {
             e.stopPropagation()
-            ref.current?.play()
+            // A codec the browser cannot decode refuses here.
+            ref.current?.play()?.catch(() => setRefused(true))
           }}
         >
           ▶
@@ -240,7 +245,10 @@ function InlineMedia({media, type, maxH}) {
     if (kind !== MediaKind.Video && kind !== MediaKind.Audio) return null
     try {
       // 88 base64 characters: 66 bytes, what sniffFormat reads (a WebM's type within 64).
-      return Uint8Array.from(atob(media.slice(0, 88)), (c) => c.charCodeAt(0))
+      // Line breaks or spaces in the base64 (other clients wrap it) are left out first.
+      return Uint8Array.from(atob(media.replace(/\s/g, '').slice(0, 88)), (c) =>
+        c.charCodeAt(0)
+      )
     } catch {
       return null
     }

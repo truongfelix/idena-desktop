@@ -86,17 +86,23 @@ export function useVoiceRecorder(onDone) {
         setRecording(false)
         return
       }
-      const bytes = new Uint8Array(
-        await new Blob(current.chunks, {type: format.type}).arrayBuffer()
-      )
-      // The draft holds the note before Record and Post come back.
-      done.current(
-        bytes.length === 0
-          ? {error: 'nothing was recorded'}
-          : {bytes, type: format.type, limited: current.limited}
-      )
-      ref.current = null
-      setRecording(false)
+      let result
+      try {
+        const bytes = new Uint8Array(
+          await new Blob(current.chunks, {type: format.type}).arrayBuffer()
+        )
+        result =
+          bytes.length === 0
+            ? {error: 'nothing was recorded'}
+            : {bytes, type: format.type, limited: current.limited}
+      } catch {
+        result = {error: 'the recording could not be read'}
+      } finally {
+        // The draft holds the note before Record and Post come back, unless the editor closed meanwhile.
+        if (!current.cancelled) done.current(result)
+        ref.current = null
+        setRecording(false)
+      }
     }
     setElapsed(0)
     setRecording(true)

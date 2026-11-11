@@ -1816,5 +1816,6 @@
   "It is stored on IPFS (a storeToIpfs transaction): {{fee}}, on top of the post's fee. The file is sent as it is; an MP4 or M4A file is sent without its details (place, camera, title), another file keeps its own.": "Il est stocké sur IPFS (une transaction storeToIpfs) : {{fee}}, en plus des frais de la publication. Le fichier est envoyé tel quel ; un fichier MP4 ou M4A est envoyé sans ses détails (lieu, appareil, titre), un autre garde les siens.",
   "The recording stopped at its limit: the {{size}} KB a voice note can hold.": "L'enregistrement s'est arrêté à sa limite : les {{size}} Ko qu'une note vocale peut contenir.",
   "The recording stopped at its limit: {{minutes}} minutes.": "L'enregistrement s'est arrêté à sa limite : {{minutes}} minutes.",
-  "Play the video": "Lire la vidéo"
+  "Play the video": "Lire la vidéo",
+  "🎞 This computer cannot play this video.": "🎞 Cet ordinateur ne peut pas lire cette vidéo."
 }
