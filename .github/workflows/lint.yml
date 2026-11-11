@@ -31,3 +31,49 @@ jobs:
 
       - name: Run unit tests
         run: npm test -- --runInBand
+
+  # The tree and the whole history, with a pinned gitleaks and this commit's .gitleaks.toml. Its control step first
+  # checks that the config reports a fresh token, in a file one of its allowlists names.
+  secret-scan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Scan the tree and the history
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/gitleaks_8.30.1_linux_x64.tar.gz"
+          curl --fail --location --silent --show-error \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
+            --output "$archive"
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $archive" | sha256sum --check --status
+          tar -xzf "$archive" -C "$RUNNER_TEMP" gitleaks
+          gitleaks="$RUNNER_TEMP/gitleaks"
+
+          # Control: a fresh token in a file an allowlist names must be reported.
+          control_dir="$RUNNER_TEMP/gitleaks-control/renderer/screens/flips"
+          mkdir -p "$control_dir"
+          cp renderer/screens/flips/ImageAccess.js "$control_dir/"
+          printf "\nconst token = 'ghp_%s'\n" "$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 36)" \
+            >>"$control_dir/ImageAccess.js"
+          control_report="$RUNNER_TEMP/gitleaks-control.json"
+          set +e
+          "$gitleaks" dir "$RUNNER_TEMP/gitleaks-control" --config .gitleaks.toml --no-banner --redact=100 \
+            --report-format json --report-path "$control_report" --log-level error
+          control_status=$?
+          set -e
+          if [ "$control_status" -ne 1 ] || [ "$(jq length "$control_report")" -ne 1 ]; then
+            echo "gitleaks with .gitleaks.toml did not report a planted token: the scan would check nothing" >&2
+            exit 1
+          fi
+
+          tree_dir="$RUNNER_TEMP/tree"
+          mkdir -p "$tree_dir"
+          git archive HEAD | tar -x -C "$tree_dir"
+          "$gitleaks" dir "$tree_dir" --config .gitleaks.toml --no-banner --redact=100 --log-level warn
+          "$gitleaks" git . --config .gitleaks.toml --no-banner --redact=100 --log-level warn

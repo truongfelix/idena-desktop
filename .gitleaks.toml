@@ -1,11 +1,36 @@
 title = "idena-desktop gitleaks config"
 
+# Without this, the file defines no rule and every scan finds nothing.
+[extend]
+useDefault = true
+
+# Each allowlist names the value and matches the whole finding ("match"; the default target, the secret alone, never
+# holds the name). No `paths`: a path in an allowlist skips the whole file, whatever the condition.
+
 [[allowlists]]
-description = "Generated image helper string table"
-condition = "AND"
-paths = [
-  '''renderer/screens/flips/ImageAccess\.js''',
-]
+description = "Base64 string table of the generated image helper (renderer/screens/flips/ImageAccess.js)"
+regexTarget = "match"
 regexes = [
-  '''var _0x3473 = \['Z2V0TWVhbg==', 'Z2V0UGl4ZWw='''',
+  '''^ImageAccess from a 2D array', 'cHJvdG90eXBl'$''',
+]
+
+[[allowlists]]
+description = "Public key of the message code test (renderer/screens/social/message-code.test.js)"
+regexTarget = "match"
+regexes = [
+  '''^key =\s+'044e3b81af9c2234cad09d679ce6035ed1392347ce64ce405f5dcd36228a25de6e47fd35c4215d1edf53e6f83de344615ce719bdb0fd878f6ed76f06dd277956de'$''',
+]
+
+[[allowlists]]
+description = "Test vector key of the IPFS text encryption (renderer/screens/social/messages.test-vectors.json)"
+regexTarget = "match"
+regexes = [
+  '''^key": "fU5t03Rhch7GLh8KECH\+M1fB6nu00/1TzJmeiUG9Jio="$''',
+]
+
+[[allowlists]]
+description = "The image search key of 2019, in history only (removed from the tree in 2019)"
+commits = [
+  "5b296268b524e1afda45a5f0f87a1d124e303f11",
+  "ba7a28b804e02f5a0043f3b0e5d5284355b2a87c",
 ]
