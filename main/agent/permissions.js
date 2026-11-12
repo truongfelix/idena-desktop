@@ -20,7 +20,15 @@ function checkAction(settings, action, {usage = 0, amount = 1} = {}) {
     return {decision: 'off', reason: 'action off'}
   if (row.level === 'ask') return {decision: 'ask', reason: 'asks first'}
   if (row.level !== 'alone') return {decision: 'off', reason: 'action off'}
-  if (row.limit !== null && Number(usage) + Number(amount) > row.limit)
+  // The count comes from the renderer: one that is not a count cannot be within the limit.
+  const used = typeof usage === 'number' ? usage : NaN
+  const adds = typeof amount === 'number' ? amount : NaN
+  if (
+    row.limit !== null &&
+    (!Number.isFinite(used) || used < 0 || !Number.isFinite(adds) || adds < 0)
+  )
+    return {decision: 'ask', reason: 'count unknown'}
+  if (row.limit !== null && used + adds > row.limit)
     return {decision: 'ask', reason: 'above the limit'}
   return {decision: 'alone', reason: 'within the limit'}
 }

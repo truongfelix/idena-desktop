@@ -9,6 +9,7 @@ export const saveAgentSettings = (settings) => agent('saveSettings', settings)
 export const setAgentKey = (key) => agent('setKey', {key})
 export const clearAgentKey = () => agent('clearKey')
 export const agentActivity = () => agent('activity')
+export const stopAgentTest = () => agent('stopTest')
 export const testAgentFlip = (flip, timeoutMs) =>
   agent('testFlip', {flip, timeoutMs})
 export const solveAgentFlip = (flip, {reportsUsed, timeoutMs}) =>

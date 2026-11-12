@@ -11,6 +11,7 @@ import {
   clearAgentKey,
   saveAgentSettings,
   setAgentKey,
+  stopAgentTest,
   testAgentFlip,
 } from './api'
 import {runPracticeTest} from './practice-test'
@@ -47,8 +48,20 @@ export function testResultText(result, t) {
 }
 
 function usePracticeTest(t, onDone) {
-  const [state, setState] = React.useState({isRunning: false, line: null})
+  const [state, setStateNow] = React.useState({isRunning: false, line: null})
   const stopped = React.useRef(false)
+  const mounted = React.useRef(true)
+  const setState = (value) => mounted.current && setStateNow(value)
+
+  // Leaving the page stops the test: no more flips sent, the one in flight ended in the main process.
+  React.useEffect(
+    () => () => {
+      mounted.current = false
+      stopped.current = true
+      stopAgentTest().catch(() => {})
+    },
+    []
+  )
 
   const start = async () => {
     stopped.current = false
@@ -68,7 +81,7 @@ function usePracticeTest(t, onDone) {
     } catch (error) {
       setState({isRunning: false, line: agentErrorText(error)})
     }
-    onDone()
+    if (mounted.current) onDone()
   }
 
   return {
@@ -78,6 +91,7 @@ function usePracticeTest(t, onDone) {
     start,
     stop: () => {
       stopped.current = true
+      stopAgentTest().catch(() => {})
     },
   }
 }
@@ -115,9 +129,18 @@ export function AgentSettings() {
 
   const test = usePracticeTest(t, refreshActivity)
 
+  // One save at a time, each changing its own field on the settings the main process holds: two quick changes
+  // (a field's blur, then a click) cannot undo each other.
+  const saving = React.useRef(Promise.resolve())
+
   if (!status) return error ? <ErrorAlert mt={8}>{error}</ErrorAlert> : null
   const {settings} = status
-  const save = (next) => run(() => saveAgentSettings(next))
+  const save = (change) => {
+    saving.current = saving.current.then(() =>
+      run(async () => saveAgentSettings(change((await agentStatus()).settings)))
+    )
+    return saving.current
+  }
 
   return (
     <Stack spacing={8} mt={8} maxW="2xl">
@@ -133,7 +156,10 @@ export function AgentSettings() {
             aria-label={t('Agent on')}
             size="lg"
             isChecked={settings.enabled}
-            onChange={(e) => save({...settings, enabled: e.target.checked})}
+            onChange={(e) => {
+              const enabled = e.target.checked
+              save((s) => ({...s, enabled}))
+            }}
           />
         </Box>
       </Flex>

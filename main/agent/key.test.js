@@ -3,6 +3,8 @@ const path = require('path')
 const fs = require('fs-extra')
 const {createAgentKey, keychainState} = require('./key')
 
+const ANTHROPIC = {provider: 'anthropic', address: 'https://api.anthropic.com'}
+
 /** A keychain that "encrypts" by reversing and tagging, enough to see what lands on disk. */
 function fakeSafeStorage({available = true, backend = 'gnome_libsecret'} = {}) {
   return {
@@ -28,17 +30,70 @@ describe('agent key', () => {
       safeStorage: fakeSafeStorage(),
       platform: 'linux',
     })
-    expect(key.has()).toBe(false)
-    expect(key.read()).toBeNull()
-    key.set('  sk-test-1234567890  ')
-    expect(key.has()).toBe(true)
-    expect(key.read()).toBe('sk-test-1234567890')
+    expect(key.has(ANTHROPIC)).toBe(false)
+    expect(key.read(ANTHROPIC)).toBeNull()
+    key.set('  sk-test-1234567890  ', ANTHROPIC)
+    expect(key.has(ANTHROPIC)).toBe(true)
+    expect(key.read(ANTHROPIC)).toBe('sk-test-1234567890')
     const onDisk = fs.readFileSync(file).toString()
     expect(onDisk).not.toContain('sk-test-1234567890')
     if (process.platform !== 'win32')
       expect(fs.statSync(file).mode.toString(8).slice(-3)).toBe('600')
     key.clear()
-    expect(key.has()).toBe(false)
+    expect(key.has(ANTHROPIC)).toBe(false)
+  })
+
+  test('sent only to the provider and address it was saved for, never to a local server', () => {
+    const key = createAgentKey({
+      file: () => file,
+      safeStorage: fakeSafeStorage(),
+      platform: 'linux',
+    })
+    key.set('sk-ant-1', ANTHROPIC)
+    expect(
+      key.read({provider: 'local', address: 'http://127.0.0.1:11434/v1'})
+    ).toBeNull()
+    expect(
+      key.read({provider: 'openai', address: ANTHROPIC.address})
+    ).toBeNull()
+    expect(key.read({...ANTHROPIC, address: 'https://other.test'})).toBeNull()
+    expect(
+      key.has({provider: 'openai', address: 'https://api.openai.com/v1'})
+    ).toBe(false)
+    expect(() =>
+      key.set('sk-1', {provider: 'local', address: 'http://127.0.0.1'})
+    ).toThrow('hosted model only')
+  })
+
+  test('the binding is inside the encrypted bytes: no file to edit', () => {
+    const key = createAgentKey({
+      file: () => file,
+      safeStorage: fakeSafeStorage(),
+      platform: 'linux',
+    })
+    key.set('sk-ant-1', ANTHROPIC)
+    expect(fs.readFileSync(file).toString()).not.toContain('anthropic.com')
+    expect(fs.readdirSync(path.dirname(file))).toEqual(['key.enc'])
+  })
+
+  test('no keychain any more: no key, and a local model is not stopped by it', () => {
+    let available = true
+    const safeStorage = {
+      ...fakeSafeStorage(),
+      isEncryptionAvailable: () => available,
+    }
+    const key = createAgentKey({
+      file: () => file,
+      safeStorage,
+      platform: 'linux',
+    })
+    key.set('sk-ant-1', ANTHROPIC)
+    available = false
+    expect(key.has(ANTHROPIC)).toBe(false)
+    expect(
+      key.read({provider: 'local', address: 'http://127.0.0.1:11434/v1'})
+    ).toBeNull()
+    expect(() => key.read(ANTHROPIC)).toThrow(/cannot be kept/u)
   })
 
   test('refused without a real keychain: nothing written', () => {
@@ -52,7 +107,7 @@ describe('agent key', () => {
         safeStorage,
         platform: 'linux',
       })
-      expect(() => key.set('sk-test')).toThrow(/cannot be kept/u)
+      expect(() => key.set('sk-test', ANTHROPIC)).toThrow(/cannot be kept/u)
       expect(fs.existsSync(keyFile)).toBe(false)
     })
   })
@@ -69,8 +124,8 @@ describe('agent key', () => {
       safeStorage: fakeSafeStorage(),
       platform: 'linux',
     })
-    expect(() => key.set('')).toThrow('invalid key')
-    expect(() => key.set('sk one')).toThrow('invalid key')
-    expect(() => key.set(42)).toThrow('invalid key')
+    expect(() => key.set('', ANTHROPIC)).toThrow('invalid key')
+    expect(() => key.set('sk one', ANTHROPIC)).toThrow('invalid key')
+    expect(() => key.set(42, ANTHROPIC)).toThrow('invalid key')
   })
 })

@@ -16,8 +16,9 @@ const SYSTEM = [
   'be reported: its keywords are not shown, it needs text, numbers or arrows on the pictures to be solved, or it',
   'shows something cruel, sexual or offensive.',
   'Reply with one JSON object and nothing else:',
-  '{"answer": "left" | "right" | "skip", "confidence": a number from 0 to 1,',
-  '"keywords": "shown" | "not shown" | null, "report": true | false}',
+  '{"answer": "left" | "right" | "skip", "confidence": how sure the answer is, from 0 to 1,',
+  '"keywords": "shown" | "not shown" | null, "report": true | false,',
+  '"reportConfidence": how sure the flip breaks the rules, from 0 to 1}',
 ].join('\n')
 
 function mediaType(bytes) {
@@ -85,31 +86,34 @@ function flipQuestion({images, orders, words}) {
   return {system: SYSTEM, parts}
 }
 
-/** The first JSON object of a reply (models may wrap it in a code block or a sentence). */
+/** A reply longer than this is cut before it is read: an answer is a few lines. */
+const MAX_REPLY_TEXT = 64 * 1024
+
+/**
+ * The first JSON object of a reply (models may wrap it in a code block or a sentence): one pass, each outermost
+ * {...} tried in turn. An object never closed is no answer.
+ */
 function firstJsonObject(text) {
-  const source = String(text || '')
-  for (
-    let start = source.indexOf('{');
-    start !== -1;
-    start = source.indexOf('{', start + 1)
-  ) {
-    let depth = 0
-    let inString = false
-    for (let i = start; i < source.length; i += 1) {
-      const c = source[i]
-      if (inString) {
-        if (c === '\\') i += 1
-        else if (c === '"') inString = false
-      } else if (c === '"') inString = true
-      else if (c === '{') depth += 1
-      else if (c === '}') {
-        depth -= 1
-        if (depth === 0) {
-          try {
-            return JSON.parse(source.slice(start, i + 1))
-          } catch {
-            break
-          }
+  const source = String(text || '').slice(0, MAX_REPLY_TEXT)
+  let depth = 0
+  let start = -1
+  let inString = false
+  for (let i = 0; i < source.length; i += 1) {
+    const c = source[i]
+    if (inString) {
+      if (c === '\\') i += 1
+      else if (c === '"') inString = false
+    } else if (c === '"' && depth > 0) inString = true
+    else if (c === '{') {
+      if (depth === 0) start = i
+      depth += 1
+    } else if (c === '}' && depth > 0) {
+      depth -= 1
+      if (depth === 0) {
+        try {
+          return JSON.parse(source.slice(start, i + 1))
+        } catch {
+          // not JSON: the next object
         }
       }
     }
@@ -131,7 +135,12 @@ function readFlipAnswer(text, {hasWords}) {
     ? Math.min(Math.max(confidence, 0), 1)
     : 0
   const answer = ['left', 'right'].includes(reply.answer) ? reply.answer : null
-  const report = hasWords && reply.report === true && sure >= REPORT_CONFIDENCE
+  const reportConfidence = Number(reply.reportConfidence)
+  const report =
+    hasWords &&
+    reply.report === true &&
+    Number.isFinite(reportConfidence) &&
+    reportConfidence >= REPORT_CONFIDENCE
   // "Not shown" marks the flip irrelevant, which is a report: only when the model is very sure.
   let relevance = null
   if (report) relevance = 'irrelevant'

@@ -171,4 +171,15 @@ describe('agent provider calls', () => {
       )
     }
   })
+
+  test('stopped by the app reads as stopped, not as a deadline', async () => {
+    const controller = new AbortController()
+    controller.abort()
+    const request = jest
+      .fn()
+      .mockRejectedValue(Object.assign(new Error('x'), {code: 'ERR_CANCELED'}))
+    await expect(
+      ask(config, 's', parts, {request, signal: controller.signal})
+    ).rejects.toThrow(/^stopped$/u)
+  })
 })

@@ -129,7 +129,7 @@ export function ModelSection({status, onChange, onSetKey, onClearKey, test}) {
               borderColor={settings.provider === id ? 'blue.500' : 'gray.100'}
               onClick={() =>
                 settings.provider !== id &&
-                onChange({...settings, provider: id, address: ''})
+                onChange((s) => ({...s, provider: id, address: ''}))
               }
             >
               <Box>
@@ -145,14 +145,14 @@ export function ModelSection({status, onChange, onSetKey, onClearKey, test}) {
           <FormControlWithLabel label={t('Address')}>
             <SavedOnBlurInput
               value={settings.address}
-              onSave={(address) => onChange({...settings, address})}
+              onSave={(address) => onChange((s) => ({...s, address}))}
             />
           </FormControlWithLabel>
           <FormControlWithLabel label={t('Model')}>
             <SavedOnBlurInput
               value={settings.model}
               placeholder={isLocal ? 'qwen2.5vl:7b' : ''}
-              onSave={(model) => onChange({...settings, model})}
+              onSave={(model) => onChange((s) => ({...s, model}))}
             />
           </FormControlWithLabel>
         </SimpleGrid>

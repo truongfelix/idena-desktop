@@ -86,6 +86,16 @@ describe('agent flips: the model answer', () => {
       answer: 'right',
     })
     expect(firstJsonObject('no json')).toBeNull()
+    expect(firstJsonObject('{"a": "}"} more')).toEqual({a: '}'})
+    expect(firstJsonObject('{ never closed {"answer":"left"}')).toBeNull()
+  })
+
+  test('a long reply of braces is read in one pass', () => {
+    const start = Date.now()
+    expect(firstJsonObject('{'.repeat(1024 * 1024))).toBeNull()
+    // Many closed objects that are not JSON: each tried once, the reply cut at 64 KB.
+    expect(firstJsonObject('{a}'.repeat(400 * 1024))).toBeNull()
+    expect(Date.now() - start).toBeLessThan(2000)
   })
 
   test('an unreadable answer is no answer', () => {
@@ -101,19 +111,26 @@ describe('agent flips: the model answer', () => {
   })
 
   test('a report only when very sure, and only with keywords', () => {
-    const sure = `{"answer":"left","confidence":${REPORT_CONFIDENCE},"keywords":"not shown","report":true}`
+    const sure = `{"answer":"left","confidence":0.3,"keywords":"not shown","report":true,"reportConfidence":${REPORT_CONFIDENCE}}`
     expect(readFlipAnswer(sure, {hasWords: true})).toEqual({
       answer: 'left',
-      confidence: REPORT_CONFIDENCE,
+      confidence: 0.3,
       relevance: 'irrelevant',
       report: true,
     })
     expect(readFlipAnswer(sure, {hasWords: false}).report).toBe(false)
-    const unsure = sure.replace(`${REPORT_CONFIDENCE}`, '0.6')
+    const unsure = sure.replace(
+      `"reportConfidence":${REPORT_CONFIDENCE}`,
+      '"reportConfidence":0.6'
+    )
     expect(readFlipAnswer(unsure, {hasWords: true})).toMatchObject({
       report: false,
       relevance: null,
     })
+    // Sure of the story, not of the rule break: no report.
+    const storySure =
+      '{"answer":"left","confidence":0.99,"keywords":"not shown","report":true}'
+    expect(readFlipAnswer(storySure, {hasWords: true}).report).toBe(false)
   })
 
   test('keywords shown: the flip approved', () => {

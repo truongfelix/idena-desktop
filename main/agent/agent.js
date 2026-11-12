@@ -11,7 +11,9 @@ const MAX_TIMEOUT_MS = 120 * 1000
 const MAX_ACTIVITY = 200
 
 function clampTimeout(value) {
-  const ms = Number(value)
+  // null, '' and booleans are numbers to Number(): 0, a 1 s deadline. Only a real number counts.
+  if (typeof value !== 'number') return MAX_TIMEOUT_MS
+  const ms = value
   if (!Number.isFinite(ms)) return MAX_TIMEOUT_MS
   return Math.min(Math.max(ms, MIN_TIMEOUT_MS), MAX_TIMEOUT_MS)
 }
@@ -23,7 +25,10 @@ function createAgent({
   ask = providers.ask,
   now = Date.now,
 }) {
-  const running = new Set()
+  // The questions in flight: the validation's (stopped when the agent is paused or turned off) and the practice
+  // test's (stopped by its own Stop button), apart so a settings change during a test does not cut it.
+  const solving = new Set()
+  const testing = new Set()
   const activity = []
 
   const log = (entry) => {
@@ -31,19 +36,24 @@ function createAgent({
     if (activity.length > MAX_ACTIVITY) activity.shift()
   }
 
-  const status = () => ({
-    settings: settings.read(),
-    keychain: key.keychain(),
-    hasKey: key.has(),
-  })
+  const destination = ({provider, address}) => ({provider, address})
 
-  const stopRunning = () => {
-    running.forEach((controller) => controller.abort())
-    running.clear()
+  const status = () => {
+    const current = settings.read()
+    return {
+      settings: current,
+      keychain: key.keychain(),
+      hasKey: key.has(destination(current)),
+    }
+  }
+
+  const stop = (set) => {
+    set.forEach((controller) => controller.abort())
+    set.clear()
   }
 
   /** One flip to the model, the answer read. Throws the provider's error. */
-  const askFlip = async (config, flip, timeoutMs) => {
+  const askFlip = async (config, flip, timeoutMs, running) => {
     const checked = checkFlip(flip)
     const {system, parts} = flipQuestion(checked)
     const controller = new AbortController()
@@ -54,7 +64,7 @@ function createAgent({
           provider: config.provider,
           address: config.address,
           model: config.model,
-          key: key.read(),
+          key: key.read(destination(config)),
         },
         system,
         parts,
@@ -75,7 +85,7 @@ function createAgent({
     }
     let answer
     try {
-      answer = await askFlip(config, flip, timeoutMs)
+      answer = await askFlip(config, flip, timeoutMs, solving)
     } catch (error) {
       log({action: 'answerFlip', decision: 'failed', detail: error.message})
       throw error
@@ -84,6 +94,9 @@ function createAgent({
       ? checkAction(config, 'report', {usage: reportsUsed})
       : {decision: 'off', reason: 'nothing to report'}
     const report = answer.report && reportCheck.decision !== 'off'
+    // A report is never more automatic than the answer: with answers asked first, so is the report.
+    const reportDecision =
+      report && answerCheck.decision === 'ask' ? 'ask' : reportCheck.decision
     const result = {
       decision: answerCheck.decision,
       answer: answer.answer,
@@ -91,7 +104,7 @@ function createAgent({
       relevance:
         report || answer.relevance !== 'irrelevant' ? answer.relevance : null,
       report,
-      reportDecision: report ? reportCheck.decision : 'off',
+      reportDecision: report ? reportDecision : 'off',
     }
     log({
       action: 'answerFlip',
@@ -107,12 +120,12 @@ function createAgent({
     status,
     saveSettings(data) {
       const saved = settings.write(data)
-      if (saved.paused || !saved.enabled) stopRunning()
+      if (saved.paused || !saved.enabled) stop(solving)
       log({action: 'settings', decision: 'saved', detail: saved.provider})
       return status()
     },
     setKey(data) {
-      key.set(data && data.key)
+      key.set(data && data.key, destination(settings.read()))
       log({action: 'key', decision: 'saved', detail: ''})
       return status()
     },
@@ -126,7 +139,7 @@ function createAgent({
     async testFlip({flip, timeoutMs} = {}) {
       const config = settings.read()
       try {
-        const answer = await askFlip(config, flip, timeoutMs)
+        const answer = await askFlip(config, flip, timeoutMs, testing)
         log({
           action: 'test',
           decision: 'answered',
@@ -137,6 +150,11 @@ function createAgent({
         log({action: 'test', decision: 'failed', detail: error.message})
         throw error
       }
+    },
+    /** The practice test's Stop: its question in flight ends at once. */
+    stopTest() {
+      stop(testing)
+      return null
     },
     activity: () => activity.slice().reverse(),
   }
@@ -153,7 +171,10 @@ function createAgent({
         throw new Error(error.message)
       }
     },
-    stop: stopRunning,
+    stop: () => {
+      stop(solving)
+      stop(testing)
+    },
   }
 }
 

@@ -175,6 +175,8 @@ async function ask(
     })
     return replyText(config.provider, response.data)
   } catch (error) {
+    // Stopped by the app (the agent paused, the test stopped): not the model's fault, nor a deadline.
+    if (signal && signal.aborted) throw new Error('stopped')
     throw providerError(error)
   }
 }

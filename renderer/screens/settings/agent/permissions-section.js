@@ -82,16 +82,13 @@ export function PermissionsSection({settings, onChange}) {
                       colorScheme={isOn ? 'blue' : 'gray'}
                       onClick={() =>
                         !isOn &&
-                        onChange({
-                          ...settings,
+                        onChange((s) => ({
+                          ...s,
                           permissions: {
-                            ...settings.permissions,
-                            [id]: {
-                              ...settings.permissions[id],
-                              level: level.id,
-                            },
+                            ...s.permissions,
+                            [id]: {...s.permissions[id], level: level.id},
                           },
-                        })
+                        }))
                       }
                     >
                       {level.label}

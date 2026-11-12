@@ -1,4 +1,4 @@
-const {createAgent} = require('./agent')
+const {createAgent, clampTimeout} = require('./agent')
 const {normalizeSettings} = require('./settings')
 
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 1]).toString('base64')
@@ -29,7 +29,9 @@ function setup(saved = {}, reply = '{"answer":"left","confidence":0.8}') {
   const key = {
     keychain: () => ({available: true, reason: null}),
     has: () => true,
-    read: () => 'sk-secret',
+    read: jest.fn((destination) =>
+      destination.provider === 'local' ? null : 'sk-secret'
+    ),
     set: jest.fn(),
     clear: jest.fn(),
   }
@@ -77,7 +79,7 @@ describe('the agent channel', () => {
 
   test('alone: the answer applied, a sure report checked against its own row', async () => {
     const reply =
-      '{"answer":"right","confidence":0.95,"keywords":"not shown","report":true}'
+      '{"answer":"right","confidence":0.6,"keywords":"not shown","report":true,"reportConfidence":0.95}'
     const {agent} = setup(
       {
         permissions: {
@@ -103,7 +105,7 @@ describe('the agent channel', () => {
 
   test('a report the row turns off is not sent, nor its relevance', async () => {
     const reply =
-      '{"answer":"right","confidence":0.95,"keywords":"not shown","report":true}'
+      '{"answer":"right","confidence":0.6,"keywords":"not shown","report":true,"reportConfidence":0.95}'
     const {agent} = setup({permissions: {report: {level: 'off'}}}, reply)
     await expect(agent.handle('solveFlip', {flip})).resolves.toMatchObject({
       report: false,
@@ -150,5 +152,91 @@ describe('the agent channel', () => {
       answer: 'left',
     })
     expect(ask).toHaveBeenCalled()
+  })
+
+  test('the key asked for the provider and address in use, none for a local model', async () => {
+    const {agent, ask, key} = setup()
+    await agent.handle('solveFlip', {flip})
+    expect(key.read).toHaveBeenCalledWith({
+      provider: 'openai',
+      address: 'https://x.test/v1',
+    })
+    await agent.handle('setKey', {key: 'sk-new'})
+    expect(key.set).toHaveBeenCalledWith('sk-new', {
+      provider: 'openai',
+      address: 'https://x.test/v1',
+    })
+    const {agent: local, ask: askLocal} = setup({
+      provider: 'local',
+      address: 'http://127.0.0.1:11434/v1',
+    })
+    await local.handle('solveFlip', {flip})
+    expect(askLocal.mock.calls[0][0].key).toBeNull()
+    expect(ask.mock.calls[0][0].key).toBe('sk-secret')
+  })
+
+  test('with answers asked first, a report is asked first too', async () => {
+    const reply =
+      '{"answer":"right","confidence":0.6,"keywords":"not shown","report":true,"reportConfidence":0.95}'
+    const {agent} = setup(
+      {permissions: {answerFlip: {level: 'ask'}, report: {level: 'alone'}}},
+      reply
+    )
+    await expect(agent.handle('solveFlip', {flip})).resolves.toMatchObject({
+      decision: 'ask',
+      report: true,
+      reportDecision: 'ask',
+    })
+  })
+
+  test('a report count that is not a number is not within the limit', async () => {
+    const reply =
+      '{"answer":"right","confidence":0.6,"keywords":"not shown","report":true,"reportConfidence":0.95}'
+    const {agent} = setup(
+      {
+        permissions: {
+          answerFlip: {level: 'alone'},
+          report: {level: 'alone', limit: 3},
+        },
+      },
+      reply
+    )
+    for (const reportsUsed of [null, 'x', NaN, -1]) {
+      // eslint-disable-next-line no-await-in-loop
+      await expect(
+        agent.handle('solveFlip', {flip, reportsUsed})
+      ).resolves.toMatchObject({
+        reportDecision: 'ask',
+      })
+    }
+  })
+
+  test('a settings change does not cut the practice test; its Stop does', async () => {
+    const {agent, ask} = setup({enabled: false})
+    ask.mockImplementation(
+      (config, system, parts, {signal}) =>
+        new Promise((resolve, reject) => {
+          signal.addEventListener('abort', () => reject(new Error('stopped')))
+          setTimeout(() => resolve('{"answer":"left","confidence":0.7}'), 50)
+        })
+    )
+    const first = agent.handle('testFlip', {flip})
+    await agent.handle('saveSettings', {
+      ...(await agent.handle('status')).settings,
+      model: 'other',
+    })
+    await expect(first).resolves.toMatchObject({answer: 'left'})
+    const second = agent.handle('testFlip', {flip})
+    await Promise.resolve()
+    await agent.handle('stopTest')
+    await expect(second).rejects.toThrow('stopped')
+  })
+
+  test('a deadline that is not a number is the longest one, not 1 s', () => {
+    expect(clampTimeout(null)).toBe(120000)
+    expect(clampTimeout('')).toBe(120000)
+    expect(clampTimeout(undefined)).toBe(120000)
+    expect(clampTimeout(30000)).toBe(30000)
+    expect(clampTimeout(10)).toBe(1000)
   })
 })
