@@ -72,7 +72,10 @@ function createAgent({
         parts,
         {timeoutMs: clampTimeout(timeoutMs), signal: controller.signal}
       )
-      return readFlipAnswer(text, {hasWords: checked.words.length > 0})
+      return readFlipAnswer(text, {
+        hasWords: checked.words.length > 0,
+        thresholds: config.reportThresholds,
+      })
     } finally {
       running.delete(controller)
     }

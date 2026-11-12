@@ -1810,7 +1810,6 @@
   "Answer the flips": "Answer the flips",
   "Alone = Autopilot, Ask me = Suggest (its pick is highlighted, you click). A flip it cannot answer in time stays unanswered.": "Alone = Autopilot, Ask me = Suggest (its pick is highlighted, you click). A flip it cannot answer in time stays unanswered.",
   "Report flips": "Report flips",
-  "Only when it is at least 90% sure the flip breaks the rules": "Only when it is at least 90% sure the flip breaks the rules",
   "Ask me": "Ask me",
   "Alone": "Alone",
   "What the agent may do": "What the agent may do",
@@ -1891,5 +1890,8 @@
   "A good flip": "A good flip",
   "The model said {{reasons}}": "The model said {{reasons}}",
   "The model saw no rule broken": "The model saw no rule broken",
-  "Rightly reported": "Rightly reported"
+  "Rightly reported": "Rightly reported",
+  "When to report": "When to report",
+  "The agent reports a flip when it is at least this sure that the flip breaks one of these rules. The right values depend on the model: the practice test shows how sure it was, flip by flip.": "The agent reports a flip when it is at least this sure that the flip breaks one of these rules. The right values depend on the model: the practice test shows how sure it was, flip by flip.",
+  "Only when it is sure enough that the flip breaks a rule (When to report, below)": "Only when it is sure enough that the flip breaks a rule (When to report, below)"
 }

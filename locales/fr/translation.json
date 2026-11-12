@@ -1809,7 +1809,6 @@
   "Answer the flips": "Répondre aux flips",
   "Alone = Autopilot, Ask me = Suggest (its pick is highlighted, you click). A flip it cannot answer in time stays unanswered.": "Seul = pilote automatique, Me demander = suggestion (son choix est mis en évidence, vous cliquez). Un flip auquel il ne peut pas répondre à temps reste sans réponse.",
   "Report flips": "Signaler des flips",
-  "Only when it is at least 90% sure the flip breaks the rules": "Seulement s'il est sûr à 90 % au moins que le flip enfreint les règles",
   "Ask me": "Me demander",
   "Alone": "Seul",
   "What the agent may do": "Ce que l'agent peut faire",
@@ -1891,5 +1890,8 @@
   "To report for {{reason}}": "À signaler pour {{reason}}",
   "A good flip": "Un bon flip",
   "The model said {{reasons}}": "Le modèle a répondu {{reasons}}",
-  "The model saw no rule broken": "Le modèle n'a vu aucune règle enfreinte"
+  "The model saw no rule broken": "Le modèle n'a vu aucune règle enfreinte",
+  "When to report": "Quand signaler",
+  "The agent reports a flip when it is at least this sure that the flip breaks one of these rules. The right values depend on the model: the practice test shows how sure it was, flip by flip.": "L'agent signale un flip quand il est au moins aussi sûr que le flip enfreint une de ces règles. Les bonnes valeurs dépendent du modèle : le test d'entraînement montre sa certitude, flip par flip.",
+  "Only when it is sure enough that the flip breaks a rule (When to report, below)": "Seulement quand il est assez sûr que le flip enfreint une règle (Quand signaler, plus bas)"
 }

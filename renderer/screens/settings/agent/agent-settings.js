@@ -18,6 +18,7 @@ import {
 import {runPracticeTest} from './practice-test'
 import {ModelSection} from './model-section'
 import {PermissionsSection} from './permissions-section'
+import {ReportRulesSection} from './report-rules-section'
 import {ActivitySection} from './activity-section'
 
 /** The test line under the button, from the last run's result. */
@@ -185,6 +186,7 @@ export function AgentSettings() {
         test={test}
       />
       <PermissionsSection settings={settings} onChange={save} />
+      <ReportRulesSection settings={settings} onChange={save} />
       <ActivitySection activity={activity} />
     </Stack>
   )

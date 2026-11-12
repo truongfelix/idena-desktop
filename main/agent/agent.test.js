@@ -117,6 +117,20 @@ describe('the agent channel', () => {
     ).resolves.toMatchObject({report: true, reportDecision: 'ask'})
   })
 
+  test('the saved report thresholds decide', async () => {
+    const reply =
+      '{"answer":"right","confidence":0.6,"keywords":"not shown","reasons":[{"reason":1,"confidence":0.95}]}'
+    const {agent} = setup({reportThresholds: {1: 0.96}}, reply)
+    await expect(agent.handle('solveFlip', {flip})).resolves.toMatchObject({
+      report: false,
+      relevance: null,
+    })
+    await expect(agent.handle('testFlip', {flip})).resolves.toMatchObject({
+      report: false,
+      reasons: [{reason: 1, confidence: 0.95}],
+    })
+  })
+
   test('a report the row turns off is not sent, nor its relevance', async () => {
     const reply =
       '{"answer":"right","confidence":0.6,"keywords":"not shown","reasons":[{"reason":1,"confidence":0.95}]}'

@@ -1,4 +1,5 @@
 const fs = require('fs-extra')
+const {REPORT_THRESHOLDS} = require('./flips')
 
 // The agent's settings, kept by the main process in one JSON file of the user data folder (never the API key: see
 // key.js). The renderer reads and changes them only through the agent channel (ipc.js), which normalizes each one.
@@ -45,7 +46,17 @@ function defaultSettings() {
     permissions: Object.fromEntries(
       Object.entries(ACTIONS).map(([name, value]) => [name, {...value}])
     ),
+    reportThresholds: {...REPORT_THRESHOLDS},
   }
+}
+
+/** A report reason's threshold: a confidence from 0.5 to 1, in hundredths; anything else is the default. */
+function normalizeThreshold(value, fallback) {
+  const number = Number(value)
+  if (value === null || value === '' || !Number.isFinite(number))
+    return fallback
+  if (number < 0.5 || number > 1) return fallback
+  return Math.round(number * 100) / 100
 }
 
 function normalizeLimit(value, fallback) {
@@ -92,6 +103,16 @@ function normalizeSettings(input) {
       ]
     })
   )
+  const savedThresholds =
+    value.reportThresholds && typeof value.reportThresholds === 'object'
+      ? value.reportThresholds
+      : {}
+  const reportThresholds = Object.fromEntries(
+    Object.entries(defaults.reportThresholds).map(([reason, fallback]) => [
+      reason,
+      normalizeThreshold(savedThresholds[reason], fallback),
+    ])
+  )
   return {
     enabled: value.enabled === true,
     paused: value.paused === true,
@@ -99,6 +120,7 @@ function normalizeSettings(input) {
     address,
     model,
     permissions,
+    reportThresholds,
   }
 }
 

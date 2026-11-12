@@ -9,6 +9,7 @@ const {
   normalizeSettings,
 } = require('./settings')
 const {checkAction} = require('./permissions')
+const {REPORT_THRESHOLDS} = require('./flips')
 
 describe('agent settings', () => {
   let dir
@@ -53,6 +54,34 @@ describe('agent settings', () => {
       limit: null,
     })
     expect(settings.permissions.report).toEqual(ACTIONS.report)
+    // A file from before the report thresholds: the defaults.
+    expect(settings.reportThresholds).toEqual(REPORT_THRESHOLDS)
+  })
+
+  test('each report threshold kept from 0.5 to 1, in hundredths, a broken one the default', () => {
+    const {reportThresholds} = normalizeSettings({
+      reportThresholds: {
+        1: 0.9,
+        2: '0.55',
+        3: 0.4,
+        4: 1.2,
+        5: 'x',
+        6: null,
+        7: 0.876,
+        8: 1,
+        10: 0.6,
+      },
+    })
+    expect(reportThresholds).toEqual({
+      ...REPORT_THRESHOLDS,
+      1: 0.9,
+      2: 0.55,
+      7: 0.88,
+      8: 1,
+    })
+    expect(normalizeSettings({reportThresholds: 'x'}).reportThresholds).toEqual(
+      REPORT_THRESHOLDS
+    )
   })
 
   test('unknown values are replaced, unknown keys dropped', () => {
@@ -79,8 +108,17 @@ describe('agent settings', () => {
   test('written whole and read back', () => {
     const file = path.join(dir, 'agent', 'settings.json')
     const store = createAgentSettings({file: () => file})
-    store.write({...defaultSettings(), enabled: true, model: 'llava'})
-    expect(store.read()).toMatchObject({enabled: true, model: 'llava'})
+    store.write({
+      ...defaultSettings(),
+      enabled: true,
+      model: 'llava',
+      reportThresholds: {...REPORT_THRESHOLDS, 1: 0.95},
+    })
+    expect(store.read()).toMatchObject({
+      enabled: true,
+      model: 'llava',
+      reportThresholds: {1: 0.95, 2: REPORT_THRESHOLDS[2]},
+    })
   })
 })
 

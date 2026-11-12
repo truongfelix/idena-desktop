@@ -23,14 +23,16 @@ const REPORT_REASONS = {
 }
 
 /**
- * The confidence each reason needs for a report (the template: "reports when very sure"): a wrong report costs an
- * honest author, so every reason starts at 0.9 until the practice runs show the model's confidences.
+ * The confidence each reason needs for a report by default; the person sets each in Settings › Agent
+ * (settings.js reportThresholds), as they depend on the model. The practice runs of 2026-11-12 (9 long flips): at
+ * 0.7, Opus reported the four flips to report and no good flip; Sonnet gave a good flip 0.85 on reason 1. Reasons
+ * 5 to 9 never came up there: they keep the template's "very sure".
  */
 const REPORT_THRESHOLDS = {
-  1: 0.9,
-  2: 0.9,
-  3: 0.9,
-  4: 0.9,
+  1: 0.7,
+  2: 0.7,
+  3: 0.7,
+  4: 0.7,
   5: 0.9,
   6: 0.9,
   7: 0.9,
@@ -176,9 +178,9 @@ function readReasons(list) {
 /**
  * The model's answer, read strictly: anything unreadable is no answer. `answer` 'left' | 'right' | null,
  * `relevance` 'relevant' | 'irrelevant' | null, `reasons` the report reasons it gave (with keywords only), `report`
- * when one of them reaches its threshold.
+ * when one of them reaches its threshold (`thresholds`, by reason; the defaults when left out).
  */
-function readFlipAnswer(text, {hasWords}) {
+function readFlipAnswer(text, {hasWords, thresholds = REPORT_THRESHOLDS}) {
   const reply = firstJsonObject(text)
   const none = {
     answer: null,
@@ -191,7 +193,8 @@ function readFlipAnswer(text, {hasWords}) {
   const answer = ['left', 'right'].includes(reply.answer) ? reply.answer : null
   const reasons = hasWords ? readReasons(reply.reasons) : []
   const report = reasons.some(
-    ({reason, confidence}) => confidence >= REPORT_THRESHOLDS[reason]
+    ({reason, confidence}) =>
+      confidence >= (thresholds[reason] ?? REPORT_THRESHOLDS[reason])
   )
   // A report marks the flip irrelevant; "not shown" alone, below its threshold, leaves it unmarked.
   let relevance = null

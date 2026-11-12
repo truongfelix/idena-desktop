@@ -156,21 +156,18 @@ describe('agent flips: the model answer', () => {
   })
 
   test('each reason is held against its own threshold', () => {
-    const thresholds = {...REPORT_THRESHOLDS}
-    try {
-      REPORT_THRESHOLDS[5] = 0.5
-      REPORT_THRESHOLDS[2] = 0.95
-      expect(
-        readFlipAnswer(reply([{reason: 5, confidence: 0.5}]), {hasWords: true})
-          .report
-      ).toBe(true)
-      expect(
-        readFlipAnswer(reply([{reason: 2, confidence: 0.9}]), {hasWords: true})
-          .report
-      ).toBe(false)
-    } finally {
-      Object.assign(REPORT_THRESHOLDS, thresholds)
-    }
+    const thresholds = {...REPORT_THRESHOLDS, 5: 0.5, 2: 0.95}
+    const read = (reasons) =>
+      readFlipAnswer(reply(reasons), {hasWords: true, thresholds}).report
+    expect(read([{reason: 5, confidence: 0.5}])).toBe(true)
+    expect(read([{reason: 2, confidence: 0.9}])).toBe(false)
+    expect(read([{reason: 2, confidence: 0.95}])).toBe(true)
+    // Left out: the defaults.
+    expect(
+      readFlipAnswer(reply([{reason: 2, confidence: REPORT_THRESHOLDS[2]}]), {
+        hasWords: true,
+      }).report
+    ).toBe(true)
   })
 
   test('unknown reasons are dropped, a reason given twice kept once', () => {

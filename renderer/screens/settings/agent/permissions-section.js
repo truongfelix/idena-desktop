@@ -23,7 +23,9 @@ function useRows() {
       id: 'report',
       area: t('Validation'),
       label: t('Report flips'),
-      limit: t('Only when it is at least 90% sure the flip breaks the rules'),
+      limit: t(
+        'Only when it is sure enough that the flip breaks a rule (When to report, below)'
+      ),
     },
   ]
 }
