@@ -25,7 +25,9 @@ import {
   withCallbackGas,
 } from './profiles'
 import {memberExtraFor} from './vouching'
+import {mediaWhat} from './media-type'
 import {
+  IMAGE_TYPE,
   prepareFile,
   estimateCall,
   prepareCall,
@@ -486,6 +488,8 @@ export function useSocialSending({
             text: draftText,
             textOnIpfs,
             image: draftImage?.bytes || null,
+            mediaType: draftImage?.type || IMAGE_TYPE,
+            mediaWhat: mediaWhat(draftImage?.type),
             target: draftTarget(draft.target, draftTopic),
           },
           storedRef.current
@@ -583,15 +587,24 @@ export function useSocialSending({
         : await sendPrepared(socialRpc, pending, {
             onFile: (file) =>
               show(
-                file === 'text'
-                  ? t('{{what}}: storing the text on IPFS…', {
-                      what,
-                      nsSeparator: '|',
-                    })
-                  : t('{{what}}: storing the image on IPFS…', {
-                      what,
-                      nsSeparator: '|',
-                    })
+                {
+                  text: t('{{what}}: storing the text on IPFS…', {
+                    what,
+                    nsSeparator: '|',
+                  }),
+                  video: t('{{what}}: storing the video on IPFS…', {
+                    what,
+                    nsSeparator: '|',
+                  }),
+                  sound: t('{{what}}: storing the sound on IPFS…', {
+                    what,
+                    nsSeparator: '|',
+                  }),
+                }[file] ||
+                  t('{{what}}: storing the image on IPFS…', {
+                    what,
+                    nsSeparator: '|',
+                  })
               ),
             onStored: (cid) => storedRef.current.add(cid),
           })

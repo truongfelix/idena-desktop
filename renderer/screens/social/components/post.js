@@ -15,6 +15,7 @@ import {postTopic} from '../topics'
 import {PicturesMode} from '../hiding'
 import {TopicTag} from './topic'
 import {PersonAvatar} from './profile-public'
+import {MediaKind, kindOfType, playableKind} from '../media-type'
 
 const textDecoder = new TextDecoder()
 
@@ -65,7 +66,91 @@ export function PostText({message, lines}) {
   )
 }
 
-function MediaElement({src, type, maxH}) {
+// A click on a player plays it, and does not open the post.
+const stop = (e) => e.stopPropagation()
+
+/**
+ * A post's video (B-229): its first frame (loaded at once: the file is already in memory) with a round ▶ in its middle
+ * while paused, as other social apps do; the browser's controls stay for the bar and the volume.
+ */
+function VideoPlayer({src, maxH}) {
+  const {t} = useTranslation()
+  const ref = React.useRef()
+  const [paused, setPaused] = React.useState(true)
+  const [refused, setRefused] = React.useState(false)
+  return (
+    <Box position="relative" alignSelf="flex-start" maxW="full" onClick={stop}>
+      {refused && (
+        <SmallText>{t('🎞 This computer cannot play this video.')}</SmallText>
+      )}
+      <Box
+        as="video"
+        ref={ref}
+        src={src}
+        controls
+        preload="auto"
+        display="block"
+        maxH={maxH}
+        maxW="full"
+        rounded="lg"
+        onPlay={() => setPaused(false)}
+        onPause={() => setPaused(true)}
+      />
+      {paused && (
+        <Box
+          as="button"
+          type="button"
+          aria-label={t('Play the video')}
+          position="absolute"
+          top="50%"
+          left="50%"
+          transform="translate(-50%, -50%)"
+          w="64px"
+          h="64px"
+          rounded="full"
+          bg="blackAlpha.600"
+          color="white"
+          fontSize="28px"
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+          onClick={(e) => {
+            e.stopPropagation()
+            // A codec the browser cannot decode refuses here.
+            ref.current?.play()?.catch(() => setRefused(true))
+          }}
+        >
+          ▶
+        </Box>
+      )}
+    </Box>
+  )
+}
+
+/**
+ * A post's media from `src`: a picture (a GIF or an animated WebP moves), or a video or a sound in the browser's
+ * player, never playing by itself, and only when its file `bytes` is what the post declares (B-222).
+ */
+function MediaElement({src, type, maxH, bytes}) {
+  const {t} = useTranslation()
+  const kind = kindOfType(type)
+  if (kind === MediaKind.Video || kind === MediaKind.Audio) {
+    const playable = playableKind(type, bytes)
+    if (!playable)
+      return (
+        <SmallText>
+          {t(
+            '🎞 This file is not the video or sound the post says: it is not played.',
+            {nsSeparator: '|'}
+          )}
+        </SmallText>
+      )
+    return playable === MediaKind.Video ? (
+      <VideoPlayer src={src} maxH={maxH} />
+    ) : (
+      <Box as="audio" src={src} controls w="full" maxW="md" onClick={stop} />
+    )
+  }
   if (type.startsWith('image/'))
     return (
       <Image
@@ -92,7 +177,10 @@ function IpfsMedia({cid, type, maxH}) {
   if (isLoading)
     return (
       <SmallText>
-        {t('Loading the image from IPFS through the node…')}
+        {kindOfType(type) === MediaKind.Picture ||
+        kindOfType(type) === MediaKind.Animation
+          ? t('Loading the image from IPFS through the node…')
+          : t('Loading from IPFS through the node…')}
       </SmallText>
     )
   if (isError || !url)
@@ -115,28 +203,62 @@ function IpfsMedia({cid, type, maxH}) {
         </Button>
       </HStack>
     )
-  return <MediaElement src={url} type={type} maxH={maxH} />
+  return <MediaElement src={url} type={type} maxH={maxH} bytes={data} />
 }
 
-/** A post's first media: inline (base64) or on IPFS. */
-export function PostMedia({call: {hasMedia, media, mediaType}, maxH}) {
+/**
+ * A post's first media: inline (base64) or on IPFS. A video or a sound plays in its thread only (`inThread`): in a
+ * list, a line says to open the post, and nothing is fetched.
+ */
+export function PostMedia({
+  call: {hasMedia, media, mediaType},
+  maxH,
+  inThread = false,
+}) {
   const {t} = useTranslation()
   if (!hasMedia) return null
   const type = String(mediaType).toLowerCase()
   if (type === 'image/svg+xml')
     return <SmallText>{t('🖼 SVG image, not shown here.')}</SmallText>
-  if (type.startsWith('video/') || type.startsWith('audio/'))
-    return <SmallText>{t('🎞 Video or audio, not shown here.')}</SmallText>
-  if (!type.startsWith('image/') || !media)
+  const kind = kindOfType(type)
+  const playable = kind === MediaKind.Video || kind === MediaKind.Audio
+  if ((!type.startsWith('image/') && !playable) || !media)
     return <SmallText>{t('🖼 Media')}</SmallText>
+  if (playable && !inThread)
+    return (
+      <SmallText>
+        {kind === MediaKind.Video
+          ? t('🎞 A video: open the post to play it.', {nsSeparator: '|'})
+          : t('🎵 A sound: open the post to play it.', {nsSeparator: '|'})}
+      </SmallText>
+    )
   const cid = ipfsCid(media)
   if (cid) return <IpfsMedia cid={cid} type={type} maxH={maxH} />
   if (media.startsWith('ipfs://')) return null
+  return <InlineMedia media={media} type={type} maxH={maxH} />
+}
+
+/** Media written in the post itself (base64); a video's or a sound's first bytes for the type check. */
+function InlineMedia({media, type, maxH}) {
+  const bytes = React.useMemo(() => {
+    const kind = kindOfType(type)
+    if (kind !== MediaKind.Video && kind !== MediaKind.Audio) return null
+    try {
+      // 88 base64 characters: 66 bytes, what sniffFormat reads (a WebM's type within 64).
+      // Line breaks or spaces in the base64 (other clients wrap it) are left out first.
+      return Uint8Array.from(atob(media.replace(/\s/g, '').slice(0, 88)), (c) =>
+        c.charCodeAt(0)
+      )
+    } catch {
+      return null
+    }
+  }, [media, type])
   return (
     <MediaElement
       src={`data:${type};base64,${media}`}
       type={type}
       maxH={maxH}
+      bytes={bytes}
     />
   )
 }
@@ -148,11 +270,18 @@ export function PostMedia({call: {hasMedia, media, mediaType}, maxH}) {
 function TapToShowMedia({call, maxH, inThread}) {
   const {t} = useTranslation()
   const [shown, setShown] = React.useState(false)
-  if (shown) return <PostMedia call={call} maxH={maxH} />
+  if (shown) return <PostMedia call={call} maxH={maxH} inThread={inThread} />
+  const kind = kindOfType(call.mediaType)
   if (!inThread)
     return (
       <SmallText>
-        {t('🖼 A picture: open the post to show it.', {nsSeparator: '|'})}
+        {kind === MediaKind.Video &&
+          t('🎞 A video: open the post to play it.', {nsSeparator: '|'})}
+        {kind === MediaKind.Audio &&
+          t('🎵 A sound: open the post to play it.', {nsSeparator: '|'})}
+        {kind !== MediaKind.Video &&
+          kind !== MediaKind.Audio &&
+          t('🖼 A picture: open the post to show it.', {nsSeparator: '|'})}
       </SmallText>
     )
   return (
@@ -165,7 +294,11 @@ function TapToShowMedia({call, maxH, inThread}) {
         setShown(true)
       }}
     >
-      {t('🖼 A picture. Click to show it.')}
+      {kind === MediaKind.Video && t('🎞 A video. Click to show it.')}
+      {kind === MediaKind.Audio && t('🎵 A sound. Click to show it.')}
+      {kind !== MediaKind.Video &&
+        kind !== MediaKind.Audio &&
+        t('🖼 A picture. Click to show it.')}
     </Button>
   )
 }
@@ -196,7 +329,7 @@ export function PostBody({call, lines, maxH, media = true, inThread = false}) {
         (hidden.pictures === PicturesMode.TapToShow && !own && call.hasMedia ? (
           <TapToShowMedia call={call} maxH={maxH} inThread={inThread} />
         ) : (
-          <PostMedia call={call} maxH={maxH} />
+          <PostMedia call={call} maxH={maxH} inThread={inThread} />
         ))}
     </>
   )

@@ -2,6 +2,12 @@
 // sizes, turned upright from its EXIF orientation. Encoding drops the photo's details (place, camera).
 
 import {IMAGE_TYPE} from './posting'
+import {
+  MediaFormat,
+  pickedAs,
+  sniffFormat,
+  withoutMp4Details,
+} from './media-type'
 
 /** The sizes offered for the longer side, in pixels. */
 export const IMAGE_SIDES = [320, 480, 720, 1080]
@@ -73,6 +79,79 @@ export async function encodeImage(file) {
     return out
   } finally {
     bitmap.close()
+  }
+}
+
+/** Whether a GIF or a WebP `bytes` moves (more than one frame), read with the browser's ImageDecoder. */
+async function isAnimation(bytes, type) {
+  if (typeof ImageDecoder === 'undefined') return true
+  // eslint-disable-next-line no-undef
+  const decoder = new ImageDecoder({data: bytes, type})
+  try {
+    // The track list fills only once `tracks.ready` resolves: read before it, it is empty (0 frames).
+    await decoder.tracks.ready
+    await decoder.completed
+    return decoder.tracks.selectedTrack?.frameCount > 1
+  } catch {
+    return false
+  } finally {
+    decoder.close()
+  }
+}
+
+/**
+ * The draft of a picked `file` (B-222; `audio`: picked as a sound): a moving picture, a video or a sound under the
+ * 900 KB of one IPFS file as it is ({asIs: true, type, bytes}; an MP4 without its details), any other picture
+ * encoded as WebP ({sides, side, bytes, type}; `stillInstead` when it moved but was too large). Throws with a reason
+ * the editor shows.
+ */
+export async function pickMedia(file, {audio = false} = {}) {
+  if (file.size > MAX_IMAGE_SOURCE)
+    throw new Error('the file is larger than 40 MB')
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  const format = sniffFormat(bytes)
+  const asSound = audio || String(file.type).startsWith('audio/')
+  const moving =
+    (format === MediaFormat.Gif || format === MediaFormat.AnimatedWebp) &&
+    (await isAnimation(
+      bytes,
+      format === MediaFormat.Gif ? 'image/gif' : 'image/webp'
+    ))
+  const picked = pickedAs(format, moving, bytes.length, asSound)
+  // A file picked as a sound must be one (a moving GIF would be posted as itself).
+  if (audio && picked.asIs && !picked.asIs.startsWith('audio/'))
+    throw new Error('this file is not a sound')
+  if (picked.asIs) {
+    const sent = withoutMp4Details(bytes)
+    if (!sent)
+      throw new Error(
+        'its parts cannot be read, so the place where it was taken cannot be removed'
+      )
+    return {asIs: true, type: picked.asIs, bytes: sent}
+  }
+  if (picked.tooLarge)
+    throw new Error(
+      `the ${
+        picked.tooLarge === 'video' ? 'video' : 'sound'
+      } is too large (${Math.floor(bytes.length / 1000)} KB, at most 900 KB)`
+    )
+  if (
+    format === MediaFormat.Unknown &&
+    (audio || /^(video|audio)\//.test(String(file.type)))
+  )
+    throw new Error(
+      'only MP4 and WebM videos, and MP3, M4A, Ogg and WebM sounds, can be sent'
+    )
+  // A picture picked as a sound is not one.
+  if (audio) throw new Error('this file is not a sound')
+  const sides = await encodeImage(file)
+  const side = defaultSide(sides.map((item) => item.side))
+  return {
+    sides,
+    side,
+    bytes: sides.find((item) => item.side === side).bytes,
+    type: IMAGE_TYPE,
+    stillInstead: picked.tooLargeToMove ? Math.floor(bytes.length / 1000) : 0,
   }
 }
 
