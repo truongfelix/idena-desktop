@@ -20,7 +20,8 @@ export const MAX_SUBMIT_RETRIES = 3
 /** A long flip whose keywords have not come after this long is asked without them. */
 export const KEYWORDS_WAIT_MS = 60 * 1000
 
-const isLoaded = (flip) => Boolean(flip.decoded) && !flip.failed
+const isLoaded = (flip) =>
+  Boolean(flip.decoded) && !flip.failed && flip.images?.length > 0
 const isLoading = (flip) => !flip.fetched && !flip.failed
 
 /**

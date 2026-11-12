@@ -22,7 +22,6 @@ import {
   KEYWORDS_WAIT_MS,
   MAX_SUBMIT_RETRIES,
   RETRY_SUBMIT_MS,
-  SUBMIT_COUNTDOWN_MS,
   SUBMIT_GUARD_MS,
   autopilotPlan,
   isSettled,
@@ -108,7 +107,8 @@ export function useAgentValidation({
       if (!live.current) return
       setMode(agentMode(settings))
       setSavedPause(settings.paused)
-      setPausing(false)
+      // Only the pause itself ends the screen's own pause: an older write landing first does not lift it.
+      if (settings.paused) setPausing(false)
     }
     agentStatus().then(show, () => {})
     // Paused, resumed or changed during the validation (here, or the menu card): the screen follows.
@@ -145,17 +145,24 @@ export function useAgentValidation({
     stopAgentSolve().catch(() => {})
   }, [phase, session])
 
-  // The clock: the countdown, the latest submit and the wait for keywords move with time, not only with the state.
+  // The clock, only when time matters: Autopilot's countdown, latest submit and retries (a failed submit has no
+  // phase), and a long flip waiting for its keywords.
+  const waitsForWords =
+    !isShort && flips.some((flip) => flip.decoded && !flip.words?.length)
+  const needsClock =
+    active &&
+    ((mode === 'autopilot' && Boolean(step)) ||
+      (Boolean(phase) && waitsForWords))
   React.useEffect(() => {
-    if (!active || !phase) return undefined
+    if (!needsClock) return undefined
     const timer = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(timer)
-  }, [active, phase])
+  }, [needsClock])
 
-  // A long flip loaded without its keywords is asked without them after KEYWORDS_WAIT_MS.
+  // A long flip loaded without its keywords is asked without them after KEYWORDS_WAIT_MS, from when it loaded.
   flips.forEach((flip) => {
     if (flip.decoded && !seen.current.has(flip.hash))
-      seen.current.set(flip.hash, now)
+      seen.current.set(flip.hash, Date.now())
   })
   const withoutWords = new Set(
     flips
@@ -192,9 +199,11 @@ export function useAgentValidation({
           // Cut by a pause: asked again after the resume, not a failure.
           agentErrorText(error) === 'stopped' ? null : {failed: true}
       )
-      .then((pick) => {
+      .then((answer) => {
         // Gone, or a question of the session before: dropped.
         if (!live.current || sessionRef.current !== session) return
+        // Refused for the pause (the main process saw it first): asked again after the resume.
+        const pick = answer?.decision === 'off' ? null : answer
         if (pick) setPicks((current) => ({...current, [flip.hash]: pick}))
         else asked.current.delete(flip.hash)
         setAsking((current) => (current === token ? null : current))
@@ -243,6 +252,8 @@ export function useAgentValidation({
     if (mode !== 'autopilot' || !active || !step) return
     // The time now, not the clock's last tick: after a resume, the tick is the pause's.
     const at = Date.now()
+    // Back where a submit starts (the person cancelled its dialog): a submit now is not Autopilot's.
+    if (step === 'short' || step === 'keywords') submitted.current = null
     if (step === 'shortFail' || step === 'longFail') {
       const tries = retries.current
       if (tries.step !== step) retries.current = {step, count: 0, at: 0}
@@ -272,8 +283,11 @@ export function useAgentValidation({
       if (event.type === 'SUBMIT') submitted.current = session
       send(event)
     })
-    if (plan.countdownEnd !== countdownEnd)
+    if (plan.countdownEnd !== countdownEnd) {
       setCountdown({step, end: plan.countdownEnd})
+      // The countdown shown from the time it was set from.
+      setNow(at)
+    }
   }, [
     mode,
     active,
@@ -298,11 +312,7 @@ export function useAgentValidation({
     asking,
     countdown:
       mode === 'autopilot' && active && countdownEnd
-        ? // The clock ticks after the countdown was set: never above its length.
-          Math.min(
-            SUBMIT_COUNTDOWN_MS / 1000,
-            Math.max(0, Math.ceil((countdownEnd - now) / 1000))
-          )
+        ? Math.max(0, Math.ceil((countdownEnd - now) / 1000))
         : null,
     // The pause is the agent's everywhere (the menu card shows it too); here it stops the agent at once.
     pause: () => {

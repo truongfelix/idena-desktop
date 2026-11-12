@@ -10,6 +10,7 @@ const flip = (hash, more = {}) => ({
   hash,
   fetched: true,
   decoded: true,
+  images: ['blob:1', 'blob:2', 'blob:3', 'blob:4'],
   ...more,
 })
 const left = () => 0.1
@@ -22,6 +23,7 @@ describe('Autopilot through the validation', () => {
       flip('waiting'),
       flip('failed', {failed: true}),
       flip('unreadable', {decoded: false}),
+      flip('no pictures', {images: []}),
       flip('skipped'),
       flip('timeout'),
       flip('picked'),
