@@ -1843,5 +1843,12 @@
   "Agent's pick · {{percent}}% sure · it would report this flip": "Choix de l'agent · sûr à {{percent}} % · il signalerait ce flip",
   "Agent: Suggest": "Agent : suggestions",
   "Agent: Autopilot": "Agent : pilote automatique",
-  "Take the agent's picks for the rest": "Prendre les choix de l'agent pour la suite"
+  "Take the agent's picks for the rest": "Prendre les choix de l'agent pour la suite",
+  "Paused: it does nothing until you resume it.": "En pause : il ne fait rien jusqu'à la reprise.",
+  "Autopilot in the validation": "Pilote automatique pendant la validation",
+  "Suggests the answers in the validation": "Suggère les réponses pendant la validation",
+  "Every action is off": "Toutes les actions sont désactivées",
+  "Agent paused": "Agent en pause",
+  "Resume the agent": "Reprendre l'agent",
+  "Pause the agent": "Mettre l'agent en pause"
 }

@@ -9,6 +9,7 @@ import {
   agentErrorText,
   agentStatus,
   clearAgentKey,
+  onAgentChange,
   saveAgentSettings,
   setAgentKey,
   stopAgentTest,
@@ -126,6 +127,9 @@ export function AgentSettings() {
   React.useEffect(() => {
     run(agentStatus)
   }, [run])
+
+  // A change saved elsewhere (the menu card's Pause) shows here too.
+  React.useEffect(() => onAgentChange(setStatus), [])
 
   const test = usePracticeTest(t, refreshActivity)
 

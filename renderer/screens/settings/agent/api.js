@@ -4,8 +4,21 @@
 const agent = (command, data) =>
   global.ipcRenderer.invoke('agent', command, data)
 
+// Who shows the agent's state (the menu's card, Settings › Agent) hears each saved change.
+const listeners = new Set()
+
+/** Calls `listener(status)` after each settings save; returns the unsubscribe. */
+export function onAgentChange(listener) {
+  listeners.add(listener)
+  return () => listeners.delete(listener)
+}
+
 export const agentStatus = () => agent('status')
-export const saveAgentSettings = (settings) => agent('saveSettings', settings)
+export async function saveAgentSettings(settings) {
+  const status = await agent('saveSettings', settings)
+  listeners.forEach((listener) => listener(status))
+  return status
+}
 export const setAgentKey = (key) => agent('setKey', {key})
 export const clearAgentKey = () => agent('clearKey')
 export const agentActivity = () => agent('activity')

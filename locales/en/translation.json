@@ -1843,5 +1843,12 @@
   "Agent's pick · {{percent}}% sure · it would report this flip": "Agent's pick · {{percent}}% sure · it would report this flip",
   "Agent: Suggest": "Agent: Suggest",
   "Agent: Autopilot": "Agent: Autopilot",
-  "Take the agent's picks for the rest": "Take the agent's picks for the rest"
+  "Take the agent's picks for the rest": "Take the agent's picks for the rest",
+  "Paused: it does nothing until you resume it.": "Paused: it does nothing until you resume it.",
+  "Autopilot in the validation": "Autopilot in the validation",
+  "Suggests the answers in the validation": "Suggests the answers in the validation",
+  "Every action is off": "Every action is off",
+  "Agent paused": "Agent paused",
+  "Resume the agent": "Resume the agent",
+  "Pause the agent": "Pause the agent"
 }

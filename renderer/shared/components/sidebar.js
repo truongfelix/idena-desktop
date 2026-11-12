@@ -60,6 +60,7 @@ import {TodoVotingCountBadge} from '../../screens/oracles/components'
 import {socialNewsCount} from '../../screens/social/news-count'
 import {useSocial} from '../../screens/social/provider'
 import {ReleaseNoteDialog} from './release-check'
+import {AgentCard} from '../../screens/settings/agent/agent-card'
 import {
   AdsIcon,
   ClockIcon,
@@ -107,6 +108,7 @@ export default function Sidebar({
         <ActionPanel />
       </Flex>
       <Box>
+        <AgentCard />
         <Version
           isForkAvailable={isForkAvailable}
           didActivateFork={didActivateFork}
