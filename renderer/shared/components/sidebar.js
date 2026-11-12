@@ -98,15 +98,18 @@ export default function Sidebar({
       minW={200}
       zIndex={2}
       position="relative"
-      overflow="hidden"
+      overflowX="hidden"
+      // Zoomed in, the sidebar is taller than the window: it scrolls instead of hiding its bottom.
+      overflowY="auto"
+      sx={{scrollbarWidth: 'thin'}}
     >
-      <Flex direction="column" align="flex-start">
+      <Flex direction="column" align="flex-start" flexShrink={0}>
         <Status />
         <Logo />
         <Navbar />
         <ActionPanel />
       </Flex>
-      <Box>
+      <Box flexShrink={0} mt={4}>
         <Version
           isForkAvailable={isForkAvailable}
           didActivateFork={didActivateFork}
