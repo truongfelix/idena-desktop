@@ -3,6 +3,7 @@ import {
   answersToTake,
   autopilotEvents,
   flipDeadlineMs,
+  flipsLeftToAsk,
   nextFlipToAsk,
   sessionEnd,
   SHORT_FLIP_MAX_MS,
@@ -64,6 +65,16 @@ describe('the agent in a validation', () => {
     expect(
       nextFlipToAsk([flip('e', {words})], new Set(), {isShort: false}).hash
     ).toBe('e')
+  })
+
+  test('the time is shared by the flips that can still be asked', () => {
+    const flips = [
+      flip('a'),
+      flip('b', {failed: true}),
+      flip('c', {fetched: true, decoded: false}),
+      flip('d', {decoded: false}),
+    ]
+    expect(flipsLeftToAsk(flips, new Set(['a']))).toBe(1)
   })
 
   test("taking the agent's picks answers only the flips without an answer", () => {
@@ -130,11 +141,22 @@ describe('the agent in a validation', () => {
       picks,
       applied: new Set(['answer:a', 'answer:d', 'answer:e', 'answer:f']),
       isKeywords: true,
+      reportsLeft: 1,
     })
     expect(marks).toEqual([
       {type: 'APPROVE_WORDS', hash: 'a'},
       {type: 'REPORT_WORDS', hash: 'f'},
     ])
+    // No report left in the session: the flip it would report is left to the person, not approved.
+    expect(
+      autopilotEvents({
+        flips,
+        picks,
+        applied: new Set(['answer:a', 'answer:d', 'answer:e', 'answer:f']),
+        isKeywords: true,
+        reportsLeft: 0,
+      })
+    ).toEqual([{type: 'APPROVE_WORDS', hash: 'a'}])
     // A mark it gave once is not given again, even when the person took it back.
     expect(
       autopilotEvents({

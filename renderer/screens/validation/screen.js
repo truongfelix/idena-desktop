@@ -106,16 +106,25 @@ export function ValidationScreen({
     ? AGENT_COLORS.dark
     : AGENT_COLORS.themed
 
-  // The agent's pick on this flip, for the side it picked (Suggest only: Autopilot answers itself).
+  // The agent's pick on this flip, on the side it picked: in Suggest until the person answers; in the keywords
+  // check, a report it leaves to the person (Suggest, or Autopilot with reports on Ask me) until the flip is marked.
   const pick = agent && currentFlip ? agent.picks[currentFlip.hash] : null
-  const agentPickFor = (variant) =>
-    agent?.mode === 'suggest' && pickedSide(pick) === variant
+  const agentPickFor = (variant) => {
+    if (!pick || pickedSide(pick) !== variant) return null
+    const isKeywords = isLongSessionKeywords(state)
+    const show = isKeywords
+      ? Boolean(pick.report) &&
+        !currentFlip.relevance &&
+        !(agent.mode === 'autopilot' && pick.reportDecision === 'alone')
+      : agent.mode === 'suggest' && !currentFlip.option
+    return show
       ? {
           percent: Math.round((pick.confidence || 0) * 100),
-          report: Boolean(pick.report) && isLongSessionKeywords(state),
+          report: isKeywords,
           isDark: isShortSession(state),
         }
       : null
+  }
 
   const flipTimerDetails = {
     isShortSession: isShortSession(state),

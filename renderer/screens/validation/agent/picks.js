@@ -57,9 +57,12 @@ export function nextFlipToAsk(flips, asked, {isShort}) {
   )
 }
 
-/** The flips not asked yet, to share the time left between them. */
+/** The flips not asked yet that can still be (not failed), to share the time left between them. */
 export function flipsLeftToAsk(flips, asked) {
-  return flips.filter((flip) => !asked.has(flip.hash)).length
+  return flips.filter(
+    (flip) =>
+      !asked.has(flip.hash) && !flip.failed && !(flip.fetched && !flip.decoded)
+  ).length
 }
 
 /** The side of the agent's pick (AnswerType), or null when it skips. */
@@ -86,10 +89,18 @@ const unmarked = (flip) =>
 /**
  * Autopilot's events: the answers its permission lets it give alone, and in the keywords check its marks (a
  * report only when its report permission is Alone too). `applied` holds what it already did, so a mark the person
- * changed is never put back; the person's own answer is never replaced.
+ * changed is never put back; the person's own answer is never replaced. `reportsLeft`: the session's reports not
+ * used yet (the permission was checked when the flip was asked, before any report).
  */
-export function autopilotEvents({flips, picks, applied, isKeywords}) {
+export function autopilotEvents({
+  flips,
+  picks,
+  applied,
+  isKeywords,
+  reportsLeft = 0,
+}) {
   const events = []
+  let left = reportsLeft
   flips.forEach((flip) => {
     const pick = picks[flip.hash]
     if (!pick || pick.decision !== 'alone') return
@@ -98,9 +109,12 @@ export function autopilotEvents({flips, picks, applied, isKeywords}) {
       events.push({type: 'ANSWER', hash: flip.hash, option: side})
     if (!isKeywords || applied.has(`mark:${flip.hash}`) || !unmarked(flip))
       return
-    if (pick.report && pick.reportDecision === 'alone')
-      events.push({type: 'REPORT_WORDS', hash: flip.hash})
-    else if (!pick.report && pick.relevance === 'relevant')
+    if (pick.report) {
+      if (pick.reportDecision === 'alone' && left > 0) {
+        left -= 1
+        events.push({type: 'REPORT_WORDS', hash: flip.hash})
+      }
+    } else if (!pick.report && pick.relevance === 'relevant')
       events.push({type: 'APPROVE_WORDS', hash: flip.hash})
   })
   return events
