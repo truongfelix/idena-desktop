@@ -10,6 +10,7 @@ const {
   nativeTheme,
   net,
   protocol,
+  safeStorage,
   session,
   shell,
   // eslint-disable-next-line import/no-extraneous-dependencies
@@ -26,6 +27,9 @@ const {themeSource} = require('./theme')
 const loadRoute = require('./utils/routes')
 const {getI18nConfig} = require('./language')
 const {searchImageSource, searchImages} = require('./image-search')
+const {createAgent} = require('./agent/agent')
+const {createAgentSettings} = require('./agent/settings')
+const {createAgentKey} = require('./agent/key')
 const {openExternalUrl} = require('./safe-external-url')
 const {RELEASES_API, createReleaseCheck} = require('./app-update-check')
 const {isTrustedIpcSender} = require('./ipc-sender')
@@ -173,6 +177,19 @@ const routerPort = createRouterPortService({
   nodeRpc,
   configuredPort: () => Number(nodeConnection?.ipfsPort) || null,
   nodeLogTail: () => readNodeLogTail(),
+  logger,
+})
+
+// The agent (main/agent/agent.js): its settings and its encrypted key in the user data folder's agent/ folder.
+const agent = createAgent({
+  settings: createAgentSettings({
+    file: () => join(app.getPath('userData'), 'agent', 'settings.json'),
+    logger,
+  }),
+  key: createAgentKey({
+    file: () => join(app.getPath('userData'), 'agent', 'key.enc'),
+    safeStorage,
+  }),
   logger,
 })
 
@@ -1076,6 +1093,11 @@ ipcMain.handle('search-image', async (event, query, source) => {
   requireIpcSender(event)
   if (source !== undefined) return searchImageSource(query, source, {logger})
   return searchImages(query, {logger})
+})
+
+ipcMain.handle('agent', async (event, command, data) => {
+  requireIpcSender(event)
+  return agent.handle(command, data)
 })
 
 ipcMain.handle('router-port', async (event, command, data) => {
