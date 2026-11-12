@@ -40,10 +40,12 @@ function createAgent({
 
   const status = () => {
     const current = settings.read()
+    const hasKey = key.has(destination(current))
     return {
       settings: current,
       keychain: key.keychain(),
-      hasKey: key.has(destination(current)),
+      hasKey,
+      keyElsewhere: !hasKey && key.hasAny(),
     }
   }
 

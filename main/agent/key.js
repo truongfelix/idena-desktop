@@ -61,6 +61,11 @@ function createAgentKey({file, safeStorage, platform = process.platform}) {
       if (!keychainState(safeStorage, platform).available) return false
       return matches(kept(), destination)
     },
+    /** Whether a key is kept at all: one saved for another provider or address can still be removed. */
+    hasAny() {
+      if (!keychainState(safeStorage, platform).available) return false
+      return Boolean(kept())
+    },
     set(key, {provider, address} = {}) {
       const value = typeof key === 'string' ? key.trim() : ''
       if (!value || value.length > MAX_KEY_LENGTH || /\s/u.test(value))

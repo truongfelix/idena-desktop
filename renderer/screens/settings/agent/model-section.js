@@ -73,32 +73,46 @@ function KeyField({status, onSetKey, onClearKey}) {
       </Flex>
     )
   return (
-    <Flex align="flex-end" gap={2}>
-      <FormControlWithLabel
-        label={t(
-          "API key: kept in this computer's keychain, never in the app's files",
-          {
-            nsSeparator: '!!',
-          }
-        )}
-        flex={1}
-      >
-        <Input
-          type="password"
-          autoComplete="off"
-          value={key}
-          onChange={(e) => setKey(e.target.value)}
-        />
-      </FormControlWithLabel>
-      <PrimaryButton
-        isDisabled={!key.trim()}
-        onClick={async () => {
-          if (await onSetKey(key)) setKey('')
-        }}
-      >
-        {t('Save the key')}
-      </PrimaryButton>
-    </Flex>
+    <Stack spacing={3}>
+      {status.keyElsewhere && (
+        <Flex align="center" justify="space-between" gap={4} wrap="wrap">
+          <Text color="muted">
+            {t(
+              "A key saved for another service or address is still in this computer's keychain."
+            )}
+          </Text>
+          <SecondaryButton onClick={onClearKey}>
+            {t('Remove the key')}
+          </SecondaryButton>
+        </Flex>
+      )}
+      <Flex align="flex-end" gap={2}>
+        <FormControlWithLabel
+          label={t(
+            "API key: kept in this computer's keychain, never in the app's files",
+            {
+              nsSeparator: '!!',
+            }
+          )}
+          flex={1}
+        >
+          <Input
+            type="password"
+            autoComplete="off"
+            value={key}
+            onChange={(e) => setKey(e.target.value)}
+          />
+        </FormControlWithLabel>
+        <PrimaryButton
+          isDisabled={!key.trim()}
+          onClick={async () => {
+            if (await onSetKey(key)) setKey('')
+          }}
+        >
+          {t('Save the key')}
+        </PrimaryButton>
+      </Flex>
+    </Stack>
   )
 }
 

@@ -1798,6 +1798,7 @@
   "Claude models": "Modèles Claude",
   "This computer has no keychain the app can use, so it cannot keep an API key. Use a model on this computer, or set up the system keychain.": "Cet ordinateur n'a pas de trousseau que l'application peut utiliser : elle ne peut donc pas garder de clé d'API. Utilisez un modèle sur cet ordinateur, ou configurez le trousseau du système.",
   "A key is kept in this computer's keychain.": "Une clé est gardée dans le trousseau de cet ordinateur.",
+  "A key saved for another service or address is still in this computer's keychain.": "Une clé enregistrée pour un autre service ou une autre adresse est encore dans le trousseau de cet ordinateur.",
   "Remove the key": "Supprimer la clé",
   "API key: kept in this computer's keychain, never in the app's files": "Clé d'API : gardée dans le trousseau de cet ordinateur, jamais dans les fichiers de l'application",
   "Save the key": "Enregistrer la clé",

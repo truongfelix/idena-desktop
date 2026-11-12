@@ -1799,6 +1799,7 @@
   "Claude models": "Claude models",
   "This computer has no keychain the app can use, so it cannot keep an API key. Use a model on this computer, or set up the system keychain.": "This computer has no keychain the app can use, so it cannot keep an API key. Use a model on this computer, or set up the system keychain.",
   "A key is kept in this computer's keychain.": "A key is kept in this computer's keychain.",
+  "A key saved for another service or address is still in this computer's keychain.": "A key saved for another service or address is still in this computer's keychain.",
   "Remove the key": "Remove the key",
   "API key: kept in this computer's keychain, never in the app's files": "API key: kept in this computer's keychain, never in the app's files",
   "Save the key": "Save the key",

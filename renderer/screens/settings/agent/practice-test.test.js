@@ -91,4 +91,21 @@ describe('the practice test of Settings › Agent', () => {
     )
     expect(testFlip).toHaveBeenCalledTimes(1)
   })
+
+  test('the flip stopped in flight does not count', async () => {
+    let stopped = false
+    const testFlip = jest
+      .fn()
+      .mockResolvedValueOnce({answer: 'left'})
+      .mockImplementationOnce(async () => {
+        stopped = true
+        throw new Error('stopped')
+      })
+    const result = await runPracticeTest(
+      {short: [flip('a', 1), flip('b', 1), flip('c', 1)], long: []},
+      {testFlip, isStopped: () => stopped}
+    )
+    expect(result).toMatchObject({right: 1, total: 1, failed: 0})
+    expect(result.lastError).toBeNull()
+  })
 })

@@ -60,6 +60,9 @@ describe('agent key', () => {
     expect(
       key.has({provider: 'openai', address: 'https://api.openai.com/v1'})
     ).toBe(false)
+    expect(key.hasAny()).toBe(true)
+    key.clear()
+    expect(key.hasAny()).toBe(false)
     expect(() =>
       key.set('sk-1', {provider: 'local', address: 'http://127.0.0.1'})
     ).toThrow('hosted model only')

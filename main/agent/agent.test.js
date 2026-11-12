@@ -29,6 +29,7 @@ function setup(saved = {}, reply = '{"answer":"left","confidence":0.8}') {
   const key = {
     keychain: () => ({available: true, reason: null}),
     has: () => true,
+    hasAny: () => true,
     read: jest.fn((destination) =>
       destination.provider === 'local' ? null : 'sk-secret'
     ),
@@ -51,7 +52,20 @@ describe('the agent channel', () => {
     const {agent} = setup()
     const status = await agent.handle('status')
     expect(JSON.stringify(status)).not.toContain('sk-secret')
-    expect(status).toMatchObject({hasKey: true, keychain: {available: true}})
+    expect(status).toMatchObject({
+      hasKey: true,
+      keyElsewhere: false,
+      keychain: {available: true},
+    })
+  })
+
+  test('a key kept for another service shows, to be removed', async () => {
+    const {agent, key} = setup()
+    key.has = () => false
+    await expect(agent.handle('status')).resolves.toMatchObject({
+      hasKey: false,
+      keyElsewhere: true,
+    })
   })
 
   test('the model is not asked when the action is off', async () => {

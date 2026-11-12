@@ -59,6 +59,8 @@ export async function runPracticeTest(
         TEST_FLIP_TIMEOUT_MS
       )
     } catch (error) {
+      // Stopped by the user: the flip in flight was never answered, it does not count.
+      if (isStopped()) break
       result.failed += 1
       result.lastError = error
     }

@@ -54,14 +54,14 @@ function usePracticeTest(t, onDone) {
   const setState = (value) => mounted.current && setStateNow(value)
 
   // Leaving the page stops the test: no more flips sent, the one in flight ended in the main process.
-  React.useEffect(
-    () => () => {
+  React.useEffect(() => {
+    mounted.current = true
+    return () => {
       mounted.current = false
       stopped.current = true
       stopAgentTest().catch(() => {})
-    },
-    []
-  )
+    }
+  }, [])
 
   const start = async () => {
     stopped.current = false
@@ -135,12 +135,13 @@ export function AgentSettings() {
 
   if (!status) return error ? <ErrorAlert mt={8}>{error}</ErrorAlert> : null
   const {settings} = status
-  const save = (change) => {
-    saving.current = saving.current.then(() =>
-      run(async () => saveAgentSettings(change((await agentStatus()).settings)))
-    )
+  // The key waits in the same line: saved after an address change still being saved, it is bound to the new one.
+  const queue = (call) => {
+    saving.current = saving.current.then(() => run(call))
     return saving.current
   }
+  const save = (change) =>
+    queue(async () => saveAgentSettings(change((await agentStatus()).settings)))
 
   return (
     <Stack spacing={8} mt={8} maxW="2xl">
@@ -167,8 +168,8 @@ export function AgentSettings() {
       <ModelSection
         status={status}
         onChange={save}
-        onSetKey={(key) => run(() => setAgentKey(key))}
-        onClearKey={() => run(clearAgentKey)}
+        onSetKey={(key) => queue(() => setAgentKey(key))}
+        onClearKey={() => queue(clearAgentKey)}
         test={test}
       />
       <PermissionsSection settings={settings} onChange={save} />
