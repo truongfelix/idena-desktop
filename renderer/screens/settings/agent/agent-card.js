@@ -2,19 +2,27 @@ import * as React from 'react'
 import NextLink from 'next/link'
 import {Box, Button, Link, Text} from '@chakra-ui/react'
 import {useTranslation} from 'react-i18next'
-import {agentStatus, onAgentChange, saveAgentSettings} from './api'
+import {
+  agentStatus,
+  lastAgentStatus,
+  onAgentChange,
+  updateAgentSettings,
+} from './api'
 import {AGENT_COLORS} from '../../validation/agent/picks'
 
-/** What the agent does now, in the menu's card (the approved design's screen 2). */
-export function agentCardLine(t, settings) {
+/** What the agent does now, in the menu's card (the approved design's screen 2), from its status. */
+export function agentCardLine(t, {settings, hasKey}) {
   if (settings.paused)
     return t('Paused: it does nothing until you resume it.', {
       nsSeparator: '!!',
     })
+  if (!settings.model) return t('No model chosen yet')
+  if (settings.provider !== 'local' && !hasKey)
+    return t('No API key kept for this service')
   const {level} = settings.permissions.answerFlip
   if (level === 'alone') return t('Autopilot in the validation')
   if (level === 'ask') return t('Suggests the answers in the validation')
-  return t('Every action is off')
+  return t('Answers in the validation are off')
 }
 
 /**
@@ -23,11 +31,13 @@ export function agentCardLine(t, settings) {
  */
 export function AgentCard() {
   const {t} = useTranslation()
-  const [settings, setSettings] = React.useState(null)
+  // The last status known first: the menu mounts again at each page, the card does not blink.
+  const [status, setStatus] = React.useState(lastAgentStatus)
+  const [isBusy, setIsBusy] = React.useState(false)
 
   React.useEffect(() => {
     let live = true
-    const show = (status) => live && setSettings(status.settings)
+    const show = (next) => live && setStatus(next)
     agentStatus().then(show, () => {})
     const off = onAgentChange(show)
     return () => {
@@ -36,8 +46,8 @@ export function AgentCard() {
     }
   }, [])
 
-  if (!settings?.enabled) return null
-  const {paused} = settings
+  if (!status?.settings.enabled) return null
+  const {paused} = status.settings
 
   return (
     <Box
@@ -57,7 +67,7 @@ export function AgentCard() {
         {paused ? t('Agent paused') : t('Agent on')}
       </Link>
       <Text color="xwhite.050" mt={1}>
-        {agentCardLine(t, settings)}
+        {agentCardLine(t, status)}
       </Text>
       <Button
         mt={2}
@@ -67,10 +77,14 @@ export function AgentCard() {
         color="white"
         borderColor="xwhite.016"
         _hover={{bg: 'xwhite.010'}}
-        onClick={async () => {
-          // The saved settings, not this card's copy: another page may have changed them since.
-          const current = (await agentStatus()).settings
-          await saveAgentSettings({...current, paused: !current.paused})
+        isLoading={isBusy}
+        onClick={() => {
+          setIsBusy(true)
+          // Applied to the saved settings in turn with every other change (api.js). A failed save: the card shows
+          // what the main process holds.
+          updateAgentSettings((s) => ({...s, paused: !paused}))
+            .catch(() => agentStatus().then(setStatus, () => {}))
+            .finally(() => setIsBusy(false))
         }}
       >
         {paused ? t('Resume the agent') : t('Pause the agent')}

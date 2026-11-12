@@ -1,6 +1,7 @@
 import * as React from 'react'
 import {
   agentStatus,
+  onAgentChange,
   solveAgentFlip,
   stopAgentSolve,
 } from '../../settings/agent/api'
@@ -13,7 +14,6 @@ import {
   nextFlipToAsk,
   sessionEnd,
 } from './picks'
-import {availableReportsNumber} from '../utils'
 
 // A picture shown from a blob URL, read back as JPEG base64: the app's content policy refuses fetch() of blob URLs,
 // an <img> loads them.
@@ -47,6 +47,13 @@ async function agentFlip(flip, {isShort}) {
   }
 }
 
+/** 'autopilot' | 'suggest' from the settings, or null when the agent does not answer (off, paused). */
+export function agentMode(settings) {
+  const {level} = settings.permissions.answerFlip
+  if (!settings.enabled || settings.paused || level === 'off') return null
+  return level === 'alone' ? 'autopilot' : 'suggest'
+}
+
 /**
  * The agent beside a validation screen. `flips` are the session's flips as shown, `phase` 'short' | 'long' |
  * 'keywords' | null (not solving). Returns null when the agent is off, else its mode ('suggest' | 'autopilot'),
@@ -56,6 +63,7 @@ export function useAgentValidation({
   flips,
   phase,
   reportsUsed,
+  reportsAllowed,
   send,
   validationStart,
   shortSessionDuration,
@@ -70,20 +78,13 @@ export function useAgentValidation({
 
   React.useEffect(() => {
     live.current = true
-    agentStatus()
-      .then(({settings}) => {
-        const {level} = settings.permissions.answerFlip
-        if (
-          live.current &&
-          settings.enabled &&
-          !settings.paused &&
-          level !== 'off'
-        )
-          setMode(level === 'alone' ? 'autopilot' : 'suggest')
-      })
-      .catch(() => {})
+    const show = ({settings}) => live.current && setMode(agentMode(settings))
+    agentStatus().then(show, () => {})
+    // Paused, resumed or changed during the validation (the menu card): the screen follows.
+    const off = onAgentChange(show)
     return () => {
       live.current = false
+      off()
       // Leaving the validation: the question in flight ends in the main process.
       stopAgentSolve().catch(() => {})
     }
@@ -158,12 +159,12 @@ export function useAgentValidation({
       picks,
       applied: applied.current,
       isKeywords: phase === 'keywords',
-      reportsLeft: availableReportsNumber(flips) - reportsUsed,
+      reportsLeft: reportsAllowed - reportsUsed,
     }).forEach((event) => {
       applied.current.add(appliedKey(event))
       send(event)
     })
-  }, [mode, phase, flips, picks, reportsUsed, send])
+  }, [mode, phase, flips, picks, reportsUsed, reportsAllowed, send])
 
   if (!mode) return null
   const toTake = answersToTake(flips, picks)

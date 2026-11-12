@@ -1847,8 +1847,10 @@
   "Paused: it does nothing until you resume it.": "En pause : il ne fait rien jusqu'à la reprise.",
   "Autopilot in the validation": "Pilote automatique pendant la validation",
   "Suggests the answers in the validation": "Suggère les réponses pendant la validation",
-  "Every action is off": "Toutes les actions sont désactivées",
   "Agent paused": "Agent en pause",
   "Resume the agent": "Reprendre l'agent",
-  "Pause the agent": "Mettre l'agent en pause"
+  "Pause the agent": "Mettre l'agent en pause",
+  "No model chosen yet": "Aucun modèle choisi",
+  "No API key kept for this service": "Aucune clé d'API gardée pour ce service",
+  "Answers in the validation are off": "Les réponses pendant la validation sont désactivées"
 }

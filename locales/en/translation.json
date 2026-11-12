@@ -1847,8 +1847,10 @@
   "Paused: it does nothing until you resume it.": "Paused: it does nothing until you resume it.",
   "Autopilot in the validation": "Autopilot in the validation",
   "Suggests the answers in the validation": "Suggests the answers in the validation",
-  "Every action is off": "Every action is off",
   "Agent paused": "Agent paused",
   "Resume the agent": "Resume the agent",
-  "Pause the agent": "Pause the agent"
+  "Pause the agent": "Pause the agent",
+  "No model chosen yet": "No model chosen yet",
+  "No API key kept for this service": "No API key kept for this service",
+  "Answers in the validation are off": "Answers in the validation are off"
 }

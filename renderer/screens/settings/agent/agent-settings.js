@@ -10,10 +10,10 @@ import {
   agentStatus,
   clearAgentKey,
   onAgentChange,
-  saveAgentSettings,
   setAgentKey,
   stopAgentTest,
   testAgentFlip,
+  updateAgentSettings,
 } from './api'
 import {runPracticeTest} from './practice-test'
 import {ModelSection} from './model-section'
@@ -129,23 +129,22 @@ export function AgentSettings() {
   }, [run])
 
   // A change saved elsewhere (the menu card's Pause) shows here too.
-  React.useEffect(() => onAgentChange(setStatus), [])
+  React.useEffect(
+    () =>
+      onAgentChange((next) => {
+        setStatus(next)
+        refreshActivity()
+      }),
+    [refreshActivity]
+  )
 
   const test = usePracticeTest(t, refreshActivity)
 
-  // One save at a time, each changing its own field on the settings the main process holds: two quick changes
-  // (a field's blur, then a click) cannot undo each other.
-  const saving = React.useRef(Promise.resolve())
-
   if (!status) return error ? <ErrorAlert mt={8}>{error}</ErrorAlert> : null
   const {settings} = status
-  // The key waits in the same line: saved after an address change still being saved, it is bound to the new one.
-  const queue = (call) => {
-    saving.current = saving.current.then(() => run(call))
-    return saving.current
-  }
-  const save = (change) =>
-    queue(async () => saveAgentSettings(change((await agentStatus()).settings)))
+  // Each change applied to the saved settings in turn (api.js): two quick changes cannot undo each other, and the
+  // key, saved after an address change still being saved, is bound to the new address.
+  const save = (change) => run(() => updateAgentSettings(change))
 
   return (
     <Stack spacing={8} mt={8} maxW="2xl">
@@ -172,8 +171,8 @@ export function AgentSettings() {
       <ModelSection
         status={status}
         onChange={save}
-        onSetKey={(key) => queue(() => setAgentKey(key))}
-        onClearKey={() => queue(clearAgentKey)}
+        onSetKey={(key) => run(() => setAgentKey(key))}
+        onClearKey={() => run(clearAgentKey)}
         test={test}
       />
       <PermissionsSection settings={settings} onChange={save} />

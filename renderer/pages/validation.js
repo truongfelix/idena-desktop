@@ -8,6 +8,7 @@ import {createValidationMachine} from '../screens/validation/machine'
 import {
   persistValidationState,
   loadValidationState,
+  availableReportsNumber,
 } from '../screens/validation/utils'
 import {
   ValidationFailedDialog,
@@ -105,6 +106,8 @@ function ValidationSession({
     flips: sessionFlips(state),
     phase: agentPhase(state),
     reportsUsed: state.context.reports.size,
+    // The machine's own limit: every long flip counts, ready or not.
+    reportsAllowed: availableReportsNumber(state.context.longFlips),
     send,
     validationStart,
     shortSessionDuration,

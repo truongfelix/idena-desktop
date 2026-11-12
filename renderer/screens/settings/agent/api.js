@@ -4,23 +4,48 @@
 const agent = (command, data) =>
   global.ipcRenderer.invoke('agent', command, data)
 
-// Who shows the agent's state (the menu's card, Settings › Agent) hears each saved change.
+// Who shows the agent's state (the menu's card, Settings › Agent, the validation) hears each change written, and
+// the last status read is kept for a part that mounts again (the menu, at each page).
 const listeners = new Set()
+let lastStatus = null
 
-/** Calls `listener(status)` after each settings save; returns the unsubscribe. */
+/** Calls `listener(status)` after each change written (settings, key); returns the unsubscribe. */
 export function onAgentChange(listener) {
   listeners.add(listener)
   return () => listeners.delete(listener)
 }
 
-export const agentStatus = () => agent('status')
-export async function saveAgentSettings(settings) {
-  const status = await agent('saveSettings', settings)
-  listeners.forEach((listener) => listener(status))
-  return status
+/** The last status read or written, or null. */
+export const lastAgentStatus = () => lastStatus
+
+export const agentStatus = () =>
+  agent('status').then((status) => {
+    lastStatus = status
+    return status
+  })
+
+// One write at a time, whoever writes (a field's blur, a click, the menu card's Pause): each change is applied to
+// the settings the main process holds when its turn comes, so two quick changes cannot undo each other.
+let writing = Promise.resolve()
+function write(call) {
+  const done = writing.then(call).then((status) => {
+    lastStatus = status
+    listeners.forEach((listener) => listener(status))
+    return status
+  })
+  writing = done.catch(() => {})
+  return done
 }
-export const setAgentKey = (key) => agent('setKey', {key})
-export const clearAgentKey = () => agent('clearKey')
+
+/** Saves `change(settings)`, `change` applied to the saved settings when this write's turn comes. */
+export const updateAgentSettings = (change) =>
+  write(async () =>
+    agent('saveSettings', change((await agent('status')).settings))
+  )
+export const saveAgentSettings = (settings) =>
+  write(() => agent('saveSettings', settings))
+export const setAgentKey = (key) => write(() => agent('setKey', {key}))
+export const clearAgentKey = () => write(() => agent('clearKey'))
 export const agentActivity = () => agent('activity')
 export const stopAgentTest = () => agent('stopTest')
 export const stopAgentSolve = () => agent('stopSolve')

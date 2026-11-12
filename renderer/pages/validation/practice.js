@@ -239,6 +239,8 @@ function PracticeSession({practice, onDone, onLeave}) {
     flips: sessionFlips(state),
     phase: agentPhase(state),
     reportsUsed: state.context.reports.size,
+    // The machine's own limit: every long flip counts, ready or not.
+    reportsAllowed: availableReportsNumber(state.context.longFlips),
     send,
     validationStart,
     shortSessionDuration: PRACTICE_SHORT_SESSION_DURATION,
