@@ -246,6 +246,20 @@ describe('the agent channel', () => {
     await expect(second).rejects.toThrow('stopped')
   })
 
+  test('leaving the validation ends its question in flight', async () => {
+    const {agent, ask} = setup()
+    ask.mockImplementation(
+      (config, system, parts, {signal}) =>
+        new Promise((resolve, reject) => {
+          signal.addEventListener('abort', () => reject(new Error('stopped')))
+        })
+    )
+    const solving = agent.handle('solveFlip', {flip, timeoutMs: 5000})
+    await Promise.resolve()
+    await agent.handle('stopSolve')
+    await expect(solving).rejects.toThrow('stopped')
+  })
+
   test('a deadline that is not a number is the longest one, not 1 s', () => {
     expect(clampTimeout(null)).toBe(120000)
     expect(clampTimeout('')).toBe(120000)

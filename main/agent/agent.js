@@ -153,6 +153,11 @@ function createAgent({
         throw error
       }
     },
+    /** Leaving a validation: its question in flight ends at once. */
+    stopSolve() {
+      stop(solving)
+      return null
+    },
     /** The practice test's Stop: its question in flight ends at once. */
     stopTest() {
       stop(testing)

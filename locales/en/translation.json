@@ -1838,5 +1838,10 @@
   "Runs the 15 practice flips; nothing goes to the chain.": "Runs the 15 practice flips; nothing goes to the chain.",
   "Connect a model to this node and choose what it may do for you. The agent never gets your key: each action it asks for goes through the same steps as your own click, after the permission you set here.": "Connect a model to this node and choose what it may do for you. The agent never gets your key: each action it asks for goes through the same steps as your own click, after the permission you set here.",
   "Agent on": "Agent on",
-  "Agent": "Agent"
+  "Agent": "Agent",
+  "Agent's pick · {{percent}}% sure": "Agent's pick · {{percent}}% sure",
+  "Agent's pick · {{percent}}% sure · it would report this flip": "Agent's pick · {{percent}}% sure · it would report this flip",
+  "Agent: Suggest": "Agent: Suggest",
+  "Agent: Autopilot": "Agent: Autopilot",
+  "Take the agent's picks for the rest": "Take the agent's picks for the rest"
 }

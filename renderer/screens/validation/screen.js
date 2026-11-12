@@ -45,6 +45,7 @@ import {
   ReviewShortSessionDialog,
 } from './components'
 import {rem} from '../../shared/theme'
+import {AGENT_COLORS, pickedSide} from './agent/picks'
 import {AnswerType, RelevanceType} from '../../shared/types'
 import {InfoButton, PrimaryButton} from '../../shared/components/button'
 import {FloatDebug, Tooltip} from '../../shared/components/components'
@@ -68,6 +69,7 @@ export function ValidationScreen({
   isExceededTooltipOpen,
   onCloseExceededTooltip,
   headerActions,
+  agent,
   children,
 }) {
   const {t} = useTranslation()
@@ -99,6 +101,21 @@ export function ValidationScreen({
 
   const flips = sessionFlips(state)
   const currentFlip = flips[currentIndex]
+
+  const agentColor = isShortSession(state)
+    ? AGENT_COLORS.dark
+    : AGENT_COLORS.themed
+
+  // The agent's pick on this flip, for the side it picked (Suggest only: Autopilot answers itself).
+  const pick = agent && currentFlip ? agent.picks[currentFlip.hash] : null
+  const agentPickFor = (variant) =>
+    agent?.mode === 'suggest' && pickedSide(pick) === variant
+      ? {
+          percent: Math.round((pick.confidence || 0) * 100),
+          report: Boolean(pick.report) && isLongSessionKeywords(state),
+          isDark: isShortSession(state),
+        }
+      : null
 
   const flipTimerDetails = {
     isShortSession: isShortSession(state),
@@ -148,6 +165,22 @@ export function ValidationScreen({
             </Text>
           </Title>
 
+          {agent && (
+            <Text
+              fontSize="sm"
+              px={3}
+              py={1}
+              mr={2}
+              borderRadius="md"
+              borderWidth={1}
+              borderColor={agentColor}
+              color={agentColor}
+            >
+              {agent.mode === 'autopilot'
+                ? t('Agent: Autopilot', {nsSeparator: '!!'})
+                : t('Agent: Suggest', {nsSeparator: '!!'})}
+            </Text>
+          )}
           <IconButton
             icon={<FullscreenIcon />}
             bg={isShortSession(state) ? 'brandGray.060' : 'gray.300'}
@@ -178,6 +211,7 @@ export function ValidationScreen({
               {...currentFlip}
               variant={AnswerType.Left}
               timerDetails={flipTimerDetails}
+              agentPick={agentPickFor(AnswerType.Left)}
               onChoose={(hash) =>
                 send({
                   type: 'ANSWER',
@@ -190,6 +224,7 @@ export function ValidationScreen({
               {...currentFlip}
               variant={AnswerType.Right}
               timerDetails={flipTimerDetails}
+              agentPick={agentPickFor(AnswerType.Right)}
               onChoose={(hash) =>
                 send({
                   type: 'ANSWER',
@@ -354,7 +389,19 @@ export function ValidationScreen({
         </FlipChallenge>
       </CurrentStep>
       <ActionBar>
-        <ActionBarItem />
+        <ActionBarItem>
+          {agent?.canTakeRest && isSolving(state) && !isSubmitting(state) && (
+            <Button
+              variant="outline"
+              borderColor={agentColor}
+              color={agentColor}
+              _hover={{bg: 'transparent'}}
+              onClick={agent.takeRest}
+            >
+              {t("Take the agent's picks for the rest")}
+            </Button>
+          )}
+        </ActionBarItem>
         <ActionBarItem justify="center">
           <ValidationTimer
             validationStart={validationStart}
@@ -505,6 +552,13 @@ export function ValidationScreen({
   )
 }
 
+/** Where the agent is in a validation: 'short', 'long' (the stories), 'keywords', or null (not answering). */
+export function agentPhase(state) {
+  if (isSubmitting(state) || !isSolving(state)) return null
+  if (isShortSession(state)) return 'short'
+  return isLongSessionKeywords(state) ? 'keywords' : 'long'
+}
+
 function isShortSession(state) {
   return state.matches('shortSession')
 }
@@ -568,7 +622,7 @@ function canSubmit(state) {
     )
 }
 
-function sessionFlips(state) {
+export function sessionFlips(state) {
   const {
     context: {shortFlips, longFlips},
   } = state

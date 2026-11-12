@@ -26,7 +26,12 @@ import {PrimaryButton, SecondaryButton} from '../../shared/components/button'
 import {CrossSmallIcon} from '../../shared/components/icons'
 import {rem} from '../../shared/theme'
 import {createValidationMachine} from '../../screens/validation/machine'
-import {ValidationScreen} from '../../screens/validation/screen'
+import {
+  ValidationScreen,
+  agentPhase,
+  sessionFlips,
+} from '../../screens/validation/screen'
+import {useAgentValidation} from '../../screens/validation/agent/use-agent-validation'
 import {
   useAutoStartLottery,
   useAutoStartValidation,
@@ -229,6 +234,17 @@ function PracticeSession({practice, onDone, onLeave}) {
 
   const isShortSession = state.matches('shortSession')
 
+  // The agent, when it is on (Settings › Agent): it practises as it would validate.
+  const agent = useAgentValidation({
+    flips: sessionFlips(state),
+    phase: agentPhase(state),
+    reportsUsed: state.context.reports.size,
+    send,
+    validationStart,
+    shortSessionDuration: PRACTICE_SHORT_SESSION_DURATION,
+    longSessionDuration,
+  })
+
   return (
     <ValidationScreen
       state={state}
@@ -238,6 +254,7 @@ function PracticeSession({practice, onDone, onLeave}) {
       longSessionDuration={longSessionDuration}
       isExceededTooltipOpen={isExceededTooltipOpen}
       onCloseExceededTooltip={onCloseExceededTooltip}
+      agent={agent}
       headerActions={
         <Tooltip label={t('Leave the practice')} placement="bottom-end">
           <IconButton

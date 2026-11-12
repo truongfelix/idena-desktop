@@ -1838,5 +1838,10 @@
   "Connect a model to this node and choose what it may do for you. The agent never gets your key: each action it asks for goes through the same steps as your own click, after the permission you set here.": "Connectez un modèle à ce nœud et choisissez ce qu'il peut faire pour vous. L'agent n'obtient jamais votre clé : chaque action qu'il demande passe par les mêmes étapes que votre propre clic, après l'autorisation que vous réglez ici.",
   "Agent on": "Agent activé",
   "Agent": "Agent",
-  "Ollama, LM Studio, llama.cpp": "Ollama, LM Studio, llama.cpp"
+  "Ollama, LM Studio, llama.cpp": "Ollama, LM Studio, llama.cpp",
+  "Agent's pick · {{percent}}% sure": "Choix de l'agent · sûr à {{percent}} %",
+  "Agent's pick · {{percent}}% sure · it would report this flip": "Choix de l'agent · sûr à {{percent}} % · il signalerait ce flip",
+  "Agent: Suggest": "Agent : suggestions",
+  "Agent: Autopilot": "Agent : pilote automatique",
+  "Take the agent's picks for the rest": "Prendre les choix de l'agent pour la suite"
 }
