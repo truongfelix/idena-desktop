@@ -1880,5 +1880,8 @@
   "The recording stopped at its limit: {{minutes}} minutes.": "L'enregistrement s'est arrêté à sa limite : {{minutes}} minutes.",
   "Play the video": "Lire la vidéo",
   "🎞 This computer cannot play this video.": "🎞 Cet ordinateur ne peut pas lire cette vidéo.",
-  "The agent submits the answers in {{seconds}} s": "L'agent envoie les réponses dans {{seconds}} s"
+  "The agent submits the answers in {{seconds}} s": "L'agent envoie les réponses dans {{seconds}} s",
+  "Agent: paused": "Agent : en pause",
+  "Pause": "Pause",
+  "Resume": "Reprendre"
 }

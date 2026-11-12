@@ -44,13 +44,13 @@ export function flipDeadlineMs({end, now, flipsLeft, isShort}) {
 }
 
 /**
- * A flip the agent can be asked: its pictures read, and in the long session its keywords too, or none once the
- * validation stopped fetching them (`keywordsDone`).
+ * A flip the agent can be asked: its pictures read, and in the long session its keywords too, or none once the agent
+ * stopped waiting for them (`withoutWords`, the hashes).
  */
-export function isAskable(flip, {isShort, keywordsDone = false}) {
+export function isAskable(flip, {isShort, withoutWords = new Set()}) {
   if (!flip || flip.failed || !flip.decoded || !flip.images?.length)
     return false
-  return isShort || keywordsDone || decodedWithKeywords(flip)
+  return isShort || withoutWords.has(flip.hash) || decodedWithKeywords(flip)
 }
 
 /** The next flip to ask, in the order shown; `asked` holds the hashes already asked. */

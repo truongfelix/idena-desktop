@@ -175,20 +175,39 @@ export function ValidationScreen({
           </Title>
 
           {agent && (
-            <Text
-              fontSize="sm"
-              px={3}
-              py={1}
+            <Flex
+              align="center"
+              gap={2}
               mr={2}
+              pl={3}
+              pr={1}
+              py={1}
               borderRadius="md"
               borderWidth={1}
               borderColor={agentColor}
               color={agentColor}
+              fontSize="sm"
             >
-              {agent.mode === 'autopilot'
-                ? t('Agent: Autopilot', {nsSeparator: '!!'})
-                : t('Agent: Suggest', {nsSeparator: '!!'})}
-            </Text>
+              <Text>
+                {/* eslint-disable-next-line no-nested-ternary */}
+                {agent.paused
+                  ? t('Agent: paused', {nsSeparator: '!!'})
+                  : agent.mode === 'autopilot'
+                  ? t('Agent: Autopilot', {nsSeparator: '!!'})
+                  : t('Agent: Suggest', {nsSeparator: '!!'})}
+              </Text>
+              {/* A person supervises: pauses the agent, corrects, and resumes it. */}
+              <Button
+                size="xs"
+                variant="outline"
+                borderColor={agentColor}
+                color={agentColor}
+                _hover={{bg: 'transparent'}}
+                onClick={agent.paused ? agent.resume : agent.pause}
+              >
+                {agent.paused ? t('Resume') : t('Pause')}
+              </Button>
+            </Flex>
           )}
           <IconButton
             icon={<FullscreenIcon />}
@@ -596,11 +615,6 @@ const AUTOPILOT_STEPS = [
 export function autopilotStep(state) {
   const found = AUTOPILOT_STEPS.find(([path]) => state.matches(path))
   return found ? found[1] : null
-}
-
-/** Whether the validation stopped fetching the long flips' keywords: a flip without them is asked as it is. */
-export function keywordsDone(state) {
-  return state.matches('longSession.fetch.keywords.done')
 }
 
 /** Where the agent is in a validation: 'short', 'long' (the stories), 'keywords', or null (not answering). */

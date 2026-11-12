@@ -2,8 +2,8 @@ import {AnswerType} from '../../../shared/types'
 import {
   SUBMIT_COUNTDOWN_MS,
   autopilotPlan,
+  fallbackAnswers,
   isSettled,
-  randomAnswers,
 } from './autopilot'
 
 const flip = (hash, more = {}) => ({
@@ -14,39 +14,44 @@ const flip = (hash, more = {}) => ({
 })
 const left = () => 0.1
 const right = () => 0.9
+const answer = (hash, option) => ({type: 'ANSWER', hash, option})
 
 describe('Autopilot through the validation', () => {
-  test('a flip it cannot answer gets a random side, the others wait for the model', () => {
+  test('a loaded flip the model could not answer gets a random side; one that did not load gets none', () => {
     const flips = [
-      flip('read'),
+      flip('waiting'),
       flip('failed', {failed: true}),
       flip('unreadable', {decoded: false}),
       flip('skipped'),
       flip('timeout'),
+      flip('picked'),
       flip('mine', {option: AnswerType.Right}),
     ]
     const picks = {
       skipped: {answer: null},
       timeout: {failed: true},
+      picked: {answer: 'right', decision: 'alone'},
       mine: {failed: true},
     }
-    expect(randomAnswers(flips, picks, {random: left})).toEqual(
-      ['failed', 'unreadable', 'skipped', 'timeout'].map((hash) => ({
-        type: 'ANSWER',
-        hash,
-        option: AnswerType.Left,
-      }))
-    )
-    // A side the model picked is never replaced, even before its answer shows on the flip.
-    expect(
-      randomAnswers([flip('picked')], {picked: {answer: 'left'}}, {all: true})
-    ).toEqual([])
-    // Out of time: every flip without an answer, never over the person's.
-    expect(
-      randomAnswers(flips, picks, {all: true, random: right}).map(
-        ({hash}) => hash
-      )
-    ).toEqual(['read', 'failed', 'unreadable', 'skipped', 'timeout'])
+    expect(fallbackAnswers(flips, picks, {random: left})).toEqual([
+      answer('skipped', AnswerType.Left),
+      answer('timeout', AnswerType.Left),
+    ])
+    // Time is up: every loaded flip without an answer, the model's side where it picked one.
+    expect(fallbackAnswers(flips, picks, {all: true, random: right})).toEqual([
+      answer('waiting', AnswerType.Right),
+      answer('skipped', AnswerType.Right),
+      answer('timeout', AnswerType.Right),
+      answer('picked', AnswerType.Right),
+    ])
+  })
+
+  test('a flip gets one random side, however often it is asked for', () => {
+    const drawn = new Map()
+    const flips = [flip('a')]
+    const picks = {a: {failed: true}}
+    const first = fallbackAnswers(flips, picks, {drawn, random: left})
+    expect(fallbackAnswers(flips, picks, {drawn, random: right})).toEqual(first)
   })
 
   test('settled only when nothing is asked and nothing is left to ask', () => {
@@ -65,69 +70,65 @@ describe('Autopilot through the validation', () => {
     )
   })
 
-  test('the short session: answered, then a countdown, then the submit', () => {
+  test('the short session: answered, a countdown, then the submit', () => {
     const flips = [flip('a', {option: AnswerType.Left}), flip('b')]
     const picks = {b: {answer: null}}
-    const base = {
-      step: 'short',
-      flips,
-      picks,
-      settled: false,
-      guardAt: 100000,
-      random: left,
-    }
-    const first = autopilotPlan({...base, now: 0})
-    expect(first.events).toEqual([
-      {type: 'ANSWER', hash: 'b', option: AnswerType.Left},
-    ])
+    const base = {step: 'short', flips, picks, settled: false, guardAt: 100000}
+    const first = autopilotPlan({...base, now: 0, random: left})
+    expect(first.events).toEqual([answer('b', AnswerType.Left)])
     expect(first.countdownEnd).toBe(SUBMIT_COUNTDOWN_MS)
     const answered = [flips[0], {...flips[1], option: AnswerType.Left}]
+    const at = {...base, flips: answered, countdownEnd: SUBMIT_COUNTDOWN_MS}
+    expect(autopilotPlan({...at, now: 10000})).toEqual({
+      events: [],
+      countdownEnd: SUBMIT_COUNTDOWN_MS,
+    })
+    expect(autopilotPlan({...at, now: SUBMIT_COUNTDOWN_MS})).toEqual({
+      events: [{type: 'SUBMIT'}],
+      countdownEnd: null,
+    })
+  })
+
+  test('a side the model picked counts only once the validation holds it', () => {
+    const flips = [flip('a')]
+    const picks = {a: {answer: 'left', decision: 'ask'}}
     expect(
       autopilotPlan({
-        ...base,
-        flips: answered,
-        now: 10000,
-        countdownEnd: SUBMIT_COUNTDOWN_MS,
+        step: 'short',
+        flips,
+        picks,
+        settled: false,
+        now: 0,
+        guardAt: 100000,
       })
-    ).toEqual({events: [], countdownEnd: SUBMIT_COUNTDOWN_MS})
+    ).toEqual({events: [], countdownEnd: null})
+    // Nothing left to ask: its side is given, then the countdown runs.
     expect(
       autopilotPlan({
-        ...base,
-        flips: answered,
-        now: SUBMIT_COUNTDOWN_MS,
-        countdownEnd: SUBMIT_COUNTDOWN_MS,
-      })
-    ).toEqual({events: [{type: 'SUBMIT'}], countdownEnd: null})
+        step: 'short',
+        flips,
+        picks,
+        settled: true,
+        now: 0,
+        guardAt: 100000,
+      }).events
+    ).toEqual([answer('a', AnswerType.Left)])
   })
 
   test('the countdown never runs past the latest submit', () => {
     const flips = [flip('a', {option: AnswerType.Left})]
-    expect(
-      autopilotPlan({
-        step: 'short',
-        flips,
-        picks: {},
-        settled: true,
-        now: 90000,
-        guardAt: 100000,
-      }).countdownEnd
-    ).toBe(100000)
-    expect(
-      autopilotPlan({
-        step: 'short',
-        flips,
-        picks: {},
-        settled: true,
-        now: 100000,
-        guardAt: 100000,
-      }).events
-    ).toEqual([{type: 'SUBMIT'}])
+    const at = {step: 'short', flips, picks: {}, settled: true, guardAt: 100000}
+    expect(autopilotPlan({...at, now: 90000}).countdownEnd).toBe(100000)
+    expect(autopilotPlan({...at, now: 100000}).events).toEqual([
+      {type: 'SUBMIT'},
+    ])
   })
 
-  test('a flip still on its way waits, until the latest submit: then everything is answered and sent', () => {
+  test('a flip still loading waits, until the latest submit; one that failed is skipped', () => {
     const flips = [
       flip('a', {option: AnswerType.Left}),
       flip('b', {fetched: false, decoded: false}),
+      flip('c', {failed: true}),
     ]
     const base = {
       step: 'short',
@@ -135,19 +136,17 @@ describe('Autopilot through the validation', () => {
       picks: {},
       settled: false,
       guardAt: 100000,
-      random: right,
     }
     expect(autopilotPlan({...base, now: 50000})).toEqual({
       events: [],
       countdownEnd: null,
     })
     expect(autopilotPlan({...base, now: 100000}).events).toEqual([
-      {type: 'ANSWER', hash: 'b', option: AnswerType.Right},
       {type: 'SUBMIT'},
     ])
   })
 
-  test('the long session goes on by itself: start, flips, keywords, submit, confirm', () => {
+  test('the long session goes on by itself; it confirms only its own submit', () => {
     const at = {flips: [], picks: {}, settled: false, now: 0, guardAt: 100000}
     expect(autopilotPlan({...at, step: 'welcome'}).events).toEqual([
       {type: 'START_LONG_SESSION'},
@@ -159,6 +158,11 @@ describe('Autopilot through the validation', () => {
         flips: [flip('a', {option: AnswerType.Left})],
       }).events
     ).toEqual([{type: 'FINISH_FLIPS'}])
+    // No flip at all: it waits, then goes on at the latest submit.
+    expect(autopilotPlan({...at, step: 'long'}).events).toEqual([])
+    expect(autopilotPlan({...at, step: 'long', now: 100000}).events).toEqual([
+      {type: 'FINISH_FLIPS'},
+    ])
     expect(autopilotPlan({...at, step: 'finish'}).events).toEqual([
       {type: 'START_KEYWORDS_QUALIFICATION'},
     ])
@@ -169,11 +173,12 @@ describe('Autopilot through the validation', () => {
     expect(
       autopilotPlan({...at, step: 'keywords', settled: true}).countdownEnd
     ).toBe(SUBMIT_COUNTDOWN_MS)
-    expect(autopilotPlan({...at, step: 'review'}).events).toEqual([
-      {type: 'SUBMIT'},
-    ])
-    expect(autopilotPlan({...at, step: 'shortConfirm'}).events).toEqual([
-      {type: 'SUBMIT'},
-    ])
+    expect(
+      autopilotPlan({...at, step: 'review', didSubmit: true}).events
+    ).toEqual([{type: 'SUBMIT'}])
+    expect(autopilotPlan({...at, step: 'review'}).events).toEqual([])
+    expect(
+      autopilotPlan({...at, step: 'shortConfirm', didSubmit: true}).events
+    ).toEqual([{type: 'SUBMIT'}])
   })
 })

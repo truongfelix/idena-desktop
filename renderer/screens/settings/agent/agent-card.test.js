@@ -90,11 +90,12 @@ describe("the agent's card in the menu", () => {
 })
 
 describe("the agent's mode in a validation", () => {
-  test('follows the settings: off, paused, Suggest, Autopilot', () => {
+  test('follows the settings: off, Suggest, Autopilot', () => {
     expect(agentMode(settings('ask'))).toBe('suggest')
     expect(agentMode(settings('alone'))).toBe('autopilot')
     expect(agentMode(settings('off'))).toBeNull()
-    expect(agentMode(settings('alone', {paused: true}))).toBeNull()
+    // A pause is apart: the screen shows it, with Resume.
+    expect(agentMode(settings('alone', {paused: true}))).toBe('autopilot')
     expect(agentMode(settings('alone', {enabled: false}))).toBeNull()
   })
 })
