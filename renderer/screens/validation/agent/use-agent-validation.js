@@ -4,8 +4,11 @@ import {
   onAgentChange,
   solveAgentFlip,
   stopAgentSolve,
+  updateAgentSettings,
 } from '../../settings/agent/api'
 import {
+  END_MARGIN_MS,
+  MIN_FLIP_MS,
   answersToTake,
   appliedKey,
   autopilotEvents,
@@ -14,6 +17,12 @@ import {
   nextFlipToAsk,
   sessionEnd,
 } from './picks'
+import {
+  RETRY_SUBMIT_MS,
+  SUBMIT_GUARD_MS,
+  autopilotPlan,
+  isSettled,
+} from './autopilot'
 
 // A picture shown from a blob URL, read back as JPEG base64: the app's content policy refuses fetch() of blob URLs,
 // an <img> loads them.
@@ -56,7 +65,9 @@ export function agentMode(settings) {
 
 /**
  * The agent beside a validation screen. `flips` are the session's flips as shown, `phase` 'short' | 'long' |
- * 'keywords' | null (not solving). Returns null when the agent is off, else its mode ('suggest' | 'autopilot'),
+ * 'keywords' | null (not solving), `step` the validation's step for Autopilot (screen.js autopilotStep),
+ * `keywordsDone` whether the validation stopped fetching keywords. Autopilot answers every flip and submits both
+ * sessions after a countdown (`countdown`, seconds), which pause() stops. Returns null when the agent is off, else its mode ('suggest' | 'autopilot'),
  * its picks by hash, and takeRest() (Suggest: an answer for every flip left that has a pick).
  */
 export function useAgentValidation({
@@ -64,6 +75,8 @@ export function useAgentValidation({
   phase,
   reportsUsed,
   reportsAllowed,
+  step = null,
+  keywordsDone = false,
   send,
   validationStart,
   shortSessionDuration,
@@ -75,6 +88,9 @@ export function useAgentValidation({
   const asked = React.useRef(new Set())
   const applied = React.useRef(new Set())
   const live = React.useRef(true)
+  const [now, setNow] = React.useState(() => Date.now())
+  const [countdown, setCountdown] = React.useState({step: null, end: null})
+  const lastRetry = React.useRef(0)
 
   React.useEffect(() => {
     live.current = true
@@ -108,7 +124,7 @@ export function useAgentValidation({
   // One flip at a time, the next one as soon as the last is answered.
   React.useEffect(() => {
     if (!mode || !phase || asking) return
-    const flip = nextFlipToAsk(flips, asked.current, {isShort})
+    const flip = nextFlipToAsk(flips, asked.current, {isShort, keywordsDone})
     if (!flip) return
     const timeoutMs = flipDeadlineMs({
       end: sessionEnd({
@@ -144,6 +160,7 @@ export function useAgentValidation({
     asking,
     flips,
     isShort,
+    keywordsDone,
     session,
     reportsUsed,
     validationStart,
@@ -166,12 +183,61 @@ export function useAgentValidation({
     })
   }, [mode, phase, flips, picks, reportsUsed, reportsAllowed, send])
 
+  // Autopilot's clock: the countdown and the latest submit move with time, not only with the validation's state.
+  React.useEffect(() => {
+    if (mode !== 'autopilot' || !step) return undefined
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [mode, step])
+
+  const end = sessionEnd({
+    isShort,
+    validationStart,
+    shortSessionDuration,
+    longSessionDuration,
+  })
+  const countdownEnd = countdown.step === step ? countdown.end : null
+
+  // Autopilot through the validation: random answers where the model gave none, the next step, the submit.
+  React.useEffect(() => {
+    if (mode !== 'autopilot' || !step) return
+    if (step === 'shortFail' || step === 'longFail') {
+      if (now - lastRetry.current >= RETRY_SUBMIT_MS) {
+        lastRetry.current = now
+        send('RETRY_SUBMIT')
+      }
+      return
+    }
+    const plan = autopilotPlan({
+      step,
+      flips,
+      picks,
+      settled: isSettled(flips, asked.current, {
+        asking,
+        outOfTime: end - now - END_MARGIN_MS < MIN_FLIP_MS,
+      }),
+      now,
+      guardAt: end - SUBMIT_GUARD_MS[isShort ? 'short' : 'long'],
+      countdownEnd,
+    })
+    plan.events.forEach((event) => send(event))
+    if (plan.countdownEnd !== countdownEnd)
+      setCountdown({step, end: plan.countdownEnd})
+  }, [mode, step, flips, picks, asking, now, end, isShort, countdownEnd, send])
+
   if (!mode) return null
   const toTake = answersToTake(flips, picks)
   return {
     mode,
     picks,
     asking,
+    countdown:
+      mode === 'autopilot' && countdownEnd
+        ? Math.max(0, Math.ceil((countdownEnd - now) / 1000))
+        : null,
+    // A person takes over: the agent stops everywhere (the menu card resumes it).
+    pause: () =>
+      updateAgentSettings((s) => ({...s, paused: true})).catch(() => {}),
     takeRest: () => toTake.forEach(send),
     canTakeRest:
       mode === 'suggest' && phase !== 'keywords' && toTake.length > 0,

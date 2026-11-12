@@ -18,6 +18,8 @@ import {
 import {
   ValidationScreen,
   agentPhase,
+  autopilotStep,
+  keywordsDone,
   sessionFlips,
 } from '../screens/validation/screen'
 import {useAgentValidation} from '../screens/validation/agent/use-agent-validation'
@@ -108,6 +110,8 @@ function ValidationSession({
     reportsUsed: state.context.reports.size,
     // The machine's own limit: every long flip counts, ready or not.
     reportsAllowed: availableReportsNumber(state.context.longFlips),
+    step: autopilotStep(state),
+    keywordsDone: keywordsDone(state),
     send,
     validationStart,
     shortSessionDuration,

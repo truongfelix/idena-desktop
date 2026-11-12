@@ -1879,5 +1879,6 @@
   "The recording stopped at its limit: the {{size}} KB a voice note can hold.": "The recording stopped at its limit: the {{size}} KB a voice note can hold.",
   "The recording stopped at its limit: {{minutes}} minutes.": "The recording stopped at its limit: {{minutes}} minutes.",
   "Play the video": "Play the video",
-  "🎞 This computer cannot play this video.": "🎞 This computer cannot play this video."
+  "🎞 This computer cannot play this video.": "🎞 This computer cannot play this video.",
+  "The agent submits the answers in {{seconds}} s": "The agent submits the answers in {{seconds}} s"
 }

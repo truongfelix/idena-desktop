@@ -410,6 +410,25 @@ export function ValidationScreen({
               {t("Take the agent's picks for the rest")}
             </Button>
           )}
+          {agent?.countdown !== null && agent?.countdown !== undefined && (
+            <Flex align="center" gap={3}>
+              <Text color={agentColor} fontWeight={500}>
+                {t('The agent submits the answers in {{seconds}} s', {
+                  seconds: agent.countdown,
+                })}
+              </Text>
+              <Button
+                variant="outline"
+                size="sm"
+                borderColor={agentColor}
+                color={agentColor}
+                _hover={{bg: 'transparent'}}
+                onClick={agent.pause}
+              >
+                {t('Pause the agent')}
+              </Button>
+            </Flex>
+          )}
         </ActionBarItem>
         <ActionBarItem justify="center">
           <ValidationTimer
@@ -559,6 +578,29 @@ export function ValidationScreen({
       {global.isDev && <FloatDebug>{state.value}</FloatDebug>}
     </ValidationScene>
   )
+}
+
+const AUTOPILOT_STEPS = [
+  ['shortSession.solve.answer.normal', 'short'],
+  ['shortSession.solve.answer.submitShortSession.confirm', 'shortConfirm'],
+  ['shortSession.solve.answer.submitShortSession.fail', 'shortFail'],
+  ['longSession.solve.answer.welcomeQualification', 'welcome'],
+  ['longSession.solve.answer.flips', 'long'],
+  ['longSession.solve.answer.finishFlips', 'finish'],
+  ['longSession.solve.answer.keywords', 'keywords'],
+  ['longSession.solve.answer.review', 'review'],
+  ['longSession.solve.answer.submitLongSession.fail', 'longFail'],
+]
+
+/** The validation's step for Autopilot (agent/autopilot.js autopilotPlan), or null where it does nothing. */
+export function autopilotStep(state) {
+  const found = AUTOPILOT_STEPS.find(([path]) => state.matches(path))
+  return found ? found[1] : null
+}
+
+/** Whether the validation stopped fetching the long flips' keywords: a flip without them is asked as it is. */
+export function keywordsDone(state) {
+  return state.matches('longSession.fetch.keywords.done')
 }
 
 /** Where the agent is in a validation: 'short', 'long' (the stories), 'keywords', or null (not answering). */

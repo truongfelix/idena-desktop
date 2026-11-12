@@ -11,12 +11,13 @@ const REPORT_CONFIDENCE = 0.9
 const SYSTEM = [
   'You solve flips in an Idena validation. A flip is a story of four pictures. You see the same four pictures in',
   'two orders, LEFT and RIGHT: one order tells a story that makes sense from the first picture to the last, the',
-  'other does not. Pick the order that tells the story. Answer "skip" when you cannot tell.',
+  'other does not. Pick the order that tells the story. When you are not sure, still pick the more probable one',
+  'and give it a low confidence.',
   'When keywords are given, also say whether the story clearly shows both of them, and whether the flip should',
   'be reported: its keywords are not shown, it needs text, numbers or arrows on the pictures to be solved, or it',
   'shows something cruel, sexual or offensive.',
   'Reply with one JSON object and nothing else:',
-  '{"answer": "left" | "right" | "skip", "confidence": how sure the answer is, from 0 to 1,',
+  '{"answer": "left" | "right", "confidence": how sure the answer is, from 0 to 1,',
   '"keywords": "shown" | "not shown" | null, "report": true | false,',
   '"reportConfidence": how sure the flip breaks the rules, from 0 to 1}',
 ].join('\n')
