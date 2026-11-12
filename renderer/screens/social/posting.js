@@ -214,11 +214,18 @@ export async function prepareCall(call, socialCall) {
 
 /**
  * A post, reply or comment from the editor, ready to confirm: its files (the text when it goes on IPFS, then the
- * image), the call and the fees. Throws when the balance cannot pay the most it may cost.
+ * image, or a file sent as it is: `mediaType` and `mediaWhat`, its name in a refusal), the call and the fees. Throws when the balance cannot pay the most it may cost.
  */
 export async function prepareDraft(
   call,
-  {text, textOnIpfs = false, image = null, target},
+  {
+    text,
+    textOnIpfs = false,
+    image = null,
+    mediaType = IMAGE_TYPE,
+    mediaWhat = 'image',
+    target,
+  },
   stored = new Set()
 ) {
   const from = await call('dna_getCoinbaseAddr')
@@ -231,7 +238,7 @@ export async function prepareDraft(
   }
   let media = null
   if (image) {
-    const file = await prepareFile(call, from, 'image', image, stored)
+    const file = await prepareFile(call, from, mediaWhat, image, stored)
     files.push(file)
     media = `ipfs://${file.cid}`
   }
@@ -240,7 +247,7 @@ export async function prepareDraft(
       replyTo: target.replyTo,
       channel: target.channel,
       media,
-      mediaType: media ? IMAGE_TYPE : null,
+      mediaType: media ? mediaType : null,
     })
   )
   const fee = await estimateCall(call, from, socialCall)

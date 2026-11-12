@@ -122,6 +122,8 @@ export function ProfileItemCard({item, tab, now, onOpen, onProfile}) {
         lines={showHeader ? FEED_TEXT_LINES : 4}
         maxH="360px"
         media={tab === 'media'}
+        // The Media tab is where media is looked at: its videos and sounds play there, as in a thread.
+        inThread={tab === 'media'}
       />
       <SmallText>
         {`♡ ${likeCount(node)}  ·  💬 ${replyCount(node)}  ·  🪙 ${tipText(
