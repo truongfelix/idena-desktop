@@ -9,6 +9,7 @@ import {
   WarningAlert,
 } from '../../../shared/components/components'
 import {SettingsSection} from '../components'
+import {REPORT_REASONS} from '../../validation/practice'
 
 /** Where the model runs, the choices of Settings › Agent (main/agent/settings.js PROVIDERS). */
 function useProviders() {
@@ -116,6 +117,61 @@ function KeyField({status, onSetKey, onClearKey}) {
   )
 }
 
+/**
+ * After a practice test, each long-session flip to report or that the model gave a reason for: the right reason, the
+ * model's reasons with how sure it was, and whether that made a report (each reason has its own threshold).
+ */
+function PracticeReports({reports}) {
+  const {t} = useTranslation()
+  if (!reports || !reports.length) return null
+  const reason = (n) => t(REPORT_REASONS[n] ?? '')
+  const outcome = ({reportReason, reported}) => {
+    if (reportReason && reported) return [t('Rightly reported'), 'green.500']
+    if (reportReason) return [t('Missed'), 'red.500']
+    if (reported) return [t('Reported a good flip'), 'red.500']
+    return [t('Not reported'), 'green.500']
+  }
+  return (
+    <Stack spacing={2} fontSize="sm">
+      <Text fontWeight={500}>{t('Reports, flip by flip')}</Text>
+      {reports.map((report, i) => {
+        const [label, color] = outcome(report)
+        return (
+          <Box key={i}>
+            <Text>
+              <Text as="span" fontWeight={500}>
+                {report.keywords.join(' / ')}
+              </Text>
+              <Text as="span" color={color}>
+                {` · ${label}`}
+              </Text>
+            </Text>
+            <Text color="muted">
+              {report.reportReason
+                ? t('To report for {{reason}}', {
+                    reason: reason(report.reportReason),
+                  })
+                : t('A good flip')}
+            </Text>
+            <Text color="muted">
+              {report.reasons.length
+                ? t('The model said {{reasons}}', {
+                    reasons: report.reasons
+                      .map(
+                        ({reason: n, confidence}) =>
+                          `${reason(n)} (${Math.round(confidence * 100)}%)`
+                      )
+                      .join(', '),
+                  })
+                : t('The model saw no rule broken')}
+            </Text>
+          </Box>
+        )
+      })}
+    </Stack>
+  )
+}
+
 /** The Model section: where it runs, its address and name, the key of a hosted one, the practice test. */
 export function ModelSection({status, onChange, onSetKey, onClearKey, test}) {
   const {t} = useTranslation()
@@ -189,6 +245,7 @@ export function ModelSection({status, onChange, onSetKey, onClearKey, test}) {
           )}
           <Text color="muted">{test.line}</Text>
         </Flex>
+        <PracticeReports reports={test.reports} />
         <Text color="muted" fontSize="sm">
           {isLocal
             ? t('The flip pictures stay on this computer.')

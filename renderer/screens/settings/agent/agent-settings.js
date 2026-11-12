@@ -49,7 +49,11 @@ export function testResultText(result, t) {
 }
 
 function usePracticeTest(t, onDone) {
-  const [state, setStateNow] = React.useState({isRunning: false, line: null})
+  const [state, setStateNow] = React.useState({
+    isRunning: false,
+    line: null,
+    reports: [],
+  })
   const stopped = React.useRef(false)
   const mounted = React.useRef(true)
   const setState = (value) => mounted.current && setStateNow(value)
@@ -66,7 +70,7 @@ function usePracticeTest(t, onDone) {
 
   const start = async () => {
     stopped.current = false
-    setState({isRunning: true, line: t('Starting…')})
+    setState({isRunning: true, line: t('Starting…'), reports: []})
     try {
       const practice = createPractice(await loadPracticeFlips())
       const result = await runPracticeTest(practice, {
@@ -76,11 +80,16 @@ function usePracticeTest(t, onDone) {
           setState({
             isRunning: true,
             line: t('Flip {{done}} of {{total}}…', {done, total}),
+            reports: [],
           }),
       })
-      setState({isRunning: false, line: testResultText(result, t)})
+      setState({
+        isRunning: false,
+        line: testResultText(result, t),
+        reports: result.reports,
+      })
     } catch (error) {
-      setState({isRunning: false, line: agentErrorText(error)})
+      setState({isRunning: false, line: agentErrorText(error), reports: []})
     }
     if (mounted.current) onDone()
   }

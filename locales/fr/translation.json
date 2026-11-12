@@ -1883,5 +1883,13 @@
   "The agent submits the answers in {{seconds}} s": "L'agent envoie les réponses dans {{seconds}} s",
   "Agent: paused": "Agent : en pause",
   "Pause": "Pause",
-  "Resume": "Reprendre"
+  "Resume": "Reprendre",
+  "Rightly reported": "Signalé à raison",
+  "Reported a good flip": "Un bon flip signalé",
+  "Not reported": "Non signalé",
+  "Reports, flip by flip": "Signalements, flip par flip",
+  "To report for {{reason}}": "À signaler pour {{reason}}",
+  "A good flip": "Un bon flip",
+  "The model said {{reasons}}": "Le modèle a répondu {{reasons}}",
+  "The model saw no rule broken": "Le modèle n'a vu aucune règle enfreinte"
 }

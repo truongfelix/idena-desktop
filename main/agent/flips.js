@@ -1,25 +1,55 @@
 // The agent's validation tool: one flip to the model, its answer read back. A flip is four pictures and two orders
 // of them; one order tells a story, the other does not. In the long session the model also says whether the story
-// shows its two keywords, and whether it should be reported; a report counts only when the model is very sure.
+// shows its two keywords, and why it should be reported: one or more of the nine report reasons of the validation
+// screen, each with the model's confidence; a flip is reported when one reason reaches that reason's threshold.
 
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024
 const MAX_WORD_LENGTH = 200
 
-/** The confidence a report needs (the template: "reports when very sure"). */
-const REPORT_CONFIDENCE = 0.9
+/**
+ * The report reasons, numbered as the validation screen's (the practice flips' reportReason, B-195), as the model reads
+ * them.
+ */
+const REPORT_REASONS = {
+  1: 'a keyword is not clearly shown in the pictures',
+  2: 'numbers or letters on the pictures give the order',
+  3: 'a sequence of enumerated objects (a list of things in a row) instead of a story',
+  4: 'text on the pictures must be read to solve the flip',
+  5: 'adult content (NSFW)',
+  6: 'several unrelated stories',
+  7: 'the waking-up template (someone wakes up, then the story)',
+  8: 'a thumbs up or thumbs down picture at the end',
+  9: 'pictures of both keywords inserted into a page, screen or painting',
+}
+
+/**
+ * The confidence each reason needs for a report (the template: "reports when very sure"): a wrong report costs an
+ * honest author, so every reason starts at 0.9 until the practice runs show the model's confidences.
+ */
+const REPORT_THRESHOLDS = {
+  1: 0.9,
+  2: 0.9,
+  3: 0.9,
+  4: 0.9,
+  5: 0.9,
+  6: 0.9,
+  7: 0.9,
+  8: 0.9,
+  9: 0.9,
+}
 
 const SYSTEM = [
   'You solve flips in an Idena validation. A flip is a story of four pictures. You see the same four pictures in',
   'two orders, LEFT and RIGHT: one order tells a story that makes sense from the first picture to the last, the',
   'other does not. Pick the order that tells the story. When you are not sure, still pick the more probable one',
   'and give it a low confidence.',
-  'When keywords are given, also say whether the story clearly shows both of them, and whether the flip should',
-  'be reported: its keywords are not shown, it needs text, numbers or arrows on the pictures to be solved, or it',
-  'shows something cruel, sexual or offensive.',
+  'When keywords are given, also say whether the story clearly shows both of them, and list each rule the flip',
+  'breaks, by number, with how sure you are that it breaks it (none: an empty list). The rules:',
+  ...Object.entries(REPORT_REASONS).map(([n, text]) => `${n}. ${text}`),
   'Reply with one JSON object and nothing else:',
   '{"answer": "left" | "right", "confidence": how sure the answer is, from 0 to 1,',
-  '"keywords": "shown" | "not shown" | null, "report": true | false,',
-  '"reportConfidence": how sure the flip breaks the rules, from 0 to 1}',
+  '"keywords": "shown" | "not shown" | null,',
+  '"reasons": [{"reason": rule number, "confidence": how sure the flip breaks it, from 0 to 1}]}',
 ].join('\n')
 
 function mediaType(bytes) {
@@ -77,7 +107,7 @@ function flipQuestion({images, orders, words}) {
     ? `Keywords: ${words
         .map(({name, desc}) => (desc ? `${name} (${desc})` : name))
         .join(', ')}.`
-    : 'No keywords: leave "keywords" null and "report" false.'
+    : 'No keywords: leave "keywords" null and "reasons" empty.'
   parts.push({type: 'text', text: keywords})
   ;['LEFT', 'RIGHT'].forEach((side, s) => {
     parts.push({type: 'text', text: `${side} order, pictures 1 to 4:`})
@@ -122,35 +152,63 @@ function firstJsonObject(text) {
   return null
 }
 
+const unit = (value) => {
+  const number = Number(value)
+  return Number.isFinite(number) ? Math.min(Math.max(number, 0), 1) : 0
+}
+
+/** The reasons the model gave, known ones only, each once (its highest confidence), the surest first. */
+function readReasons(list) {
+  if (!Array.isArray(list)) return []
+  const best = new Map()
+  list.slice(0, 32).forEach((item) => {
+    const reason = Number(item?.reason)
+    if (!Object.prototype.hasOwnProperty.call(REPORT_THRESHOLDS, reason)) return
+    const confidence = unit(item.confidence)
+    if (!best.has(reason) || best.get(reason) < confidence)
+      best.set(reason, confidence)
+  })
+  return [...best]
+    .map(([reason, confidence]) => ({reason, confidence}))
+    .sort((a, b) => b.confidence - a.confidence || a.reason - b.reason)
+}
+
 /**
  * The model's answer, read strictly: anything unreadable is no answer. `answer` 'left' | 'right' | null,
- * `relevance` 'relevant' | 'irrelevant' | null, `report` only when the model is very sure and the keywords
- * are not shown.
+ * `relevance` 'relevant' | 'irrelevant' | null, `reasons` the report reasons it gave (with keywords only), `report`
+ * when one of them reaches its threshold.
  */
 function readFlipAnswer(text, {hasWords}) {
   const reply = firstJsonObject(text)
-  const none = {answer: null, confidence: 0, relevance: null, report: false}
+  const none = {
+    answer: null,
+    confidence: 0,
+    relevance: null,
+    reasons: [],
+    report: false,
+  }
   if (!reply || typeof reply !== 'object') return none
-  const confidence = Number(reply.confidence)
-  const sure = Number.isFinite(confidence)
-    ? Math.min(Math.max(confidence, 0), 1)
-    : 0
   const answer = ['left', 'right'].includes(reply.answer) ? reply.answer : null
-  const reportConfidence = Number(reply.reportConfidence)
-  const report =
-    hasWords &&
-    reply.report === true &&
-    Number.isFinite(reportConfidence) &&
-    reportConfidence >= REPORT_CONFIDENCE
-  // "Not shown" marks the flip irrelevant, which is a report: only when the model is very sure.
+  const reasons = hasWords ? readReasons(reply.reasons) : []
+  const report = reasons.some(
+    ({reason, confidence}) => confidence >= REPORT_THRESHOLDS[reason]
+  )
+  // A report marks the flip irrelevant; "not shown" alone, below its threshold, leaves it unmarked.
   let relevance = null
   if (report) relevance = 'irrelevant'
   else if (hasWords && reply.keywords === 'shown') relevance = 'relevant'
-  return {answer, confidence: sure, relevance, report}
+  return {
+    answer,
+    confidence: unit(reply.confidence),
+    relevance,
+    reasons,
+    report,
+  }
 }
 
 module.exports = {
-  REPORT_CONFIDENCE,
+  REPORT_REASONS,
+  REPORT_THRESHOLDS,
   SYSTEM,
   checkFlip,
   firstJsonObject,

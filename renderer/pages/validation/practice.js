@@ -46,20 +46,8 @@ import {
   practiceNodeCalls,
   practiceResults,
   practiceServices,
+  REPORT_REASONS,
 } from '../../screens/validation/practice'
-
-// The texts of the bad flip examples (BadFlipDialog), by report reason.
-const REPORT_REASONS = {
-  1: 'One of the keywords is not clearly visible in the images',
-  2: 'Numbers or letters indicating the order',
-  3: 'Sequence of enumerated objects',
-  4: 'Text necessary to read to solve the flip',
-  5: 'There is adult content (NSFW)',
-  6: 'Several unrelated stories',
-  7: 'Waking up template',
-  8: 'Thumbs up/down image at the end',
-  9: 'Images of both keywords are inserted into a page/screen/painting',
-}
 
 export default function PracticeValidationPage() {
   const router = useRouter()

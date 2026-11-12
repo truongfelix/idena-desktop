@@ -25,7 +25,9 @@ export function answerType(answer) {
 /**
  * Runs the practice through `testFlip` (the agent channel's testFlip), one flip at a time; `onProgress` gets the
  * count done. Resolves with the stories right (the flips to report do not count, as in the validation), the
- * reports right and wrong, the flips that failed, and the average seconds per flip.
+ * reports right and wrong, the flips that failed, the average seconds per flip, and `reports`: each long-session flip
+ * that is to report or that the model gave a reason for, with its keywords, the right reason, the model's reasons and
+ * whether it reported it.
  */
 export async function runPracticeTest(
   practice,
@@ -44,6 +46,7 @@ export async function runPracticeTest(
     failed: 0,
     lastError: null,
     seconds: 0,
+    reports: [],
   }
   let elapsed = 0
   let done = 0
@@ -75,6 +78,14 @@ export async function runPracticeTest(
       if (toReport) result.reportsRight += 1
       else result.reportsWrong += 1
     } else if (toReport) result.reportsMissed += 1
+    const reasons = (answer && answer.reasons) || []
+    if (withWords && (toReport || reasons.length))
+      result.reports.push({
+        keywords: flip.words.map(({name}) => name),
+        reportReason: flip.reportReason || null,
+        reasons,
+        reported: Boolean(answer && answer.report),
+      })
     onProgress(done, flips.length)
   }
   result.seconds = done ? elapsed / done / 1000 : 0

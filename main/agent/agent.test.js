@@ -93,7 +93,7 @@ describe('the agent channel', () => {
 
   test('alone: the answer applied, a sure report checked against its own row', async () => {
     const reply =
-      '{"answer":"right","confidence":0.6,"keywords":"not shown","report":true,"reportConfidence":0.95}'
+      '{"answer":"right","confidence":0.6,"keywords":"not shown","reasons":[{"reason":1,"confidence":0.95}]}'
     const {agent} = setup(
       {
         permissions: {
@@ -119,7 +119,7 @@ describe('the agent channel', () => {
 
   test('a report the row turns off is not sent, nor its relevance', async () => {
     const reply =
-      '{"answer":"right","confidence":0.6,"keywords":"not shown","report":true,"reportConfidence":0.95}'
+      '{"answer":"right","confidence":0.6,"keywords":"not shown","reasons":[{"reason":1,"confidence":0.95}]}'
     const {agent} = setup({permissions: {report: {level: 'off'}}}, reply)
     await expect(agent.handle('solveFlip', {flip})).resolves.toMatchObject({
       report: false,
@@ -191,7 +191,7 @@ describe('the agent channel', () => {
 
   test('with answers asked first, a report is asked first too', async () => {
     const reply =
-      '{"answer":"right","confidence":0.6,"keywords":"not shown","report":true,"reportConfidence":0.95}'
+      '{"answer":"right","confidence":0.6,"keywords":"not shown","reasons":[{"reason":1,"confidence":0.95}]}'
     const {agent} = setup(
       {permissions: {answerFlip: {level: 'ask'}, report: {level: 'alone'}}},
       reply
@@ -205,7 +205,7 @@ describe('the agent channel', () => {
 
   test('a report count that is not a number is not within the limit', async () => {
     const reply =
-      '{"answer":"right","confidence":0.6,"keywords":"not shown","report":true,"reportConfidence":0.95}'
+      '{"answer":"right","confidence":0.6,"keywords":"not shown","reasons":[{"reason":1,"confidence":0.95}]}'
     const {agent} = setup(
       {
         permissions: {

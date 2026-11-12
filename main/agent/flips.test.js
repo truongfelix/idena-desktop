@@ -1,5 +1,6 @@
 const {
-  REPORT_CONFIDENCE,
+  REPORT_REASONS,
+  REPORT_THRESHOLDS,
   checkFlip,
   firstJsonObject,
   flipQuestion,
@@ -103,6 +104,7 @@ describe('agent flips: the model answer', () => {
       answer: null,
       confidence: 0,
       relevance: null,
+      reasons: [],
       report: false,
     })
     expect(
@@ -110,33 +112,97 @@ describe('agent flips: the model answer', () => {
     ).toMatchObject({answer: null, confidence: 1})
   })
 
-  test('a report only when very sure, and only with keywords', () => {
-    const sure = `{"answer":"left","confidence":0.3,"keywords":"not shown","report":true,"reportConfidence":${REPORT_CONFIDENCE}}`
+  const reply = (reasons, extra = '') =>
+    `{"answer":"left","confidence":0.3,"keywords":"not shown"${extra},"reasons":${JSON.stringify(
+      reasons
+    )}}`
+
+  test('a report when one reason reaches its threshold, and only with keywords', () => {
+    const sure = reply([
+      {reason: 4, confidence: REPORT_THRESHOLDS[4]},
+      {reason: 1, confidence: 0.5},
+    ])
     expect(readFlipAnswer(sure, {hasWords: true})).toEqual({
       answer: 'left',
       confidence: 0.3,
       relevance: 'irrelevant',
+      reasons: [
+        {reason: 4, confidence: REPORT_THRESHOLDS[4]},
+        {reason: 1, confidence: 0.5},
+      ],
       report: true,
     })
-    expect(readFlipAnswer(sure, {hasWords: false}).report).toBe(false)
-    const unsure = sure.replace(
-      `"reportConfidence":${REPORT_CONFIDENCE}`,
-      '"reportConfidence":0.6'
-    )
+    expect(readFlipAnswer(sure, {hasWords: false})).toMatchObject({
+      reasons: [],
+      report: false,
+    })
+    // Every reason below its threshold: the reasons kept, no report, the flip left unmarked.
+    const unsure = reply([
+      {reason: 4, confidence: REPORT_THRESHOLDS[4] - 0.01},
+      {reason: 1, confidence: 0.6},
+    ])
     expect(readFlipAnswer(unsure, {hasWords: true})).toMatchObject({
+      reasons: [
+        {reason: 4, confidence: REPORT_THRESHOLDS[4] - 0.01},
+        {reason: 1, confidence: 0.6},
+      ],
       report: false,
       relevance: null,
     })
-    // Sure of the story, not of the rule break: no report.
+    // Sure of the story, not of a rule break: no report.
     const storySure =
-      '{"answer":"left","confidence":0.99,"keywords":"not shown","report":true}'
+      '{"answer":"left","confidence":0.99,"keywords":"not shown","reasons":[]}'
     expect(readFlipAnswer(storySure, {hasWords: true}).report).toBe(false)
+  })
+
+  test('each reason is held against its own threshold', () => {
+    const thresholds = {...REPORT_THRESHOLDS}
+    try {
+      REPORT_THRESHOLDS[5] = 0.5
+      REPORT_THRESHOLDS[2] = 0.95
+      expect(
+        readFlipAnswer(reply([{reason: 5, confidence: 0.5}]), {hasWords: true})
+          .report
+      ).toBe(true)
+      expect(
+        readFlipAnswer(reply([{reason: 2, confidence: 0.9}]), {hasWords: true})
+          .report
+      ).toBe(false)
+    } finally {
+      Object.assign(REPORT_THRESHOLDS, thresholds)
+    }
+  })
+
+  test('unknown reasons are dropped, a reason given twice kept once', () => {
+    const answer = readFlipAnswer(
+      reply([
+        {reason: 0, confidence: 1},
+        {reason: 10, confidence: 1},
+        {reason: '3', confidence: 2},
+        {reason: 3, confidence: 0.2},
+        {reason: 7.5, confidence: 1},
+        'x',
+        null,
+      ]),
+      {hasWords: true}
+    )
+    expect(answer.reasons).toEqual([{reason: 3, confidence: 1}])
+    expect(answer.report).toBe(true)
+    expect(readFlipAnswer(reply('3'), {hasWords: true}).reasons).toEqual([])
+  })
+
+  test('the question lists the nine reasons by number', () => {
+    const {system} = flipQuestion(checkFlip(flip()))
+    Object.entries(REPORT_REASONS).forEach(([n, text]) =>
+      expect(system).toContain(`${n}. ${text}`)
+    )
+    expect(Object.keys(REPORT_THRESHOLDS)).toEqual(Object.keys(REPORT_REASONS))
   })
 
   test('keywords shown: the flip approved', () => {
     expect(
       readFlipAnswer(
-        '{"answer":"right","confidence":0.7,"keywords":"shown","report":false}',
+        '{"answer":"right","confidence":0.7,"keywords":"shown","reasons":[]}',
         {hasWords: true}
       )
     ).toMatchObject({answer: 'right', relevance: 'relevant', report: false})

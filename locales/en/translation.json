@@ -1883,5 +1883,13 @@
   "The agent submits the answers in {{seconds}} s": "The agent submits the answers in {{seconds}} s",
   "Agent: paused": "Agent: paused",
   "Pause": "Pause",
-  "Resume": "Resume"
+  "Resume": "Resume",
+  "Reported a good flip": "Reported a good flip",
+  "Not reported": "Not reported",
+  "Reports, flip by flip": "Reports, flip by flip",
+  "To report for {{reason}}": "To report for {{reason}}",
+  "A good flip": "A good flip",
+  "The model said {{reasons}}": "The model said {{reasons}}",
+  "The model saw no rule broken": "The model saw no rule broken",
+  "Rightly reported": "Rightly reported"
 }

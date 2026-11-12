@@ -46,9 +46,17 @@ describe('the practice test of Settings › Agent', () => {
     const answers = {
       s1: {answer: 'left'},
       s2: {answer: 'left'},
-      l1: {answer: 'left', report: true},
-      l2: {answer: 'right', report: true},
-      l3: {answer: 'left', report: false},
+      l1: {answer: 'left', report: true, reasons: [{reason: 6, confidence: 1}]},
+      l2: {
+        answer: 'right',
+        report: true,
+        reasons: [{reason: 1, confidence: 0.95}],
+      },
+      l3: {
+        answer: 'left',
+        report: false,
+        reasons: [{reason: 2, confidence: 0.7}],
+      },
     }
     let clock = 0
     const testFlip = jest.fn(async (sent, timeoutMs) => {
@@ -77,6 +85,28 @@ describe('the practice test of Settings › Agent', () => {
     })
     expect(result.lastError.message).toMatch(/deadline/u)
     expect(progress).toEqual([1, 2, 3, 4, 5, 6])
+    // Per flip: the ones to report (l2 reported, l3 missed below the threshold) and the one reported wrongly (l1);
+    // l4 (failed, nothing to report) is not listed.
+    expect(result.reports).toEqual([
+      {
+        keywords: ['sign'],
+        reportReason: null,
+        reasons: [{reason: 6, confidence: 1}],
+        reported: true,
+      },
+      {
+        keywords: ['sign'],
+        reportReason: 1,
+        reasons: [{reason: 1, confidence: 0.95}],
+        reported: true,
+      },
+      {
+        keywords: ['sign'],
+        reportReason: 2,
+        reasons: [{reason: 2, confidence: 0.7}],
+        reported: false,
+      },
+    ])
   })
 
   test('stops between two flips when asked', async () => {
