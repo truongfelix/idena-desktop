@@ -90,6 +90,19 @@ function createPending({
     return entry && entry.day === today() ? entry.total : 0
   }
 
+  // The actions done today, by agent and action (alone, or approved): the limit of a day counts them even before the
+  // chain shows them to the app (a post just sent is not scanned yet).
+  const done = new Map()
+  const doneToday = (agentId, action) => {
+    const entry = done.get(`${agentId}:${action}`)
+    return entry && entry.day === today() ? entry.n : 0
+  }
+  const countDone = (agentId, action) =>
+    done.set(`${agentId}:${action}`, {
+      day: today(),
+      n: doneToday(agentId, action) + 1,
+    })
+
   /**
    * An action the agent may do alone, within its daily budget: `cost` in iDNA, fees included. No budget: it may
    * spend nothing alone, the action waits for the person.
@@ -187,8 +200,11 @@ function createPending({
         return {decision: 'off', reason: 'unknown action'}
       // The limit is checked on what the action spends: above it, the action waits for the person; so does an
       // action that would pass the agent's daily budget (`cost`: iDNA, fees included).
+      const counted = doneToday(agentId, action)
       let check = decide(agentId, action, {
-        ...(usage !== undefined ? {usage} : {}),
+        ...(usage !== undefined || counted
+          ? {usage: Math.max(Number(usage) || 0, counted)}
+          : {}),
         ...(amount !== undefined ? {amount} : {}),
       })
       if (check.decision === 'alone')
@@ -231,10 +247,17 @@ function createPending({
         const cost = Number(data.cost)
         if (data.ok === true && cost > 0)
           spent.set(agentId, {day: today(), total: spentToday(agentId) + cost})
+        if (data.ok === true) countDone(agentId, action)
+        // eslint-disable-next-line no-nested-ternary
+        const decision = data.skipped
+          ? 'skipped'
+          : data.ok === true
+          ? 'alone'
+          : 'failed'
         log({
           agentId,
           action,
-          decision: data.ok === true ? 'alone' : 'failed',
+          decision,
           detail: text(data.detail, MAX_DETAIL_LENGTH),
         })
         return null
@@ -271,6 +294,7 @@ function createPending({
         const detail = text(data.detail, MAX_DETAIL_LENGTH)
         if (data.ok === true) {
           remove(item.id)
+          countDone(item.agentId, item.action)
           log({
             agentId: item.agentId,
             action: item.action,

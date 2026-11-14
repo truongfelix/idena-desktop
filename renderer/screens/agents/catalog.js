@@ -22,6 +22,17 @@ export function actionCatalog(t) {
       reads: [t('The flips and keywords of the session')],
       needs: 'answerFlip',
     },
+    {
+      id: 'post',
+      label: t('Post on Social'),
+      limit: t('At most once a day; with Alone, within its budget'),
+      reads: [
+        t('The tips on its posts since its last joke'),
+        t('Its last 30 jokes, not to repeat them'),
+        t("The tippers' names from their profiles"),
+      ],
+      defaults: {level: 'off', limit: 1},
+    },
   ]
 }
 
@@ -98,6 +109,21 @@ export function pendingActivityText({action, decision, detail}, t) {
       return t('{{action}}: declined by you', {...opts, nsSeparator: '!!'})
     case 'dropped':
       return t('{{action}}: taken off To approve ({{detail}})', {
+        ...opts,
+        nsSeparator: '!!',
+      })
+    case 'alone':
+      return t('{{action}}: done alone ({{detail}})', {
+        ...opts,
+        nsSeparator: '!!',
+      })
+    case 'skipped':
+      return t('{{action}}: skipped ({{detail}})', {
+        ...opts,
+        nsSeparator: '!!',
+      })
+    case 'off':
+      return t('{{action}}: refused ({{detail}})', {
         ...opts,
         nsSeparator: '!!',
       })

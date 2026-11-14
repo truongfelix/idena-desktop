@@ -38,6 +38,8 @@ import {ModelSection} from '../settings/agent/model-section'
 import {ReportRulesSection} from '../settings/agent/report-rules-section'
 import {ActivitySection} from '../settings/agent/activity-section'
 import {ActionsSection} from './actions-section'
+import {TaskSection} from './task-section'
+import {DEFAULT_JOKE_INSTRUCTIONS} from './joke/joke'
 import {AgentBadge} from './agents-list'
 import {actionCatalog, readsList} from './catalog'
 import {useAgents} from './use-agents'
@@ -101,6 +103,21 @@ function InstructionsSection({agent, onChange}) {
           )}
         </Text>
       )}
+      {agent.task === 'joke' &&
+        agent.instructions !== DEFAULT_JOKE_INSTRUCTIONS && (
+          <SecondaryButton
+            mt={3}
+            size="sm"
+            onClick={() =>
+              onChange((a) => ({
+                ...a,
+                instructions: DEFAULT_JOKE_INSTRUCTIONS,
+              }))
+            }
+          >
+            {t('Back to the default instructions')}
+          </SecondaryButton>
+        )}
     </SettingsSection>
   )
 }
@@ -342,6 +359,7 @@ export function AgentPage({id}) {
           )}
         </Text>
       )}
+      <TaskSection agent={agent} onChange={save} />
       <InstructionsSection agent={agent} onChange={save} />
       <ActionsSection
         agent={agent}

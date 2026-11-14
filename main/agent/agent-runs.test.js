@@ -148,6 +148,69 @@ describe("an agent's runs: its text, its budget, what it did alone", () => {
     })
   })
 
+  test('a post done today counts for the day even before the chain shows it', async () => {
+    const agent = start([joke()])
+    await agent.handle('didAction', {
+      agentId: JOKE,
+      action: 'post',
+      ok: true,
+      cost: 0.01,
+    })
+    // The app's own count (the Social scan) still says 0: the main process's count holds.
+    await expect(
+      agent.handle('propose', {
+        agentId: JOKE,
+        action: 'post',
+        body: 'j',
+        usage: 0,
+        amount: 1,
+        cost: 0.01,
+      })
+    ).resolves.toMatchObject({decision: 'ask', reason: 'above the limit'})
+  })
+
+  test('an approved post counts for the day too', async () => {
+    const agent = start([joke({actions: {post: {level: 'ask', limit: 1}}})])
+    const {item} = await agent.handle('propose', {
+      agentId: JOKE,
+      action: 'post',
+      body: 'j',
+    })
+    await agent.handle('approve', {id: item.id})
+    await agent.handle('finish', {id: item.id, ok: true})
+    const {agents} = await agent.handle('agents')
+    const {hasKey, ...saved} = agents[0]
+    await agent.handle('saveAgent', {
+      ...saved,
+      actions: {post: {level: 'alone', limit: 1}},
+    })
+    await expect(
+      agent.handle('propose', {
+        agentId: JOKE,
+        action: 'post',
+        body: 'j',
+        usage: 0,
+        amount: 1,
+        cost: 0.01,
+      })
+    ).resolves.toMatchObject({decision: 'ask', reason: 'above the limit'})
+  })
+
+  test('a day without a joke is said skipped', async () => {
+    const agent = start([joke()])
+    await agent.handle('didAction', {
+      agentId: JOKE,
+      action: 'post',
+      skipped: true,
+      detail: 'no tip since Joke #3',
+    })
+    const [line] = await agent.handle('activity', {agentId: JOKE})
+    expect(line).toMatchObject({
+      decision: 'skipped',
+      detail: 'no tip since Joke #3',
+    })
+  })
+
   test('what it did alone shows in its Activity', async () => {
     const agent = start([joke()])
     await agent.handle('didAction', {

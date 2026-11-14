@@ -51,7 +51,7 @@ export function ActionsSection({agent, agents, catalog, onChange}) {
           spacing={2}
         >
           <Wrap spacing={2}>
-            {addable.map(({id, label}) => {
+            {addable.map(({id, label, defaults}) => {
               const holder = heldBy(id, agent, agents)
               return (
                 <Button
@@ -71,7 +71,7 @@ export function ActionsSection({agent, agents, catalog, onChange}) {
                     setIsAdding(false)
                     setActions((actions) => ({
                       ...actions,
-                      [id]: {level: 'off'},
+                      [id]: defaults || {level: 'off'},
                     }))
                   }}
                 >
