@@ -29,7 +29,19 @@ function keychainState(safeStorage, platform = process.platform) {
   return {available: true, reason: null}
 }
 
-function createAgentKey({file, safeStorage, platform = process.platform}) {
+const MAX_KEYS = 20
+
+/**
+ * The keys of the hosted services, one per provider and address, shared by the agents that use that service
+ * (B-243). `file` holds them all, encrypted as one list; `singleFile` is the one key of the single agent (before
+ * B-243), read while `file` does not exist yet and left for an older build, removed only with that key.
+ */
+function createAgentKey({
+  file,
+  singleFile = null,
+  safeStorage,
+  platform = process.platform,
+}) {
   const assertKeychain = () => {
     const state = keychainState(safeStorage, platform)
     if (!state.available)
@@ -38,34 +50,67 @@ function createAgentKey({file, safeStorage, platform = process.platform}) {
       )
   }
 
-  /** What is kept: {key, provider, address}, or null (none, or unreadable). */
-  const kept = () => {
-    if (!fs.existsSync(file())) return null
-    assertKeychain()
+  const decrypt = (path) => {
     try {
-      const value = JSON.parse(
-        safeStorage.decryptString(fs.readFileSync(file()))
-      )
-      return value && typeof value.key === 'string' ? value : null
+      return JSON.parse(safeStorage.decryptString(fs.readFileSync(path)))
     } catch {
       return null
     }
   }
+  const isEntry = (value) =>
+    Boolean(value) &&
+    typeof value.key === 'string' &&
+    typeof value.provider === 'string' &&
+    typeof value.address === 'string'
+
+  /** The single agent's key, {key, provider, address}, or null (none, or unreadable). */
+  const single = () => {
+    if (!singleFile || !fs.existsSync(singleFile())) return null
+    assertKeychain()
+    const value = decrypt(singleFile())
+    return isEntry(value) ? value : null
+  }
+
+  /** What is kept: a list of {key, provider, address} (none, or unreadable: empty). */
+  const kept = () => {
+    if (!fs.existsSync(file())) {
+      const old = single()
+      return old ? [old] : []
+    }
+    assertKeychain()
+    const value = decrypt(file())
+    return value && Array.isArray(value.keys) ? value.keys.filter(isEntry) : []
+  }
   const matches = (value, {provider, address} = {}) =>
     Boolean(value) && value.provider === provider && value.address === address
+
+  const save = (keys) => {
+    if (keys.length === 0) {
+      fs.removeSync(file())
+      return
+    }
+    fs.outputFileSync(
+      file(),
+      safeStorage.encryptString(JSON.stringify({keys})),
+      {
+        mode: 0o600,
+      }
+    )
+  }
 
   return {
     keychain: () => keychainState(safeStorage, platform),
     /** Whether a key is kept for this provider and address. */
     has(destination) {
       if (!keychainState(safeStorage, platform).available) return false
-      return matches(kept(), destination)
+      return kept().some((value) => matches(value, destination))
     },
     /** Whether a key is kept at all: one saved for another provider or address can still be removed. */
     hasAny() {
       if (!keychainState(safeStorage, platform).available) return false
-      return Boolean(kept())
+      return kept().length > 0
     },
+    /** Keeps the key of this provider and address, in place of the one it had; the others stay. */
     set(key, {provider, address} = {}) {
       const value = typeof key === 'string' ? key.trim() : ''
       if (!value || value.length > MAX_KEY_LENGTH || /\s/u.test(value))
@@ -73,22 +118,30 @@ function createAgentKey({file, safeStorage, platform = process.platform}) {
       if (provider === 'local' || !provider || !address)
         throw new Error('a key is kept for a hosted model only')
       assertKeychain()
-      fs.outputFileSync(
-        file(),
-        safeStorage.encryptString(
-          JSON.stringify({key: value, provider, address})
-        ),
-        {mode: 0o600}
+      const others = kept().filter(
+        (entry) => !matches(entry, {provider, address})
       )
+      if (others.length >= MAX_KEYS) throw new Error('too many keys')
+      save([...others, {key: value, provider, address}])
     },
     /** The key kept for this provider and address, for its request; null otherwise. */
     read(destination) {
       if (!destination || destination.provider === 'local') return null
-      const value = kept()
-      return matches(value, destination) ? value.key : null
+      const value = kept().find((entry) => matches(entry, destination))
+      return value ? value.key : null
     },
-    clear() {
-      fs.removeSync(file())
+    /** Removes the key of this provider and address, or every key without one. */
+    clear(destination) {
+      const removes = (entry) => !destination || matches(entry, destination)
+      // Without a keychain nothing can be read: every key goes.
+      const keys = keychainState(safeStorage, platform).available
+        ? kept().filter((entry) => !removes(entry))
+        : []
+      if (singleFile && fs.existsSync(singleFile())) {
+        const old = keys.length ? single() : null
+        if (!old || removes(old)) fs.removeSync(singleFile())
+      }
+      save(keys)
     },
   }
 }
