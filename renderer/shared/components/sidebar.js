@@ -63,6 +63,7 @@ import {ReleaseNoteDialog} from './release-check'
 import {AgentCard} from '../../screens/settings/agent/agent-card'
 import {
   AdsIcon,
+  AgentIcon,
   ClockIcon,
   CommunityIcon,
   ContactsIcon,
@@ -372,6 +373,9 @@ function Navbar() {
         ) : (
           t('Social')
         )}
+      </NavItem>
+      <NavItem href="/agents" icon={AgentIcon}>
+        {t('Agents')}
       </NavItem>
       <NavItem href="/oracles/list" icon={OracleIcon} display>
         {todoCount > 0 ? (

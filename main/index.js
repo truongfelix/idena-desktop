@@ -187,14 +187,14 @@ const routerPort = createRouterPortService({
 // data folder's agent/ folder. settings.json and key.enc are the single agent's (before B-243): read while the new
 // files do not exist, left for an older build.
 const agentFile = (name) => join(app.getPath('userData'), 'agent', name)
+const agentProfiles = createAgentProfiles({
+  file: () => agentFile('agents.json'),
+  singleFile: () => agentFile('settings.json'),
+  logger,
+})
 const agent = createAgent({
-  settings: validationAgentSettings(
-    createAgentProfiles({
-      file: () => agentFile('agents.json'),
-      singleFile: () => agentFile('settings.json'),
-      logger,
-    })
-  ),
+  settings: validationAgentSettings(agentProfiles),
+  profiles: agentProfiles,
   key: createAgentKey({
     file: () => agentFile('keys.enc'),
     singleFile: () => agentFile('key.enc'),

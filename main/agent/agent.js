@@ -1,4 +1,6 @@
 const {checkAction} = require('./permissions')
+const {createAgentCommands} = require('./agent-commands')
+const {validationAgent} = require('./profiles')
 const {checkFlip, flipQuestion, readFlipAnswer} = require('./flips')
 const providers = require('./providers')
 
@@ -18,8 +20,14 @@ function clampTimeout(value) {
   return Math.min(Math.max(ms, MIN_TIMEOUT_MS), MAX_TIMEOUT_MS)
 }
 
+/**
+ * `settings` is the validation agent as the single agent's settings (profiles.js validationAgentSettings), what the
+ * validation and Settings › Agent read; `profiles` the file of agents behind it, for the Agents section's commands
+ * (agent-commands.js).
+ */
 function createAgent({
   settings,
+  profiles = null,
   key,
   logger,
   ask = providers.ask,
@@ -36,6 +44,31 @@ function createAgent({
     if (activity.length > MAX_ACTIVITY) activity.shift()
   }
 
+  const stop = (set) => {
+    set.forEach((controller) => controller.abort())
+    set.clear()
+  }
+
+  // The agent answering the validation, named in its Activity lines.
+  const validationId = () => {
+    if (!profiles) return undefined
+    const agent = validationAgent(profiles.read())
+    return agent ? agent.id : undefined
+  }
+
+  const agents = profiles
+    ? createAgentCommands({
+        profiles,
+        key,
+        log,
+        // The validation's question in flight ends when its agent is turned off, removed or paused.
+        onChange: () => {
+          const current = settings.read()
+          if (current.paused || !current.enabled) stop(solving)
+        },
+      })
+    : null
+
   const destination = ({provider, address}) => ({provider, address})
 
   const status = () => {
@@ -47,11 +80,6 @@ function createAgent({
       hasKey,
       keyElsewhere: !hasKey && key.hasAny(),
     }
-  }
-
-  const stop = (set) => {
-    set.forEach((controller) => controller.abort())
-    set.clear()
   }
 
   /** One flip to the model, the answer read. Throws the provider's error. */
@@ -83,16 +111,27 @@ function createAgent({
 
   const solveFlip = async ({flip, reportsUsed = 0, timeoutMs} = {}) => {
     const config = settings.read()
+    const agentId = validationId()
     const answerCheck = checkAction(config, 'answerFlip')
     if (answerCheck.decision === 'off') {
-      log({action: 'answerFlip', decision: 'off', detail: answerCheck.reason})
+      log({
+        agentId,
+        action: 'answerFlip',
+        decision: 'off',
+        detail: answerCheck.reason,
+      })
       return {decision: 'off', reason: answerCheck.reason}
     }
     let answer
     try {
       answer = await askFlip(config, flip, timeoutMs, solving)
     } catch (error) {
-      log({action: 'answerFlip', decision: 'failed', detail: error.message})
+      log({
+        agentId,
+        action: 'answerFlip',
+        decision: 'failed',
+        detail: error.message,
+      })
       throw error
     }
     const reportCheck = answer.report
@@ -112,6 +151,7 @@ function createAgent({
       reportDecision: report ? reportDecision : 'off',
     }
     log({
+      agentId,
       action: 'answerFlip',
       decision: result.decision,
       detail: `${result.answer || 'skip'} ${result.confidence.toFixed(2)}${
@@ -122,16 +162,27 @@ function createAgent({
   }
 
   const handlers = {
+    ...(agents ? agents.commands : {}),
     status,
     saveSettings(data) {
       const saved = settings.write(data)
       if (saved.paused || !saved.enabled) stop(solving)
-      log({action: 'settings', decision: 'saved', detail: saved.provider})
+      log({
+        agentId: validationId(),
+        action: 'settings',
+        decision: 'saved',
+        detail: saved.provider,
+      })
       return status()
     },
     setKey(data) {
       key.set(data && data.key, destination(settings.read()))
-      log({action: 'key', decision: 'saved', detail: ''})
+      log({
+        agentId: validationId(),
+        action: 'key',
+        decision: 'saved',
+        detail: '',
+      })
       return status()
     },
     clearKey() {
@@ -140,19 +191,32 @@ function createAgent({
       return status()
     },
     solveFlip,
-    /** A try of the model on one flip from Settings, before the agent is on: no permission, the answer shown only. */
-    async testFlip({flip, timeoutMs} = {}) {
-      const config = settings.read()
+    /**
+     * A try of the model on one flip, before the agent is on: no permission, the answer shown only. `agentId` names
+     * the agent whose connection is tried (an agent's page); without it, the validation agent's (Settings › Agent).
+     */
+    async testFlip({flip, timeoutMs, agentId} = {}) {
+      const config =
+        agentId !== undefined && agents
+          ? agents.config(agentId)
+          : settings.read()
+      const logged = agentId !== undefined ? agentId : validationId()
       try {
         const answer = await askFlip(config, flip, timeoutMs, testing)
         log({
+          agentId: logged,
           action: 'test',
           decision: 'answered',
           detail: answer.answer || 'skip',
         })
         return answer
       } catch (error) {
-        log({action: 'test', decision: 'failed', detail: error.message})
+        log({
+          agentId: logged,
+          action: 'test',
+          decision: 'failed',
+          detail: error.message,
+        })
         throw error
       }
     },
@@ -166,7 +230,16 @@ function createAgent({
       stop(testing)
       return null
     },
-    activity: () => activity.slice().reverse(),
+    /** The log, newest first; with `agentId`, that agent's lines and the ones of every agent (the pause). */
+    activity: (data) => {
+      const agentId = data && data.agentId
+      const lines = activity.slice().reverse()
+      return agentId === undefined
+        ? lines
+        : lines.filter(
+            (entry) => entry.agentId === agentId || entry.agentId === undefined
+          )
+    },
   }
 
   return {

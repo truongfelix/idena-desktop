@@ -279,6 +279,7 @@ function validationAgentSettings(profiles) {
 module.exports = {
   MAX_AGENTS,
   SCHEDULES,
+  SINGLE_HOLDER_ACTIONS,
   agentSettings,
   createAgentProfiles,
   fromSingleAgent,

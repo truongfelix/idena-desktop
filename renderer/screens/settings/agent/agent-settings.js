@@ -49,7 +49,8 @@ export function testResultText(result, t) {
   return [answered, reports, failed].filter(Boolean).join(' · ')
 }
 
-function usePracticeTest(t, onDone) {
+/** The practice test of the validation agent, or of the agent `agentId` (its page in Agents). */
+export function usePracticeTest(t, onDone, agentId) {
   const [state, setStateNow] = React.useState({
     isRunning: false,
     line: null,
@@ -75,7 +76,7 @@ function usePracticeTest(t, onDone) {
     try {
       const practice = createPractice(await loadPracticeFlips())
       const result = await runPracticeTest(practice, {
-        testFlip: testAgentFlip,
+        testFlip: (flip, timeoutMs) => testAgentFlip(flip, timeoutMs, agentId),
         isStopped: () => stopped.current,
         onProgress: (done, total) =>
           setState({
