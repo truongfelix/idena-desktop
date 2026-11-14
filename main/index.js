@@ -195,6 +195,7 @@ const agentProfiles = createAgentProfiles({
 const agent = createAgent({
   settings: validationAgentSettings(agentProfiles),
   profiles: agentProfiles,
+  notify: (event) => sendMainWindowMsg('agent-event', event),
   key: createAgentKey({
     file: () => agentFile('keys.enc'),
     singleFile: () => agentFile('key.enc'),

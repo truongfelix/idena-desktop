@@ -1952,5 +1952,22 @@
   "Agent removed": "Agent supprimé",
   "All agents paused": "Tous les agents en pause",
   "All agents resumed": "Tous les agents relancés",
-  "Nothing leaves this computer.": "Rien ne quitte cet ordinateur."
+  "Nothing leaves this computer.": "Rien ne quitte cet ordinateur.",
+  "wants to answer a flip": "veut répondre à un flip",
+  "wants to report a flip": "veut signaler un flip",
+  "wants to send iDNA": "veut envoyer des iDNA",
+  "wants to post on Social": "veut publier sur Social",
+  "wants to tip a post": "veut faire un pourboire à une publication",
+  "wants to change an ad": "veut modifier une annonce",
+  "wants to vote in an oracle voting": "veut voter dans un vote oracle",
+  "wants to send an invitation": "veut envoyer une invitation",
+  "wants to act": "veut agir",
+  "The text": "Le texte",
+  "Last try failed: {{error}}": "Le dernier essai a échoué : {{error}}",
+  "This version of the app cannot do this action yet.": "Cette version de l'application ne sait pas encore faire cette action.",
+  "Edit the text": "Modifier le texte",
+  "To approve": "À approuver",
+  "Nothing to approve. An action an agent may do with Ask me waits here for your click.": "Rien à approuver. Une action qu'un agent peut faire avec Me demander attend ici votre clic.",
+  "1 action to approve": "1 action à approuver",
+  "{{count}} actions to approve": "{{count}} actions à approuver"
 }

@@ -1952,5 +1952,22 @@
   "Agent removed": "Agent removed",
   "All agents paused": "All agents paused",
   "All agents resumed": "All agents resumed",
-  "Nothing leaves this computer.": "Nothing leaves this computer."
+  "Nothing leaves this computer.": "Nothing leaves this computer.",
+  "wants to answer a flip": "wants to answer a flip",
+  "wants to report a flip": "wants to report a flip",
+  "wants to send iDNA": "wants to send iDNA",
+  "wants to post on Social": "wants to post on Social",
+  "wants to tip a post": "wants to tip a post",
+  "wants to change an ad": "wants to change an ad",
+  "wants to vote in an oracle voting": "wants to vote in an oracle voting",
+  "wants to send an invitation": "wants to send an invitation",
+  "wants to act": "wants to act",
+  "The text": "The text",
+  "Last try failed: {{error}}": "Last try failed: {{error}}",
+  "This version of the app cannot do this action yet.": "This version of the app cannot do this action yet.",
+  "Edit the text": "Edit the text",
+  "To approve": "To approve",
+  "Nothing to approve. An action an agent may do with Ask me waits here for your click.": "Nothing to approve. An action an agent may do with Ask me waits here for your click.",
+  "1 action to approve": "1 action to approve",
+  "{{count}} actions to approve": "{{count}} actions to approve"
 }

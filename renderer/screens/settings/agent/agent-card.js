@@ -12,6 +12,7 @@ import {
   setAgentsPaused,
 } from './api'
 import {AGENT_COLORS} from '../../validation/agent/picks'
+import {usePendingActions} from '../../agents/pending-api'
 
 /** What the agent does now, in the menu's card (the approved design's screen 2), from its status. */
 export function agentCardLine(t, {settings, hasKey}) {
@@ -26,6 +27,27 @@ export function agentCardLine(t, {settings, hasKey}) {
   if (level === 'alone') return t('Autopilot in the validation')
   if (level === 'ask') return t('Suggests the answers in the validation')
   return t('Answers in the validation are off')
+}
+
+/** The card's line while actions wait in To approve. */
+export const agentsToApproveLine = (t, count) =>
+  count === 1
+    ? t('1 action to approve')
+    : t('{{count}} actions to approve', {count})
+
+/**
+ * The card's line: the actions waiting in To approve; else, with one agent on answering the validation, what it does
+ * there; else that they are paused, or the names of the agents on.
+ */
+export function agentsCardLine(t, {status, on, paused, toApprove}) {
+  if (toApprove) return agentsToApproveLine(t, toApprove)
+  if (on.length === 1 && on[0].actions.answerFlip)
+    return agentCardLine(t, status)
+  if (paused)
+    return t('Every agent is paused: none acts until you resume them.', {
+      nsSeparator: '!!',
+    })
+  return on.map((agent) => agent.name).join(', ')
 }
 
 /** The card's title: how many agents are on, or that they are paused. */
@@ -45,6 +67,7 @@ export function AgentCard() {
   const [status, setStatus] = React.useState(lastAgentStatus)
   const [list, setList] = React.useState(lastAgentsList)
   const [isBusy, setIsBusy] = React.useState(false)
+  const toApprove = (usePendingActions() || []).length
 
   React.useEffect(() => {
     let live = true
@@ -63,18 +86,9 @@ export function AgentCard() {
 
   if (!list || !status) return null
   const on = list.agents.filter((agent) => agent.enabled)
-  if (on.length === 0) return null
+  if (on.length === 0 && toApprove === 0) return null
   const {paused} = list
-  // One agent on, answering the validation: what it does there; else the names of the agents on.
-  const alone = on.length === 1 && on[0].actions.answerFlip
-  // eslint-disable-next-line no-nested-ternary
-  const line = alone
-    ? agentCardLine(t, status)
-    : paused
-    ? t('Every agent is paused: none acts until you resume them.', {
-        nsSeparator: '!!',
-      })
-    : on.map((agent) => agent.name).join(', ')
+  const line = agentsCardLine(t, {status, on, paused, toApprove})
 
   return (
     <Box

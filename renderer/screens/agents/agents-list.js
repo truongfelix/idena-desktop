@@ -27,6 +27,8 @@ import {
   runsLine,
 } from './catalog'
 import {useAgents} from './use-agents'
+import {ToApprove} from './to-approve'
+import {usePendingActions} from './pending-api'
 
 /** The agent's letter on a soft square, as on the cards and its page. */
 export function AgentBadge({name, size = 10}) {
@@ -132,12 +134,13 @@ export function AgentsList() {
   const {t} = useTranslation()
   const router = useRouter()
   const {list, error, run} = useAgents()
+  const pending = usePendingActions()
   const [activity, setActivity] = React.useState([])
   const catalog = actionCatalog(t)
 
   React.useEffect(() => {
     agentActivity().then(setActivity, () => {})
-  }, [list])
+  }, [list, pending])
 
   const lastLine = (id) => {
     const entry = activity.find((line) => line.agentId === id)
@@ -169,6 +172,7 @@ export function AgentsList() {
         </PrimaryButton>
       </Flex>
       {error && <ErrorAlert>{error}</ErrorAlert>}
+      <ToApprove items={pending} />
       {list && (
         <Stack spacing={3}>
           <Heading as="h2" fontSize="md" fontWeight={600}>

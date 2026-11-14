@@ -25,6 +25,30 @@ export function actionCatalog(t) {
   ]
 }
 
+/** What an agent wants to do, as To approve says it, for every action an agent can ask for (settings.js ACTIONS). */
+export function actionWants(action, t) {
+  switch (action) {
+    case 'answerFlip':
+      return t('wants to answer a flip')
+    case 'report':
+      return t('wants to report a flip')
+    case 'send':
+      return t('wants to send iDNA')
+    case 'post':
+      return t('wants to post on Social')
+    case 'tip':
+      return t('wants to tip a post')
+    case 'ads':
+      return t('wants to change an ad')
+    case 'oracleVote':
+      return t('wants to vote in an oracle voting')
+    case 'invite':
+      return t('wants to send an invitation')
+    default:
+      return t('wants to act')
+  }
+}
+
 export const LEVELS = ['off', 'ask', 'alone']
 
 export function levelLabel(level, t) {

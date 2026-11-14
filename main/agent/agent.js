@@ -1,5 +1,6 @@
 const {checkAction} = require('./permissions')
 const {createAgentCommands} = require('./agent-commands')
+const {createPending} = require('./pending')
 const {validationAgent} = require('./profiles')
 const {checkFlip, flipQuestion, readFlipAnswer} = require('./flips')
 const providers = require('./providers')
@@ -30,6 +31,7 @@ function createAgent({
   profiles = null,
   key,
   logger,
+  notify = () => {},
   ask = providers.ask,
   now = Date.now,
 }) {
@@ -56,15 +58,22 @@ function createAgent({
     return agent ? agent.id : undefined
   }
 
+  // To approve: the actions the agents prepared with Ask me (pending.js); the window hears each change.
+  const pending = profiles
+    ? createPending({profiles, log, notify: () => notify('pending'), now})
+    : null
+
   const agents = profiles
     ? createAgentCommands({
         profiles,
         key,
         log,
-        // The validation's question in flight ends when its agent is turned off, removed or paused.
+        // The validation's question in flight ends when its agent is turned off, removed or paused; an action
+        // waiting for an agent removed, or an action turned Off, leaves To approve.
         onChange: () => {
           const current = settings.read()
           if (current.paused || !current.enabled) stop(solving)
+          pending.prune()
         },
       })
     : null
@@ -173,6 +182,9 @@ function createAgent({
 
   const handlers = {
     ...(agents ? agents.commands : {}),
+    ...(pending ? pending.commands : {}),
+    /** An action an agent prepared (pending.js propose): refused, to do alone, or waiting in To approve. */
+    ...(pending ? {propose: (data) => pending.propose(data)} : {}),
     status,
     saveSettings(data) {
       const saved = settings.write(data)

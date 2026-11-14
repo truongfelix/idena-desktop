@@ -1,0 +1,201 @@
+const os = require('os')
+const path = require('path')
+const fs = require('fs-extra')
+const {createAgent} = require('./agent')
+const {createAgentProfiles, validationAgentSettings} = require('./profiles')
+const {MAX_PENDING} = require('./pending')
+
+const JOKE = 'aaaaaaaaaaaaaaaa'
+const OTHER = 'bbbbbbbbbbbbbbbb'
+const joke = (level = 'ask') => ({
+  id: JOKE,
+  name: 'Joke agent',
+  enabled: true,
+  model: 'm',
+  actions: {post: {level}},
+})
+const proposal = (more = {}) => ({
+  agentId: JOKE,
+  action: 'post',
+  body: 'A joke',
+  detail: '2 tips since the last joke',
+  editable: true,
+  ...more,
+})
+
+describe('To approve', () => {
+  let dir
+  let notify
+
+  const start = (agents) => {
+    fs.writeJsonSync(path.join(dir, 'agents.json'), {
+      v: 1,
+      paused: false,
+      agents,
+    })
+    const profiles = createAgentProfiles({
+      file: () => path.join(dir, 'agents.json'),
+    })
+    const key = {
+      keychain: () => ({available: true, reason: null}),
+      has: () => false,
+      hasAny: () => false,
+      read: () => null,
+      set: jest.fn(),
+      clear: jest.fn(),
+    }
+    return createAgent({
+      settings: validationAgentSettings(profiles),
+      profiles,
+      key,
+      notify,
+      ask: jest.fn(),
+      now: () => 7,
+    })
+  }
+
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-pending-'))
+    notify = jest.fn()
+  })
+  afterEach(() => fs.removeSync(dir))
+
+  test('an Ask me action waits in the list, with its agent, and the window hears it', async () => {
+    const agent = start([joke()])
+    const result = await agent.handle('propose', proposal())
+    expect(result).toMatchObject({decision: 'ask', item: {state: 'waiting'}})
+    const list = await agent.handle('pending')
+    expect(list).toEqual([
+      expect.objectContaining({
+        agentId: JOKE,
+        agentName: 'Joke agent',
+        action: 'post',
+        body: 'A joke',
+        at: 7,
+      }),
+    ])
+    expect(notify).toHaveBeenCalledWith('pending')
+    const [line] = await agent.handle('activity', {agentId: JOKE})
+    expect(line).toMatchObject({action: 'post', decision: 'ask'})
+  })
+
+  test('an action outside the agent list, or Off, is refused and never waits', async () => {
+    const agent = start([
+      joke('off'),
+      {id: OTHER, name: 'Other', enabled: true},
+    ])
+    await expect(agent.handle('propose', proposal())).resolves.toMatchObject({
+      decision: 'off',
+      reason: 'action off',
+    })
+    await expect(
+      agent.handle('propose', proposal({agentId: OTHER}))
+    ).resolves.toMatchObject({decision: 'off', reason: 'action off'})
+    await expect(
+      agent.handle('propose', proposal({action: 'constructor'}))
+    ).resolves.toMatchObject({decision: 'off', reason: 'unknown action'})
+    await expect(
+      agent.handle('propose', proposal({agentId: 'cccccccccccccccc'}))
+    ).resolves.toMatchObject({decision: 'off'})
+    await expect(agent.handle('pending')).resolves.toEqual([])
+  })
+
+  test('an Alone action is not put in the list: its caller does it', async () => {
+    const agent = start([joke('alone')])
+    await expect(agent.handle('propose', proposal())).resolves.toEqual({
+      decision: 'alone',
+      reason: 'within the limit',
+    })
+    await expect(agent.handle('pending')).resolves.toEqual([])
+  })
+
+  test('approved: handed over with the edit, then done and gone', async () => {
+    const agent = start([joke()])
+    const {item} = await agent.handle('propose', proposal())
+    const running = await agent.handle('approve', {id: item.id, body: 'Edited'})
+    expect(running).toMatchObject({state: 'running', body: 'Edited'})
+    await expect(agent.handle('approve', {id: item.id})).rejects.toThrow(
+      'already being done'
+    )
+    await expect(agent.handle('decline', {id: item.id})).rejects.toThrow(
+      'already being done'
+    )
+    await expect(
+      agent.handle('finish', {id: item.id, ok: true, detail: 'posted'})
+    ).resolves.toEqual([])
+    const [line] = await agent.handle('activity', {agentId: JOKE})
+    expect(line).toMatchObject({decision: 'approved', detail: 'posted'})
+  })
+
+  test('a text the agent did not offer to edit is not changed by the approval', async () => {
+    const agent = start([joke()])
+    const {item} = await agent.handle('propose', proposal({editable: false}))
+    await expect(
+      agent.handle('approve', {id: item.id, body: 'Other'})
+    ).resolves.toMatchObject({body: 'A joke'})
+  })
+
+  test('a failed action goes back to waiting with its error', async () => {
+    const agent = start([joke()])
+    const {item} = await agent.handle('propose', proposal())
+    await agent.handle('approve', {id: item.id})
+    const list = await agent.handle('finish', {
+      id: item.id,
+      ok: false,
+      detail: 'not enough iDNA for the fee',
+    })
+    expect(list).toEqual([
+      expect.objectContaining({
+        state: 'waiting',
+        error: 'not enough iDNA for the fee',
+      }),
+    ])
+  })
+
+  test('declined: gone, and said in Activity', async () => {
+    const agent = start([joke()])
+    const {item} = await agent.handle('propose', proposal())
+    await expect(agent.handle('decline', {id: item.id})).resolves.toEqual([])
+    const [line] = await agent.handle('activity', {agentId: JOKE})
+    expect(line).toMatchObject({action: 'post', decision: 'declined'})
+  })
+
+  test('paused: the item waits, its approval is refused until the resume', async () => {
+    const agent = start([joke()])
+    const {item} = await agent.handle('propose', proposal())
+    await agent.handle('setPaused', {paused: true})
+    await expect(agent.handle('approve', {id: item.id})).rejects.toThrow(
+      'paused'
+    )
+    await expect(agent.handle('pending')).resolves.toHaveLength(1)
+    await agent.handle('setPaused', {paused: false})
+    await expect(agent.handle('approve', {id: item.id})).resolves.toMatchObject(
+      {state: 'running'}
+    )
+  })
+
+  test('the action turned Off, or the agent removed: its items leave the list', async () => {
+    const agent = start([joke(), {...joke(), id: OTHER, name: 'Second'}])
+    await agent.handle('propose', proposal())
+    await agent.handle('propose', proposal({agentId: OTHER}))
+    const {agents} = await agent.handle('agents')
+    const {hasKey, ...first} = agents[0]
+    await agent.handle('saveAgent', {...first, actions: {post: {level: 'off'}}})
+    let list = await agent.handle('pending')
+    expect(list.map((item) => item.agentId)).toEqual([OTHER])
+    await agent.handle('removeAgent', {agentId: OTHER})
+    list = await agent.handle('pending')
+    expect(list).toEqual([])
+  })
+
+  test(`at most ${MAX_PENDING} actions wait`, async () => {
+    const agent = start([joke()])
+    for (let i = 0; i < MAX_PENDING; i += 1)
+      // eslint-disable-next-line no-await-in-loop
+      await agent.handle('propose', proposal())
+    await expect(agent.handle('propose', proposal())).resolves.toMatchObject({
+      decision: 'off',
+      reason: 'too many actions waiting',
+    })
+  })
+})

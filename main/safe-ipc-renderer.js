@@ -30,6 +30,7 @@ const LISTEN_CHANNELS = new Set([
   NODE_EVENT,
   'DNA_LINK',
   'confirm-quit',
+  'agent-event',
 ])
 
 const NODE_COMMANDS = new Set([
