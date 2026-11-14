@@ -1,11 +1,13 @@
 const crypto = require('crypto')
+const fs = require('fs-extra')
 const {ACTIONS} = require('./settings')
 const {checkAction} = require('./permissions')
 const {agentSettings} = require('./profiles')
 
 // "To approve" (B-243): the actions the agents prepared with Ask me, across the agents, each waiting for the
 // person's click. The main process keeps the list and decides; the renderer shows it, and runs an approved action
-// with the app's own code (as the person's click would), then says how it went. Kept until the app closes.
+// with the app's own code (as the person's click would), then says how it went. Kept in a file of the user data
+// folder (pending.json), so a joke prepared at 09:00 still waits after a restart.
 
 const MAX_PENDING = 50
 /** One agent's share of the list: an agent proposing too often cannot shut the others out. */
@@ -18,20 +20,85 @@ const newPendingId = () => crypto.randomBytes(8).toString('hex')
 const text = (value, max) =>
   typeof value === 'string' ? value.slice(0, max) : ''
 
+const ID_PATTERN = /^[0-9a-f]{16}$/u
+const INTERRUPTED =
+  'interrupted: it may have been done, check before approving again'
+
 /**
- * The list over `profiles` (the file of agents). `log(entry)` adds an Activity line, `notify()` tells the window
- * the list changed.
+ * One saved item, each field checked, or null. One being done when the app closed waits again, with the warning:
+ * nobody heard how it went.
+ */
+function readItem(value) {
+  if (!value || typeof value !== 'object') return null
+  if (!ID_PATTERN.test(value.id) || !ID_PATTERN.test(value.agentId)) return null
+  if (!Object.prototype.hasOwnProperty.call(ACTIONS, value.action)) return null
+  const running = value.state === 'running'
+  return {
+    id: value.id,
+    agentId: value.agentId,
+    action: value.action,
+    body: text(value.body, MAX_TEXT_LENGTH),
+    detail: text(value.detail, MAX_DETAIL_LENGTH),
+    editable: value.editable === true,
+    at: Number.isFinite(value.at) ? value.at : 0,
+    state: 'waiting',
+    error: running ? INTERRUPTED : text(value.error, MAX_DETAIL_LENGTH) || null,
+  }
+}
+
+/** The saved list (`file`), or none: missing, unreadable, or not this format. */
+function readItems(file, logger) {
+  if (!file) return []
+  try {
+    const saved = fs.readJsonSync(file())
+    const list = saved && Array.isArray(saved.items) ? saved.items : []
+    const ids = new Set()
+    return list
+      .map(readItem)
+      .filter((item) => {
+        if (!item || ids.has(item.id)) return false
+        ids.add(item.id)
+        return true
+      })
+      .slice(0, MAX_PENDING)
+  } catch (error) {
+    if (error.code !== 'ENOENT' && logger)
+      logger.warn('agent pending file unreadable', error.toString())
+    return []
+  }
+}
+
+/**
+ * The list over `profiles` (the file of agents), kept in `file` (none: until the app closes). `log(entry)` adds an
+ * Activity line, `notify()` tells the window the list changed.
  */
 function createPending({
   profiles,
   log,
+  file = null,
+  logger = null,
   notify = () => {},
   now = Date.now,
   newId = newPendingId,
 }) {
-  let items = []
+  let items = readItems(file, logger)
+
+  // Written beside, then renamed over the file: a power cut leaves the old list or the new one, never half. A
+  // failed write keeps the list in memory: the change holds until the app closes.
+  const save = () => {
+    if (!file) return
+    try {
+      const temp = `${file()}.tmp`
+      fs.outputJsonSync(temp, {v: 1, items}, {spaces: 2})
+      fs.renameSync(temp, file())
+    } catch (error) {
+      if (logger)
+        logger.warn('agent pending file not written', error.toString())
+    }
+  }
 
   const changed = () => {
+    save()
     notify()
     return items.map((item) => ({...item}))
   }
@@ -44,12 +111,17 @@ function createPending({
 
   /**
    * What the agent may do with this action now: the pause, its list and the action's limit (`usage` already done in
-   * the limit's span, `amount` this action adds), as for any action. `file`: the agents, read once by the caller.
+   * the limit's span, `amount` this action adds), as for any action. `agentsFile`: the agents, read once by the caller.
    */
-  const decide = (agentId, action, counts = {}, file = profiles.read()) => {
-    const agent = file.agents.find((one) => one.id === agentId)
+  const decide = (
+    agentId,
+    action,
+    counts = {},
+    agentsFile = profiles.read()
+  ) => {
+    const agent = agentsFile.agents.find((one) => one.id === agentId)
     if (!agent) return {decision: 'off', reason: 'no such agent'}
-    return checkAction(agentSettings(file, agent), action, counts)
+    return checkAction(agentSettings(agentsFile, agent), action, counts)
   }
 
   /** Takes the item off the list; `reason` (not done) goes in the agent's Activity. */
@@ -183,14 +255,17 @@ function createPending({
      * done stays until it is finished). The pause keeps the items: they wait for the resume.
      */
     prune() {
-      const file = profiles.read()
+      const agentsFile = profiles.read()
       const gone = items.filter((item) => {
         if (item.state === 'running') return false
-        const {reason} = decide(item.agentId, item.action, {}, file)
+        const {reason} = decide(item.agentId, item.action, {}, agentsFile)
         return ['no such agent', 'action off', 'agent off'].includes(reason)
       })
       gone.forEach((item) =>
-        remove(item.id, decide(item.agentId, item.action, {}, file).reason)
+        remove(
+          item.id,
+          decide(item.agentId, item.action, {}, agentsFile).reason
+        )
       )
       if (gone.length) changed()
     },
@@ -202,8 +277,7 @@ function createPending({
       const running = items.filter((item) => item.state === 'running')
       running.forEach((item) => {
         item.state = 'waiting'
-        item.error =
-          'interrupted: it may have been done, check before approving again'
+        item.error = INTERRUPTED
         log({
           agentId: item.agentId,
           action: item.action,

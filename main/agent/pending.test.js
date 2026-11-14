@@ -27,12 +27,14 @@ describe('To approve', () => {
   let dir
   let notify
 
+  // `agents` written first; none: the file as it is (a restart).
   const start = (agents) => {
-    fs.writeJsonSync(path.join(dir, 'agents.json'), {
-      v: 1,
-      paused: false,
-      agents,
-    })
+    if (agents)
+      fs.writeJsonSync(path.join(dir, 'agents.json'), {
+        v: 1,
+        paused: false,
+        agents,
+      })
     const profiles = createAgentProfiles({
       file: () => path.join(dir, 'agents.json'),
     })
@@ -47,6 +49,7 @@ describe('To approve', () => {
     return createAgent({
       settings: validationAgentSettings(profiles),
       profiles,
+      pendingFile: () => path.join(dir, 'pending.json'),
       key,
       notify,
       ask: jest.fn(),
@@ -77,6 +80,44 @@ describe('To approve', () => {
     expect(notify).toHaveBeenCalledWith('pending')
     const [line] = await agent.handle('activity', {agentId: JOKE})
     expect(line).toMatchObject({action: 'post', decision: 'ask'})
+  })
+
+  test('the list holds after a restart; an action being done waits again, with a warning', async () => {
+    const before = start([joke()])
+    const {item: done} = await before.handle('propose', proposal())
+    const {item: waiting} = await before.handle(
+      'propose',
+      proposal({body: 'Second'})
+    )
+    await before.handle('approve', {id: done.id})
+    const after = start()
+    const list = await after.handle('pending')
+    expect(list.map((one) => [one.id, one.state, one.body])).toEqual([
+      [done.id, 'waiting', 'A joke'],
+      [waiting.id, 'waiting', 'Second'],
+    ])
+    expect(list[0].error).toMatch(/may have been done/u)
+    expect(list[1].error).toBeNull()
+    await after.handle('decline', {id: waiting.id})
+    await expect(start().handle('pending')).resolves.toHaveLength(1)
+  })
+
+  test('a saved list that is broken, or holds what no agent can ask, reads as nothing of it', async () => {
+    start([joke()])
+    fs.writeFileSync(path.join(dir, 'pending.json'), '{"items": [')
+    await expect(start().handle('pending')).resolves.toEqual([])
+    fs.writeJsonSync(path.join(dir, 'pending.json'), {
+      v: 1,
+      items: [
+        {id: 'x', agentId: JOKE, action: 'post'},
+        {id: 'cccccccccccccccc', agentId: JOKE, action: 'constructor'},
+        {id: 'dddddddddddddddd', agentId: JOKE, action: 'post', body: 7},
+        {id: 'dddddddddddddddd', agentId: JOKE, action: 'post', body: 'dup'},
+      ],
+    })
+    await expect(start().handle('pending')).resolves.toEqual([
+      expect.objectContaining({id: 'dddddddddddddddd', body: ''}),
+    ])
   })
 
   test('an action outside the agent list, or Off, is refused and never waits', async () => {

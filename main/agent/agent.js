@@ -29,6 +29,7 @@ function clampTimeout(value) {
 function createAgent({
   settings,
   profiles = null,
+  pendingFile = null,
   key,
   logger,
   notify = () => {},
@@ -60,7 +61,14 @@ function createAgent({
 
   // To approve: the actions the agents prepared with Ask me (pending.js); the window hears each change.
   const pending = profiles
-    ? createPending({profiles, log, notify: () => notify('pending'), now})
+    ? createPending({
+        profiles,
+        log,
+        file: pendingFile,
+        logger,
+        notify: () => notify('pending'),
+        now,
+      })
     : null
 
   const agents = profiles
