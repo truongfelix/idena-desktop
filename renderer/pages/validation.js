@@ -19,6 +19,11 @@ import {useEpochState} from '../shared/providers/epoch-context'
 import {useTimingState} from '../shared/providers/timing-context'
 import {useChainState} from '../shared/providers/chain-context'
 import {useAutoCloseValidationToast} from '../screens/validation/hooks/use-validation-toast'
+import {
+  timeLeftText,
+  useAnswersTx,
+  useNodeConnection,
+} from '../screens/validation/connection'
 
 export default function ValidationPage() {
   const epoch = useEpochState()
@@ -95,6 +100,15 @@ function ValidationSession({
 
   const {syncing, offline} = useChainState()
 
+  // The answers go out through the node: with no peer, or a head that does not move, they reach no one (B-244).
+  const {lost: connectionLost} = useNodeConnection()
+  const shortAnswersTx = useAnswersTx(
+    state.context.submitShortAnswersHash,
+    state.context.submitShortAnswersAt
+  )
+  const validationEnd =
+    validationStart + (shortSessionDuration + longSessionDuration) * 1000
+
   return (
     <ValidationScreen
       state={state}
@@ -114,6 +128,28 @@ function ValidationSession({
       {offline && (
         <OfflineValidationAlert>{t('Offline')}</OfflineValidationAlert>
       )}
+
+      {!offline && !syncing && connectionLost && (
+        <OfflineValidationAlert>
+          {t(
+            'Your node has no connection: your answers cannot reach the network',
+            {nsSeparator: '|'}
+          )}
+        </OfflineValidationAlert>
+      )}
+
+      {!offline &&
+        !syncing &&
+        !connectionLost &&
+        shortAnswersTx === 'late' &&
+        state.matches('longSession') && (
+          <SynchronizingValidationAlert>
+            {`${t(
+              'Your short answers are not in a block yet: keep the app open and connected',
+              {nsSeparator: '|'}
+            )} (${timeLeftText(t, validationEnd, Date.now())})`}
+          </SynchronizingValidationAlert>
+        )}
 
       {state.matches('validationFailed') && (
         <ValidationFailedDialog isOpen onSubmit={() => router.push('/home')} />

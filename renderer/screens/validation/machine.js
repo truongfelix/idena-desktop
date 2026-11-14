@@ -67,6 +67,11 @@ export const createValidationMachine = ({
         translations: {},
         reports: new Set(),
         submitLongAnswersHash: null,
+        // When the answers went to the node (ms), and the short answers' hash transaction: the screens follow
+        // both until a block holds them.
+        submitLongAnswersAt: null,
+        submitShortAnswersHash: null,
+        submitShortAnswersAt: null,
       },
       states: {
         shortSession: {
@@ -435,7 +440,13 @@ export const createValidationMachine = ({
                               ),
                             onDone: {
                               target: '#validation.longSession',
-                              actions: [log()],
+                              actions: [
+                                assign({
+                                  submitShortAnswersHash: (_, {data}) => data,
+                                  submitShortAnswersAt: () => Date.now(),
+                                }),
+                                log(),
+                              ],
                             },
                             onError: [
                               {
@@ -951,6 +962,7 @@ export const createValidationMachine = ({
                               actions: [
                                 assign({
                                   submitLongAnswersHash: (_, {data}) => data,
+                                  submitLongAnswersAt: () => Date.now(),
                                 }),
                               ],
                               target: '#validation.validationSucceeded',

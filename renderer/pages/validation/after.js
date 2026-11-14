@@ -6,14 +6,12 @@ import {
   Heading,
   Stack,
   Text,
-  useBoolean,
 } from '@chakra-ui/react'
 import dayjs from 'dayjs'
 import NextLink from 'next/link'
 import {useRouter} from 'next/router'
 import React from 'react'
 import {useTranslation} from 'react-i18next'
-import {useTrackTx} from '../../screens/ads/hooks'
 import {ValidationAdPromotion} from '../../screens/validation/components/ads'
 import {ValidationCountdown} from '../../screens/validation/components/countdown'
 import {usePersistedValidationState} from '../../screens/validation/hooks/use-persisted-state'
@@ -22,6 +20,13 @@ import {
   useTrackEpochPeriod,
 } from '../../screens/validation/hooks/use-validation-toast'
 import {canValidate} from '../../screens/validation/utils'
+import {
+  afterSubmitStatus,
+  persistedLongAnswersTx,
+  timeLeftText,
+  useAnswersTx,
+  useNodeConnection,
+} from '../../screens/validation/connection'
 import {ErrorAlert} from '../../shared/components/components'
 import {Status} from '../../shared/components/sidebar'
 import {useEpochState} from '../../shared/providers/epoch-context'
@@ -34,15 +39,13 @@ export default function AfterValidationPage() {
 
   const router = useRouter()
 
-  const [{isPending}, setIsPending] = useBoolean()
-
   const {data: validationState} = usePersistedValidationState()
 
-  useTrackTx(validationState?.submitLongAnswersHash, {
-    onMined: () => {
-      setIsPending.off()
-    },
-  })
+  // Success only once a block holds the answers: a node without peers keeps them in its pool (B-244).
+  const longAnswers = persistedLongAnswersTx(validationState)
+  const answersTx = useAnswersTx(longAnswers.hash, longAnswers.sentAt)
+  const {lost: connectionLost} = useNodeConnection()
+  const {status, warning} = afterSubmitStatus({answersTx, connectionLost})
 
   const epoch = useEpochState()
   const currentPeriod = epoch?.currentPeriod
@@ -121,19 +124,35 @@ export default function AfterValidationPage() {
                 </Text>
               )}
 
-              {isValidationCeremony && (
+              {isValidationCeremony && isEligible && (
                 <Text color="xwhite.050" fontSize="mdx">
-                  {isEligible &&
-                    isPending &&
-                    t('Please wait. Your answers are being submitted...')}
-                  {isEligible &&
-                    !isPending &&
+                  {status === 'submitted' &&
                     t('Your answers are successfully submitted')}
+                  {status === 'pending' &&
+                    t('Please wait. Your answers are being submitted...')}
+                  {status === 'sent' &&
+                    t('Your answers were sent to your node')}
                 </Text>
               )}
             </Stack>
             {isAfterLongSession ? null : (
               <ValidationCountdown duration={validationEnd.diff(dayjs())} />
+            )}
+
+            {isValidationCeremony && isEligible && warning && (
+              <ErrorAlert>
+                {`${
+                  warning === 'noConnection'
+                    ? t(
+                        'Your node has no connection: your answers cannot reach the network',
+                        {nsSeparator: '|'}
+                      )
+                    : t(
+                        'Your answers are not in a block yet: keep the app open and connected',
+                        {nsSeparator: '|'}
+                      )
+                } (${timeLeftText(t, validationEnd.valueOf(), Date.now())})`}
+              </ErrorAlert>
             )}
 
             {!isEligible && (
