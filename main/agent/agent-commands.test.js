@@ -337,5 +337,8 @@ describe('the Agents section commands', () => {
       'answerFlip',
     ])
     expect(await agent.handle('activity')).toHaveLength(4)
+    // Asked with an empty value, as a script may: every line, not the lines of an agent "null".
+    expect(await agent.handle('activity', null)).toHaveLength(4)
+    expect(await agent.handle('activity', {})).toHaveLength(4)
   })
 })

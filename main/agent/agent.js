@@ -326,9 +326,10 @@ function createAgent({
     },
     /** The log, newest first; with `agentId`, that agent's lines and the pause and resume of all agents. */
     activity: (data) => {
-      const agentId = data && data.agentId
+      // No agent named (no data, or none in it): every line.
+      const agentId = data ? data.agentId : undefined
       const lines = activity.slice().reverse()
-      return agentId === undefined
+      return agentId === undefined || agentId === null
         ? lines
         : lines.filter(
             (entry) =>
