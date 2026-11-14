@@ -275,12 +275,35 @@ function portMapping(answer) {
 }
 
 /**
- * Whether `ip` is an IPv4 address the internet can reach, as the node judges it (go-multiaddr's IsPublicAddr):
- * not this network's (10/8, 172.16/12, 192.168/16), not a provider's shared one (100.64/10, a router behind
- * carrier-grade NAT), loopback, link-local, multicast, documentation, benchmarking or reserved; written plainly
- * (no leading zero, which the node refuses).
+ * The IPv4 ranges the node takes as not public: go-multiaddr v0.16.1 net/private.go, Private4 then Unroutable4, as
+ * the node's IsPublicAddr checks an announced address (copied as is; compare on its next upgrade).
  */
-function isPublicIPv4(ip) {
+const NOT_PUBLIC_IPV4 = [
+  '127.0.0.0/8',
+  '10.0.0.0/8',
+  '100.64.0.0/10',
+  '172.16.0.0/12',
+  '192.168.0.0/16',
+  '169.254.0.0/16',
+  '0.0.0.0/8',
+  '192.0.0.0/26',
+  '192.0.2.0/24',
+  '192.88.99.0/24',
+  '198.18.0.0/15',
+  '198.51.100.0/24',
+  '203.0.113.0/24',
+  '224.0.0.0/4',
+  '240.0.0.0/4',
+  '255.255.255.255/32',
+].map((cidr) => {
+  const [base, bits] = cidr.split('/')
+  // The range's block: the addresses that share its first `bits` bits.
+  const size = 2 ** (32 - Number(bits))
+  return {block: Math.floor(ipv4Number(base) / size), size}
+})
+
+/** An IPv4 address written plainly (four numbers 0-255, no leading zero) as a number; null otherwise. */
+function ipv4Number(ip) {
   const parts = String(ip ?? '').split('.')
   if (
     parts.length !== 4 ||
@@ -288,21 +311,20 @@ function isPublicIPv4(ip) {
       (part) => /^(0|[1-9]\d{0,2})$/.test(part) && Number(part) <= 255
     )
   )
-    return false
-  const [a, b, c] = parts.map(Number)
-  return !(
-    a === 0 ||
-    a === 10 ||
-    a === 127 ||
-    a >= 224 ||
-    (a === 100 && b >= 64 && b < 128) ||
-    (a === 169 && b === 254) ||
-    (a === 172 && b >= 16 && b < 32) ||
-    (a === 192 && b === 168) ||
-    (a === 192 && b === 0 && (c === 0 || c === 2)) ||
-    (a === 198 && (b === 18 || b === 19)) ||
-    (a === 198 && b === 51 && c === 100) ||
-    (a === 203 && b === 0 && c === 113)
+    return null
+  return parts.reduce((n, part) => n * 256 + Number(part), 0)
+}
+
+/**
+ * Whether `ip` is an IPv4 address the internet can reach, as the node judges it (NOT_PUBLIC_IPV4): not this
+ * network's, not a provider's shared one (100.64/10, a router behind carrier-grade NAT), loopback, link-local,
+ * multicast, documentation, benchmarking or reserved; written plainly (the node refuses a leading zero).
+ */
+function isPublicIPv4(ip) {
+  const n = ipv4Number(ip)
+  return (
+    n != null &&
+    !NOT_PUBLIC_IPV4.some(({block, size}) => Math.floor(n / size) === block)
   )
 }
 

@@ -488,6 +488,9 @@ describe('the announced address', () => {
       '192.0.1.1',
       '203.0.114.1',
       '198.51.101.1',
+      '192.0.0.64',
+      '192.0.0.70',
+      '223.255.255.255',
     ])
       expect(isPublicIPv4(ip)).toBe(true)
     for (const ip of [
@@ -518,6 +521,9 @@ describe('the announced address', () => {
       '203.0.113.5',
       '08.8.8.8',
       '1.02.3.4',
+      '192.0.0.63',
+      '192.88.99.1',
+      '240.0.0.1',
     ])
       expect(isPublicIPv4(ip)).toBe(false)
   })

@@ -122,7 +122,7 @@ function createRouterPortService({
   /**
    * Has the node announce the opening (net_setPublicAddrs): the router's public address with the opened port while
    * the app's opening is on `found` (the router of this network, or null), until its end, for the port the node
-   * listens on, and the router still forwards it to this computer; nothing otherwise. Without it the network learns
+   * listens on, and the router still forwards it to this computer's address now; nothing otherwise. Without it the network learns
    * the opened port only when libp2p takes the node as reachable, measured at 46 and 51 min after an opening. A
    * node without the call (older) or not answering is left alone; a failure is logged, never the row's error.
    */
@@ -147,9 +147,8 @@ function createRouterPortService({
         (await livePort()) === opening.port
       ) {
         const {mapping, pcIp} = await net.mapping(found, opening.port)
-        if (
-          ['pc', 'pc-before'].includes(mappingOwner(mapping, pcIp, opening))
-        ) {
+        // Only a forwarding to this computer's address now: one to its previous address reaches nobody here.
+        if (mappingOwner(mapping, pcIp, opening) === 'pc') {
           const addr = publicAddrFor(
             await net.externalAddress(found),
             opening.port

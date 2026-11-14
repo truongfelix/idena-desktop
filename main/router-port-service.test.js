@@ -648,6 +648,16 @@ describe('the announcement (B-248)', () => {
     expect(env.node.publicAddrs).toEqual(['/ip4/1.2.3.4/tcp/50506'])
   })
 
+  it("announces no forwarding to this computer's previous address", async () => {
+    const env = await found()
+    await env.service.open({endMs: NOW + 6 * HOUR})
+    expect(env.node.publicAddrs).toEqual([ADDR])
+    env.net.pcIp = '192.168.1.21'
+    env.net.open.mockRejectedValue(new Error('the router refused (501)'))
+    await expect(env.service.upkeep()).rejects.toThrow('the router refused')
+    expect(env.node.publicAddrs).toEqual([])
+  })
+
   it('clears what it announced after the opening is gone, also when the upkeep fails', async () => {
     const env = await found()
     await env.service.open({endMs: NOW + 6 * HOUR})
