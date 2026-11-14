@@ -199,6 +199,14 @@ describe('why the model gave no answer', () => {
     expect(reason.endsWith('…')).toBe(true)
   })
 
+  test('a long error is cut between characters, never inside an emoji', () => {
+    const reason = noAnswerReason(
+      `${'x'.repeat(NO_ANSWER_MAX_CHARS - 2)}🙂🙂🙂`
+    )
+    expect(Array.from(reason)).toHaveLength(NO_ANSWER_MAX_CHARS)
+    expect(reason.endsWith('🙂…')).toBe(true)
+  })
+
   test('an error without text is still a failure', () => {
     expect(noAnswerReason(undefined)).toBe('')
   })

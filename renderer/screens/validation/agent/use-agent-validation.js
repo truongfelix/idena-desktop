@@ -128,10 +128,13 @@ export function useAgentValidation({
   const active = Boolean(mode) && !paused
   const isShort = phase === 'short'
 
-  // A pause cuts the countdown: after the resume, a new one, from its start.
+  // A pause cuts the countdown: after the resume, a new one, from its start. It also forgets the last failure: the
+  // agent asks again after the resume (the key may have been fixed meanwhile).
   React.useEffect(() => {
-    if (!active) setCountdown({step: null, end: null})
-    else setNow(Date.now())
+    if (!active) {
+      setCountdown({step: null, end: null})
+      setNoAnswer(null)
+    } else setNow(Date.now())
   }, [active])
 
   // The long session shows the short session's flips again, with keywords: it starts afresh, its own picks.
@@ -145,6 +148,7 @@ export function useAgentValidation({
     seen.current = new Map()
     drawn.current = new Map()
     setPicks({})
+    setNoAnswer(null)
     setAsking(null)
     stopAgentSolve().catch(() => {})
   }, [phase, session])
@@ -318,8 +322,9 @@ export function useAgentValidation({
     paused,
     picks,
     asking,
-    // The model's last answer failed: {reason}, or null; not while paused (the agent asks nothing then).
-    noAnswer: active ? noAnswer : null,
+    // The agent's last answer failed: {reason}, or null; not while paused, nor in the keywords check (nothing is
+    // asked there).
+    noAnswer: active && phase !== 'keywords' ? noAnswer : null,
     countdown:
       mode === 'autopilot' && active && countdownEnd
         ? Math.max(0, Math.ceil((countdownEnd - now) / 1000))

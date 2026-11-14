@@ -415,7 +415,7 @@ export function ValidationScreen({
             <Stack spacing={0} mr={4} maxW="sm" fontSize="sm" color="red.500">
               {agent.noAnswer.reason && (
                 <Text noOfLines={2}>
-                  {t('The model gave no answer: {{reason}}', {
+                  {t('No answer from the agent: {{reason}}', {
                     reason: agent.noAnswer.reason,
                     nsSeparator: '!!',
                     interpolation: {escapeValue: false},

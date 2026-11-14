@@ -27,14 +27,19 @@ export const MIN_FLIP_MS = 2 * 1000
 export const NO_ANSWER_MAX_CHARS = 160
 
 /**
- * Why the model gave no answer, as the validation screen shows it: the error's text, cut to NO_ANSWER_MAX_CHARS;
+ * Why the agent gave no answer (the model's error, or the app's before the call), as the validation screen shows it: the error's text, cut to NO_ANSWER_MAX_CHARS;
  * null for a question stopped by a pause (asked again after the resume, not a failure).
  */
 export function noAnswerReason(text) {
   const reason = String(text || '').trim()
   if (reason === 'stopped') return null
-  return reason.length > NO_ANSWER_MAX_CHARS
-    ? `${reason.slice(0, NO_ANSWER_MAX_CHARS - 1).trimEnd()}…`
+  // By characters, not UTF-16 units: an emoji is never cut in two.
+  const chars = Array.from(reason)
+  return chars.length > NO_ANSWER_MAX_CHARS
+    ? `${chars
+        .slice(0, NO_ANSWER_MAX_CHARS - 1)
+        .join('')
+        .trimEnd()}…`
     : reason
 }
 
