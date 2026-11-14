@@ -154,5 +154,6 @@ module.exports = {
   PROVIDERS,
   createAgentSettings,
   defaultSettings,
+  normalizeLimit,
   normalizeSettings,
 }
