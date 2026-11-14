@@ -31,6 +31,10 @@ export function activityText({action, decision, detail}, t) {
         ? t('Test flip failed: {{detail}}', {detail, nsSeparator: '!!'})
         : t('Test flip answered: {{detail}}', {detail, nsSeparator: '!!'})
     case 'settings':
+      if (decision === 'added') return t('Agent added')
+      if (decision === 'removed') return t('Agent removed')
+      if (decision === 'paused') return t('All agents paused')
+      if (decision === 'resumed') return t('All agents resumed')
       return t('Settings saved')
     case 'key':
       return decision === 'removed' ? t('Key removed') : t('Key saved')

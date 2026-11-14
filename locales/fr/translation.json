@@ -1947,5 +1947,10 @@
   "1 agent on": "1 agent activé",
   "{{count}} agents on": "{{count}} agents activés",
   "Resume all agents": "Relancer tous les agents",
-  "Pause all agents": "Mettre tous les agents en pause"
+  "Pause all agents": "Mettre tous les agents en pause",
+  "Agent added": "Agent ajouté",
+  "Agent removed": "Agent supprimé",
+  "All agents paused": "Tous les agents en pause",
+  "All agents resumed": "Tous les agents relancés",
+  "Nothing leaves this computer.": "Rien ne quitte cet ordinateur."
 }

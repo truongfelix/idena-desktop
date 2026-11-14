@@ -7,6 +7,7 @@ import {
   runsLine,
 } from './catalog'
 import {agentsCardTitle} from '../settings/agent/agent-card'
+import {activityText} from '../settings/agent/activity-section'
 
 const t = (text, values = {}) =>
   text.replace(/\{\{(\w+)\}\}/gu, (_, name) => String(values[name]))
@@ -76,6 +77,15 @@ describe('the Agents section lines', () => {
     )
     expect(heldBy('answerFlip', holder, [holder, other])).toBeNull()
     expect(heldBy('report', other, [holder, other])).toBeNull()
+  })
+
+  test('the Activity names what was done to the agents', () => {
+    const line = (decision) => activityText({action: 'settings', decision}, t)
+    expect(line('added')).toBe('Agent added')
+    expect(line('removed')).toBe('Agent removed')
+    expect(line('paused')).toBe('All agents paused')
+    expect(line('resumed')).toBe('All agents resumed')
+    expect(line('saved')).toBe('Settings saved')
   })
 
   test("the menu card's title counts the agents on", () => {

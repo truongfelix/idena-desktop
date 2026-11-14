@@ -315,8 +315,11 @@ export function AgentPage({id}) {
         onClearKey={() => run(() => clearServiceKey(id))}
         test={isValidation ? test : null}
         sentLine={
-          isValidation || agent.provider === 'local'
+          // eslint-disable-next-line no-nested-ternary
+          isValidation
             ? null
+            : agent.provider === 'local'
+            ? t('Nothing leaves this computer.')
             : t(
                 'What it reads (below) is sent to this service; nothing else.',
                 {

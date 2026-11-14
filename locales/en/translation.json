@@ -1947,5 +1947,10 @@
   "1 agent on": "1 agent on",
   "{{count}} agents on": "{{count}} agents on",
   "Resume all agents": "Resume all agents",
-  "Pause all agents": "Pause all agents"
+  "Pause all agents": "Pause all agents",
+  "Agent added": "Agent added",
+  "Agent removed": "Agent removed",
+  "All agents paused": "All agents paused",
+  "All agents resumed": "All agents resumed",
+  "Nothing leaves this computer.": "Nothing leaves this computer."
 }
