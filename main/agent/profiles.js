@@ -3,6 +3,7 @@ const fs = require('fs-extra')
 const {
   ACTIONS,
   LEVELS,
+  defaultSettings,
   normalizeLimit,
   normalizeSettings,
 } = require('./settings')
@@ -221,6 +222,54 @@ function createAgentProfiles({file, singleFile, logger}) {
   }
 }
 
+/**
+ * The validation agent as the single agent's settings (settings.js): what Settings › Agent and the validation read
+ * and write until the Agents section replaces them (B-243). Reading: the agent holding "Answer the flips", or the
+ * defaults (off) with none. Writing: that agent's connection, report thresholds and its two validation actions,
+ * and the shared pause; its other actions stay. With no such agent yet, a write adds a "Validation agent" first.
+ */
+function validationAgentSettings(profiles) {
+  const read = () => {
+    const file = profiles.read()
+    const agent = validationAgent(file)
+    return agent
+      ? agentSettings(file, agent)
+      : {...defaultSettings(), paused: file.paused}
+  }
+  return {
+    read,
+    write(settings) {
+      const value = normalizeSettings(settings)
+      const file = profiles.read()
+      const current = validationAgent(file)
+      const updated = {
+        ...(current || {
+          name: 'Validation agent',
+          schedule: {kind: 'validation'},
+          actions: {},
+        }),
+        enabled: value.enabled,
+        provider: value.provider,
+        address: value.address,
+        model: value.model,
+        reportThresholds: value.reportThresholds,
+      }
+      updated.actions = {
+        ...updated.actions,
+        answerFlip: value.permissions.answerFlip,
+        report: value.permissions.report,
+      }
+      const agents = current
+        ? file.agents.map((agent) =>
+            agent.id === current.id ? updated : agent
+          )
+        : [updated, ...file.agents]
+      profiles.write({...file, paused: value.paused, agents})
+      return read()
+    },
+  }
+}
+
 module.exports = {
   MAX_AGENTS,
   SCHEDULES,
@@ -230,4 +279,5 @@ module.exports = {
   normalizeAgent,
   normalizeAgents,
   validationAgent,
+  validationAgentSettings,
 }

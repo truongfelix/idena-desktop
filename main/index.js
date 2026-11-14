@@ -28,7 +28,10 @@ const loadRoute = require('./utils/routes')
 const {getI18nConfig} = require('./language')
 const {searchImageSource, searchImages} = require('./image-search')
 const {createAgent} = require('./agent/agent')
-const {createAgentSettings} = require('./agent/settings')
+const {
+  createAgentProfiles,
+  validationAgentSettings,
+} = require('./agent/profiles')
 const {createAgentKey} = require('./agent/key')
 const {openExternalUrl} = require('./safe-external-url')
 const {RELEASES_API, createReleaseCheck} = require('./app-update-check')
@@ -180,14 +183,21 @@ const routerPort = createRouterPortService({
   logger,
 })
 
-// The agent (main/agent/agent.js): its settings and its encrypted key in the user data folder's agent/ folder.
+// The agents (main/agent/agent.js, profiles.js): the file of agents and the services' encrypted keys in the user
+// data folder's agent/ folder. settings.json and key.enc are the single agent's (before B-243): read while the new
+// files do not exist, left for an older build.
+const agentFile = (name) => join(app.getPath('userData'), 'agent', name)
 const agent = createAgent({
-  settings: createAgentSettings({
-    file: () => join(app.getPath('userData'), 'agent', 'settings.json'),
-    logger,
-  }),
+  settings: validationAgentSettings(
+    createAgentProfiles({
+      file: () => agentFile('agents.json'),
+      singleFile: () => agentFile('settings.json'),
+      logger,
+    })
+  ),
   key: createAgentKey({
-    file: () => join(app.getPath('userData'), 'agent', 'key.enc'),
+    file: () => agentFile('keys.enc'),
+    singleFile: () => agentFile('key.enc'),
     safeStorage,
   }),
   logger,

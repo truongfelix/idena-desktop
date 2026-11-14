@@ -9,8 +9,13 @@ const {
   normalizeAgent,
   normalizeAgents,
   validationAgent,
+  validationAgentSettings,
 } = require('./profiles')
-const {DEFAULT_ADDRESSES} = require('./settings')
+const {
+  DEFAULT_ADDRESSES,
+  createAgentSettings,
+  defaultSettings,
+} = require('./settings')
 const {checkAction} = require('./permissions')
 const {REPORT_THRESHOLDS} = require('./flips')
 
@@ -230,5 +235,97 @@ describe('agent profiles', () => {
       singleFile: () => path.join(dir, 'settings.json'),
     })
     expect(store.read()).toEqual({v: 1, paused: false, agents: []})
+  })
+
+  describe('the validation agent as the single agent settings', () => {
+    const files = () => ({
+      file: () => path.join(dir, 'agents.json'),
+      singleFile: () => path.join(dir, 'settings.json'),
+    })
+
+    test('an old setup reads back as it was read before', () => {
+      const old = {
+        enabled: true,
+        paused: false,
+        provider: 'anthropic',
+        model: 'claude-opus-5-5',
+        permissions: {answerFlip: {level: 'alone'}, report: {level: 'ask'}},
+        reportThresholds: {1: 0.6, 5: 0.95},
+      }
+      fs.writeJsonSync(path.join(dir, 'settings.json'), old)
+      const before = createAgentSettings({file: files().singleFile}).read()
+      const view = validationAgentSettings(createAgentProfiles(files()))
+      expect(view.read()).toEqual(before)
+    })
+
+    test('no agent: the defaults, off', () => {
+      const view = validationAgentSettings(createAgentProfiles(files()))
+      expect(view.read()).toEqual(defaultSettings())
+    })
+
+    test('a save with no agent yet adds the Validation agent', () => {
+      const profiles = createAgentProfiles(files())
+      const view = validationAgentSettings(profiles)
+      const saved = view.write({
+        ...defaultSettings(),
+        enabled: true,
+        provider: 'anthropic',
+        model: 'm',
+        permissions: {
+          ...defaultSettings().permissions,
+          answerFlip: {level: 'ask', limit: null},
+        },
+      })
+      expect(saved.enabled).toBe(true)
+      expect(saved.permissions.answerFlip.level).toBe('ask')
+      const [agent] = profiles.read().agents
+      expect(agent).toMatchObject({
+        name: 'Validation agent',
+        schedule: {kind: 'validation', time: '09:00'},
+      })
+      expect(Object.keys(agent.actions).sort()).toEqual([
+        'answerFlip',
+        'report',
+      ])
+    })
+
+    test('a save changes the validation agent only: its other actions and the other agents stay', () => {
+      const profiles = createAgentProfiles(files())
+      profiles.write({
+        agents: [
+          {name: 'Joke agent', enabled: true, actions: {post: {level: 'ask'}}},
+          {
+            name: 'Validation agent',
+            actions: {
+              answerFlip: {level: 'ask'},
+              tip: {level: 'ask', limit: 1},
+            },
+          },
+        ],
+      })
+      const view = validationAgentSettings(profiles)
+      view.write({
+        ...view.read(),
+        enabled: true,
+        paused: true,
+        permissions: {
+          ...view.read().permissions,
+          answerFlip: {level: 'alone', limit: null},
+        },
+      })
+      const file = profiles.read()
+      expect(file.paused).toBe(true)
+      expect(file.agents[0]).toMatchObject({
+        name: 'Joke agent',
+        actions: {post: {level: 'ask', limit: null}},
+      })
+      expect(file.agents[1].enabled).toBe(true)
+      expect(file.agents[1].actions).toEqual({
+        answerFlip: {level: 'alone', limit: null},
+        // Not in its list before: read as Off, saved as Off.
+        report: {level: 'off', limit: null},
+        tip: {level: 'ask', limit: 1},
+      })
+    })
   })
 })
