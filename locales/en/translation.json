@@ -1893,5 +1893,9 @@
   "Rightly reported": "Rightly reported",
   "When to report": "When to report",
   "The agent reports a flip when it is at least this sure that the flip breaks one of these rules. The right values depend on the model: the practice test shows how sure it was, flip by flip.": "The agent reports a flip when it is at least this sure that the flip breaks one of these rules. The right values depend on the model: the practice test shows how sure it was, flip by flip.",
-  "Only when it is sure enough that the flip breaks a rule (When to report, below)": "Only when it is sure enough that the flip breaks a rule (When to report, below)"
+  "Only when it is sure enough that the flip breaks a rule (When to report, below)": "Only when it is sure enough that the flip breaks a rule (When to report, below)",
+  "Agent: no answer": "Agent: no answer",
+  "The model gave no answer: {{reason}}": "The model gave no answer: {{reason}}",
+  "A flip without an answer gets a random one.": "A flip without an answer gets a random one.",
+  "Answer the flips yourself.": "Answer the flips yourself."
 }

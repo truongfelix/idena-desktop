@@ -188,14 +188,7 @@ export function ValidationScreen({
               color={agentColor}
               fontSize="sm"
             >
-              <Text>
-                {/* eslint-disable-next-line no-nested-ternary */}
-                {agent.paused
-                  ? t('Agent: paused', {nsSeparator: '!!'})
-                  : agent.mode === 'autopilot'
-                  ? t('Agent: Autopilot', {nsSeparator: '!!'})
-                  : t('Agent: Suggest', {nsSeparator: '!!'})}
-              </Text>
+              <Text>{agentBadgeText(agent, t)}</Text>
               {/* A person supervises: pauses the agent, corrects, and resumes it. */}
               <Button
                 size="xs"
@@ -418,6 +411,24 @@ export function ValidationScreen({
       </CurrentStep>
       <ActionBar>
         <ActionBarItem>
+          {agent?.noAnswer && isSolving(state) && !isSubmitting(state) && (
+            <Stack spacing={0} mr={4} maxW="sm" fontSize="sm" color="red.500">
+              {agent.noAnswer.reason && (
+                <Text noOfLines={2}>
+                  {t('The model gave no answer: {{reason}}', {
+                    reason: agent.noAnswer.reason,
+                    nsSeparator: '!!',
+                    interpolation: {escapeValue: false},
+                  })}
+                </Text>
+              )}
+              <Text fontWeight={500}>
+                {agent.mode === 'autopilot'
+                  ? t('A flip without an answer gets a random one.')
+                  : t('Answer the flips yourself.')}
+              </Text>
+            </Stack>
+          )}
           {agent?.canTakeRest && isSolving(state) && !isSubmitting(state) && (
             <Button
               variant="outline"
@@ -610,6 +621,15 @@ const AUTOPILOT_STEPS = [
   ['longSession.solve.answer.review', 'review'],
   ['longSession.solve.answer.submitLongSession.fail', 'longFail'],
 ]
+
+/** The agent's badge on the validation screen: paused, giving no answer, or its mode. */
+function agentBadgeText(agent, t) {
+  if (agent.paused) return t('Agent: paused', {nsSeparator: '!!'})
+  if (agent.noAnswer) return t('Agent: no answer', {nsSeparator: '!!'})
+  return agent.mode === 'autopilot'
+    ? t('Agent: Autopilot', {nsSeparator: '!!'})
+    : t('Agent: Suggest', {nsSeparator: '!!'})
+}
 
 /** The validation's step for Autopilot (agent/autopilot.js autopilotPlan), or null where it does nothing. */
 export function autopilotStep(state) {

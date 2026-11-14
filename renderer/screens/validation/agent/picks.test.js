@@ -5,6 +5,8 @@ import {
   flipDeadlineMs,
   flipsLeftToAsk,
   nextFlipToAsk,
+  NO_ANSWER_MAX_CHARS,
+  noAnswerReason,
   sessionEnd,
   SHORT_FLIP_MAX_MS,
 } from './picks'
@@ -173,5 +175,31 @@ describe('the agent in a validation', () => {
         isKeywords: true,
       })
     ).toEqual([])
+  })
+})
+
+describe('why the model gave no answer', () => {
+  test("the model's error is shown as it came", () => {
+    expect(
+      noAnswerReason(
+        'the model answered HTTP 400: You have reached your specified API usage limits.'
+      )
+    ).toBe(
+      'the model answered HTTP 400: You have reached your specified API usage limits.'
+    )
+  })
+
+  test('a question stopped by a pause is no failure', () => {
+    expect(noAnswerReason('stopped')).toBeNull()
+  })
+
+  test('a long error is cut', () => {
+    const reason = noAnswerReason(`HTTP 500: ${'x'.repeat(400)}`)
+    expect(reason).toHaveLength(NO_ANSWER_MAX_CHARS)
+    expect(reason.endsWith('…')).toBe(true)
+  })
+
+  test('an error without text is still a failure', () => {
+    expect(noAnswerReason(undefined)).toBe('')
   })
 })

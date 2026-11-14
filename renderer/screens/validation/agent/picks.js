@@ -23,6 +23,20 @@ export const LONG_FLIP_MAX_MS = 60 * 1000
 export const END_MARGIN_MS = 5 * 1000
 /** Below this a model has no time to answer: the flip is not asked. */
 export const MIN_FLIP_MS = 2 * 1000
+/** The longest error shown on the validation screen when the model gave no answer. */
+export const NO_ANSWER_MAX_CHARS = 160
+
+/**
+ * Why the model gave no answer, as the validation screen shows it: the error's text, cut to NO_ANSWER_MAX_CHARS;
+ * null for a question stopped by a pause (asked again after the resume, not a failure).
+ */
+export function noAnswerReason(text) {
+  const reason = String(text || '').trim()
+  if (reason === 'stopped') return null
+  return reason.length > NO_ANSWER_MAX_CHARS
+    ? `${reason.slice(0, NO_ANSWER_MAX_CHARS - 1).trimEnd()}…`
+    : reason
+}
 
 /** When the session's answers close, as the machine's own timers count them (SHORT_SESSION_AUTO_SUBMIT …). */
 export function sessionEnd({

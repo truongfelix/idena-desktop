@@ -16,6 +16,7 @@ import {
   flipDeadlineMs,
   flipsLeftToAsk,
   nextFlipToAsk,
+  noAnswerReason,
   sessionEnd,
 } from './picks'
 import {
@@ -71,7 +72,8 @@ export function agentMode(settings) {
  * 'keywords' | null (not solving), `step` the validation's step for Autopilot (screen.js autopilotStep).
  * Returns null when the agent is off, else its mode ('suggest' | 'autopilot'), whether it is paused, pause() and
  * resume() (a person supervises: pauses, corrects, resumes), its picks by hash, takeRest() (Suggest: an answer for
- * every flip left that has a pick) and Autopilot's countdown before a submit (seconds, or null).
+ * every flip left that has a pick), Autopilot's countdown before a submit (seconds, or null) and noAnswer, why
+ * the model's last answer failed ({reason}, or null).
  */
 export function useAgentValidation({
   flips,
@@ -90,6 +92,8 @@ export function useAgentValidation({
   const [pausing, setPausing] = React.useState(false)
   const paused = savedPause || pausing
   const [picks, setPicks] = React.useState({})
+  // Why the model's last answer failed ({reason}), until one comes back: the person is told the agent gives none.
+  const [noAnswer, setNoAnswer] = React.useState(null)
   const [asking, setAsking] = React.useState(null)
   const asked = React.useRef(new Set())
   const applied = React.useRef(new Set())
@@ -195,17 +199,21 @@ export function useAgentValidation({
       .then((data) => solveAgentFlip(data, {reportsUsed, timeoutMs}))
       .then(
         (pick) => ({...pick, seconds: (Date.now() - start) / 1000}),
-        (error) =>
+        (error) => {
           // Cut by a pause: asked again after the resume, not a failure.
-          agentErrorText(error) === 'stopped' ? null : {failed: true}
+          const reason = noAnswerReason(agentErrorText(error))
+          return reason === null ? null : {failed: true, reason}
+        }
       )
       .then((answer) => {
         // Gone, or a question of the session before: dropped.
         if (!live.current || sessionRef.current !== session) return
         // Refused for the pause (the main process saw it first): asked again after the resume.
         const pick = answer?.decision === 'off' ? null : answer
-        if (pick) setPicks((current) => ({...current, [flip.hash]: pick}))
-        else asked.current.delete(flip.hash)
+        if (pick) {
+          setPicks((current) => ({...current, [flip.hash]: pick}))
+          setNoAnswer(pick.failed ? {reason: pick.reason} : null)
+        } else asked.current.delete(flip.hash)
         setAsking((current) => (current === token ? null : current))
       })
     // withoutWords changes with the clock; its size says when a flip joined it.
@@ -310,6 +318,8 @@ export function useAgentValidation({
     paused,
     picks,
     asking,
+    // The model's last answer failed: {reason}, or null; not while paused (the agent asks nothing then).
+    noAnswer: active ? noAnswer : null,
     countdown:
       mode === 'autopilot' && active && countdownEnd
         ? Math.max(0, Math.ceil((countdownEnd - now) / 1000))
