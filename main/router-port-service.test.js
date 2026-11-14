@@ -88,6 +88,7 @@ function setup({net = routerInMemory(), dir} = {}) {
     announces: true,
     publicAddrs: [],
     setCalls: [],
+    queries: 0,
   }
   let clock = NOW
   const logger = {info: jest.fn(), warn: jest.fn()}
@@ -103,7 +104,10 @@ function setup({net = routerInMemory(), dir} = {}) {
           throw new Error(
             `the method ${method} does not exist/is not available`
           )
-        if (method === 'net_publicAddrs') return node.publicAddrs
+        if (method === 'net_publicAddrs') {
+          node.queries += 1
+          return node.publicAddrs
+        }
         const [addrs] = params
         node.setCalls.push(addrs)
         node.publicAddrs = addrs
@@ -627,5 +631,29 @@ describe('the announcement (B-248)', () => {
       'router port announcement failed',
       'Error: 501 Not Implemented'
     )
+    await failing.service.upkeep()
+    await failing.service.upkeep()
+    expect(
+      failing.logger.warn.mock.calls.filter(
+        ([message]) => message === 'router port announcement failed'
+      )
+    ).toHaveLength(1)
+  })
+
+  it('asks the node nothing when no port was opened, and leaves what it got otherwise', async () => {
+    const env = setup()
+    env.node.publicAddrs = ['/ip4/1.2.3.4/tcp/50506']
+    expect(await env.service.upkeep()).toBe('nothing')
+    expect(env.node.queries).toBe(0)
+    expect(env.node.publicAddrs).toEqual(['/ip4/1.2.3.4/tcp/50506'])
+  })
+
+  it('clears what it announced after the opening is gone, also when the upkeep fails', async () => {
+    const env = await found()
+    await env.service.open({endMs: NOW + 6 * HOUR})
+    env.net.router.mappings.clear()
+    env.net.open.mockRejectedValue(new Error('the router refused (501)'))
+    await expect(env.service.upkeep()).rejects.toThrow('the router refused')
+    expect(env.node.publicAddrs).toEqual([])
   })
 })

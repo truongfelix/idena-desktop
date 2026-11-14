@@ -275,15 +275,21 @@ function portMapping(answer) {
 }
 
 /**
- * Whether `ip` is an IPv4 address the internet can reach: not this network's (10/8, 172.16/12, 192.168/16), not a
- * provider's shared one (100.64/10, a router behind carrier-grade NAT), loopback, link-local, multicast or reserved.
+ * Whether `ip` is an IPv4 address the internet can reach, as the node judges it (go-multiaddr's IsPublicAddr):
+ * not this network's (10/8, 172.16/12, 192.168/16), not a provider's shared one (100.64/10, a router behind
+ * carrier-grade NAT), loopback, link-local, multicast, documentation, benchmarking or reserved; written plainly
+ * (no leading zero, which the node refuses).
  */
 function isPublicIPv4(ip) {
   const parts = String(ip ?? '').split('.')
-  if (parts.length !== 4 || !parts.every((part) => /^\d{1,3}$/.test(part)))
+  if (
+    parts.length !== 4 ||
+    !parts.every(
+      (part) => /^(0|[1-9]\d{0,2})$/.test(part) && Number(part) <= 255
+    )
+  )
     return false
-  const [a, b] = parts.map(Number)
-  if (parts.some((part) => Number(part) > 255)) return false
+  const [a, b, c] = parts.map(Number)
   return !(
     a === 0 ||
     a === 10 ||
@@ -292,7 +298,11 @@ function isPublicIPv4(ip) {
     (a === 100 && b >= 64 && b < 128) ||
     (a === 169 && b === 254) ||
     (a === 172 && b >= 16 && b < 32) ||
-    (a === 192 && b === 168)
+    (a === 192 && b === 168) ||
+    (a === 192 && b === 0 && (c === 0 || c === 2)) ||
+    (a === 198 && (b === 18 || b === 19)) ||
+    (a === 198 && b === 51 && c === 100) ||
+    (a === 203 && b === 0 && c === 113)
   )
 }
 

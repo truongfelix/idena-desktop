@@ -48,6 +48,9 @@ function createRouterPortService({
   let failure = null
   let actionError = null
   let queue = Promise.resolve()
+  // Whether the node announces an address the app gave it (`announce`), and the announcement's last failure.
+  let announcedByApp = false
+  let announceFailure = null
 
   function load() {
     let json = {}
@@ -124,6 +127,9 @@ function createRouterPortService({
    * node without the call (older) or not answering is left alone; a failure is logged, never the row's error.
    */
   async function announce(found) {
+    // Nothing to announce, and nothing the app announced to clear: the node is not asked (nor anything it got
+    // otherwise, a node config file, cleared).
+    if (!load().opening && !announcedByApp) return
     let announced
     try {
       announced = await nodeRpc('net_publicAddrs')
@@ -152,18 +158,29 @@ function createRouterPortService({
         }
       }
     } catch (error) {
-      logger.warn('router port announcement failed', String(error))
+      announceFailed(error)
       return
     }
     const have = Array.isArray(announced) ? announced : []
-    if (have.length === want.length && have.every((a, i) => a === want[i]))
+    if (have.length === want.length && have.every((a, i) => a === want[i])) {
+      announceFailure = null
       return
+    }
     try {
       await nodeRpc('net_setPublicAddrs', [want])
+      announcedByApp = want.length > 0
+      announceFailure = null
       logger.info('router port announced', {addrs: want})
     } catch (error) {
-      logger.warn('router port announcement failed', String(error))
+      announceFailed(error)
     }
+  }
+
+  /** Logs a failure of the announcement once, until it changes or one succeeds: a router may never answer it. */
+  function announceFailed(error) {
+    if (String(error) === announceFailure) return
+    announceFailure = String(error)
+    logger.warn('router port announcement failed', announceFailure)
   }
 
   /** The routers found before, the opening's first, each once (each one not on this network costs a timeout). */
@@ -391,9 +408,9 @@ function createRouterPortService({
    */
   function upkeep() {
     return exclusive(async () => {
-      // The router of this network, when the opening's is here: the announcement follows it on every run.
+      // This network's router when it is the opening's: the announcement follows it after every run, also a failed one.
       let here = null
-      const result = await (async () => {
+      try {
         const {opening} = load()
         if (!opening) return 'nothing'
         here = await net.gatewayAt(
@@ -462,9 +479,9 @@ function createRouterPortService({
         }
         if (action !== 'nothing') logger.info('router port upkeep', {action})
         return action
-      })()
-      await announce(here)
-      return result
+      } finally {
+        await announce(here)
+      }
     })
   }
 

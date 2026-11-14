@@ -166,6 +166,9 @@ async function nodeRpc(method, params = []) {
   return data?.result
 }
 
+/** When the router port's upkeep first runs after a node start: the node answers its net_ calls by then. */
+const ROUTER_UPKEEP_AFTER_START_MS = 60 * 1000
+
 // The node's port on the router, opened by the user in the Advanced settings (main/router-port-service.js).
 const routerPort = createRouterPortService({
   file: () => join(app.getPath('userData'), 'router-port.json'),
@@ -845,6 +848,15 @@ ipcMain.on(NODE_COMMAND, async (event, command, data) => {
         })
         .then(({child, started}) => {
           if (started) nodeWatchdog.started()
+          // A node started anew announces nothing: the router port's upkeep gives it the opening once it answers,
+          // rather than at the next 5-minute run.
+          setTimeout(() => {
+            routerPort
+              .upkeep()
+              .catch((e) =>
+                logger.warn('router port upkeep failed', e.toString())
+              )
+          }, ROUTER_UPKEEP_AFTER_START_MS)
           logger.info(
             started
               ? `node started, PID: ${child.pid}`
