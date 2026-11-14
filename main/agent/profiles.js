@@ -25,6 +25,12 @@ const ID_PATTERN = /^[0-9a-f]{16}$/u
 const SCHEDULES = ['validation', 'daily', 'manual']
 const DEFAULT_TIME = '09:00'
 
+/**
+ * What an agent does when it runs, beyond its actions: the daily joke of 3615 IDENA (B-237, the app writes its
+ * frame and counts its tips). None: it only acts within its actions.
+ */
+const TASKS = ['joke']
+
 /** The actions only one agent may hold: the validation has one agent answering it. */
 const SINGLE_HOLDER_ACTIONS = ['answerFlip']
 
@@ -100,6 +106,7 @@ function normalizeAgent(input, {id = newAgentId} = {}) {
     },
     budgetPerDay: !Number.isFinite(budget) || budget < 0 ? null : budget,
     reportThresholds,
+    task: TASKS.includes(value.task) ? value.task : null,
   }
 }
 
@@ -280,6 +287,7 @@ module.exports = {
   MAX_AGENTS,
   SCHEDULES,
   SINGLE_HOLDER_ACTIONS,
+  TASKS,
   agentSettings,
   createAgentProfiles,
   fromSingleAgent,

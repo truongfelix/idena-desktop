@@ -1,7 +1,7 @@
 const {checkAction} = require('./permissions')
 const {createAgentCommands} = require('./agent-commands')
 const {createPending} = require('./pending')
-const {validationAgent} = require('./profiles')
+const {agentSettings, validationAgent} = require('./profiles')
 const {checkFlip, flipQuestion, readFlipAnswer} = require('./flips')
 const providers = require('./providers')
 
@@ -12,6 +12,9 @@ const providers = require('./providers')
 const MIN_TIMEOUT_MS = 1000
 const MAX_TIMEOUT_MS = 120 * 1000
 const MAX_ACTIVITY = 200
+/** What an agent is given to read for a text (the joke agent: its recent jokes), and what its answer may be. */
+const MAX_INPUT_TEXT = 20000
+const MAX_ANSWER_TEXT = 4000
 
 function clampTimeout(value) {
   // null, '' and booleans are numbers to Number(): 0, a 1 s deadline. Only a real number counts.
@@ -233,6 +236,50 @@ function createAgent({
       return status()
     },
     solveFlip,
+    /**
+     * A text from the agent's model, for an action it may do (not Off, not paused): its instructions as the system
+     * prompt, `input` (what the app gives it to read) as the question. The answer is a draft: the action itself still
+     * goes through propose (To approve, or alone within its limits).
+     */
+    async writeText({agentId, action, input, timeoutMs} = {}) {
+      if (!profiles) throw new Error('no agents')
+      const file = profiles.read()
+      const agent = file.agents.find((one) => one.id === agentId)
+      if (!agent) throw new Error('no such agent')
+      const check = checkAction(agentSettings(file, agent), action)
+      if (check.decision === 'off') {
+        log({agentId, action, decision: 'off', detail: check.reason})
+        throw new Error(`the agent may not do it (${check.reason})`)
+      }
+      if (!agent.instructions.trim())
+        throw new Error('the agent has no instructions')
+      const controller = new AbortController()
+      solving.add(controller)
+      try {
+        const answer = await ask(
+          {
+            provider: agent.provider,
+            address: agent.address,
+            model: agent.model,
+            key: key.read(destination(agent)),
+          },
+          agent.instructions,
+          [
+            {
+              type: 'text',
+              text: String(input || '').slice(0, MAX_INPUT_TEXT),
+            },
+          ],
+          {timeoutMs: clampTimeout(timeoutMs), signal: controller.signal}
+        )
+        return String(answer || '').slice(0, MAX_ANSWER_TEXT)
+      } catch (error) {
+        log({agentId, action, decision: 'failed', detail: error.message})
+        throw error
+      } finally {
+        solving.delete(controller)
+      }
+    },
     /**
      * A try of the model on one flip, before the agent is on: no permission, the answer shown only. `agentId` names
      * the agent whose connection is tried (an agent's page); without it, the validation agent's (Settings › Agent).

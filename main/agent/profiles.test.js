@@ -48,7 +48,10 @@ describe('agent profiles', () => {
       schedule: {kind: 'manual', time: '09:00'},
       budgetPerDay: null,
       reportThresholds: REPORT_THRESHOLDS,
+      task: null,
     })
+    expect(normalizeAgent({task: 'joke'}).task).toBe('joke')
+    expect(normalizeAgent({task: 'constructor'}).task).toBeNull()
   })
 
   test('each field is checked: unknown actions, levels, times and budgets fall back', () => {

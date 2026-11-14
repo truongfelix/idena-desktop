@@ -82,6 +82,27 @@ function createPending({
   newId = newPendingId,
 }) {
   let items = readItems(file, logger)
+  // What each agent spent today in iDNA (fees included) on the actions it did alone: {agentId: {day, total}}.
+  const spent = new Map()
+  const today = () => new Date(now()).toDateString()
+  const spentToday = (agentId) => {
+    const entry = spent.get(agentId)
+    return entry && entry.day === today() ? entry.total : 0
+  }
+
+  /**
+   * An action the agent may do alone, within its daily budget: `cost` in iDNA, fees included. No budget: it may
+   * spend nothing alone, the action waits for the person.
+   */
+  const withinBudget = (agentId, cost) => {
+    if (!(cost > 0)) return {decision: 'alone', reason: 'within the limit'}
+    const agent = profiles.read().agents.find((one) => one.id === agentId)
+    const budget = agent ? agent.budgetPerDay : null
+    if (budget === null) return {decision: 'ask', reason: 'no budget'}
+    return spentToday(agentId) + cost > budget
+      ? {decision: 'ask', reason: 'above the budget'}
+      : {decision: 'alone', reason: 'within the limit'}
+  }
 
   // Written beside, then renamed over the file: a power cut leaves the old list or the new one, never half. A
   // failed write keeps the list in memory: the change holds until the app closes.
@@ -152,14 +173,26 @@ function createPending({
      * An action an agent prepared: refused when the agent may not do it, done by the caller when it may do it alone,
      * added to the list when it asks first. Returns {decision, reason, item?}.
      */
-    propose({agentId, action, body, detail, editable, usage, amount} = {}) {
+    propose({
+      agentId,
+      action,
+      body,
+      detail,
+      editable,
+      usage,
+      amount,
+      cost,
+    } = {}) {
       if (!Object.prototype.hasOwnProperty.call(ACTIONS, action))
         return {decision: 'off', reason: 'unknown action'}
-      // The limit is checked on what the action spends: above it, the action waits for the person.
-      const check = decide(agentId, action, {
+      // The limit is checked on what the action spends: above it, the action waits for the person; so does an
+      // action that would pass the agent's daily budget (`cost`: iDNA, fees included).
+      let check = decide(agentId, action, {
         ...(usage !== undefined ? {usage} : {}),
         ...(amount !== undefined ? {amount} : {}),
       })
+      if (check.decision === 'alone')
+        check = withinBudget(agentId, Number(cost))
       if (check.decision !== 'ask') return check
       if (
         items.length >= MAX_PENDING ||
@@ -185,6 +218,27 @@ function createPending({
     },
     commands: {
       pending: list,
+      /**
+       * An action the agent did alone (after a propose that said so): logged, and what it spent counted in its
+       * budget of the day.
+       */
+      didAction(data) {
+        const {agentId, action} = data || {}
+        if (!Object.prototype.hasOwnProperty.call(ACTIONS, action))
+          throw new Error('unknown action')
+        if (!profiles.read().agents.some((one) => one.id === agentId))
+          throw new Error('no such agent')
+        const cost = Number(data.cost)
+        if (data.ok === true && cost > 0)
+          spent.set(agentId, {day: today(), total: spentToday(agentId) + cost})
+        log({
+          agentId,
+          action,
+          decision: data.ok === true ? 'alone' : 'failed',
+          detail: text(data.detail, MAX_DETAIL_LENGTH),
+        })
+        return null
+      },
       /**
        * The person approves: the item is handed to the renderer to run (`body` replaced by the person's edit when it
        * is editable). Refused, and taken off the list, when its agent may no longer do it (removed, paused, the
