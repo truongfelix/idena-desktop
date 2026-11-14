@@ -2006,5 +2006,19 @@
   "Runs once a day at its time, while the app is open.": "Travaille une fois par jour à son heure, quand l'application est ouverte.",
   "Waits for Social to read the chain up to now.": "Attend que Social ait lu la chaîne jusqu'à maintenant.",
   "replaced by a new day": "remplacée par un nouveau jour",
-  "It is running now.": "Il est en train de travailler."
+  "It is running now.": "Il est en train de travailler.",
+  "{{level}}, limit {{limit}}": "{{level}}, limite {{limit}}",
+  "Import an agent": "Importer un agent",
+  "Hide them": "Les masquer",
+  "Read them": "Les lire",
+  "None": "Aucune",
+  "The file holds no key: it uses the one saved on this computer for its service.": "Le fichier ne contient aucune clé : il utilise celle enregistrée sur cet ordinateur pour son service.",
+  "The file holds no key, and none is saved on this computer for its service: add it on the agent page.": "Le fichier ne contient aucune clé, et aucune n'est enregistrée sur cet ordinateur pour son service : ajoutez-la sur la page de l'agent.",
+  "It asks for these actions": "Il demande ces actions",
+  "All start Off. Turn each one on yourself, on the agent page, once you have read its instructions.": "Toutes commencent désactivées. Activez chacune vous-même, sur la page de l'agent, après avoir lu ses instructions.",
+  "Asked for: {{what}}": "Demandé : {{what}}",
+  "Not added: {{actions}}. Another agent of yours answers the validation.": "Non ajouté : {{actions}}. Un autre de vos agents répond à la validation.",
+  "Add the agent": "Ajouter l'agent",
+  "Agent exported to a file": "Agent exporté dans un fichier",
+  "Agent imported from a file": "Agent importé depuis un fichier"
 }

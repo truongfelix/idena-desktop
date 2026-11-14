@@ -29,6 +29,7 @@ import {
 import {useAgents} from './use-agents'
 import {ToApprove} from './to-approve'
 import {usePendingActions} from './pending-api'
+import {ImportAgent} from './agent-file'
 
 /** The agent's letter on a soft square, as on the cards and its page. */
 export function AgentBadge({name, size = 10}) {
@@ -134,6 +135,7 @@ export function AgentsList() {
   const {t} = useTranslation()
   const router = useRouter()
   const {list, error, run} = useAgents()
+  const [note, setNote] = React.useState(null)
   const pending = usePendingActions()
   const [activity, setActivity] = React.useState([])
   const catalog = actionCatalog(t)
@@ -159,19 +161,22 @@ export function AgentsList() {
             )}
           </Text>
         </Box>
-        <PrimaryButton
-          onClick={async () => {
-            const saved = await run(() =>
-              updateAgent(null, () => ({name: t('New agent')}))
-            )
-            if (saved && saved.savedId)
-              router.push(`/agents/view?id=${saved.savedId}`)
-          }}
-        >
-          {t('New agent')}
-        </PrimaryButton>
+        <Flex gap={2} wrap="wrap">
+          <ImportAgent onError={setNote} />
+          <PrimaryButton
+            onClick={async () => {
+              const saved = await run(() =>
+                updateAgent(null, () => ({name: t('New agent')}))
+              )
+              if (saved && saved.savedId)
+                router.push(`/agents/view?id=${saved.savedId}`)
+            }}
+          >
+            {t('New agent')}
+          </PrimaryButton>
+        </Flex>
       </Flex>
-      {error && <ErrorAlert>{error}</ErrorAlert>}
+      {(error || note) && <ErrorAlert>{error || note}</ErrorAlert>}
       <ToApprove items={pending} />
       {list && (
         <Stack spacing={3}>

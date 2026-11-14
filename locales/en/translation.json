@@ -2006,5 +2006,19 @@
   "Runs once a day at its time, while the app is open.": "Runs once a day at its time, while the app is open.",
   "Waits for Social to read the chain up to now.": "Waits for Social to read the chain up to now.",
   "replaced by a new day": "replaced by a new day",
-  "It is running now.": "It is running now."
+  "It is running now.": "It is running now.",
+  "{{level}}, limit {{limit}}": "{{level}}, limit {{limit}}",
+  "Import an agent": "Import an agent",
+  "Hide them": "Hide them",
+  "Read them": "Read them",
+  "None": "None",
+  "The file holds no key: it uses the one saved on this computer for its service.": "The file holds no key: it uses the one saved on this computer for its service.",
+  "The file holds no key, and none is saved on this computer for its service: add it on the agent page.": "The file holds no key, and none is saved on this computer for its service: add it on the agent page.",
+  "It asks for these actions": "It asks for these actions",
+  "All start Off. Turn each one on yourself, on the agent page, once you have read its instructions.": "All start Off. Turn each one on yourself, on the agent page, once you have read its instructions.",
+  "Asked for: {{what}}": "Asked for: {{what}}",
+  "Not added: {{actions}}. Another agent of yours answers the validation.": "Not added: {{actions}}. Another agent of yours answers the validation.",
+  "Add the agent": "Add the agent",
+  "Agent exported to a file": "Agent exported to a file",
+  "Agent imported from a file": "Agent imported from a file"
 }

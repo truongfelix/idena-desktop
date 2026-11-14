@@ -11,7 +11,7 @@ import {
 import {SettingsSection} from '../components'
 import {REPORT_REASONS} from '../../validation/practice'
 
-/** Where the model runs, the choices of Settings › Agent (main/agent/settings.js PROVIDERS). */
+/** Where the model runs, the choices of an agent page (main/agent/settings.js PROVIDERS). */
 function useProviders() {
   const {t} = useTranslation()
   return [

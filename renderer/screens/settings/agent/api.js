@@ -106,6 +106,13 @@ export const setServiceKey = (agentId, key) =>
   writeAgents(() => agent('setAgentKey', {agentId, key}))
 export const clearServiceKey = (agentId) =>
   writeAgents(() => agent('clearAgentKey', {agentId}))
+/** The agent as a file ({fileName, text}): never the key. */
+export const exportAgentFile = (agentId) => agent('exportAgent', {agentId})
+/** What an agent file holds, as it would be added: {agent, asked, dropped, hasKey}. */
+export const previewAgentFile = (text) => agent('previewAgent', {text})
+/** Adds the agent a file holds, off and each action Off; resolves with `savedId`. */
+export const importAgentFile = (text) =>
+  writeAgents(() => agent('importAgent', {text}))
 export const agentActivity = (agentId) =>
   agent('activity', agentId === undefined ? undefined : {agentId})
 export const stopAgentTest = () => agent('stopTest')

@@ -9,6 +9,8 @@ const {
 // or removed, the pause of them all, each service's key. Every agent is read and written whole through the file of
 // agents (profiles.js), which checks each field; the keys stay in the keychain (key.js) and never come back.
 
+const {agentFileName, exportAgent, readAgentFile} = require('./agent-file')
+
 const destination = ({provider, address}) => ({provider, address})
 
 /**
@@ -103,6 +105,39 @@ function createAgentCommands({profiles, key, log, onChange = () => {}}) {
           detail: agent.name,
         })
         return written
+      },
+      /** The agent as a file to save: its name and its text (never the key). */
+      exportAgent(data) {
+        const {agent} = agentOf(data)
+        log({
+          agentId: agent.id,
+          action: 'settings',
+          decision: 'exported',
+          detail: agent.name,
+        })
+        return {fileName: agentFileName(agent), text: exportAgent(agent)}
+      },
+      /** What an agent file holds, as it would be added (readAgentFile), and whether its service has a key here. */
+      previewAgent(data) {
+        const {agents} = profiles.read()
+        const {agent, asked, dropped} = readAgentFile(data && data.text, agents)
+        return {agent, asked, dropped, hasKey: key.has(destination(agent))}
+      },
+      /** Adds the agent a file holds: off, each action Off (at most MAX_AGENTS). */
+      importAgent(data) {
+        const file = profiles.read()
+        if (file.agents.length >= MAX_AGENTS)
+          throw new Error(`at most ${MAX_AGENTS} agents`)
+        const {agent: read} = readAgentFile(data && data.text, file.agents)
+        const agent = normalizeAgent(read)
+        const written = write({...file, agents: [...file.agents, agent]})
+        log({
+          agentId: agent.id,
+          action: 'settings',
+          decision: 'imported',
+          detail: agent.name,
+        })
+        return {...written, savedId: agent.id}
       },
       /** Pauses every agent, or resumes them. */
       setPaused(data) {

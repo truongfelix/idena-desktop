@@ -33,12 +33,13 @@ import {
   setServiceKey,
   updateAgent,
 } from '../settings/agent/api'
-import {usePracticeTest} from '../settings/agent/agent-settings'
+import {usePracticeTest} from './practice-run'
 import {ModelSection} from '../settings/agent/model-section'
 import {ReportRulesSection} from '../settings/agent/report-rules-section'
 import {ActivitySection} from '../settings/agent/activity-section'
 import {ActionsSection} from './actions-section'
 import {TaskSection} from './task-section'
+import {saveAgentFile} from './agent-file'
 import {DEFAULT_JOKE_INSTRUCTIONS} from './joke/joke'
 import {AgentBadge} from './agents-list'
 import {actionCatalog, readsList} from './catalog'
@@ -313,15 +314,20 @@ export function AgentPage({id}) {
             />
           </Box>
         </Flex>
-        <Switch
-          size="lg"
-          aria-label={t('{{name}} on', {name: agent.name})}
-          isChecked={agent.enabled}
-          onChange={(e) => {
-            const enabled = e.target.checked
-            save((a) => ({...a, enabled}))
-          }}
-        />
+        <Flex gap={3} align="center">
+          <SecondaryButton onClick={() => run(() => saveAgentFile(id))}>
+            {t('Export')}
+          </SecondaryButton>
+          <Switch
+            size="lg"
+            aria-label={t('{{name}} on', {name: agent.name})}
+            isChecked={agent.enabled}
+            onChange={(e) => {
+              const enabled = e.target.checked
+              save((a) => ({...a, enabled}))
+            }}
+          />
+        </Flex>
       </Flex>
       {list.paused && (
         <Text color="muted">
