@@ -94,6 +94,25 @@ describe('router requests', () => {
     )
   })
 
+  it("reads the router's public address", async () => {
+    const {request, calls} = routerAnswering((action) =>
+      action === 'GetExternalIPAddress'
+        ? {body: '<NewExternalIPAddress>82.123.115.203</NewExternalIPAddress>'}
+        : {}
+    )
+    const net = createRouterNet({request})
+    expect(await net.externalAddress(GATEWAY)).toBe('82.123.115.203')
+    expect(calls.map(([action]) => action)).toEqual(['GetExternalIPAddress'])
+    const empty = createRouterNet({
+      request: routerAnswering(() => ({})).request,
+    })
+    expect(await empty.externalAddress(GATEWAY)).toBeNull()
+    const refused = createRouterNet({
+      request: routerAnswering(() => upnpError(501)).request,
+    })
+    await expect(refused.externalAddress(GATEWAY)).rejects.toThrow()
+  })
+
   it('deletes before adding when it replaces its own forwarding', async () => {
     const {request, calls} = routerAnswering(() => ({}))
     await createRouterNet({request}).open(

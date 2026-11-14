@@ -275,6 +275,76 @@ function portMapping(answer) {
 }
 
 /**
+ * The IPv4 ranges the node takes as not public: go-multiaddr v0.16.1 net/private.go, Private4 then Unroutable4, as
+ * the node's IsPublicAddr checks an announced address (copied as is; compare on its next upgrade).
+ */
+const NOT_PUBLIC_IPV4 = [
+  '127.0.0.0/8',
+  '10.0.0.0/8',
+  '100.64.0.0/10',
+  '172.16.0.0/12',
+  '192.168.0.0/16',
+  '169.254.0.0/16',
+  '0.0.0.0/8',
+  '192.0.0.0/26',
+  '192.0.2.0/24',
+  '192.88.99.0/24',
+  '198.18.0.0/15',
+  '198.51.100.0/24',
+  '203.0.113.0/24',
+  '224.0.0.0/4',
+  '240.0.0.0/4',
+  '255.255.255.255/32',
+].map((cidr) => {
+  const [base, bits] = cidr.split('/')
+  // The range's block: the addresses that share its first `bits` bits.
+  const size = 2 ** (32 - Number(bits))
+  return {block: Math.floor(ipv4Number(base) / size), size}
+})
+
+/** An IPv4 address written plainly (four numbers 0-255, no leading zero) as a number; null otherwise. */
+function ipv4Number(ip) {
+  const parts = String(ip ?? '').split('.')
+  if (
+    parts.length !== 4 ||
+    !parts.every(
+      (part) => /^(0|[1-9]\d{0,2})$/.test(part) && Number(part) <= 255
+    )
+  )
+    return null
+  return parts.reduce((n, part) => n * 256 + Number(part), 0)
+}
+
+/**
+ * Whether `ip` is an IPv4 address the internet can reach, as the node judges it (NOT_PUBLIC_IPV4): not this
+ * network's, not a provider's shared one (100.64/10, a router behind carrier-grade NAT), loopback, link-local,
+ * multicast, documentation, benchmarking or reserved; written plainly (the node refuses a leading zero).
+ */
+function isPublicIPv4(ip) {
+  const n = ipv4Number(ip)
+  return (
+    n != null &&
+    !NOT_PUBLIC_IPV4.some(({block, size}) => Math.floor(n / size) === block)
+  )
+}
+
+/**
+ * The address the node announces for the router's opening of `port` (net_setPublicAddrs): the router's public
+ * address (GetExternalIPAddress) with the port, or null when the router has no public IPv4 address (behind another
+ * router, or a provider's carrier-grade NAT: then the port is not reachable from the internet).
+ */
+function publicAddrFor(externalIp, port) {
+  if (
+    !isPublicIPv4(externalIp) ||
+    !Number.isInteger(port) ||
+    port < 1 ||
+    port > 65535
+  )
+    return null
+  return `/ip4/${externalIp}/tcp/${port}`
+}
+
+/**
  * The opening the app made, read from a file: on which router (`gateway`), for which port and address of this
  * computer (`port`, `client`), until when the user chose (`endMs`), when the router's forwarding last changed
  * (`changedAtMs`) and whether it was made again once because no incoming peer came (`retried`). Null when invalid.
@@ -427,4 +497,6 @@ module.exports = {
   upkeepAction,
   ipfsAddressPort,
   inboundPeersSince,
+  isPublicIPv4,
+  publicAddrFor,
 }
