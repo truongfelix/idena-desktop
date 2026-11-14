@@ -69,8 +69,9 @@ describe('the Agents section commands', () => {
           {...to, key: value},
         ]
       }),
+      // As key.js: no destination removes every key.
       clear: jest.fn((to) => {
-        keys = keys.filter((entry) => !same(entry, to))
+        keys = to ? keys.filter((entry) => !same(entry, to)) : []
       }),
     }
     ask = jest.fn().mockResolvedValue('{"answer":"left","confidence":0.8}')
@@ -233,6 +234,65 @@ describe('the Agents section commands', () => {
     ).rejects.toThrow('no such agent')
   })
 
+  test("Settings › Agent's Remove the key leaves another agent's key", async () => {
+    const agent = start([
+      {id: 'aaaaaaaaaaaaaaaa', ...validation},
+      {
+        id: 'bbbbbbbbbbbbbbbb',
+        name: 'Other',
+        provider: 'openai',
+        address: 'https://x.test/v1',
+      },
+    ])
+    keys = [
+      {provider: 'anthropic', address: 'https://api.anthropic.com', key: 'k1'},
+      {provider: 'openai', address: 'https://x.test/v1', key: 'k2'},
+    ]
+    await agent.handle('clearKey')
+    expect(keys.map((entry) => entry.key)).toEqual(['k2'])
+    // No key of its own left: the other agent's key is not offered for removal, nor removed.
+    await expect(agent.handle('status')).resolves.toMatchObject({
+      hasKey: false,
+      keyElsewhere: false,
+    })
+    await agent.handle('clearKey')
+    expect(keys.map((entry) => entry.key)).toEqual(['k2'])
+  })
+
+  test('Remove the key with only keys no agent uses removes them', async () => {
+    const agent = start([{id: 'aaaaaaaaaaaaaaaa', ...validation}])
+    keys = [{provider: 'openai', address: 'https://old.test/v1', key: 'old'}]
+    await expect(agent.handle('status')).resolves.toMatchObject({
+      keyElsewhere: true,
+    })
+    await agent.handle('clearKey')
+    expect(keys).toEqual([])
+  })
+
+  test("a line of no agent (a flip with no validation agent) is not in another agent's Activity", async () => {
+    const agent = start([{id: 'bbbbbbbbbbbbbbbb', name: 'Other', model: 'm'}])
+    await agent.handle('solveFlip', {flip})
+    await expect(agent.handle('activity')).resolves.toHaveLength(1)
+    await expect(
+      agent.handle('activity', {agentId: 'bbbbbbbbbbbbbbbb'})
+    ).resolves.toEqual([])
+  })
+
+  test('a write that fails leaves no Activity line', async () => {
+    const agent = start([{id: 'aaaaaaaaaaaaaaaa', ...validation}])
+    fs.chmodSync(dir, 0o500)
+    try {
+      await expect(agent.handle('saveAgent', {name: 'X'})).rejects.toThrow()
+      await expect(
+        agent.handle('removeAgent', {agentId: 'aaaaaaaaaaaaaaaa'})
+      ).rejects.toThrow()
+      await expect(agent.handle('setPaused', {paused: true})).rejects.toThrow()
+    } finally {
+      fs.chmodSync(dir, 0o700)
+    }
+    await expect(agent.handle('activity')).resolves.toEqual([])
+  })
+
   test("a practice try on an agent's page uses that agent's connection", async () => {
     const agent = start([
       {id: 'aaaaaaaaaaaaaaaa', ...validation},
@@ -264,15 +324,18 @@ describe('the Agents section commands', () => {
     await agent.handle('solveFlip', {flip})
     await agent.handle('testFlip', {flip, agentId: 'bbbbbbbbbbbbbbbb'})
     await agent.handle('setPaused', {paused: true})
+    // A flip refused while paused: the validation agent's line, not the other agent's.
+    await agent.handle('solveFlip', {flip})
     const own = await agent.handle('activity', {agentId: 'bbbbbbbbbbbbbbbb'})
     expect(own.map((line) => line.action)).toEqual(['settings', 'test'])
     const validationLines = await agent.handle('activity', {
       agentId: 'aaaaaaaaaaaaaaaa',
     })
     expect(validationLines.map((line) => line.action)).toEqual([
+      'answerFlip',
       'settings',
       'answerFlip',
     ])
-    expect(await agent.handle('activity')).toHaveLength(3)
+    expect(await agent.handle('activity')).toHaveLength(4)
   })
 })

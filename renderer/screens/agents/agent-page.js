@@ -66,7 +66,8 @@ function NameField({value, onSave}) {
       fontWeight={500}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={save}
-      onKeyDown={(e) => e.key === 'Enter' && save(e)}
+      // Enter leaves the field: its blur saves, once.
+      onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
     />
   )
 }
@@ -86,7 +87,8 @@ function InstructionsSection({agent, onChange}) {
           onChange={(e) => setDraft(e.target.value)}
           onBlur={(e) => {
             const next = e.currentTarget.value
-            if (next !== agent.instructions)
+            // Saved trimmed: a text that differs only by its ends is no change.
+            if (next.trim() !== agent.instructions)
               onChange((a) => ({...a, instructions: next}))
           }}
         />
@@ -170,7 +172,12 @@ function ScheduleSection({agent, catalog, onChange}) {
               onBlur={(e) => {
                 const text = e.currentTarget.value.trim()
                 const next = text === '' ? null : Number(text)
-                if (next !== null && !(Number.isFinite(next) && next >= 0)) {
+                // A number the field cannot read (a comma in some languages) reads as '': not "no budget".
+                const unreadable = e.currentTarget.validity.badInput
+                if (
+                  unreadable ||
+                  (next !== null && !(Number.isFinite(next) && next >= 0))
+                ) {
                   setBudget(
                     agent.budgetPerDay === null
                       ? ''

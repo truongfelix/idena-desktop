@@ -71,6 +71,16 @@ function createAgent({
 
   const destination = ({provider, address}) => ({provider, address})
 
+  // Whether an agent other than the validation agent has its service's key: then a kept key that is not the
+  // validation agent's may be that agent's, and Settings › Agent leaves it alone.
+  const othersHaveKeys = () => {
+    if (!profiles) return false
+    const id = validationId()
+    return profiles
+      .read()
+      .agents.some((agent) => agent.id !== id && key.has(destination(agent)))
+  }
+
   const status = () => {
     const current = settings.read()
     const hasKey = key.has(destination(current))
@@ -78,7 +88,7 @@ function createAgent({
       settings: current,
       keychain: key.keychain(),
       hasKey,
-      keyElsewhere: !hasKey && key.hasAny(),
+      keyElsewhere: !hasKey && key.hasAny() && !othersHaveKeys(),
     }
   }
 
@@ -185,9 +195,20 @@ function createAgent({
       })
       return status()
     },
+    /**
+     * Settings › Agent's Remove the key: the validation agent's service key; with none, the keys left from an older
+     * setup (every key, when no other agent uses one). Another agent's key stays.
+     */
     clearKey() {
-      key.clear()
-      log({action: 'key', decision: 'removed', detail: ''})
+      const current = destination(settings.read())
+      if (key.has(current)) key.clear(current)
+      else if (!othersHaveKeys()) key.clear()
+      log({
+        agentId: validationId(),
+        action: 'key',
+        decision: 'removed',
+        detail: '',
+      })
       return status()
     },
     solveFlip,
@@ -230,14 +251,17 @@ function createAgent({
       stop(testing)
       return null
     },
-    /** The log, newest first; with `agentId`, that agent's lines and the ones of every agent (the pause). */
+    /** The log, newest first; with `agentId`, that agent's lines and the pause and resume of all agents. */
     activity: (data) => {
       const agentId = data && data.agentId
       const lines = activity.slice().reverse()
       return agentId === undefined
         ? lines
         : lines.filter(
-            (entry) => entry.agentId === agentId || entry.agentId === undefined
+            (entry) =>
+              entry.agentId === agentId ||
+              (entry.action === 'settings' &&
+                ['paused', 'resumed'].includes(entry.decision))
           )
     },
   }

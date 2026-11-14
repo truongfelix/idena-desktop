@@ -66,10 +66,15 @@ export function AgentCard() {
   if (on.length === 0) return null
   const {paused} = list
   // One agent on, answering the validation: what it does there; else the names of the agents on.
-  const line =
-    paused || (on.length === 1 && on[0].actions.answerFlip)
-      ? agentCardLine(t, status)
-      : on.map((agent) => agent.name).join(', ')
+  const alone = on.length === 1 && on[0].actions.answerFlip
+  // eslint-disable-next-line no-nested-ternary
+  const line = alone
+    ? agentCardLine(t, status)
+    : paused
+    ? t('Every agent is paused: none acts until you resume them.', {
+        nsSeparator: '!!',
+      })
+    : on.map((agent) => agent.name).join(', ')
 
   return (
     <Box

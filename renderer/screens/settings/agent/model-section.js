@@ -43,15 +43,16 @@ function SavedOnBlurInput({value, onSave, ...props}) {
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={save}
+      // Enter leaves the field: its blur saves, once.
       onKeyDown={(e) => {
-        if (e.key === 'Enter') save(e)
+        if (e.key === 'Enter') e.currentTarget.blur()
       }}
       {...props}
     />
   )
 }
 
-export function KeyField({status, onSetKey, onClearKey}) {
+function KeyField({status, onSetKey, onClearKey}) {
   const {t} = useTranslation()
   const [key, setKey] = React.useState('')
   if (!status.keychain.available)

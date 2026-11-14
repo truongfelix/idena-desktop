@@ -81,37 +81,40 @@ function createAgentCommands({profiles, key, log, onChange = () => {}}) {
         const agents = current
           ? file.agents.map((other) => (other.id === agent.id ? agent : other))
           : [...file.agents, agent]
+        const written = write({...file, agents})
         log({
           agentId: agent.id,
           action: 'settings',
           decision: current ? 'saved' : 'added',
           detail: agent.name,
         })
-        return {...write({...file, agents}), savedId: agent.id}
+        return {...written, savedId: agent.id}
       },
       removeAgent(data) {
         const {file, agent} = agentOf(data)
+        const written = write({
+          ...file,
+          agents: file.agents.filter((other) => other.id !== agent.id),
+        })
         log({
           agentId: agent.id,
           action: 'settings',
           decision: 'removed',
           detail: agent.name,
         })
-        return write({
-          ...file,
-          agents: file.agents.filter((other) => other.id !== agent.id),
-        })
+        return written
       },
       /** Pauses every agent, or resumes them. */
       setPaused(data) {
         const file = profiles.read()
         const paused = Boolean(data && data.paused === true)
+        const written = write({...file, paused})
         log({
           action: 'settings',
           decision: paused ? 'paused' : 'resumed',
           detail: '',
         })
-        return write({...file, paused})
+        return written
       },
       /** The key of the agent's service (its provider and address), shared by every agent of that service. */
       setAgentKey(data) {
