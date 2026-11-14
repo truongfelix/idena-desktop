@@ -87,14 +87,16 @@ export async function runJokeAgent(agent, social, deps) {
     thanks: thanksLine(state.tippers, social.names),
   })
   const cost = await deps.prepare(body)
+  // Shown rounded: the most it may cost, to the cent.
+  const fee = cost < 0.01 ? '< 0.01' : cost.toFixed(2)
   const detail =
     state.tippers.length === 1
       ? t('1 tipper since the last joke · fee about {{fee}} iDNA', {
-          fee: cost,
+          fee,
         })
       : t('{{count}} tippers since the last joke · fee about {{fee}} iDNA', {
           count: state.tippers.length,
-          fee: cost,
+          fee,
         })
   const decision = await call('propose', {
     agentId: agent.id,

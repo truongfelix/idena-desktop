@@ -81,6 +81,9 @@ describe('a run of the joke agent', () => {
       amount: 1,
       cost: 0.01,
     })
+    expect(proposal.detail).toBe(
+      '1 tipper since the last joke · fee about 0.01 iDNA'
+    )
     expect(proposal.body).toBe(
       '📟 3615 IDENA\n\n🃏 Joke #4\n\nA new joke.\n\nThanks to @bob for keeping the jokes alive!\nTip this post for a new joke tomorrow 😉'
     )
