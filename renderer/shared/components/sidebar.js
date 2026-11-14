@@ -61,8 +61,10 @@ import {socialNewsCount} from '../../screens/social/news-count'
 import {useSocial} from '../../screens/social/provider'
 import {ReleaseNoteDialog} from './release-check'
 import {AgentCard} from '../../screens/settings/agent/agent-card'
+import {usePendingActions} from '../../screens/agents/pending-api'
 import {
   AdsIcon,
+  AgentIcon,
   ClockIcon,
   CommunityIcon,
   ContactsIcon,
@@ -343,6 +345,7 @@ function Navbar() {
 
   const [{todoCount}] = useVotingNotification()
   const socialNews = socialNewsCount(useSocial() || {})
+  const toApprove = (usePendingActions() || []).length
 
   return (
     <Nav>
@@ -371,6 +374,18 @@ function Navbar() {
           </Flex>
         ) : (
           t('Social')
+        )}
+      </NavItem>
+      <NavItem href="/agents" icon={AgentIcon}>
+        {toApprove > 0 ? (
+          <Flex flex={1} align="center" justify="space-between">
+            <Text as="span">{t('Agents')}</Text>
+            <TodoVotingCountBadge aria-label={t('To approve')}>
+              {toApprove > 99 ? '99+' : toApprove}
+            </TodoVotingCountBadge>
+          </Flex>
+        ) : (
+          t('Agents')
         )}
       </NavItem>
       <NavItem href="/oracles/list" icon={OracleIcon} display>

@@ -131,4 +131,98 @@ describe('agent key', () => {
     expect(() => key.set('sk one', ANTHROPIC)).toThrow('invalid key')
     expect(() => key.set(42, ANTHROPIC)).toThrow('invalid key')
   })
+
+  describe('one key per service (B-243)', () => {
+    const OPENAI = {provider: 'openai', address: 'https://api.openai.com/v1'}
+    let single
+    const store = () =>
+      createAgentKey({
+        file: () => file,
+        singleFile: () => single,
+        safeStorage: fakeSafeStorage(),
+        platform: 'linux',
+      })
+    const writeSingle = (value) => {
+      fs.outputFileSync(
+        single,
+        fakeSafeStorage().encryptString(JSON.stringify(value))
+      )
+    }
+    beforeEach(() => {
+      file = path.join(dir, 'agent', 'keys.enc')
+      single = path.join(dir, 'agent', 'key.enc')
+    })
+
+    test('two services keep their own key; saving one again replaces only it', () => {
+      const key = store()
+      key.set('sk-ant-1', ANTHROPIC)
+      key.set('sk-oa-1', OPENAI)
+      key.set('sk-ant-2', ANTHROPIC)
+      expect(key.read(ANTHROPIC)).toBe('sk-ant-2')
+      expect(key.read(OPENAI)).toBe('sk-oa-1')
+      const onDisk = fs.readFileSync(file).toString()
+      expect(onDisk).not.toContain('sk-ant-2')
+      expect(onDisk).not.toContain('sk-oa-1')
+      key.clear(ANTHROPIC)
+      expect(key.has(ANTHROPIC)).toBe(false)
+      expect(key.read(OPENAI)).toBe('sk-oa-1')
+      key.clear()
+      expect(key.hasAny()).toBe(false)
+      expect(fs.existsSync(file)).toBe(false)
+    })
+
+    test("the single agent's key is read, and left for an older build", () => {
+      writeSingle({key: 'sk-ant-old', ...ANTHROPIC})
+      const before = fs.readFileSync(single)
+      const key = store()
+      expect(key.read(ANTHROPIC)).toBe('sk-ant-old')
+      key.set('sk-oa-1', OPENAI)
+      expect(key.read(ANTHROPIC)).toBe('sk-ant-old')
+      expect(key.read(OPENAI)).toBe('sk-oa-1')
+      expect(fs.readFileSync(single)).toEqual(before)
+    })
+
+    test("removing the single agent's key removes its file too: it does not come back", () => {
+      writeSingle({key: 'sk-ant-old', ...ANTHROPIC})
+      const key = store()
+      key.set('sk-oa-1', OPENAI)
+      key.clear(OPENAI)
+      expect(key.read(ANTHROPIC)).toBe('sk-ant-old')
+      expect(fs.existsSync(single)).toBe(true)
+      key.clear(ANTHROPIC)
+      expect(fs.existsSync(single)).toBe(false)
+      expect(key.hasAny()).toBe(false)
+    })
+
+    test("another service's removal keeps the single agent's key", () => {
+      writeSingle({key: 'sk-ant-old', ...ANTHROPIC})
+      const key = store()
+      key.clear(OPENAI)
+      expect(key.read(ANTHROPIC)).toBe('sk-ant-old')
+    })
+    test('a key the older build saved after the list wins for its service (new, old, new)', () => {
+      const key = store()
+      key.set('sk-ant-A', ANTHROPIC)
+      key.set('sk-oa-1', OPENAI)
+      writeSingle({key: 'sk-ant-B', ...ANTHROPIC})
+      const later = Date.now() / 1000 + 60
+      fs.utimesSync(single, later, later)
+      expect(key.read(ANTHROPIC)).toBe('sk-ant-B')
+      expect(key.read(OPENAI)).toBe('sk-oa-1')
+    })
+
+    test('a list the keychain cannot read is never written over', () => {
+      const key = store()
+      key.set('sk-oa-1', OPENAI)
+      fs.writeFileSync(file, 'enc:garbage')
+      const before = fs.readFileSync(file)
+      expect(key.has(OPENAI)).toBe(false)
+      expect(() => key.set('sk-ant-1', ANTHROPIC)).toThrow(/cannot be read/u)
+      expect(() => key.clear(ANTHROPIC)).toThrow(/cannot be read/u)
+      expect(fs.readFileSync(file)).toEqual(before)
+      // Removing every key still works.
+      key.clear()
+      expect(fs.existsSync(file)).toBe(false)
+    })
+  })
 })

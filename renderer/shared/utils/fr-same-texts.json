@@ -6,8 +6,11 @@
   "64 MiB",
   "80x80 px",
   "APY",
+  "Actions",
   "Agent",
+  "Agents",
   "Bio",
+  "Budget",
   "Contacts",
   "Date",
   "Description",
@@ -15,6 +18,7 @@
   "Grain",
   "Hub",
   "Image",
+  "Instructions",
   "Interface",
   "Invitation",
   "Invitations",
@@ -47,5 +51,6 @@
   "stake {{stake}} iDNA",
   "{{committeeSize}} oracles",
   "{{count}} votes",
-  "{{count}} votes_plural"
+  "{{count}} votes_plural",
+  "← Agents"
 ]

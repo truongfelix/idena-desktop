@@ -11,7 +11,7 @@ import {
 import {SettingsSection} from '../components'
 import {REPORT_REASONS} from '../../validation/practice'
 
-/** Where the model runs, the choices of Settings › Agent (main/agent/settings.js PROVIDERS). */
+/** Where the model runs, the choices of an agent page (main/agent/settings.js PROVIDERS). */
 function useProviders() {
   const {t} = useTranslation()
   return [
@@ -43,8 +43,9 @@ function SavedOnBlurInput({value, onSave, ...props}) {
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={save}
+      // Enter leaves the field: its blur saves, once.
       onKeyDown={(e) => {
-        if (e.key === 'Enter') save(e)
+        if (e.key === 'Enter') e.currentTarget.blur()
       }}
       {...props}
     />
@@ -172,15 +173,26 @@ function PracticeReports({reports}) {
   )
 }
 
-/** The Model section: where it runs, its address and name, the key of a hosted one, the practice test. */
-export function ModelSection({status, onChange, onSetKey, onClearKey, test}) {
+/**
+ * The Model section: where it runs, its address and name, the key of a hosted one, the practice test (`test`, for an
+ * agent answering the validation; none otherwise). `sentLine` says what a hosted service is sent.
+ */
+export function ModelSection({
+  status,
+  onChange,
+  onSetKey,
+  onClearKey,
+  test,
+  sentLine,
+  title,
+}) {
   const {t} = useTranslation()
   const providers = useProviders()
   const {settings} = status
   const isLocal = settings.provider === 'local'
 
   return (
-    <SettingsSection title={t('Model')}>
+    <SettingsSection title={title || t('Model')}>
       <Stack spacing={5}>
         <SimpleGrid columns={[1, 3]} spacing={2} role="radiogroup">
           {providers.map(({id, label, hint}) => (
@@ -233,25 +245,28 @@ export function ModelSection({status, onChange, onSetKey, onClearKey, test}) {
             onClearKey={onClearKey}
           />
         )}
-        <Flex align="center" gap={4} wrap="wrap">
-          {test.isRunning ? (
-            <SecondaryButton onClick={test.stop}>
-              {t('Stop the test')}
-            </SecondaryButton>
-          ) : (
-            <PrimaryButton isDisabled={!settings.model} onClick={test.start}>
-              {t('Test on the practice flips')}
-            </PrimaryButton>
-          )}
-          <Text color="muted">{test.line}</Text>
-        </Flex>
-        <PracticeReports reports={test.reports} />
+        {test && (
+          <Flex align="center" gap={4} wrap="wrap">
+            {test.isRunning ? (
+              <SecondaryButton onClick={test.stop}>
+                {t('Stop the test')}
+              </SecondaryButton>
+            ) : (
+              <PrimaryButton isDisabled={!settings.model} onClick={test.start}>
+                {t('Test on the practice flips')}
+              </PrimaryButton>
+            )}
+            <Text color="muted">{test.line}</Text>
+          </Flex>
+        )}
+        {test && <PracticeReports reports={test.reports} />}
         <Text color="muted" fontSize="sm">
-          {isLocal
-            ? t('The flip pictures stay on this computer.')
-            : t(
-                'During a validation, the flip pictures and keywords are sent to this service. They become public on the chain after the ceremony anyway; nothing else is sent.'
-              )}
+          {sentLine ||
+            (isLocal
+              ? t('The flip pictures stay on this computer.')
+              : t(
+                  'During a validation, the flip pictures and keywords are sent to this service. They become public on the chain after the ceremony anyway; nothing else is sent.'
+                ))}
         </Text>
       </Stack>
     </SettingsSection>

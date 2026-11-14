@@ -4,6 +4,7 @@ import {Flex, Stack, Text} from '@chakra-ui/react'
 import {useTranslation} from 'react-i18next'
 import {HDivider} from '../../../shared/components/components'
 import {SettingsSection} from '../components'
+import {pendingActivityText} from '../../agents/catalog'
 
 function formatTime(ms) {
   return new Date(ms).toLocaleString([], {
@@ -14,6 +15,8 @@ function formatTime(ms) {
 
 /** One line of the log (main/agent/agent.js) in words. */
 export function activityText({action, decision, detail}, t) {
+  const pending = pendingActivityText({action, decision, detail}, t)
+  if (pending) return pending
   switch (action) {
     case 'answerFlip':
       if (decision === 'failed')
@@ -31,6 +34,12 @@ export function activityText({action, decision, detail}, t) {
         ? t('Test flip failed: {{detail}}', {detail, nsSeparator: '!!'})
         : t('Test flip answered: {{detail}}', {detail, nsSeparator: '!!'})
     case 'settings':
+      if (decision === 'added') return t('Agent added')
+      if (decision === 'removed') return t('Agent removed')
+      if (decision === 'paused') return t('All agents paused')
+      if (decision === 'resumed') return t('All agents resumed')
+      if (decision === 'exported') return t('Agent exported to a file')
+      if (decision === 'imported') return t('Agent imported from a file')
       return t('Settings saved')
     case 'key':
       return decision === 'removed' ? t('Key removed') : t('Key saved')
@@ -42,7 +51,7 @@ export function activityText({action, decision, detail}, t) {
 /** What the column on the right says: who decided. */
 function how(decision, t) {
   if (decision === 'alone') return t('ALONE')
-  if (decision === 'ask') return t('ASKED')
+  if (['ask', 'approved', 'declined'].includes(decision)) return t('ASKED')
   if (decision === 'failed') return t('FAILED')
   return ''
 }

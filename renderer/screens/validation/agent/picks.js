@@ -1,7 +1,7 @@
 import {AnswerType, RelevanceType} from '../../../shared/types'
 import {decodedWithKeywords} from '../utils'
 
-// The agent in a validation (Settings › Agent, "Answer the flips"): Ask me = Suggest, its pick ringed and the
+// The agent in a validation (its action "Answer the flips", on its page in Agents): Ask me = Suggest, its pick ringed and the
 // person clicks; Alone = Autopilot, it answers within the session's time. A flip is asked once, one at a time, as
 // the validation shows them. The validation machine is not changed: the agent sends the person's own events.
 

@@ -1299,6 +1299,20 @@ export const LayersIcon = createIcon({
   ),
 })
 
+export const AgentIcon = createIcon({
+  displayName: 'AgentIcon',
+  viewBox: '0 0 24 24',
+  path: (
+    <g fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="4.75" y="7.75" width="14.5" height="11.5" rx="3" />
+      <path d="M12 7.75V4.5M9.5 15.25h5" strokeLinecap="round" />
+      <circle cx="12" cy="3.75" r="0.75" fill="currentColor" />
+      <circle cx="9.25" cy="12" r="1" fill="currentColor" stroke="none" />
+      <circle cx="14.75" cy="12" r="1" fill="currentColor" stroke="none" />
+    </g>
+  ),
+})
+
 export const GithubIcon = createIcon({
   displayName: 'GithubIcon',
   viewBox: '0 0 15 15',
