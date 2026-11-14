@@ -8,13 +8,20 @@ import {createValidationMachine} from '../screens/validation/machine'
 import {
   persistValidationState,
   loadValidationState,
+  availableReportsNumber,
 } from '../screens/validation/utils'
 import {
   ValidationFailedDialog,
   SynchronizingValidationAlert,
   OfflineValidationAlert,
 } from '../screens/validation/components'
-import {ValidationScreen} from '../screens/validation/screen'
+import {
+  ValidationScreen,
+  agentPhase,
+  autopilotStep,
+  sessionFlips,
+} from '../screens/validation/screen'
+import {useAgentValidation} from '../screens/validation/agent/use-agent-validation'
 import {useEpochState} from '../shared/providers/epoch-context'
 import {useTimingState} from '../shared/providers/timing-context'
 import {useChainState} from '../shared/providers/chain-context'
@@ -95,6 +102,20 @@ function ValidationSession({
 
   const {syncing, offline} = useChainState()
 
+  // The agent, when it is on (Settings › Agent): Suggest or Autopilot, as the practice showed it.
+  const agent = useAgentValidation({
+    flips: sessionFlips(state),
+    phase: agentPhase(state),
+    reportsUsed: state.context.reports.size,
+    // The machine's own limit: every long flip counts, ready or not.
+    reportsAllowed: availableReportsNumber(state.context.longFlips),
+    step: autopilotStep(state),
+    send,
+    validationStart,
+    shortSessionDuration,
+    longSessionDuration,
+  })
+
   return (
     <ValidationScreen
       state={state}
@@ -104,6 +125,7 @@ function ValidationSession({
       longSessionDuration={longSessionDuration}
       isExceededTooltipOpen={isExceededTooltipOpen}
       onCloseExceededTooltip={onCloseExceededTooltip}
+      agent={agent}
     >
       {syncing && (
         <SynchronizingValidationAlert>

@@ -104,13 +104,22 @@ export function ConfirmDialog({pending, onSend, onCancel}) {
             if (file.stored)
               return (
                 <Text key={file.what}>
-                  {file.what === 'text'
-                    ? t('The text is already stored on IPFS: no new fee.', {
-                        nsSeparator: '|',
-                      })
-                    : t('The image is already stored on IPFS: no new fee.', {
-                        nsSeparator: '|',
-                      })}
+                  {{
+                    text: t('The text is already stored on IPFS: no new fee.', {
+                      nsSeparator: '|',
+                    }),
+                    video: t(
+                      'The video is already stored on IPFS: no new fee.',
+                      {nsSeparator: '|'}
+                    ),
+                    sound: t(
+                      'The sound is already stored on IPFS: no new fee.',
+                      {nsSeparator: '|'}
+                    ),
+                  }[file.what] ||
+                    t('The image is already stored on IPFS: no new fee.', {
+                      nsSeparator: '|',
+                    })}
                 </Text>
               )
             const values = {
@@ -120,15 +129,24 @@ export function ConfirmDialog({pending, onSend, onCancel}) {
             }
             return (
               <Text key={file.what}>
-                {file.what === 'text'
-                  ? t(
-                      'Storing the text on IPFS ({{size}} KB): about {{fee}} iDNA (at most {{most}}).',
-                      {...values, nsSeparator: '|'}
-                    )
-                  : t(
-                      'Storing the image on IPFS ({{size}} KB): about {{fee}} iDNA (at most {{most}}).',
-                      {...values, nsSeparator: '|'}
-                    )}
+                {{
+                  text: t(
+                    'Storing the text on IPFS ({{size}} KB): about {{fee}} iDNA (at most {{most}}).',
+                    {...values, nsSeparator: '|'}
+                  ),
+                  video: t(
+                    'Storing the video on IPFS ({{size}} KB): about {{fee}} iDNA (at most {{most}}).',
+                    {...values, nsSeparator: '|'}
+                  ),
+                  sound: t(
+                    'Storing the sound on IPFS ({{size}} KB): about {{fee}} iDNA (at most {{most}}).',
+                    {...values, nsSeparator: '|'}
+                  ),
+                }[file.what] ||
+                  t(
+                    'Storing the image on IPFS ({{size}} KB): about {{fee}} iDNA (at most {{most}}).',
+                    {...values, nsSeparator: '|'}
+                  )}
               </Text>
             )
           })}

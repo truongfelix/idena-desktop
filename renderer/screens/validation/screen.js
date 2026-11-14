@@ -45,6 +45,7 @@ import {
   ReviewShortSessionDialog,
 } from './components'
 import {rem} from '../../shared/theme'
+import {AGENT_COLORS, pickedSide} from './agent/picks'
 import {AnswerType, RelevanceType} from '../../shared/types'
 import {InfoButton, PrimaryButton} from '../../shared/components/button'
 import {FloatDebug, Tooltip} from '../../shared/components/components'
@@ -68,6 +69,7 @@ export function ValidationScreen({
   isExceededTooltipOpen,
   onCloseExceededTooltip,
   headerActions,
+  agent,
   children,
 }) {
   const {t} = useTranslation()
@@ -99,6 +101,30 @@ export function ValidationScreen({
 
   const flips = sessionFlips(state)
   const currentFlip = flips[currentIndex]
+
+  const agentColor = isShortSession(state)
+    ? AGENT_COLORS.dark
+    : AGENT_COLORS.themed
+
+  // The agent's pick on this flip, on the side it picked: in Suggest until the person answers; in the keywords
+  // check, a report it leaves to the person (Suggest, or Autopilot with reports on Ask me) until the flip is marked.
+  const pick = agent && currentFlip ? agent.picks[currentFlip.hash] : null
+  const agentPickFor = (variant) => {
+    if (!pick || pickedSide(pick) !== variant) return null
+    const isKeywords = isLongSessionKeywords(state)
+    const show = isKeywords
+      ? Boolean(pick.report) &&
+        !currentFlip.relevance &&
+        !(agent.mode === 'autopilot' && pick.reportDecision === 'alone')
+      : agent.mode === 'suggest' && !currentFlip.option
+    return show
+      ? {
+          percent: Math.round((pick.confidence || 0) * 100),
+          report: isKeywords,
+          isDark: isShortSession(state),
+        }
+      : null
+  }
 
   const flipTimerDetails = {
     isShortSession: isShortSession(state),
@@ -148,6 +174,34 @@ export function ValidationScreen({
             </Text>
           </Title>
 
+          {agent && (
+            <Flex
+              align="center"
+              gap={2}
+              mr={2}
+              pl={3}
+              pr={1}
+              py={1}
+              borderRadius="md"
+              borderWidth={1}
+              borderColor={agentColor}
+              color={agentColor}
+              fontSize="sm"
+            >
+              <Text>{agentBadgeText(agent, t)}</Text>
+              {/* A person supervises: pauses the agent, corrects, and resumes it. */}
+              <Button
+                size="xs"
+                variant="outline"
+                borderColor={agentColor}
+                color={agentColor}
+                _hover={{bg: 'transparent'}}
+                onClick={agent.paused ? agent.resume : agent.pause}
+              >
+                {agent.paused ? t('Resume') : t('Pause')}
+              </Button>
+            </Flex>
+          )}
           <IconButton
             icon={<FullscreenIcon />}
             bg={isShortSession(state) ? 'brandGray.060' : 'gray.300'}
@@ -178,6 +232,7 @@ export function ValidationScreen({
               {...currentFlip}
               variant={AnswerType.Left}
               timerDetails={flipTimerDetails}
+              agentPick={agentPickFor(AnswerType.Left)}
               onChoose={(hash) =>
                 send({
                   type: 'ANSWER',
@@ -190,6 +245,7 @@ export function ValidationScreen({
               {...currentFlip}
               variant={AnswerType.Right}
               timerDetails={flipTimerDetails}
+              agentPick={agentPickFor(AnswerType.Right)}
               onChoose={(hash) =>
                 send({
                   type: 'ANSWER',
@@ -354,7 +410,56 @@ export function ValidationScreen({
         </FlipChallenge>
       </CurrentStep>
       <ActionBar>
-        <ActionBarItem />
+        <ActionBarItem>
+          {agent?.noAnswer && isSolving(state) && !isSubmitting(state) && (
+            <Stack spacing={0} mr={4} maxW="sm" fontSize="sm" color="red.500">
+              {agent.noAnswer.reason && (
+                <Text noOfLines={2}>
+                  {t('No answer from the agent: {{reason}}', {
+                    reason: agent.noAnswer.reason,
+                    nsSeparator: '!!',
+                    interpolation: {escapeValue: false},
+                  })}
+                </Text>
+              )}
+              <Text fontWeight={500}>
+                {agent.mode === 'autopilot'
+                  ? t('A flip without an answer gets a random one.')
+                  : t('Answer the flips yourself.')}
+              </Text>
+            </Stack>
+          )}
+          {agent?.canTakeRest && isSolving(state) && !isSubmitting(state) && (
+            <Button
+              variant="outline"
+              borderColor={agentColor}
+              color={agentColor}
+              _hover={{bg: 'transparent'}}
+              onClick={agent.takeRest}
+            >
+              {t("Take the agent's picks for the rest")}
+            </Button>
+          )}
+          {agent?.countdown !== null && agent?.countdown !== undefined && (
+            <Flex align="center" gap={3}>
+              <Text color={agentColor} fontWeight={500}>
+                {t('The agent submits the answers in {{seconds}} s', {
+                  seconds: agent.countdown,
+                })}
+              </Text>
+              <Button
+                variant="outline"
+                size="sm"
+                borderColor={agentColor}
+                color={agentColor}
+                _hover={{bg: 'transparent'}}
+                onClick={agent.pause}
+              >
+                {t('Pause the agent')}
+              </Button>
+            </Flex>
+          )}
+        </ActionBarItem>
         <ActionBarItem justify="center">
           <ValidationTimer
             validationStart={validationStart}
@@ -505,6 +610,40 @@ export function ValidationScreen({
   )
 }
 
+const AUTOPILOT_STEPS = [
+  ['shortSession.solve.answer.normal', 'short'],
+  ['shortSession.solve.answer.submitShortSession.confirm', 'shortConfirm'],
+  ['shortSession.solve.answer.submitShortSession.fail', 'shortFail'],
+  ['longSession.solve.answer.welcomeQualification', 'welcome'],
+  ['longSession.solve.answer.flips', 'long'],
+  ['longSession.solve.answer.finishFlips', 'finish'],
+  ['longSession.solve.answer.keywords', 'keywords'],
+  ['longSession.solve.answer.review', 'review'],
+  ['longSession.solve.answer.submitLongSession.fail', 'longFail'],
+]
+
+/** The agent's badge on the validation screen: paused, giving no answer, or its mode. */
+function agentBadgeText(agent, t) {
+  if (agent.paused) return t('Agent: paused', {nsSeparator: '!!'})
+  if (agent.noAnswer) return t('Agent: no answer', {nsSeparator: '!!'})
+  return agent.mode === 'autopilot'
+    ? t('Agent: Autopilot', {nsSeparator: '!!'})
+    : t('Agent: Suggest', {nsSeparator: '!!'})
+}
+
+/** The validation's step for Autopilot (agent/autopilot.js autopilotPlan), or null where it does nothing. */
+export function autopilotStep(state) {
+  const found = AUTOPILOT_STEPS.find(([path]) => state.matches(path))
+  return found ? found[1] : null
+}
+
+/** Where the agent is in a validation: 'short', 'long' (the stories), 'keywords', or null (not answering). */
+export function agentPhase(state) {
+  if (isSubmitting(state) || !isSolving(state)) return null
+  if (isShortSession(state)) return 'short'
+  return isLongSessionKeywords(state) ? 'keywords' : 'long'
+}
+
 function isShortSession(state) {
   return state.matches('shortSession')
 }
@@ -568,7 +707,7 @@ function canSubmit(state) {
     )
 }
 
-function sessionFlips(state) {
+export function sessionFlips(state) {
   const {
     context: {shortFlips, longFlips},
   } = state

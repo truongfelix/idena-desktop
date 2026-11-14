@@ -23,6 +23,7 @@ export default function SettingsLayout({children}) {
           <SettingsNavLink href="/settings/advanced">
             {t('Advanced')}
           </SettingsNavLink>
+          <SettingsNavLink href="/settings/agent">{t('Agent')}</SettingsNavLink>
         </HStack>
         {children}
       </Page>

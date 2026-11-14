@@ -22,6 +22,7 @@ const INVOKE_CHANNELS = new Set([
   'search-image',
   'router-port',
   'node-reports',
+  'agent',
 ])
 
 const LISTEN_CHANNELS = new Set([
