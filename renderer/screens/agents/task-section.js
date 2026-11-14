@@ -62,11 +62,13 @@ export function TaskSection({agent, onChange}) {
         <FormControlWithLabel label={t('What it does when it runs')}>
           <Select
             value={agent.task || ''}
-            onChange={(e) =>
+            onChange={(e) => {
+              // Read now: the change is applied later, to the agent as saved, when React has put the select back.
+              const task = e.target.value
               onChange((a) =>
-                e.target.value === 'joke' ? withJokeTask(a) : {...a, task: null}
+                task === 'joke' ? withJokeTask(a) : {...a, task: null}
               )
-            }
+            }}
           >
             <option value="">{t('Only the actions below')}</option>
             <option value="joke">
