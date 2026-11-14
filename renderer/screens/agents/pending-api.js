@@ -39,7 +39,8 @@ export async function approveAction(item, body, run = executors) {
     })
     throw error
   }
-  await agent('finish', {id: item.id, ok: true, detail})
+  // Done: a failure to say so is not a failure of the action (the item waits again at the next load, with a warning).
+  await agent('finish', {id: item.id, ok: true, detail}).catch(() => {})
   return detail
 }
 

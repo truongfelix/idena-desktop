@@ -3,7 +3,7 @@ const path = require('path')
 const fs = require('fs-extra')
 const {createAgent} = require('./agent')
 const {createAgentProfiles, validationAgentSettings} = require('./profiles')
-const {MAX_PENDING} = require('./pending')
+const {MAX_PENDING, MAX_PENDING_PER_AGENT} = require('./pending')
 
 const JOKE = 'aaaaaaaaaaaaaaaa'
 const OTHER = 'bbbbbbbbbbbbbbbb'
@@ -188,14 +188,80 @@ describe('To approve', () => {
     expect(list).toEqual([])
   })
 
-  test(`at most ${MAX_PENDING} actions wait`, async () => {
-    const agent = start([joke()])
-    for (let i = 0; i < MAX_PENDING; i += 1)
+  test(`at most ${MAX_PENDING_PER_AGENT} actions of one agent wait: the others still can`, async () => {
+    const agent = start([joke(), {...joke(), id: OTHER, name: 'Second'}])
+    for (let i = 0; i < MAX_PENDING_PER_AGENT; i += 1)
       // eslint-disable-next-line no-await-in-loop
       await agent.handle('propose', proposal())
     await expect(agent.handle('propose', proposal())).resolves.toMatchObject({
       decision: 'off',
       reason: 'too many actions waiting',
+    })
+    await expect(
+      agent.handle('propose', proposal({agentId: OTHER}))
+    ).resolves.toMatchObject({decision: 'ask'})
+    expect(MAX_PENDING).toBeGreaterThan(MAX_PENDING_PER_AGENT)
+  })
+
+  test('an Alone action above its limit waits for the person', async () => {
+    const agent = start([
+      {
+        id: JOKE,
+        name: 'Sender',
+        enabled: true,
+        actions: {send: {level: 'alone', limit: 100}},
+      },
+    ])
+    const send = (more) =>
+      agent.handle('propose', proposal({action: 'send', ...more}))
+    await expect(send({amount: 5, usage: 0})).resolves.toEqual({
+      decision: 'alone',
+      reason: 'within the limit',
+    })
+    await expect(send({amount: 5000, usage: 0})).resolves.toMatchObject({
+      decision: 'ask',
+      reason: 'above the limit',
+    })
+    await expect(send({amount: 5, usage: 100})).resolves.toMatchObject({
+      decision: 'ask',
+    })
+    await expect(agent.handle('pending')).resolves.toHaveLength(2)
+  })
+
+  test('an edit that empties the text is refused', async () => {
+    const agent = start([joke()])
+    const {item} = await agent.handle('propose', proposal())
+    await expect(
+      agent.handle('approve', {id: item.id, body: '  \n '})
+    ).rejects.toThrow('the text is empty')
+    await expect(agent.handle('pending')).resolves.toEqual([
+      expect.objectContaining({state: 'waiting', body: 'A joke'}),
+    ])
+  })
+
+  test('the window loaded again: an action it was doing waits again, with a warning', async () => {
+    const agent = start([joke()])
+    const {item} = await agent.handle('propose', proposal())
+    await agent.handle('approve', {id: item.id})
+    agent.windowLoaded()
+    const [waiting] = await agent.handle('pending')
+    expect(waiting).toMatchObject({state: 'waiting'})
+    expect(waiting.error).toMatch(/may have been done/u)
+    await expect(agent.handle('decline', {id: item.id})).resolves.toEqual([])
+  })
+
+  test('the validation agent turned off in Settings › Agent: its items leave, said in Activity', async () => {
+    const agent = start([
+      {...joke(), actions: {post: {level: 'ask'}, answerFlip: {level: 'ask'}}},
+    ])
+    await agent.handle('propose', proposal())
+    const {settings} = await agent.handle('status')
+    await agent.handle('saveSettings', {...settings, enabled: false})
+    await expect(agent.handle('pending')).resolves.toEqual([])
+    const lines = await agent.handle('activity', {agentId: JOKE})
+    expect(lines.find((line) => line.decision === 'dropped')).toMatchObject({
+      action: 'post',
+      detail: 'agent off',
     })
   })
 })

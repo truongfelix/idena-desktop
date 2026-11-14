@@ -88,6 +88,27 @@ describe('the Agents section lines', () => {
     expect(line('saved')).toBe('Settings saved')
   })
 
+  test("To approve's steps read as words in Activity", () => {
+    const line = (decision, detail = '') =>
+      activityText({action: 'post', decision, detail}, t)
+    expect(line('ask')).toBe('Post on Social: waits for your approval')
+    expect(line('approved', 'posted')).toBe(
+      'Post on Social: done after your approval (posted)'
+    )
+    expect(line('approved')).toBe('Post on Social: done after your approval')
+    expect(line('declined')).toBe('Post on Social: declined by you')
+    expect(line('dropped', 'action off')).toBe(
+      'Post on Social: taken off To approve (action off)'
+    )
+    // The validation's own lines keep their words.
+    expect(
+      activityText(
+        {action: 'answerFlip', decision: 'ask', detail: 'left 0.80'},
+        t
+      )
+    ).toBe('Answered a flip: left 0.80')
+  })
+
   test("the menu card's title counts the agents on", () => {
     const list = (agents, paused = false) => ({paused, agents})
     expect(agentsCardTitle(t, list([agent()]))).toBe('1 agent on')

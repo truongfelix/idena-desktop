@@ -1969,5 +1969,14 @@
   "To approve": "To approve",
   "Nothing to approve. An action an agent may do with Ask me waits here for your click.": "Nothing to approve. An action an agent may do with Ask me waits here for your click.",
   "1 action to approve": "1 action to approve",
-  "{{count}} actions to approve": "{{count}} actions to approve"
+  "{{count}} actions to approve": "{{count}} actions to approve",
+  "{{action}}: waits for your approval": "{{action}}: waits for your approval",
+  "{{action}}: done after your approval ({{detail}})": "{{action}}: done after your approval ({{detail}})",
+  "{{action}}: done after your approval": "{{action}}: done after your approval",
+  "{{action}}: declined by you": "{{action}}: declined by you",
+  "{{action}}: taken off To approve ({{detail}})": "{{action}}: taken off To approve ({{detail}})",
+  "{{action}}: failed ({{detail}})": "{{action}}: failed ({{detail}})",
+  "Post on Social": "Post on Social",
+  "Tip posts": "Tip posts",
+  "Vote in oracle votings": "Vote in oracle votings"
 }

@@ -49,6 +49,65 @@ export function actionWants(action, t) {
   }
 }
 
+/** An action's name, as Activity says it. */
+export function actionName(action, t) {
+  switch (action) {
+    case 'answerFlip':
+      return t('Answer the flips')
+    case 'report':
+      return t('Report flips')
+    case 'send':
+      return t('Send iDNA')
+    case 'post':
+      return t('Post on Social')
+    case 'tip':
+      return t('Tip posts')
+    case 'ads':
+      return t('Ads')
+    case 'oracleVote':
+      return t('Vote in oracle votings')
+    case 'invite':
+      return t('Invite')
+    default:
+      return action
+  }
+}
+
+/** A line of To approve's steps in Activity (main/agent/pending.js), or null for another line. */
+export function pendingActivityText({action, decision, detail}, t) {
+  const name = actionName(action, t)
+  const opts = {action: name, detail}
+  if (['answerFlip', 'test', 'settings', 'key'].includes(action)) return null
+  switch (decision) {
+    case 'ask':
+      return t('{{action}}: waits for your approval', {
+        ...opts,
+        nsSeparator: '!!',
+      })
+    case 'approved':
+      return detail
+        ? t('{{action}}: done after your approval ({{detail}})', {
+            ...opts,
+            nsSeparator: '!!',
+          })
+        : t('{{action}}: done after your approval', {
+            ...opts,
+            nsSeparator: '!!',
+          })
+    case 'declined':
+      return t('{{action}}: declined by you', {...opts, nsSeparator: '!!'})
+    case 'dropped':
+      return t('{{action}}: taken off To approve ({{detail}})', {
+        ...opts,
+        nsSeparator: '!!',
+      })
+    case 'failed':
+      return t('{{action}}: failed ({{detail}})', {...opts, nsSeparator: '!!'})
+    default:
+      return null
+  }
+}
+
 export const LEVELS = ['off', 'ask', 'alone']
 
 export function levelLabel(level, t) {

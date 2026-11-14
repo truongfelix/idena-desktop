@@ -383,6 +383,8 @@ const createMainWindow = () => {
   })
 
   installNavigationGuards(mainWindow)
+  // A reload or a crash ends what the page was doing: an approved agent action waits again (B-243).
+  mainWindow.webContents.on('did-finish-load', () => agent.windowLoaded())
 
   if (isE2ESmoke) {
     mainWindow.webContents.once('preload-error', (_event, preloadPath, error) =>

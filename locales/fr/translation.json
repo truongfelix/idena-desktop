@@ -1969,5 +1969,14 @@
   "To approve": "À approuver",
   "Nothing to approve. An action an agent may do with Ask me waits here for your click.": "Rien à approuver. Une action qu'un agent peut faire avec Me demander attend ici votre clic.",
   "1 action to approve": "1 action à approuver",
-  "{{count}} actions to approve": "{{count}} actions à approuver"
+  "{{count}} actions to approve": "{{count}} actions à approuver",
+  "{{action}}: waits for your approval": "{{action}} : attend votre accord",
+  "{{action}}: done after your approval ({{detail}})": "{{action}} : fait après votre accord ({{detail}})",
+  "{{action}}: done after your approval": "{{action}} : fait après votre accord",
+  "{{action}}: declined by you": "{{action}} : refusé par vous",
+  "{{action}}: taken off To approve ({{detail}})": "{{action}} : retiré de À approuver ({{detail}})",
+  "{{action}}: failed ({{detail}})": "{{action}} : a échoué ({{detail}})",
+  "Post on Social": "Publier sur Social",
+  "Tip posts": "Faire des pourboires",
+  "Vote in oracle votings": "Voter dans les votes oracle"
 }

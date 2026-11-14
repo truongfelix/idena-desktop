@@ -44,6 +44,21 @@ describe('an approval', () => {
     ])
   })
 
+  test('done, then the main process cannot be told: still done, not reported failed', async () => {
+    global.ipcRenderer = {
+      invoke: jest.fn(async (channel, command) => {
+        if (command === 'approve') return {...item, state: 'running'}
+        throw new Error('window closing')
+      }),
+    }
+    const post = jest.fn().mockResolvedValue('posted')
+    await expect(approveAction(item, undefined, {post})).resolves.toBe('posted')
+    const finishes = global.ipcRenderer.invoke.mock.calls.filter(
+      ([, command]) => command === 'finish'
+    )
+    expect(finishes.map(([, , data]) => data.ok)).toEqual([true])
+  })
+
   test('an action this app cannot do is not handed over at all', async () => {
     const calls = fakeMain()
     await expect(approveAction(item, undefined, {})).rejects.toThrow(

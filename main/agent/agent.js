@@ -189,6 +189,7 @@ function createAgent({
     saveSettings(data) {
       const saved = settings.write(data)
       if (saved.paused || !saved.enabled) stop(solving)
+      if (pending) pending.prune()
       log({
         agentId: validationId(),
         action: 'settings',
@@ -293,6 +294,10 @@ function createAgent({
     stop: () => {
       stop(solving)
       stop(testing)
+    },
+    /** The window loaded (again): an approved action it was doing is no longer being done (pending.js). */
+    windowLoaded: () => {
+      if (pending) pending.interrupted()
     },
   }
 }
