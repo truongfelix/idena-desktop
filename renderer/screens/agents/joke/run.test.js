@@ -142,6 +142,73 @@ describe('a run of the joke agent', () => {
       expect(d.calls.map(([c]) => c)).not.toContain('writeText')
   })
 
+  test("an older day's joke still waiting is taken back, and today's is written", async () => {
+    const d = deps({
+      pending: [
+        {
+          id: 'old',
+          agentId: agent.id,
+          action: 'post',
+          state: 'waiting',
+          at: NOW - 3 * 86400 * 1000,
+        },
+      ],
+    })
+    const feed = [jokeNode(3, [{from: B12, height: 110, index: 0}])]
+    await expect(
+      runJokeAgent(agent, {feed, me: ME, names: {}}, d)
+    ).resolves.toMatchObject({result: 'ask'})
+    expect(d.calls.find(([c]) => c === 'withdraw')[1]).toEqual({
+      id: 'old',
+      agentId: agent.id,
+      reason: 'replaced by a new day',
+    })
+    const today = deps({
+      pending: [
+        {
+          id: 'p',
+          agentId: agent.id,
+          action: 'post',
+          state: 'waiting',
+          at: NOW - 600,
+        },
+      ],
+    })
+    await expect(
+      runJokeAgent(agent, {feed, me: ME, names: {}}, today)
+    ).resolves.toMatchObject({result: 'waiting'})
+  })
+
+  test('a post refused before it was sent is given back; one sent but not seen in a block is not', async () => {
+    const feed = [jokeNode(3, [{from: B12, height: 110, index: 0}])]
+    const refused = deps({
+      decision: 'alone',
+      post: jest.fn().mockRejectedValue(new Error('the node refused it')),
+    })
+    await runJokeAgent(agent, {feed, me: ME, names: {}}, refused)
+    expect(refused.calls.slice(-1)[0][1]).toMatchObject({release: true})
+    const sent = deps({
+      decision: 'alone',
+      post: jest
+        .fn()
+        .mockRejectedValue(
+          Object.assign(new Error('not in a block yet'), {sent: true})
+        ),
+    })
+    await runJokeAgent(agent, {feed, me: ME, names: {}}, sent)
+    expect(sent.calls.slice(-1)[0][1]).toMatchObject({release: false})
+  })
+
+  test('the fee is shown rounded up to the cent', async () => {
+    const d = deps()
+    d.prepare = jest.fn().mockResolvedValue(0.0149)
+    const feed = [jokeNode(3, [{from: B12, height: 110, index: 0}])]
+    await runJokeAgent(agent, {feed, me: ME, names: {}}, d)
+    expect(d.calls.find(([c]) => c === 'propose')[1].detail).toBe(
+      '1 tipper since the last joke · fee about 0.02 iDNA'
+    )
+  })
+
   test('a model answer that is no joke is not posted', async () => {
     const d = deps({answer: '   ', decision: 'alone'})
     const feed = [jokeNode(3, [{from: B12, height: 110, index: 0}])]

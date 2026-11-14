@@ -52,10 +52,25 @@ export async function runJokeAgent(agent, social, deps) {
 
   const state = jokeState(social.feed, social.me, now)
   if (state.postedToday > 0) return {result: 'done today', detail: ''}
-  const waiting = (await call('pending')).some(
+  // Its joke still waiting: today's stops the run; an older day's is taken back (its number and thanks are old).
+  const day = new Date(now).toDateString()
+  const own = (await call('pending')).filter(
     (item) => item.agentId === agent.id && item.action === 'post'
   )
-  if (waiting) return {result: 'waiting', detail: ''}
+  if (
+    own.some(
+      (item) =>
+        item.state !== 'waiting' || new Date(item.at).toDateString() === day
+    )
+  )
+    return {result: 'waiting', detail: ''}
+  // eslint-disable-next-line no-await-in-loop
+  for (const item of own)
+    await call('withdraw', {
+      id: item.id,
+      agentId: agent.id,
+      reason: t('replaced by a new day'),
+    })
   const number = state.lastNumber + 1
   if (state.tippers.length === 0)
     return skip(
@@ -87,8 +102,8 @@ export async function runJokeAgent(agent, social, deps) {
     thanks: thanksLine(state.tippers, social.names),
   })
   const cost = await deps.prepare(body)
-  // Shown rounded: the most it may cost, to the cent.
-  const fee = cost < 0.01 ? '< 0.01' : cost.toFixed(2)
+  // Shown rounded up: the most it may cost, to the cent.
+  const fee = (Math.ceil(cost * 100) / 100).toFixed(2)
   const detail =
     state.tippers.length === 1
       ? t('1 tipper since the last joke · fee about {{fee}} iDNA', {
@@ -121,10 +136,13 @@ export async function runJokeAgent(agent, social, deps) {
     })
     return {result: 'posted', detail: done}
   } catch (error) {
+    // Never sent (refused before): the day's post and its cost are given back; sent, they stay counted.
     await call('didAction', {
       agentId: agent.id,
       action: 'post',
       ok: false,
+      release: !error?.sent,
+      cost,
       detail: String(error?.message || error),
     })
     return {result: 'failed', detail: String(error?.message || error)}

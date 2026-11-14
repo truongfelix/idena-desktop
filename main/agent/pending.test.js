@@ -143,11 +143,38 @@ describe('To approve', () => {
 
   test('an Alone action is not put in the list: its caller does it', async () => {
     const agent = start([joke('alone')])
-    await expect(agent.handle('propose', proposal())).resolves.toEqual({
-      decision: 'alone',
-      reason: 'within the limit',
-    })
+    await expect(agent.handle('propose', proposal({cost: 0}))).resolves.toEqual(
+      {
+        decision: 'alone',
+        reason: 'within the limit',
+      }
+    )
     await expect(agent.handle('pending')).resolves.toEqual([])
+    // A cost not given is unknown: the person decides.
+    await expect(agent.handle('propose', proposal())).resolves.toMatchObject({
+      decision: 'ask',
+      reason: 'cost unknown',
+    })
+  })
+
+  test("the agent takes back its own waiting item, said in its Activity; not another agent's", async () => {
+    const agent = start([joke(), {...joke(), id: OTHER, name: 'Second'}])
+    const {item} = await agent.handle('propose', proposal())
+    await expect(
+      agent.handle('withdraw', {id: item.id, agentId: OTHER, reason: 'x'})
+    ).rejects.toThrow('not its own')
+    await expect(
+      agent.handle('withdraw', {
+        id: item.id,
+        agentId: JOKE,
+        reason: 'replaced by a new day',
+      })
+    ).resolves.toEqual([])
+    const [line] = await agent.handle('activity', {agentId: JOKE})
+    expect(line).toMatchObject({
+      decision: 'dropped',
+      detail: 'replaced by a new day',
+    })
   })
 
   test('approved: handed over with the edit, then done and gone', async () => {
@@ -255,7 +282,7 @@ describe('To approve', () => {
     ])
     const send = (more) =>
       agent.handle('propose', proposal({action: 'send', ...more}))
-    await expect(send({amount: 5, usage: 0})).resolves.toEqual({
+    await expect(send({amount: 5, usage: 0, cost: 0})).resolves.toEqual({
       decision: 'alone',
       reason: 'within the limit',
     })

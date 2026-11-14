@@ -2004,5 +2004,7 @@
   "The model writes the joke alone. The app writes the rest of the post: the header, the joke's number, the thanks line (each tipper's name from their profile, else the short address) and the last line. No tip since the last joke: no joke that day.": "Le modèle écrit seul la blague. L'application écrit le reste de la publication : l'en-tête, le numéro de la blague, la ligne de remerciements (le nom de chaque donateur tiré de son profil, sinon l'adresse courte) et la dernière ligne. Aucun pourboire depuis la dernière blague : pas de blague ce jour-là.",
   "Run now": "Lancer maintenant",
   "Runs once a day at its time, while the app is open.": "Travaille une fois par jour à son heure, quand l'application est ouverte.",
-  "Waits for Social to read the chain up to now.": "Attend que Social ait lu la chaîne jusqu'à maintenant."
+  "Waits for Social to read the chain up to now.": "Attend que Social ait lu la chaîne jusqu'à maintenant.",
+  "replaced by a new day": "remplacée par un nouveau jour",
+  "It is running now.": "Il est en train de travailler."
 }

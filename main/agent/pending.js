@@ -13,6 +13,8 @@ const MAX_PENDING = 50
 /** One agent's share of the list: an agent proposing too often cannot shut the others out. */
 const MAX_PENDING_PER_AGENT = 20
 const MAX_TEXT_LENGTH = 10000
+/** The actions whose limit counts them per day (the joke agent's post): the others count iDNA, or per validation. */
+const DAILY_COUNT_ACTIONS = new Set(['post'])
 const MAX_DETAIL_LENGTH = 500
 
 const newPendingId = () => crypto.randomBytes(8).toString('hex')
@@ -46,11 +48,35 @@ function readItem(value) {
   }
 }
 
-/** The saved list (`file`), or none: missing, unreadable, or not this format. */
-function readItems(file, logger) {
-  if (!file) return []
+/** The day's tally saved with the list ({day, spent, done}), or an empty one; another day's starts again. */
+function readTally(saved, day) {
+  const tally = saved && saved.tally
+  const numbers = (value) =>
+    Object.fromEntries(
+      Object.entries(value && typeof value === 'object' ? value : {}).filter(
+        ([, n]) => typeof n === 'number' && Number.isFinite(n) && n >= 0
+      )
+    )
+  return tally && tally.day === day
+    ? {day, spent: numbers(tally.spent), done: numbers(tally.done)}
+    : {day, spent: {}, done: {}}
+}
+
+function readSaved(file, logger) {
+  if (!file) return null
   try {
-    const saved = fs.readJsonSync(file())
+    return fs.readJsonSync(file())
+  } catch (error) {
+    if (error.code !== 'ENOENT' && logger)
+      logger.warn('agent pending file unreadable', error.toString())
+    return null
+  }
+}
+
+/** The saved list, or none: missing, unreadable, or not this format. */
+function readItems(saved) {
+  if (!saved) return []
+  {
     const list = saved && Array.isArray(saved.items) ? saved.items : []
     const ids = new Set()
     return list
@@ -61,10 +87,6 @@ function readItems(file, logger) {
         return true
       })
       .slice(0, MAX_PENDING)
-  } catch (error) {
-    if (error.code !== 'ENOENT' && logger)
-      logger.warn('agent pending file unreadable', error.toString())
-    return []
   }
 }
 
@@ -81,34 +103,36 @@ function createPending({
   now = Date.now,
   newId = newPendingId,
 }) {
-  let items = readItems(file, logger)
-  // What each agent spent today in iDNA (fees included) on the actions it did alone: {agentId: {day, total}}.
-  const spent = new Map()
   const today = () => new Date(now()).toDateString()
-  const spentToday = (agentId) => {
-    const entry = spent.get(agentId)
-    return entry && entry.day === today() ? entry.total : 0
+  const saved = readSaved(file, logger)
+  let items = readItems(saved)
+  // The day's tally, kept with the list (a restart keeps it): what each agent spent in iDNA (fees included) on the
+  // actions it did alone, and the actions of a daily count done (alone, or approved), by agent and action. A post
+  // counts from the moment it goes alone (two runs at once cannot both post), until it is known never sent.
+  let tally = readTally(saved, today())
+  const current = () => {
+    if (tally.day !== today()) tally = {day: today(), spent: {}, done: {}}
+    return tally
   }
-
-  // The actions done today, by agent and action (alone, or approved): the limit of a day counts them even before the
-  // chain shows them to the app (a post just sent is not scanned yet).
-  const done = new Map()
-  const doneToday = (agentId, action) => {
-    const entry = done.get(`${agentId}:${action}`)
-    return entry && entry.day === today() ? entry.n : 0
+  const spentToday = (agentId) => current().spent[agentId] || 0
+  const doneToday = (agentId, action) =>
+    current().done[`${agentId}:${action}`] || 0
+  const addTally = (agentId, action, {n = 0, cost = 0} = {}) => {
+    const day = current()
+    const key = `${agentId}:${action}`
+    if (n) day.done[key] = Math.max(0, (day.done[key] || 0) + n)
+    if (cost) day.spent[agentId] = Math.max(0, (day.spent[agentId] || 0) + cost)
   }
-  const countDone = (agentId, action) =>
-    done.set(`${agentId}:${action}`, {
-      day: today(),
-      n: doneToday(agentId, action) + 1,
-    })
 
   /**
    * An action the agent may do alone, within its daily budget: `cost` in iDNA, fees included. No budget: it may
    * spend nothing alone, the action waits for the person.
    */
   const withinBudget = (agentId, cost) => {
-    if (!(cost > 0)) return {decision: 'alone', reason: 'within the limit'}
+    // A cost the caller did not give, or not a number, is unknown: the person decides.
+    if (!(typeof cost === 'number' && Number.isFinite(cost) && cost >= 0))
+      return {decision: 'ask', reason: 'cost unknown'}
+    if (cost === 0) return {decision: 'alone', reason: 'within the limit'}
     const agent = profiles.read().agents.find((one) => one.id === agentId)
     const budget = agent ? agent.budgetPerDay : null
     if (budget === null) return {decision: 'ask', reason: 'no budget'}
@@ -123,7 +147,7 @@ function createPending({
     if (!file) return
     try {
       const temp = `${file()}.tmp`
-      fs.outputJsonSync(temp, {v: 1, items}, {spaces: 2})
+      fs.outputJsonSync(temp, {v: 1, items, tally: current()}, {spaces: 2})
       fs.renameSync(temp, file())
     } catch (error) {
       if (logger)
@@ -200,15 +224,28 @@ function createPending({
         return {decision: 'off', reason: 'unknown action'}
       // The limit is checked on what the action spends: above it, the action waits for the person; so does an
       // action that would pass the agent's daily budget (`cost`: iDNA, fees included).
-      const counted = doneToday(agentId, action)
+      // A daily count also counts what the main process saw done today (a post just sent is not scanned yet). A
+      // usage that is not a count stays as it is: the check then asks the person ("count unknown").
+      const counted = DAILY_COUNT_ACTIONS.has(action)
+        ? doneToday(agentId, action)
+        : 0
+      const isCount = typeof usage === 'number' && Number.isFinite(usage)
+      let counts = usage !== undefined ? {usage} : {}
+      if (counted && (isCount || usage === undefined))
+        counts = {usage: Math.max(isCount ? usage : 0, counted)}
       let check = decide(agentId, action, {
-        ...(usage !== undefined || counted
-          ? {usage: Math.max(Number(usage) || 0, counted)}
-          : {}),
+        ...counts,
         ...(amount !== undefined ? {amount} : {}),
       })
-      if (check.decision === 'alone')
-        check = withinBudget(agentId, Number(cost))
+      if (check.decision === 'alone') check = withinBudget(agentId, cost)
+      if (check.decision === 'alone') {
+        // Counted now, not once done: a second run meanwhile finds the day's post taken and the budget spent.
+        addTally(agentId, action, {
+          n: DAILY_COUNT_ACTIONS.has(action) ? 1 : 0,
+          cost,
+        })
+        save()
+      }
       if (check.decision !== 'ask') return check
       if (
         items.length >= MAX_PENDING ||
@@ -235,8 +272,8 @@ function createPending({
     commands: {
       pending: list,
       /**
-       * An action the agent did alone (after a propose that said so): logged, and what it spent counted in its
-       * budget of the day.
+       * How an action the agent did alone went (after a propose that said so, which counted it): logged. `release`:
+       * it was never sent (refused before), its count and cost are given back to the day.
        */
       didAction(data) {
         const {agentId, action} = data || {}
@@ -245,9 +282,13 @@ function createPending({
         if (!profiles.read().agents.some((one) => one.id === agentId))
           throw new Error('no such agent')
         const cost = Number(data.cost)
-        if (data.ok === true && cost > 0)
-          spent.set(agentId, {day: today(), total: spentToday(agentId) + cost})
-        if (data.ok === true) countDone(agentId, action)
+        if (data.ok !== true && data.release === true) {
+          addTally(agentId, action, {
+            n: DAILY_COUNT_ACTIONS.has(action) ? -1 : 0,
+            cost: Number.isFinite(cost) && cost > 0 ? -cost : 0,
+          })
+          save()
+        }
         // eslint-disable-next-line no-nested-ternary
         const decision = data.skipped
           ? 'skipped'
@@ -294,7 +335,8 @@ function createPending({
         const detail = text(data.detail, MAX_DETAIL_LENGTH)
         if (data.ok === true) {
           remove(item.id)
-          countDone(item.agentId, item.action)
+          if (DAILY_COUNT_ACTIONS.has(item.action))
+            addTally(item.agentId, item.action, {n: 1})
           log({
             agentId: item.agentId,
             action: item.action,
@@ -311,6 +353,15 @@ function createPending({
             detail: item.error,
           })
         }
+        changed()
+        return list()
+      },
+      /** The agent takes back an item of its own still waiting (an older day's joke): said in its Activity. */
+      withdraw(data) {
+        const item = find(data && data.id)
+        if (item.state !== 'waiting') throw new Error('already being done')
+        if (item.agentId !== data.agentId) throw new Error('not its own')
+        remove(item.id, text(data.reason, MAX_DETAIL_LENGTH) || 'withdrawn')
         changed()
         return list()
       },

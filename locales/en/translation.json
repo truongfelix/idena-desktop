@@ -2004,5 +2004,7 @@
   "The model writes the joke alone. The app writes the rest of the post: the header, the joke's number, the thanks line (each tipper's name from their profile, else the short address) and the last line. No tip since the last joke: no joke that day.": "The model writes the joke alone. The app writes the rest of the post: the header, the joke's number, the thanks line (each tipper's name from their profile, else the short address) and the last line. No tip since the last joke: no joke that day.",
   "Run now": "Run now",
   "Runs once a day at its time, while the app is open.": "Runs once a day at its time, while the app is open.",
-  "Waits for Social to read the chain up to now.": "Waits for Social to read the chain up to now."
+  "Waits for Social to read the chain up to now.": "Waits for Social to read the chain up to now.",
+  "replaced by a new day": "replaced by a new day",
+  "It is running now.": "It is running now."
 }

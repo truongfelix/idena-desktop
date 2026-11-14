@@ -41,6 +41,8 @@ function runLine({result, detail}, t) {
       return t('A joke was already posted today.')
     case 'waiting':
       return t("Today's joke already waits in To approve.")
+    case 'running':
+      return t('It is running now.')
     case 'off':
       return t('Not allowed: {{detail}}', {detail, nsSeparator: '!!'})
     default:

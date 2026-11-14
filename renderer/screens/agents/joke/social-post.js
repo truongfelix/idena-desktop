@@ -37,6 +37,8 @@ export async function postOnSocial(
     target: PostTarget.newPost(),
   })
   const hash = await sendPrepared(call, pending)
+  // From here the post is sent: whatever comes, it may be in a block (and its fee paid).
+  const sentError = (message) => Object.assign(new Error(message), {sent: true})
   const until = now() + MINED_WITHIN_MS
   const mined = await waitForBlock(call, hash, {
     pause:
@@ -49,7 +51,7 @@ export async function postOnSocial(
   })
   if (mined.result === 'dropped') throw new Error('the node dropped the post')
   if (mined.result !== 'mined')
-    throw new Error(`the post is not in a block yet (${hash})`)
-  if (mined.error) throw new Error(mined.error)
+    throw sentError(`the post is not in a block yet (${hash})`)
+  if (mined.error) throw sentError(mined.error)
   return `block ${mined.height}`
 }

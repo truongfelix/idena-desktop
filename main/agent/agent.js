@@ -43,6 +43,9 @@ function createAgent({
   // test's (stopped by its own Stop button), apart so a settings change during a test does not cut it.
   const solving = new Set()
   const testing = new Set()
+  // The texts asked of the agents' models (the joke): stopped by the pause of all agents, not by a change of the
+  // validation agent.
+  const writing = new Set()
   const activity = []
 
   const log = (entry) => {
@@ -81,9 +84,10 @@ function createAgent({
         log,
         // The validation's question in flight ends when its agent is turned off, removed or paused; an action
         // waiting for an agent removed, or an action turned Off, leaves To approve.
-        onChange: () => {
+        onChange: (file) => {
           const current = settings.read()
           if (current.paused || !current.enabled) stop(solving)
+          if (file.paused) stop(writing)
           pending.prune()
         },
       })
@@ -200,6 +204,7 @@ function createAgent({
     saveSettings(data) {
       const saved = settings.write(data)
       if (saved.paused || !saved.enabled) stop(solving)
+      if (saved.paused) stop(writing)
       if (pending) pending.prune()
       log({
         agentId: validationId(),
@@ -254,7 +259,7 @@ function createAgent({
       if (!agent.instructions.trim())
         throw new Error('the agent has no instructions')
       const controller = new AbortController()
-      solving.add(controller)
+      writing.add(controller)
       try {
         const answer = await ask(
           {
@@ -277,7 +282,7 @@ function createAgent({
         log({agentId, action, decision: 'failed', detail: error.message})
         throw error
       } finally {
-        solving.delete(controller)
+        writing.delete(controller)
       }
     },
     /**
@@ -349,6 +354,7 @@ function createAgent({
     stop: () => {
       stop(solving)
       stop(testing)
+      stop(writing)
     },
     /** The window loaded (again): an approved action it was doing is no longer being done (pending.js). */
     windowLoaded: () => {

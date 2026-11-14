@@ -24,12 +24,14 @@ describe("an agent's runs: its text, its budget, what it did alone", () => {
   let ask
   let clock
 
+  // `agents` written first; none: the files as they are (a restart).
   const start = (agents) => {
-    fs.writeJsonSync(path.join(dir, 'agents.json'), {
-      v: 1,
-      paused: false,
-      agents,
-    })
+    if (agents)
+      fs.writeJsonSync(path.join(dir, 'agents.json'), {
+        v: 1,
+        paused: false,
+        agents,
+      })
     const profiles = createAgentProfiles({
       file: () => path.join(dir, 'agents.json'),
     })
@@ -44,6 +46,7 @@ describe("an agent's runs: its text, its budget, what it did alone", () => {
     return createAgent({
       settings: validationAgentSettings(profiles),
       profiles,
+      pendingFile: () => path.join(dir, 'pending.json'),
       key,
       ask,
       now: () => clock,
@@ -77,6 +80,33 @@ describe("an agent's runs: its text, its budget, what it did alone", () => {
       [{type: 'text', text: 'Recent: X'}],
       expect.objectContaining({signal: expect.anything()})
     )
+  })
+
+  test("a change of another agent does not stop the joke's text; the pause does", async () => {
+    const agent = start([joke(), {id: 'bbbbbbbbbbbbbbbb', name: 'Other'}])
+    let release
+    ask.mockImplementation(
+      (config, system, parts, {signal}) =>
+        new Promise((resolve, reject) => {
+          release = () => resolve('A joke.')
+          signal.addEventListener('abort', () => reject(new Error('stopped')))
+        })
+    )
+    const tick = () =>
+      new Promise((resolve) => {
+        setImmediate(resolve)
+      })
+    const first = agent.handle('writeText', {agentId: JOKE, action: 'post'})
+    await tick()
+    const {agents} = await agent.handle('agents')
+    const {hasKey, ...other} = agents[1]
+    await agent.handle('saveAgent', {...other, name: 'Renamed'})
+    release()
+    await expect(first).resolves.toBe('A joke.')
+    const second = agent.handle('writeText', {agentId: JOKE, action: 'post'})
+    await tick()
+    await agent.handle('setPaused', {paused: true})
+    await expect(second).rejects.toThrow('stopped')
   })
 
   test('no text for an action outside its list, Off, paused, or without instructions', async () => {
@@ -148,25 +178,78 @@ describe("an agent's runs: its text, its budget, what it did alone", () => {
     })
   })
 
-  test('a post done today counts for the day even before the chain shows it', async () => {
+  const postAlone = (agent, more = {}) =>
+    agent.handle('propose', {
+      agentId: JOKE,
+      action: 'post',
+      body: 'j',
+      usage: 0,
+      amount: 1,
+      cost: 0.01,
+      ...more,
+    })
+
+  test('a post going alone counts at once: a second run meanwhile waits', async () => {
     const agent = start([joke()])
+    await expect(postAlone(agent)).resolves.toMatchObject({decision: 'alone'})
+    // The first is still being posted (no didAction yet), the app's own count still says 0.
+    await expect(postAlone(agent)).resolves.toMatchObject({
+      decision: 'ask',
+      reason: 'above the limit',
+    })
+  })
+
+  test('a post never sent is given back to the day; a post sent and not seen in a block stays counted', async () => {
+    const agent = start([joke({actions: {post: {level: 'alone', limit: 1}}})])
+    await postAlone(agent)
     await agent.handle('didAction', {
       agentId: JOKE,
       action: 'post',
-      ok: true,
+      ok: false,
+      release: true,
       cost: 0.01,
+      detail: 'the node refused it',
     })
-    // The app's own count (the Social scan) still says 0: the main process's count holds.
-    await expect(
-      agent.handle('propose', {
-        agentId: JOKE,
-        action: 'post',
-        body: 'j',
-        usage: 0,
-        amount: 1,
-        cost: 0.01,
-      })
-    ).resolves.toMatchObject({decision: 'ask', reason: 'above the limit'})
+    await expect(postAlone(agent)).resolves.toMatchObject({decision: 'alone'})
+    await agent.handle('didAction', {
+      agentId: JOKE,
+      action: 'post',
+      ok: false,
+      release: false,
+      cost: 0.01,
+      detail: 'not in a block yet',
+    })
+    await expect(postAlone(agent)).resolves.toMatchObject({decision: 'ask'})
+  })
+
+  test("the day's count and spending hold over a restart", async () => {
+    const before = start([joke({budgetPerDay: 0.015})])
+    await expect(postAlone(before)).resolves.toMatchObject({decision: 'alone'})
+    const after = start()
+    await expect(postAlone(after)).resolves.toMatchObject({
+      decision: 'ask',
+      reason: 'above the limit',
+    })
+    // The budget too: 0.01 of 0.015 spent, the next 0.01 is above it, even with a limit left.
+    const {agents} = await after.handle('agents')
+    const {hasKey, ...saved} = agents[0]
+    await after.handle('saveAgent', {
+      ...saved,
+      actions: {post: {level: 'alone', limit: 5}},
+    })
+    await expect(postAlone(after)).resolves.toMatchObject({
+      decision: 'ask',
+      reason: 'above the budget',
+    })
+  })
+
+  test('a usage that is not a count is not taken as 0', async () => {
+    const agent = start([joke()])
+    await postAlone(agent, {cost: 0})
+    await expect(postAlone(agent, {usage: 'abc'})).resolves.toMatchObject({
+      decision: 'ask',
+      reason: 'count unknown',
+    })
   })
 
   test('an approved post counts for the day too', async () => {
