@@ -133,8 +133,9 @@ function ImportDialog({preview, onCancel, onAdd, isAdding, error}) {
                   <Text
                     fontSize="xs"
                     fontWeight={600}
-                    color="white"
-                    bg="gray.500"
+                    color="muted"
+                    borderWidth={1}
+                    borderColor="gray.100"
                     borderRadius="md"
                     px={2}
                     py={1}
