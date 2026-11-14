@@ -23,7 +23,7 @@ const REPORT_REASONS = {
 }
 
 /**
- * The confidence each reason needs for a report by default; the person sets each in Settings › Agent
+ * The confidence each reason needs for a report by default; the person sets each on the validation agent's page
  * (settings.js reportThresholds), as they depend on the model. The practice runs of 2026-11-12 (9 long flips): at
  * 0.7, Opus reported the four flips to report and no good flip; Sonnet gave a good flip 0.85 on reason 1. Reasons
  * 5 to 9 never came up there: they keep the template's "very sure".

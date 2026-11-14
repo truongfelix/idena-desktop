@@ -4,7 +4,7 @@
 const agent = (command, data) =>
   global.ipcRenderer.invoke('agent', command, data)
 
-// Who shows the agent's state (the menu's card, Settings › Agent, the validation) hears each change written, and
+// Who shows the agent's state (the menu's card, the Agents pages, the validation) hears each change written, and
 // the last status read is kept for a part that mounts again (the menu, at each page). The Agents section's list of
 // agents is heard the same way: a change written by either side shows on both.
 const listeners = new Set()
@@ -107,7 +107,9 @@ export const setServiceKey = (agentId, key) =>
 export const clearServiceKey = (agentId) =>
   writeAgents(() => agent('clearAgentKey', {agentId}))
 /** The agent as a file ({fileName, text}): never the key. */
-export const exportAgentFile = (agentId) => agent('exportAgent', {agentId})
+// After the saves in flight: an export right after an edit holds the edit.
+export const exportAgentFile = (agentId) =>
+  queue(() => agent('exportAgent', {agentId}))
 /** What an agent file holds, as it would be added: {agent, asked, dropped, hasKey}. */
 export const previewAgentFile = (text) => agent('previewAgent', {text})
 /** Adds the agent a file holds, off and each action Off; resolves with `savedId`. */

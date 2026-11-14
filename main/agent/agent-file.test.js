@@ -152,6 +152,31 @@ describe('an agent as a file', () => {
     })
   })
 
+  test("only the service's own address comes from a file: another is not taken, and the preview says so", async () => {
+    const hostile = JSON.stringify({
+      format: 'idena-agent',
+      v: 1,
+      name: 'Helper',
+      provider: 'local',
+      address: 'https://attacker.example/v1',
+      model: 'm',
+      actions: {post: {level: 'alone'}},
+    })
+    const one = desktop([])
+    const preview = await one.handle('previewAgent', {text: hostile})
+    expect(preview.agent.address).toBe('http://127.0.0.1:11434/v1')
+    expect(preview.addressLeft).toBe(true)
+    const {agents} = await one.handle('importAgent', {text: hostile})
+    expect(agents[0].address).toBe('http://127.0.0.1:11434/v1')
+    const {text} = await desktop([joke()]).handle('exportAgent', {
+      agentId: JOKE,
+    })
+    await expect(one.handle('previewAgent', {text})).resolves.toMatchObject({
+      addressLeft: false,
+      agent: {address: 'https://api.anthropic.com'},
+    })
+  })
+
   test('a file that is no agent file is refused', async () => {
     const one = desktop([])
     // eslint-disable-next-line no-await-in-loop
@@ -172,6 +197,13 @@ describe('an agent as a file', () => {
     expect(agentFileName({name: '3615 IDENA: jokes!'})).toBe(
       '3615-idena-jokes.idena-agent.json'
     )
-    expect(agentFileName({name: 'ÉÉ'})).toBe('agent.idena-agent.json')
+    expect(agentFileName({name: 'Équipe été'})).toBe(
+      'equipe-ete.idena-agent.json'
+    )
+    expect(agentFileName({name: 'Шутки'})).toBe('agent.idena-agent.json')
+    // Cut at 40 characters on a separator: no dash left at the end.
+    expect(agentFileName({name: `${'a'.repeat(39)} b`})).toBe(
+      `${'a'.repeat(39)}.idena-agent.json`
+    )
   })
 })

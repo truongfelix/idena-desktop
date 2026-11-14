@@ -28,7 +28,8 @@ import {
 // An agent as a file (B-243, "like skills"): Export saves one agent (never its key); Import an agent shows what a
 // file holds and what it asks for, then adds it off, each action Off, for the person to turn on.
 
-const MAX_IMPORT_BYTES = 200000
+// The main process takes at most 200,000 characters (main/agent/agent-file.js); a character is up to 4 bytes.
+const MAX_IMPORT_BYTES = 800000
 
 /** Saves the agent's file, as a download (the app asks where). */
 export async function saveAgentFile(agentId) {
@@ -52,7 +53,7 @@ function askedLine(row, t) {
 function ImportDialog({preview, onCancel, onAdd, isAdding, error}) {
   const {t} = useTranslation()
   const [showInstructions, setShowInstructions] = React.useState(false)
-  const {agent, asked, dropped, hasKey} = preview
+  const {agent, asked, dropped, addressLeft, hasKey} = preview
   const fact = (label, value) => (
     <Flex gap={4}>
       <Text color="muted" w={28} flexShrink={0}>
@@ -96,6 +97,14 @@ function ImportDialog({preview, onCancel, onAdd, isAdding, error}) {
             {fact(t('Budget'), budgetLine(agent, t))}
             {fact(t('Model'), connectionLine(agent, t))}
           </Stack>
+          {addressLeft && (
+            <Text fontSize="sm" color="muted">
+              {t(
+                "The file names another address for its service: not taken. The agent uses the service's usual address; change it on the agent page if you trust the other one.",
+                {nsSeparator: '!!'}
+              )}
+            </Text>
+          )}
           <Text fontSize="sm" color="muted">
             {agent.provider === 'local' || hasKey
               ? t(
@@ -188,6 +197,7 @@ export function ImportAgent({onError}) {
       const text = await chosen.text()
       setError(null)
       setFile({text, preview: await previewAgentFile(text)})
+      onError(null)
     } catch (e) {
       onError(t('Import failed ({{message}}).', {message: agentErrorText(e)}))
     }

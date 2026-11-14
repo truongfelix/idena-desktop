@@ -102,7 +102,7 @@ function ValidationSession({
 
   const {syncing, offline} = useChainState()
 
-  // The agent, when it is on (Settings › Agent): Suggest or Autopilot, as the practice showed it.
+  // The agent, when it is on (the validation agent, in Agents): Suggest or Autopilot, as the practice showed it.
   const agent = useAgentValidation({
     flips: sessionFlips(state),
     phase: agentPhase(state),

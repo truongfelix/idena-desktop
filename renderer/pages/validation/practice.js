@@ -223,7 +223,7 @@ function PracticeSession({practice, onDone, onLeave}) {
 
   const isShortSession = state.matches('shortSession')
 
-  // The agent, when it is on (Settings › Agent): it practises as it would validate.
+  // The agent, when it is on (the validation agent, in Agents): it practises as it would validate.
   const agent = useAgentValidation({
     flips: sessionFlips(state),
     phase: agentPhase(state),

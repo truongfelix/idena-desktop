@@ -39,10 +39,13 @@ function exportAgent(agent) {
 function agentFileName(agent) {
   const base =
     agent.name
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/gu, '')
       .toLowerCase()
       .replace(/[^a-z0-9]+/gu, '-')
-      .replace(/^-|-$/gu, '') || 'agent'
-  return `${base.slice(0, 40)}.idena-agent.json`
+      .slice(0, 40)
+      .replace(/^-+|-+$/gu, '') || 'agent'
+  return `${base}.idena-agent.json`
 }
 
 /**
@@ -65,9 +68,18 @@ function readAgentFile(text, agents = []) {
     ...value,
     id: undefined,
     enabled: false,
-    // The address only when the file gives one, else the service's default (normalizeAgent's).
-    address: typeof value.address === 'string' ? value.address : '',
+    // Only the service's public default address comes from a file, as only it goes into one: another (a server
+    // that would get the key and what the agent reads) is set by the person on the agent's page.
+    address:
+      typeof value.address === 'string' &&
+      value.address === DEFAULT_ADDRESSES[value.provider]
+        ? value.address
+        : '',
   })
+  const addressLeft =
+    typeof value.address === 'string' &&
+    value.address !== '' &&
+    value.address !== read.address
   const dropped = SINGLE_HOLDER_ACTIONS.filter(
     (name) => read.actions[name] && agents.some((one) => one.actions[name])
   )
@@ -80,7 +92,7 @@ function readAgentFile(text, agents = []) {
   const actions = Object.fromEntries(
     Object.entries(asked).map(([name, row]) => [name, {...row, level: 'off'}])
   )
-  return {agent: {...read, actions}, asked, dropped}
+  return {agent: {...read, actions}, asked, dropped, addressLeft}
 }
 
 module.exports = {

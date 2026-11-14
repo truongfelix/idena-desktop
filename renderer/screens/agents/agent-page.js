@@ -315,7 +315,11 @@ export function AgentPage({id}) {
           </Box>
         </Flex>
         <Flex gap={3} align="center">
-          <SecondaryButton onClick={() => run(() => saveAgentFile(id))}>
+          <SecondaryButton
+            onClick={() =>
+              run(() => saveAgentFile(id)).then(() => refreshActivity())
+            }
+          >
             {t('Export')}
           </SecondaryButton>
           <Switch

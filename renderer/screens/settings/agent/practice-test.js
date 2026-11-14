@@ -1,6 +1,6 @@
 import {AnswerType} from '../../../shared/types'
 
-// "Test on the practice flips" (Settings › Agent): the 15 flips of the practice validation, one by one, to the model,
+// "Test on the practice flips" (the validation agent's page): the 15 flips of the practice validation, one by one, to the model,
 // its answers held against the right ones. Nothing goes to the chain. A flip takes at most the time of a short
 // session flip (2 minutes for 6 flips, so 20 s each), as the validation would give it.
 

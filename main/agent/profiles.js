@@ -236,7 +236,7 @@ function createAgentProfiles({file, singleFile, logger}) {
 }
 
 /**
- * The validation agent as the single agent's settings (settings.js): what Settings › Agent and the validation read
+ * The validation agent as the single agent's settings (settings.js): what the validation reads (and Settings › Agent read, until B-243 step 7)
  * and write until the Agents section replaces them (B-243). Reading: the agent holding "Answer the flips", or the
  * defaults (off) with none. Writing: that agent's connection, report thresholds and its two validation actions,
  * and the shared pause; its other actions stay. With no such agent yet, a write adds a "Validation agent" first.

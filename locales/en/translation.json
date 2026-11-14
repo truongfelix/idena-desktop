@@ -2020,5 +2020,6 @@
   "Not added: {{actions}}. Another agent of yours answers the validation.": "Not added: {{actions}}. Another agent of yours answers the validation.",
   "Add the agent": "Add the agent",
   "Agent exported to a file": "Agent exported to a file",
-  "Agent imported from a file": "Agent imported from a file"
+  "Agent imported from a file": "Agent imported from a file",
+  "The file names another address for its service: not taken. The agent uses the service's usual address; change it on the agent page if you trust the other one.": "The file names another address for its service: not taken. The agent uses the service's usual address; change it on the agent page if you trust the other one."
 }

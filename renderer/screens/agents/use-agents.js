@@ -8,7 +8,7 @@ import {
 
 /**
  * The list of agents (main/agent/agent-commands.js), read at mount and kept up to date with every change written
- * anywhere (the menu card's Pause, Settings › Agent, another page). `run(call)` runs a write and returns its
+ * anywhere (the menu card's Pause, the validation, another page). `run(call)` runs a write and returns its
  * result, or null with the error shown.
  */
 export function useAgents() {

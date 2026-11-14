@@ -26,7 +26,7 @@ function clampTimeout(value) {
 
 /**
  * `settings` is the validation agent as the single agent's settings (profiles.js validationAgentSettings), what the
- * validation and Settings › Agent read; `profiles` the file of agents behind it, for the Agents section's commands
+ * validation reads; `profiles` the file of agents behind it, for the Agents section's commands
  * (agent-commands.js).
  */
 function createAgent({
@@ -96,7 +96,7 @@ function createAgent({
   const destination = ({provider, address}) => ({provider, address})
 
   // Whether an agent other than the validation agent has its service's key: then a kept key that is not the
-  // validation agent's may be that agent's, and Settings › Agent leaves it alone.
+  // validation agent's may be that agent's, and the validation agent's Remove the key leaves it alone.
   const othersHaveKeys = () => {
     if (!profiles) return false
     const id = validationId()
@@ -225,7 +225,7 @@ function createAgent({
       return status()
     },
     /**
-     * Settings › Agent's Remove the key: the validation agent's service key; with none, the keys left from an older
+     * The validation agent's Remove the key (clearKey, as Settings › Agent called it): its service key; with none, the keys left from an older
      * setup (every key, when no other agent uses one). Another agent's key stays.
      */
     clearKey() {
@@ -287,7 +287,7 @@ function createAgent({
     },
     /**
      * A try of the model on one flip, before the agent is on: no permission, the answer shown only. `agentId` names
-     * the agent whose connection is tried (an agent's page); without it, the validation agent's (Settings › Agent).
+     * the agent whose connection is tried (an agent's page); without it, the validation agent's.
      */
     async testFlip({flip, timeoutMs, agentId} = {}) {
       const config =
