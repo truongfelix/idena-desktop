@@ -154,12 +154,12 @@ const nodeProcess = createNodeProcess({
 // The built-in node's RPC port, API key and IPFS port from its last start: the router port asks the node.
 let nodeConnection = null
 
-/** The built-in node's answer to `method` (no parameters). */
-async function nodeRpc(method) {
+/** The built-in node's answer to `method` with `params`. */
+async function nodeRpc(method, params = []) {
   if (!nodeConnection) throw new Error('the node has not started')
   const {data} = await axios.post(
     `http://localhost:${nodeConnection.rpcPort}`,
-    {method, params: [], id: 1, key: nodeConnection.apiKey},
+    {method, params, id: 1, key: nodeConnection.apiKey},
     {timeout: 5000}
   )
   if (data?.error) throw new Error(data.error.message)

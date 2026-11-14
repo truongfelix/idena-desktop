@@ -275,6 +275,44 @@ function portMapping(answer) {
 }
 
 /**
+ * Whether `ip` is an IPv4 address the internet can reach: not this network's (10/8, 172.16/12, 192.168/16), not a
+ * provider's shared one (100.64/10, a router behind carrier-grade NAT), loopback, link-local, multicast or reserved.
+ */
+function isPublicIPv4(ip) {
+  const parts = String(ip ?? '').split('.')
+  if (parts.length !== 4 || !parts.every((part) => /^\d{1,3}$/.test(part)))
+    return false
+  const [a, b] = parts.map(Number)
+  if (parts.some((part) => Number(part) > 255)) return false
+  return !(
+    a === 0 ||
+    a === 10 ||
+    a === 127 ||
+    a >= 224 ||
+    (a === 100 && b >= 64 && b < 128) ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b < 32) ||
+    (a === 192 && b === 168)
+  )
+}
+
+/**
+ * The address the node announces for the router's opening of `port` (net_setPublicAddrs): the router's public
+ * address (GetExternalIPAddress) with the port, or null when the router has no public IPv4 address (behind another
+ * router, or a provider's carrier-grade NAT: then the port is not reachable from the internet).
+ */
+function publicAddrFor(externalIp, port) {
+  if (
+    !isPublicIPv4(externalIp) ||
+    !Number.isInteger(port) ||
+    port < 1 ||
+    port > 65535
+  )
+    return null
+  return `/ip4/${externalIp}/tcp/${port}`
+}
+
+/**
  * The opening the app made, read from a file: on which router (`gateway`), for which port and address of this
  * computer (`port`, `client`), until when the user chose (`endMs`), when the router's forwarding last changed
  * (`changedAtMs`) and whether it was made again once because no incoming peer came (`retried`). Null when invalid.
@@ -427,4 +465,6 @@ module.exports = {
   upkeepAction,
   ipfsAddressPort,
   inboundPeersSince,
+  isPublicIPv4,
+  publicAddrFor,
 }
