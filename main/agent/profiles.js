@@ -29,11 +29,12 @@ const DEFAULT_TIME = '09:00'
 const SINGLE_HOLDER_ACTIONS = ['answerFlip']
 
 const newAgentId = () => crypto.randomBytes(8).toString('hex')
+/** The id of the agent read from the single agent's setup. */
+const SINGLE_AGENT_ID = '0000000000000001'
 
+/** A text field, trimmed and cut to `max` characters (never emptied for being long). */
 function text(value, max, fallback) {
-  return typeof value === 'string' && value.length <= max
-    ? value.trim()
-    : fallback
+  return typeof value === 'string' ? value.trim().slice(0, max) : fallback
 }
 
 function normalizeTime(value) {
@@ -75,7 +76,12 @@ function normalizeAgent(input, {id = newAgentId} = {}) {
   const {provider, address, model, reportThresholds} = normalizeSettings(value)
   const schedule =
     value.schedule && typeof value.schedule === 'object' ? value.schedule : {}
-  const budget = Number(value.budgetPerDay)
+  // A number, or a number written as text; anything else (an empty field included) is no budget.
+  const budget =
+    typeof value.budgetPerDay === 'number' ||
+    (typeof value.budgetPerDay === 'string' && value.budgetPerDay.trim())
+      ? Number(value.budgetPerDay)
+      : NaN
   return {
     id:
       typeof value.id === 'string' && ID_PATTERN.test(value.id)
@@ -92,13 +98,7 @@ function normalizeAgent(input, {id = newAgentId} = {}) {
       kind: SCHEDULES.includes(schedule.kind) ? schedule.kind : 'manual',
       time: normalizeTime(schedule.time),
     },
-    budgetPerDay:
-      value.budgetPerDay === null ||
-      value.budgetPerDay === undefined ||
-      !Number.isFinite(budget) ||
-      budget < 0
-        ? null
-        : budget,
+    budgetPerDay: !Number.isFinite(budget) || budget < 0 ? null : budget,
     reportThresholds,
   }
 }
@@ -114,7 +114,8 @@ function normalizeAgents(input, options) {
   const held = new Set()
   const agents = list.slice(0, MAX_AGENTS).map((saved) => {
     let agent = normalizeAgent(saved, options)
-    if (ids.has(agent.id)) agent = {...agent, id: newAgentId()}
+    if (ids.has(agent.id))
+      agent = {...agent, id: ((options && options.id) || newAgentId)()}
     ids.add(agent.id)
     const actions = {...agent.actions}
     SINGLE_HOLDER_ACTIONS.forEach((name) => {
@@ -149,6 +150,8 @@ function fromSingleAgent(input) {
     paused: old.paused,
     agents: [
       {
+        // A fixed id: the agent read from the older setup keeps it from one read to the next, until written.
+        id: SINGLE_AGENT_ID,
         name: 'Validation agent',
         enabled: old.enabled,
         provider: old.provider,
@@ -216,7 +219,10 @@ function createAgentProfiles({file, singleFile, logger}) {
     },
     write(value) {
       const normalized = normalizeAgents(value)
-      fs.outputJsonSync(file(), normalized, {spaces: 2})
+      // Written beside, then renamed over the file: a power cut leaves the old file or the new one, never half.
+      const temp = `${file()}.tmp`
+      fs.outputJsonSync(temp, normalized, {spaces: 2})
+      fs.renameSync(temp, file())
       return normalized
     },
   }

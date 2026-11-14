@@ -71,18 +71,39 @@ function createAgentKey({
     return isEntry(value) ? value : null
   }
 
-  /** What is kept: a list of {key, provider, address} (none, or unreadable: empty). */
-  const kept = () => {
+  const matches = (value, {provider, address} = {}) =>
+    Boolean(value) && value.provider === provider && value.address === address
+
+  const modified = (path) => fs.statSync(path).mtimeMs
+
+  /**
+   * What is kept: a list of {key, provider, address}. A list the keychain cannot read is empty to a reader, and
+   * refused (`strict`) to a change, which would write over the keys it holds. The single agent's key saved after the
+   * list (an older build run in between) replaces the list's key for its service.
+   */
+  const kept = ({strict = false} = {}) => {
     if (!fs.existsSync(file())) {
-      const old = single()
-      return old ? [old] : []
+      const only = single()
+      return only ? [only] : []
     }
     assertKeychain()
     const value = decrypt(file())
-    return value && Array.isArray(value.keys) ? value.keys.filter(isEntry) : []
+    if (!value || !Array.isArray(value.keys)) {
+      if (strict)
+        throw new Error(
+          'the saved keys cannot be read: remove them all to start again'
+        )
+      return []
+    }
+    const keys = value.keys.filter(isEntry)
+    const old =
+      singleFile &&
+      fs.existsSync(singleFile()) &&
+      modified(singleFile()) > modified(file())
+        ? single()
+        : null
+    return old ? [...keys.filter((entry) => !matches(entry, old)), old] : keys
   }
-  const matches = (value, {provider, address} = {}) =>
-    Boolean(value) && value.provider === provider && value.address === address
 
   const save = (keys) => {
     if (keys.length === 0) {
@@ -118,7 +139,7 @@ function createAgentKey({
       if (provider === 'local' || !provider || !address)
         throw new Error('a key is kept for a hosted model only')
       assertKeychain()
-      const others = kept().filter(
+      const others = kept({strict: true}).filter(
         (entry) => !matches(entry, {provider, address})
       )
       if (others.length >= MAX_KEYS) throw new Error('too many keys')
@@ -130,16 +151,19 @@ function createAgentKey({
       const value = kept().find((entry) => matches(entry, destination))
       return value ? value.key : null
     },
-    /** Removes the key of this provider and address, or every key without one. */
+    /** Removes the key of this provider and address, or every key without one (or without a keychain). */
     clear(destination) {
-      const removes = (entry) => !destination || matches(entry, destination)
-      // Without a keychain nothing can be read: every key goes.
-      const keys = keychainState(safeStorage, platform).available
-        ? kept().filter((entry) => !removes(entry))
-        : []
+      if (!destination || !keychainState(safeStorage, platform).available) {
+        fs.removeSync(file())
+        if (singleFile) fs.removeSync(singleFile())
+        return
+      }
+      const keys = kept({strict: true}).filter(
+        (entry) => !matches(entry, destination)
+      )
       if (singleFile && fs.existsSync(singleFile())) {
-        const old = keys.length ? single() : null
-        if (!old || removes(old)) fs.removeSync(singleFile())
+        const old = single()
+        if (!old || matches(old, destination)) fs.removeSync(singleFile())
       }
       save(keys)
     },

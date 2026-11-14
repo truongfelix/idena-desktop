@@ -200,5 +200,29 @@ describe('agent key', () => {
       key.clear(OPENAI)
       expect(key.read(ANTHROPIC)).toBe('sk-ant-old')
     })
+    test('a key the older build saved after the list wins for its service (new, old, new)', () => {
+      const key = store()
+      key.set('sk-ant-A', ANTHROPIC)
+      key.set('sk-oa-1', OPENAI)
+      writeSingle({key: 'sk-ant-B', ...ANTHROPIC})
+      const later = Date.now() / 1000 + 60
+      fs.utimesSync(single, later, later)
+      expect(key.read(ANTHROPIC)).toBe('sk-ant-B')
+      expect(key.read(OPENAI)).toBe('sk-oa-1')
+    })
+
+    test('a list the keychain cannot read is never written over', () => {
+      const key = store()
+      key.set('sk-oa-1', OPENAI)
+      fs.writeFileSync(file, 'enc:garbage')
+      const before = fs.readFileSync(file)
+      expect(key.has(OPENAI)).toBe(false)
+      expect(() => key.set('sk-ant-1', ANTHROPIC)).toThrow(/cannot be read/u)
+      expect(() => key.clear(ANTHROPIC)).toThrow(/cannot be read/u)
+      expect(fs.readFileSync(file)).toEqual(before)
+      // Removing every key still works.
+      key.clear()
+      expect(fs.existsSync(file)).toBe(false)
+    })
   })
 })

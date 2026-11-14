@@ -328,4 +328,38 @@ describe('agent profiles', () => {
       })
     })
   })
+
+  describe('from the review', () => {
+    test('the agent read from the older setup keeps its id from one read to the next', () => {
+      fs.writeJsonSync(path.join(dir, 'settings.json'), {
+        enabled: true,
+        provider: 'anthropic',
+      })
+      const store = createAgentProfiles({
+        file: () => path.join(dir, 'agents.json'),
+        singleFile: () => path.join(dir, 'settings.json'),
+      })
+      expect(store.read().agents[0].id).toBe(store.read().agents[0].id)
+    })
+
+    test('long instructions are cut, not emptied', () => {
+      const agent = normalizeAgent({instructions: `  ${'a'.repeat(30000)}`})
+      expect(agent.instructions).toHaveLength(20000)
+    })
+
+    test('an empty budget field is no budget; a number written as text counts', () => {
+      expect(normalizeAgent({budgetPerDay: ''}).budgetPerDay).toBeNull()
+      expect(normalizeAgent({budgetPerDay: true}).budgetPerDay).toBeNull()
+      expect(normalizeAgent({budgetPerDay: '0.05'}).budgetPerDay).toBe(0.05)
+      expect(normalizeAgent({budgetPerDay: 0}).budgetPerDay).toBe(0)
+    })
+
+    test('the file is written whole: nothing left beside it', () => {
+      const store = createAgentProfiles({
+        file: () => path.join(dir, 'agents.json'),
+      })
+      store.write({agents: [{name: 'A'}]})
+      expect(fs.readdirSync(dir)).toEqual(['agents.json'])
+    })
+  })
 })
