@@ -26,6 +26,38 @@ const ID_PATTERN = /^[0-9a-f]{16}$/u
 const SCHEDULES = ['validation', 'hourly', 'daily', 'manual']
 const DEFAULT_TIME = '09:00'
 
+/**
+ * What an agent reads on Idena Social (B-255, notes/agent-areas.md): the posts (none, those of the last 24 hours, or
+ * the last N), its notifications (likes, answers, tips to it), its private messages. Reading spends nothing: it is
+ * what the model is sent.
+ */
+const POST_WINDOWS = ['off', 'day', 'count']
+const MAX_POSTS_READ = 50
+const DEFAULT_POSTS_READ = 10
+/** The events that start a run besides the schedule: a like, an answer, a tip or a private message to it. */
+const EVENTS = ['like', 'answer', 'tip', 'message']
+
+function normalizeReads(value) {
+  const reads = value && typeof value === 'object' ? value : {}
+  const posts =
+    reads.posts && typeof reads.posts === 'object' ? reads.posts : {}
+  const count = Number(posts.count)
+  return {
+    posts: {
+      window: POST_WINDOWS.includes(posts.window) ? posts.window : 'off',
+      count:
+        Number.isInteger(count) && count >= 1 && count <= MAX_POSTS_READ
+          ? count
+          : DEFAULT_POSTS_READ,
+    },
+    notifications: reads.notifications === true,
+    messages: reads.messages === true,
+  }
+}
+
+const normalizeEvents = (value) =>
+  Array.isArray(value) ? EVENTS.filter((one) => value.includes(one)) : []
+
 /** The actions only one agent may hold: the validation has one agent answering it. */
 const SINGLE_HOLDER_ACTIONS = ['answerFlip']
 
@@ -100,6 +132,8 @@ function normalizeAgent(input, {id = newAgentId} = {}) {
     imageModel: text(value.imageModel, 200, ''),
     instructions: text(value.instructions, MAX_INSTRUCTIONS_LENGTH, ''),
     actions: normalizeActions(value.actions),
+    reads: normalizeReads(value.reads),
+    events: normalizeEvents(value.events),
     schedule: {
       kind: SCHEDULES.includes(schedule.kind) ? schedule.kind : 'manual',
       time: normalizeTime(schedule.time),
@@ -283,7 +317,10 @@ function validationAgentSettings(profiles) {
 }
 
 module.exports = {
+  EVENTS,
   MAX_AGENTS,
+  MAX_POSTS_READ,
+  POST_WINDOWS,
   SCHEDULES,
   SINGLE_HOLDER_ACTIONS,
   agentSettings,

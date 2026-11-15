@@ -6,7 +6,6 @@ import {
   Box,
   Flex,
   Link,
-  SimpleGrid,
   Stack,
   Switch,
   Text,
@@ -18,14 +17,9 @@ import {
   DialogBody,
   DialogFooter,
   ErrorAlert,
-  FormControlWithLabel,
-  HDivider,
   Input,
-  Select,
-  Textarea,
 } from '../../shared/components/components'
 import {PrimaryButton, SecondaryButton} from '../../shared/components/button'
-import {SettingsSection} from '../settings/components'
 import {
   agentActivity,
   clearAgentActivity,
@@ -39,19 +33,17 @@ import {ModelSection} from '../settings/agent/model-section'
 import {ReportRulesSection} from '../settings/agent/report-rules-section'
 import {ActivitySection} from '../settings/agent/activity-section'
 import {ActionsSection} from './actions-section'
-import {TaskSection} from './task-section'
 import {saveAgentFile} from './agent-file'
-import {DEFAULT_JOKE_INSTRUCTIONS} from './joke/joke'
 import {AgentBadge} from './agents-list'
-import {actionCatalog, readsList} from './catalog'
+import {actionCatalog} from './catalog'
 import {useAgents} from './use-agents'
-
-/** A text field saved when it loses the focus, not at each key. */
-function useDraft(value) {
-  const [draft, setDraft] = React.useState(value)
-  React.useEffect(() => setDraft(value), [value])
-  return [draft, setDraft]
-}
+import {
+  InstructionsSection,
+  ReadsSection,
+  ScheduleSection,
+  useDraft,
+} from './page-sections'
+import {RunNow} from './run-now'
 
 function NameField({value, onSave}) {
   const {t} = useTranslation()
@@ -73,168 +65,6 @@ function NameField({value, onSave}) {
       // Enter leaves the field: its blur saves, once.
       onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
     />
-  )
-}
-
-function InstructionsSection({agent, onChange}) {
-  const {t} = useTranslation()
-  const [draft, setDraft] = useDraft(agent.instructions)
-  return (
-    <SettingsSection
-      title={t('Instructions')}
-      foldId="agent.instructions"
-      summary={
-        agent.instructions.trim().split('\n')[0] ||
-        t("None: the app's own text for each action", {nsSeparator: '!!'})
-      }
-    >
-      <FormControlWithLabel
-        label={t(
-          'Sent to the model with each of its actions: solving a flip, writing a post',
-          {nsSeparator: '!!'}
-        )}
-      >
-        <Textarea
-          rows={6}
-          value={draft}
-          maxLength={20000}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={(e) => {
-            const next = e.currentTarget.value
-            // Saved trimmed: a text that differs only by its ends is no change.
-            if (next.trim() !== agent.instructions)
-              onChange((a) => ({...a, instructions: next}))
-          }}
-        />
-      </FormControlWithLabel>
-      <Text fontSize="sm" color="muted" mt={2}>
-        {t(
-          'The app adds what each action needs, and that part stays as it is: for a flip, its pictures and keywords, the report rules and the format of the answer it reads.',
-          {nsSeparator: '!!'}
-        )}
-      </Text>
-      {agent.task === 'joke' &&
-        agent.instructions !== DEFAULT_JOKE_INSTRUCTIONS && (
-          <SecondaryButton
-            mt={3}
-            size="sm"
-            onClick={() =>
-              onChange((a) => ({
-                ...a,
-                instructions: DEFAULT_JOKE_INSTRUCTIONS,
-              }))
-            }
-          >
-            {t('Back to the default instructions')}
-          </SecondaryButton>
-        )}
-    </SettingsSection>
-  )
-}
-
-function ScheduleSection({agent, catalog, onChange}) {
-  const {t} = useTranslation()
-  const [budget, setBudget] = useDraft(
-    agent.budgetPerDay === null ? '' : String(agent.budgetPerDay)
-  )
-  const [time, setTime] = useDraft(agent.schedule.time)
-  return (
-    <SimpleGrid minChildWidth="280px" spacing={6} w="full">
-      <SettingsSection title={t('What it reads')} foldId="agent.reads">
-        <Text fontSize="sm" color="muted" mb={2}>
-          {t('Set by its actions; the model is sent nothing else.')}
-        </Text>
-        {readsList(agent, catalog, t).map((item) => (
-          <React.Fragment key={item}>
-            <HDivider />
-            <Text py={2}>{item}</Text>
-          </React.Fragment>
-        ))}
-      </SettingsSection>
-      <SettingsSection
-        title={t('When and how much')}
-        foldId="agent.schedule"
-        summary={
-          {
-            validation: t('At each validation'),
-            hourly: t('Every hour'),
-            daily: t('Every day'),
-            manual: t('When I ask'),
-          }[agent.schedule.kind]
-        }
-      >
-        <Stack spacing={4}>
-          <FormControlWithLabel label={t('Runs')}>
-            <Select
-              value={agent.schedule.kind}
-              onChange={(e) => {
-                const kind = e.target.value
-                onChange((a) => ({...a, schedule: {...a.schedule, kind}}))
-              }}
-            >
-              <option value="validation">{t('At each validation')}</option>
-              <option value="hourly">{t('Every hour')}</option>
-              <option value="daily">{t('Every day')}</option>
-              <option value="manual">{t('When I ask')}</option>
-            </Select>
-          </FormControlWithLabel>
-          {agent.schedule.kind === 'daily' && (
-            <FormControlWithLabel label={t('At')}>
-              <Input
-                type="time"
-                value={time}
-                onChange={(e) => setTime(e.target.value)}
-                onBlur={(e) => {
-                  const next = e.currentTarget.value
-                  if (next && next !== agent.schedule.time)
-                    onChange((a) => ({
-                      ...a,
-                      schedule: {...a.schedule, time: next},
-                    }))
-                }}
-              />
-            </FormControlWithLabel>
-          )}
-          <FormControlWithLabel
-            label={t(
-              'Budget: the most it may spend a day, in iDNA, fees included',
-              {nsSeparator: '!!'}
-            )}
-          >
-            <Input
-              type="number"
-              min={0}
-              step="0.01"
-              placeholder={t('None: it spends no iDNA', {nsSeparator: '!!'})}
-              value={budget}
-              onChange={(e) => setBudget(e.target.value)}
-              onBlur={(e) => {
-                const text = e.currentTarget.value.trim()
-                const next = text === '' ? null : Number(text)
-                // A number the field cannot read (a comma in some languages) reads as '': not "no budget".
-                const unreadable = e.currentTarget.validity.badInput
-                if (
-                  unreadable ||
-                  (next !== null && !(Number.isFinite(next) && next >= 0))
-                ) {
-                  setBudget(
-                    agent.budgetPerDay === null
-                      ? ''
-                      : String(agent.budgetPerDay)
-                  )
-                  return
-                }
-                if (next !== agent.budgetPerDay)
-                  onChange((a) => ({...a, budgetPerDay: next}))
-              }}
-            />
-          </FormControlWithLabel>
-          <Text fontSize="sm" color="muted">
-            {t('Model use is billed by its service, not in iDNA.')}
-          </Text>
-        </Stack>
-      </SettingsSection>
-    </SimpleGrid>
   )
 }
 
@@ -335,6 +165,7 @@ export function AgentPage({id}) {
           </Box>
         </Flex>
         <Flex gap={3} align="center">
+          <RunNow agent={agent} onDone={refreshActivity} />
           <SecondaryButton
             onClick={() =>
               run(() => saveAgentFile(id)).then(() => refreshActivity())
@@ -374,28 +205,11 @@ export function AgentPage({id}) {
         onSetKey={(key) => run(() => setServiceKey(id, key)).then(Boolean)}
         onClearKey={() => run(() => clearServiceKey(id))}
         test={isValidation ? test : null}
-        sentLine={
-          // eslint-disable-next-line no-nested-ternary
-          isValidation
-            ? null
-            : agent.provider === 'local'
-            ? t('Nothing leaves this computer.')
-            : t(
-                'What it reads (below) is sent to this service; nothing else.',
-                {
-                  nsSeparator: '!!',
-                }
-              )
-        }
+        info={t(
+          "Where the model runs. On this computer, nothing leaves it; a service is sent what the agent reads, and nothing else. One key per service, kept in this computer's keychain and shared by the agents that use that service.",
+          {nsSeparator: '!!'}
+        )}
       />
-      {agent.provider !== 'local' && (
-        <Text fontSize="sm" color="muted" mt={-4}>
-          {t(
-            'One key per service, kept on this computer and shared by the agents that use that service.'
-          )}
-        </Text>
-      )}
-      <TaskSection agent={agent} onChange={save} />
       <InstructionsSection agent={agent} onChange={save} />
       <ActionsSection
         agent={agent}
@@ -403,7 +217,8 @@ export function AgentPage({id}) {
         catalog={catalog}
         onChange={save}
       />
-      <ScheduleSection agent={agent} catalog={catalog} onChange={save} />
+      <ReadsSection agent={agent} catalog={catalog} onChange={save} />
+      <ScheduleSection agent={agent} onChange={save} />
       {agent.actions.report && (
         <ReportRulesSection settings={agent} onChange={save} />
       )}

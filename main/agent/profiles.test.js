@@ -49,7 +49,35 @@ describe('agent profiles', () => {
       schedule: {kind: 'manual', time: '09:00'},
       budgetPerDay: null,
       reportThresholds: REPORT_THRESHOLDS,
+      // Reads nothing and runs on no event until the person says so (B-255).
+      reads: {
+        posts: {window: 'off', count: 10},
+        notifications: false,
+        messages: false,
+      },
+      events: [],
     })
+    // What it reads and its events: each field checked (B-255).
+    expect(
+      normalizeAgent({
+        reads: {
+          posts: {window: 'count', count: 500},
+          notifications: 'yes',
+          messages: true,
+        },
+        events: ['tip', 'launch', 'tip', 'message'],
+      })
+    ).toMatchObject({
+      reads: {
+        posts: {window: 'count', count: 10},
+        notifications: false,
+        messages: true,
+      },
+      events: ['tip', 'message'],
+    })
+    expect(
+      normalizeAgent({reads: {posts: {window: 'week', count: 3}}}).reads.posts
+    ).toEqual({window: 'off', count: 3})
     // The daily joke's routine is gone (B-255): a saved task is not kept.
     expect(normalizeAgent({task: 'joke'})).not.toHaveProperty('task')
   })

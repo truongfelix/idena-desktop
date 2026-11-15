@@ -14,8 +14,12 @@ import {
 } from '@chakra-ui/react'
 import {useTranslation} from 'react-i18next'
 import {ErrorAlert, PageTitle} from '../../shared/components/components'
-import {PrimaryButton} from '../../shared/components/button'
-import {agentActivity, updateAgent} from '../settings/agent/api'
+import {PrimaryButton, SecondaryButton} from '../../shared/components/button'
+import {
+  agentActivity,
+  setAgentsPaused,
+  updateAgent,
+} from '../settings/agent/api'
 import {activityText} from '../settings/agent/activity-section'
 import {
   actionCatalog,
@@ -162,6 +166,13 @@ export function AgentsList() {
           </Text>
         </Box>
         <Flex gap={2} wrap="wrap">
+          {list && list.agents.length > 0 && (
+            <SecondaryButton
+              onClick={() => run(() => setAgentsPaused(!list.paused))}
+            >
+              {list.paused ? t('Resume all agents') : t('Pause all agents')}
+            </SecondaryButton>
+          )}
           <ImportAgent onError={setNote} />
           <PrimaryButton
             onClick={async () => {
@@ -177,6 +188,13 @@ export function AgentsList() {
         </Flex>
       </Flex>
       {(error || note) && <ErrorAlert>{error || note}</ErrorAlert>}
+      {list && list.paused && (
+        <Text>
+          {t('Every agent is paused: none acts until you resume them.', {
+            nsSeparator: '!!',
+          })}
+        </Text>
+      )}
       <ToApprove items={pending} />
       {list && (
         <Stack spacing={3}>

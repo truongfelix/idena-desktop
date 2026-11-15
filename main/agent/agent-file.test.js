@@ -77,6 +77,12 @@ describe('an agent as a file', () => {
       actions: {post: {level: 'alone', limit: 1}},
       schedule: {kind: 'daily', time: '09:00'},
       budgetPerDay: 0.05,
+      reads: {
+        posts: {window: 'off', count: 10},
+        notifications: false,
+        messages: false,
+      },
+      events: [],
       reportThresholds: expect.any(Object),
     })
   })

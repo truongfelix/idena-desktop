@@ -1,101 +1,109 @@
-// The Agents section's words for what an agent may do, when it runs, what it reads and spends
-// (main/agent/profiles.js, settings.js ACTIONS). The catalog holds the actions that have a tool in this version:
-// the others (post, tip, send, …) join it with their tools.
+// The Agents section's words for what an agent may do, read, when it runs and what it spends (main/agent/profiles.js,
+// settings.js ACTIONS). Its rights follow the app's areas (ruling Q-64, notes/agent-areas.md): each action belongs
+// to one. The catalog holds the actions that have a tool in this version.
 
-/** The actions an agent can be given, in the order of the catalog. */
+/** The areas, in the menu's order, by id. */
+export function areaNames(t) {
+  return {flips: t('Flips'), validation: t('Validation'), social: t('Social')}
+}
+export const AREAS = ['flips', 'validation', 'social']
+
+/** The actions an agent can be given, in the catalog's order: `info` says what each is for. */
 export function actionCatalog(t) {
   return [
     {
+      id: 'flipStory',
+      area: 'flips',
+      label: t('Write flip stories'),
+      info: t(
+        "Writes a flip's story and one picture prompt per frame, from the flip's two keywords, in the flip editor."
+      ),
+      reads: [t('The two keywords of the flip you make')],
+    },
+    {
       id: 'answerFlip',
+      area: 'validation',
       label: t('Answer the flips'),
-      limit: t(
-        'Alone = Autopilot, Ask me = Suggest (its pick is highlighted, you click). A flip it cannot answer in time stays unanswered.'
+      info: t(
+        'Answers the flips of a validation. Ask me: its answer is shown, you choose.',
+        {nsSeparator: '!!'}
       ),
       reads: [t('The flips and keywords of the session')],
     },
     {
       id: 'report',
+      area: 'validation',
       label: t('Report flips'),
-      limit: t(
-        'Only when it is sure enough that the flip breaks a rule (When to report, below)'
+      info: t(
+        'Reports the flips that break a rule, as When to report sets it.'
       ),
       reads: [t('The flips and keywords of the session')],
       needs: 'answerFlip',
     },
     {
       id: 'post',
+      area: 'social',
       label: t('Post on Social'),
-      limit: t('At most once a day; with Alone, within its budget'),
-      // The joke agent's post (B-237) reads its own; another agent's, the Social run's (B-239).
-      jokeReads: [
-        t('The tips on its posts since its last joke'),
-        t('Its last 30 jokes, not to repeat them'),
-        t("The tippers' names from their profiles"),
-      ],
-      reads: [t('The new posts since its last run')],
+      info: t('Writes posts of its own. It reads its own last posts.'),
+      reads: [t('Its own last posts')],
       defaults: {level: 'off', limit: 1},
       perDay: 'count',
     },
     {
       id: 'reply',
+      area: 'social',
       label: t('Reply and comment'),
-      limit: t(
-        'Answers posts, replies and comments it read; with Alone, at most the number a day below, within its budget'
-      ),
-      reads: [
-        t('The new posts since its last run'),
-        t('The answers to its posts, replies and comments'),
-      ],
+      info: t('Answers the posts, replies and comments it read.'),
+      reads: [],
       defaults: {level: 'off', limit: 5},
       perDay: 'count',
     },
     {
       id: 'like',
+      area: 'social',
       label: t('Like posts'),
-      limit: t('With Alone, at most the number a day below, within its budget'),
-      reads: [
-        t('The new posts since its last run'),
-        t('The answers to its posts, replies and comments'),
-      ],
+      info: t('Likes the posts, replies and comments it read.'),
+      reads: [],
       defaults: {level: 'off', limit: 10},
       perDay: 'count',
     },
     {
       id: 'message',
+      area: 'social',
       label: t('Private messages'),
-      limit: t(
-        'Answers the people who wrote to it, or writes to the author of a post it read; no group. With Alone, at most the number a day below.'
+      info: t(
+        'Writes private messages: in its conversations, to the author of a post it read, or to someone who liked or tipped it.',
+        {nsSeparator: '!!'}
       ),
-      reads: [
-        t('Its private conversations with a new message'),
-        t('The new posts since its last run'),
-      ],
+      reads: [],
       defaults: {level: 'off', limit: 3},
       perDay: 'count',
     },
     {
       id: 'tip',
+      area: 'social',
       label: t('Tip posts'),
-      limit: t(
-        'You set the amount of each tip; the agent only picks the posts. With Alone, at most the total a day below, within its budget.'
+      info: t(
+        'Tips the authors of posts it read. You set the amount of each tip; it picks the posts.'
       ),
-      reads: [
-        t('The new posts since its last run'),
-        t('The answers to its posts, replies and comments'),
-      ],
+      reads: [],
       defaults: {level: 'off', limit: 5, amount: 1},
       perDay: 'idna',
     },
-    {
-      id: 'flipStory',
-      label: t('Write flip stories'),
-      limit: t(
-        'In the flip editor, from the two keywords: a story and one image prompt per picture. Ask me: when you click Write a story. Alone: as soon as the keywords show. Nothing goes to the chain.',
-        {nsSeparator: '!!'}
-      ),
-      reads: [t('The two keywords of the flip you make')],
-    },
   ]
+}
+
+/** What the agent reads on Social (profiles.js reads), each in words. */
+export function socialReadsList({reads}, t) {
+  const out = []
+  if (reads.posts.window === 'day')
+    out.push(t('The posts of the last 24 hours'))
+  if (reads.posts.window === 'count')
+    out.push(t('The last {{count}} posts', {count: reads.posts.count}))
+  if (reads.notifications)
+    out.push(t('Its notifications: likes, answers, tips', {nsSeparator: '!!'}))
+  if (reads.messages) out.push(t('Its private messages'))
+  return out
 }
 
 /** What an agent wants to do, as To approve says it, for every action an agent can ask for (settings.js ACTIONS). */
@@ -241,18 +249,19 @@ export function runsLine({schedule}, t) {
 }
 
 /**
- * What the model is sent: what its actions that are not Off need, each once. Nothing else is sent to it.
+ * What the model is sent: what its actions that are not Off need, and what it reads on Social, each once. Nothing
+ * else is sent to it.
  */
 export function readsList(agent, catalog, t) {
   const reads = []
-  catalog.forEach(({id, reads: other, jokeReads}) => {
+  catalog.forEach(({id, reads: needs}) => {
     const row = agent.actions[id]
     if (!row || row.level === 'off') return
-    const needs = agent.task === 'joke' && jokeReads ? jokeReads : other
     needs.forEach((item) => {
       if (!reads.includes(item)) reads.push(item)
     })
   })
+  socialReadsList(agent, t).forEach((item) => reads.push(item))
   return reads.length
     ? reads
     : [t('Nothing: every action is off', {nsSeparator: '!!'})]

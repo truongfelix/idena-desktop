@@ -26,6 +26,8 @@ function exportAgent(agent) {
       model: agent.model,
       ...(agent.imageModel ? {imageModel: agent.imageModel} : {}),
       actions: agent.actions,
+      reads: agent.reads,
+      events: agent.events,
       schedule: agent.schedule,
       budgetPerDay: agent.budgetPerDay,
       reportThresholds: agent.reportThresholds,

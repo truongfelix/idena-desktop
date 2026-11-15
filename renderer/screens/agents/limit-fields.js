@@ -41,9 +41,7 @@ function NumberField({label, value, min, onSave}) {
         onBlur={save}
         onKeyDown={(e) => e.key === 'Enter' && save(e)}
       />
-      <Text fontSize="sm" color="muted">
-        {label}
-      </Text>
+      <Text color="muted">{label}</Text>
     </Flex>
   )
 }

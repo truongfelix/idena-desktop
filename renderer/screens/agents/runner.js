@@ -6,7 +6,8 @@ import {blockedAddresses} from '../social/people'
 import {historyDone} from '../social/scan'
 import {agentsList, lastAgentsList, onAgentsChange} from '../settings/agent/api'
 import {executors} from './pending-api'
-import {heldSocial, runSocialAgent} from './social/run'
+import {heldSocial, runSocialAgent, scannedHeight} from './social/run'
+import {EVENT_MIN_MS, eventPending} from './social/events'
 import {
   prepareSocialAction,
   sendSocialAction,
@@ -25,6 +26,8 @@ const MAX_TRIES = 3
 // Each agent's runs today, in this window: {day, done, tries, retryAt} (a reload runs it again: its read point and
 // the main process's counts of the day hold).
 const runs = new Map()
+// When an event last ran each agent, in this window.
+const lastEvent = new Map()
 // The agents running now: one run at a time each, the scheduled run and Run now alike.
 const running = new Set()
 
@@ -150,15 +153,39 @@ export function AgentRunner() {
       if (busy.current || list.paused) return
       const now = Date.now()
       const day = new Date(now).toDateString()
-      const due = list.agents.filter((agent) => {
-        if (!agent.enabled || !isSocialAgent(agent)) return false
+      if (!socialReady(socialRef.current)) return
+      const active = list.agents.filter(
+        (agent) => agent.enabled && isSocialAgent(agent)
+      )
+      const due = active.filter((agent) => {
         const state = runs.get(agent.id)
         if (agent.schedule.kind === 'hourly') return hourlyDue(state, now)
         return runDue(state, day, now) && dueToday(agent.schedule, now)
       })
-      if (!due.length || !socialReady(socialRef.current)) return
       busy.current = true
       try {
+        // An event (a like, an answer, a tip, a message to it) after its read point runs it too, at most every
+        // EVENT_MIN_MS.
+        const state = socialState(socialRef.current)
+        const scanned = scannedHeight(state)
+        // eslint-disable-next-line no-restricted-syntax
+        for (const agent of active) {
+          if (
+            due.includes(agent) ||
+            !agent.events.length ||
+            now - (lastEvent.get(agent.id) || 0) < EVENT_MIN_MS
+          )
+            // eslint-disable-next-line no-continue
+            continue
+          // eslint-disable-next-line no-await-in-loop
+          const point = await agentCall('readPoint', {agentId: agent.id}).catch(
+            () => null
+          )
+          if (eventPending(agent.events, state, {point, scanned})) {
+            lastEvent.set(agent.id, now)
+            due.push(agent)
+          }
+        }
         for (const agent of due) {
           // eslint-disable-next-line no-await-in-loop
           const {result} = await runAgentNow(agent, socialRef.current, t).catch(
@@ -167,7 +194,7 @@ export function AgentRunner() {
               return {result: 'failed'}
             }
           )
-          if (result !== 'running')
+          if (result !== 'running' && lastEvent.get(agent.id) !== now)
             runs.set(
               agent.id,
               agent.schedule.kind === 'hourly'

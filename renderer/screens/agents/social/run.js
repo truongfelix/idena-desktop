@@ -87,7 +87,11 @@ export async function runSocialAgent(agent, social, deps) {
   if (typeof scanned !== 'number')
     return {result: 'failed', detail: t('Social has not read the chain yet')}
   const point = await call('readPoint', {agentId: agent.id})
-  const digest = socialDigest(social, held, {point, scanned})
+  const digest = socialDigest(
+    social,
+    {reads: agent.reads, held},
+    {point, scanned}
+  )
   // Nothing to read, and no post of its own to write: the model is not asked (its service bills each question).
   if (digest.empty && !held.includes('post')) {
     await call('setReadPoint', {agentId: agent.id, height: digest.readTo})
