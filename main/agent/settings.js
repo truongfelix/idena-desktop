@@ -34,6 +34,11 @@ const ACTIONS = {
   like: {level: 'off', limit: 10},
   message: {level: 'off', limit: 3},
   tip: {level: 'off', limit: 0, amount: 1},
+  // What it reads on Social, given like any action (B-262): on ('alone') or off. Reading spends nothing.
+  readPosts: {level: 'off', limit: null},
+  readOwnPosts: {level: 'off', limit: null},
+  readNotifications: {level: 'off', limit: null},
+  readMessages: {level: 'off', limit: null},
   ads: {level: 'off', limit: null},
   oracleVote: {level: 'off', limit: null},
   invite: {level: 'off', limit: null},

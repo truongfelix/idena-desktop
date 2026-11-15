@@ -74,12 +74,17 @@ describe('an agent as a file', () => {
       provider: 'anthropic',
       address: 'https://api.anthropic.com',
       model: 'claude-sonnet-5-5',
-      actions: {post: {level: 'alone', limit: 1}},
+      // A joke agent saved before reads were actions: its tips and its own posts, as it read them (B-262).
+      actions: {
+        post: {level: 'alone', limit: 1},
+        readOwnPosts: {level: 'alone', limit: null},
+        readNotifications: {level: 'alone', limit: null},
+      },
       schedule: {kind: 'daily', time: '09:00'},
       budgetPerDay: 0.05,
-      // A joke agent saved before it had reads: its tips, as it read them, no one's posts.
       reads: {
         posts: {window: 'off', count: 10},
+        own: true,
         notifications: true,
         messages: false,
       },

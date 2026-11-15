@@ -16,6 +16,8 @@ import {InfoTip} from '../../shared/components/info-tip'
 import {SettingsSection} from '../settings/components'
 import {AREAS, LEVELS, areaNames, heldBy, levelLabel} from './catalog'
 import {LimitFields} from './limit-fields'
+import {ReadRow} from './read-row'
+import {nothingToActOn} from './page-sections'
 
 /**
  * "What it may do": the agent's actions by area (Q-64), each Off, Ask me or Alone with its limit a day, and the
@@ -43,10 +45,13 @@ export function ActionsSection({agent, agents, catalog, onChange}) {
       summary={
         rows.length
           ? rows
-              .map(
-                ({id, label}) =>
-                  `${label}: ${levelLabel(agent.actions[id].level, t)}`
-              )
+              .map(({id, label, kind}) => {
+                const {level} = agent.actions[id]
+                // A read is on or off (B-262).
+                if (kind === 'read')
+                  return `${label}: ${level === 'off' ? t('Off') : t('On')}`
+                return `${label}: ${levelLabel(level, t)}`
+              })
               .join(', ')
           : t('Nothing', {nsSeparator: '!!'})
       }
@@ -98,6 +103,14 @@ export function ActionsSection({agent, agents, catalog, onChange}) {
             })}
           </Stack>
         )}
+        {nothingToActOn(agent) && (
+          <Text color="orange.500">
+            {t(
+              'Its actions on Social have nothing to act on: give it something to read.',
+              {nsSeparator: '!!'}
+            )}
+          </Text>
+        )}
         {rows.length === 0 ? (
           <Text color="muted">
             {t('No action yet: it can do nothing.', {nsSeparator: '!!'})}
@@ -111,17 +124,28 @@ export function ActionsSection({agent, agents, catalog, onChange}) {
                 <Heading as="h3" fontSize="md" fontWeight={500} mb={1}>
                   {names[area]}
                 </Heading>
-                {inArea.map(({id, label, info, perDay}) => (
-                  <ActionRow
-                    key={id}
-                    id={id}
-                    label={label}
-                    info={info}
-                    perDay={perDay}
-                    row={agent.actions[id]}
-                    setActions={setActions}
-                  />
-                ))}
+                {inArea.map(({id, label, info, perDay, kind}) =>
+                  kind === 'read' ? (
+                    <ReadRow
+                      key={id}
+                      id={id}
+                      label={label}
+                      info={info}
+                      row={agent.actions[id]}
+                      setActions={setActions}
+                    />
+                  ) : (
+                    <ActionRow
+                      key={id}
+                      id={id}
+                      label={label}
+                      info={info}
+                      perDay={perDay}
+                      row={agent.actions[id]}
+                      setActions={setActions}
+                    />
+                  )
+                )}
               </Stack>
             )
           })
