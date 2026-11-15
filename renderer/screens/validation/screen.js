@@ -110,8 +110,13 @@ export function ValidationScreen({
   // check, a report it leaves to the person (Suggest, or Autopilot with reports on Ask me) until the flip is marked.
   const pick = agent && currentFlip ? agent.picks[currentFlip.hash] : null
   const agentPickFor = (variant) => {
-    if (!pick || pickedSide(pick) !== variant) return null
+    if (!pick) return null
     const isKeywords = isLongSessionKeywords(state)
+    // A report shows on the reporting agent's side (B-257: another agent, or no answer); an answer on its own.
+    const side = isKeywords
+      ? pickedSide({answer: pick.reportSide ?? pick.answer})
+      : pickedSide(pick)
+    if (side !== variant) return null
     const show = isKeywords
       ? Boolean(pick.report) &&
         !currentFlip.relevance &&

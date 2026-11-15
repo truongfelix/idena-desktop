@@ -183,19 +183,31 @@ function normalizeAgents(input, options) {
   const value = input && typeof input === 'object' ? input : {}
   const list = Array.isArray(value.agents) ? value.agents : []
   const ids = new Set()
-  const held = new Set()
   const agents = list.slice(0, MAX_AGENTS).map((saved) => {
-    let agent = normalizeAgent(saved, options)
-    if (ids.has(agent.id))
-      agent = {...agent, id: ((options && options.id) || newAgentId)()}
-    ids.add(agent.id)
-    const actions = {...agent.actions}
-    SINGLE_HOLDER_ACTIONS.forEach((name) => {
-      if (!actions[name]) return
-      if (held.has(name)) delete actions[name]
-      else held.add(name)
+    const agent = normalizeAgent(saved, options)
+    if (!ids.has(agent.id)) {
+      ids.add(agent.id)
+      return agent
+    }
+    const id = ((options && options.id) || newAgentId)()
+    ids.add(id)
+    return {...agent, id}
+  })
+  // Each action only one agent may hold stays with one: the first that lists it; the reports, with the agent
+  // answering when it has them too (a file from before B-257 could hold them twice).
+  const answering = agents.find((agent) => agent.actions.answerFlip)
+  const holderOf = (name) =>
+    name === 'report' && answering && answering.actions.report
+      ? answering
+      : agents.find((agent) => agent.actions[name])
+  SINGLE_HOLDER_ACTIONS.forEach((name) => {
+    const holder = holderOf(name)
+    agents.forEach((agent, i) => {
+      if (agent === holder || !agent.actions[name]) return
+      const actions = {...agent.actions}
+      delete actions[name]
+      agents[i] = {...agent, actions}
     })
-    return {...agent, actions}
   })
   return {v: FORMAT, paused: value.paused === true, agents}
 }

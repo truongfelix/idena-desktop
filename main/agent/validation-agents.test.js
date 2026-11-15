@@ -2,7 +2,11 @@ const os = require('os')
 const path = require('path')
 const fs = require('fs-extra')
 const {createAgent} = require('./agent')
-const {createAgentProfiles, validationAgentSettings} = require('./profiles')
+const {
+  createAgentProfiles,
+  normalizeAgents,
+  validationAgentSettings,
+} = require('./profiles')
 
 // The validation's two actions on their own (B-257): one agent answering and one reporting, the same or two; each
 // is asked with its own connection and Instructions, the reporting one only once the flip has its keywords.
@@ -112,7 +116,7 @@ describe('the validation answered by one agent, reported by another', () => {
     expect(ask).toHaveBeenCalledTimes(1)
   })
 
-  test('only a reporting agent: no answer to give, its report and its side to show', async () => {
+  test('only a reporting agent: no answer to give, its report and the side that shows it', async () => {
     const agent = start([
       agentRow(R, 'Checker', 'reports', {report: {level: 'ask'}}),
     ])
@@ -121,7 +125,9 @@ describe('the validation answered by one agent, reported by another', () => {
     ).resolves.toMatchObject({
       decision: 'ask',
       answers: false,
-      answer: 'right',
+      // Its side only places the report; it is no answer.
+      answer: null,
+      reportSide: 'right',
       report: true,
       reportDecision: 'ask',
     })
@@ -274,5 +280,76 @@ describe('the validation answered by one agent, reported by another', () => {
       reportLater: false,
     })
     expect(ask.mock.calls.map(([config]) => config.model)).toEqual(['reports'])
+  })
+
+  test('an edit of another agent while one validation agent stays off does not stop the question in flight', async () => {
+    let aborted = false
+    let release
+    ask = jest.fn(
+      (config, system, parts, {signal}) =>
+        new Promise((resolve, reject) => {
+          release = () => resolve(REPLIES.answers)
+          signal.addEventListener('abort', () => {
+            aborted = true
+            reject(new Error('stopped'))
+          })
+        })
+    )
+    const agent = start([
+      agentRow(A, 'Solver', 'answers', {answerFlip: {level: 'alone'}}),
+      agentRow(
+        R,
+        'Checker',
+        'reports',
+        {report: {level: 'alone'}},
+        {enabled: false}
+      ),
+      agentRow('cccccccccccccccc', 'Poster', 'm', {post: {level: 'off'}}),
+    ])
+    // Its error, if it was stopped, is the test's to read (not an unhandled rejection).
+    const solving = agent
+      .handle('solveFlip', {flip: longFlip})
+      .catch((error) => error)
+    await agent.handle('saveAgent', {
+      ...agentRow('cccccccccccccccc', 'Poster', 'm', {post: {level: 'ask'}}),
+    })
+    expect(aborted).toBe(false)
+    release()
+    await expect(solving).resolves.toMatchObject({answer: 'left'})
+  })
+
+  test('reports held twice in an old file stay with the agent answering', () => {
+    const file = normalizeAgents({
+      agents: [
+        agentRow(R, 'Checker', 'reports', {report: {level: 'ask'}}),
+        agentRow(A, 'Solver', 'answers', {
+          answerFlip: {level: 'alone'},
+          report: {level: 'alone'},
+        }),
+      ],
+    })
+    expect(
+      file.agents.map(({name, actions}) => [name, Object.keys(actions)])
+    ).toEqual([
+      ['Checker', []],
+      ['Solver', ['answerFlip', 'report']],
+    ])
+  })
+
+  test('the reason of the agent that would have acted, under its own action', async () => {
+    const agent = start([
+      agentRow(R, 'Checker', 'reports', {report: {level: 'alone'}}),
+    ])
+    await agent.handle('setPaused', {paused: true})
+    await expect(agent.handle('solveFlip', {flip: longFlip})).resolves.toEqual({
+      decision: 'off',
+      reason: 'paused',
+    })
+    const [line] = await agent.handle('activity', {agentId: R})
+    expect(line).toMatchObject({
+      action: 'report',
+      decision: 'off',
+      detail: 'paused',
+    })
   })
 })

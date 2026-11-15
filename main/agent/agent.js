@@ -95,6 +95,13 @@ function createAgent({
     ? createReadPoints({file: readPointsFile, logger})
     : null
 
+  // The agents of the validation that are on (answering, reporting), by id: one that stops being so ends its question.
+  const validationActive = (file) =>
+    [validationAgent(file), reportAgent(file)]
+      .filter((agent) => agent && agent.enabled)
+      .map((agent) => agent.id)
+  let lastActive = profiles ? validationActive(profiles.read()) : []
+
   const agents = profiles
     ? createAgentCommands({
         profiles,
@@ -103,16 +110,12 @@ function createAgent({
         // The validation's question in flight ends when its agent is turned off, removed or paused; an action
         // waiting for an agent removed, or an action turned Off, leaves To approve.
         onChange: (file) => {
-          // Either agent of the validation turned off (B-257), or the pause: its question ends.
-          const answerer = validationAgent(file)
-          const reporter = reportAgent(file)
-          if (
-            file.paused ||
-            (answerer && !answerer.enabled) ||
-            (reporter && !reporter.enabled) ||
-            (!answerer && !reporter)
-          )
+          // The pause, or an agent of the validation turned off or gone (B-257): its question ends. Not at an edit of
+          // another agent while one of them stays off.
+          const active = validationActive(file)
+          if (file.paused || lastActive.some((id) => !active.includes(id)))
             stop(solving)
+          lastActive = active
           if (file.paused) stop(writing)
           pending.prune()
           readPoints.keepOnly(file.agents.map((agent) => agent.id))
@@ -234,13 +237,16 @@ function createAgent({
       ? checkAction(reporting.config, 'report', {usage: reportsUsed})
       : {decision: 'off', reason: 'no agent reports'}
     if (answerCheck.decision === 'off' && reportAllowed.decision === 'off') {
+      // The reason of the agent that would have acted: the answering one, else the reporting one.
+      const byAnswer = Boolean(answering) && !reportOnly
+      const reason = byAnswer ? answerCheck.reason : reportAllowed.reason
       log({
-        agentId: answering ? answering.id : validationId(),
-        action: 'answerFlip',
+        agentId: byAnswer || !reporting ? validationId() : reporting.id,
+        action: byAnswer || !reporting ? 'answerFlip' : 'report',
         decision: 'off',
-        detail: answerCheck.reason,
+        detail: reason,
       })
-      return {decision: 'off', reason: answerCheck.reason}
+      return {decision: 'off', reason}
     }
     // Another agent that may report: asked apart. One that is off changes nothing for the answering agent.
     const separate =
@@ -264,7 +270,7 @@ function createAgent({
             answering.instructions
           )
         : Promise.resolve(null),
-      asksReport && (separate || !asksAnswer)
+      asksReport
         ? askFlip(asker.config, flip, timeoutMs, solving, asker.instructions)
         : Promise.resolve(null),
     ])
@@ -301,7 +307,8 @@ function createAgent({
       report && !separate && asksAnswer && answerCheck.decision === 'ask'
         ? 'ask'
         : reportCheck.decision
-    const shown = answer || reading || null
+    // The side shown: the answer's; a reporting agent's side only places its report, it is never an answer.
+    const shown = answer || null
     const relevanceOf = (read) =>
       read && (report || read.relevance !== 'irrelevant')
         ? read.relevance
@@ -315,7 +322,8 @@ function createAgent({
       decision: answer ? answerCheck.decision : reportAllowed.decision,
       answers: Boolean(answer),
       answer: shown ? shown.answer : null,
-      confidence: shown ? shown.confidence : 0,
+      reportSide: reading ? reading.answer : null,
+      confidence: (shown || reading || {confidence: 0}).confidence,
       relevance: relevanceOf(reading || (separate ? null : answer)),
       report,
       reportDecision: report ? reportDecision : 'off',
