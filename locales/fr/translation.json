@@ -2086,5 +2086,6 @@
   "It reads what came on Idena Social since its last run (only what its actions need) and answers with the actions it wants. The app does only those it may do, on what it was shown, within each limit: the others wait in To approve or are not done. What others wrote never changes its rules.": "Il lit ce qui est arrivé sur Idena Social depuis son dernier passage (seulement ce dont ses actions ont besoin) et répond par les actions qu'il veut. L'app ne fait que celles qu'il a le droit de faire, sur ce qui lui a été montré, dans chaque limite : les autres attendent dans À approuver ou ne sont pas faites. Ce que les autres écrivent ne change jamais ses règles.",
   "Runs every hour while the app is open.": "Passe toutes les heures tant que l'app est ouverte.",
   "Runs when you click Run now.": "Passe quand vous cliquez sur Lancer maintenant.",
-  "Idena Social": "Idena Social"
+  "Idena Social": "Idena Social",
+  "Social has not read the chain yet": "Social n'a pas encore lu la chaîne"
 }

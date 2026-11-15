@@ -31,14 +31,17 @@ const cleanText = (value) =>
   typeof value === 'string' ? value.replace(/\r\n?/gu, '\n').trim() : ''
 
 /**
- * The plan: {actions: [{action, label, item, text}], dropped: [reason]}. `digest` is the run's (digest.js), `held`
+ * The plan: {actions: [{action, label, item, text}], dropped: [{action, reason}]}. `digest` is the run's (digest.js), `held`
  * the Social actions not Off, `me` the account (it never likes, tips or messages itself), `done` what it already did
  * on the chain ({liked, answered}: sets of post ids), so that a second run does not do it twice.
  */
 export function readPlan(answer, digest, held, me, done = {}) {
   const value = answerObject(answer)
   if (!value || !Array.isArray(value.actions))
-    return {actions: [], dropped: ['the answer is not a list of actions']}
+    return {
+      actions: [],
+      dropped: [{action: '', reason: 'the answer is not a list of actions'}],
+    }
   const actions = []
   const dropped = []
   const seen = new Set()
@@ -50,7 +53,10 @@ export function readPlan(answer, digest, held, me, done = {}) {
     const label = typeof row.to === 'string' ? row.to.trim() : ''
     const text = cleanText(row.text)
     const drop = (why) =>
-      dropped.push(`${action || '?'} ${label}: ${why}`.trim())
+      dropped.push({
+        action,
+        reason: `${action || '?'} ${label}: ${why}`.trim(),
+      })
     if (!held.includes(action)) return drop('not an action it may do')
     if (actions.length >= MAX_ACTIONS_PER_RUN)
       return drop('too many actions in one run')

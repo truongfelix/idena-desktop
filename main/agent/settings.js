@@ -30,9 +30,9 @@ const ACTIONS = {
   send: {level: 'off', limit: 0},
   post: {level: 'off', limit: null},
   // Idena Social (B-239): replies and comments, likes, private messages.
-  reply: {level: 'off', limit: null},
-  like: {level: 'off', limit: null},
-  message: {level: 'off', limit: null},
+  reply: {level: 'off', limit: 5},
+  like: {level: 'off', limit: 10},
+  message: {level: 'off', limit: 3},
   tip: {level: 'off', limit: 0, amount: 1},
   ads: {level: 'off', limit: null},
   oracleVote: {level: 'off', limit: null},

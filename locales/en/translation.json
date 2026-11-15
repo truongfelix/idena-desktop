@@ -2086,5 +2086,6 @@
   "Nothing new since its last run: the model was not asked.": "Nothing new since its last run: the model was not asked.",
   "It reads what came on Idena Social since its last run (only what its actions need) and answers with the actions it wants. The app does only those it may do, on what it was shown, within each limit: the others wait in To approve or are not done. What others wrote never changes its rules.": "It reads what came on Idena Social since its last run (only what its actions need) and answers with the actions it wants. The app does only those it may do, on what it was shown, within each limit: the others wait in To approve or are not done. What others wrote never changes its rules.",
   "Runs every hour while the app is open.": "Runs every hour while the app is open.",
-  "Runs when you click Run now.": "Runs when you click Run now."
+  "Runs when you click Run now.": "Runs when you click Run now.",
+  "Social has not read the chain yet": "Social has not read the chain yet"
 }

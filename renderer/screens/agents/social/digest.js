@@ -16,8 +16,6 @@ export const MAX_TEXT = 500
 /** A first run reads about the last day of blocks (20 s each). */
 export const FIRST_RUN_BLOCKS = 4320
 
-const after = (point) => (item) => item.height > point
-
 /** A text as the model reads it: on one quote, cut, a text on IPFS or a picture only named. */
 export function shownText(message, hasMedia = false) {
   const value = String(message || '')
@@ -40,22 +38,89 @@ function walk(feed) {
 }
 
 /**
+ * Where a run's reading ends: the scanned block, or before the block of the first item left out; when an item of that
+ * same block was shown, at that block (its others are lost rather than one shown twice, and acted on twice).
+ */
+function readUpTo(leftOut, lastHeight, from, scanned) {
+  if (!leftOut) return scanned
+  if (lastHeight === leftOut.height) return leftOut.height
+  return Math.max(from, leftOut.height - 1)
+}
+
+/** The most characters of a run's input: below what the main process sends the model (MAX_INPUT_TEXT, 20,000). */
+export const MAX_DIGEST = 15000
+
+/**
  * The digest of a run: `social` is the Social state (feed, me, conversations, profiles' claimed `names`, blocked
- * addresses `blocked`), `held` the Social actions the agent may do (not Off), `point` its read point (null: a
- * first run), `head` the chain's last block. Returns {text, labels, empty, readTo}: the model's input, what each
+ * addresses `blocked`), `held` the Social actions the agent may do (not Off), `point` its read point (null: a first
+ * run), `scanned` the last block the Social scan read (the feed holds nothing after it). The new items are taken
+ * oldest first, within each kind's cap and MAX_DIGEST; the first one left out ends what is read (`readTo` stops
+ * before its block), so the next run shows it. Returns {text, labels, empty, readTo}: the model's input, what each
  * label stands for ({kind: 'post', node, post, target, author} or {kind: 'chat', conversation, others}), whether
  * there is anything new, and the block it read up to.
  */
-export function socialDigest(social, held, {point, head}) {
+export function socialDigest(social, held, {point, scanned}) {
   const {feed = [], me, names = {}, conversations = [], blocked} = social
   const isBlocked = (address) => Boolean(blocked && blocked.has(address))
   const from =
-    point === null || point === undefined ? head - FIRST_RUN_BLOCKS : point
+    point === null || point === undefined ? scanned - FIRST_RUN_BLOCKS : point
+  const isNew = (item) => item.height > from && item.height <= scanned
   const name = (address) => names[address] || shortAddress(address)
   const targets = postTargets(feed)
+  const onPosts = held.some((one) =>
+    ['reply', 'like', 'tip', 'message'].includes(one)
+  )
+
+  // Every new item, each with the block that makes it new.
+  const candidates = []
+  if (onPosts)
+    walk(feed)
+      .filter(
+        ({node, parent}) =>
+          parent &&
+          parent.call.author === me &&
+          node.call.author !== me &&
+          !isBlocked(node.call.author) &&
+          typeof node.id === 'number' &&
+          isNew(node.call) &&
+          node.call.message !== LIKE
+      )
+      .forEach((one) =>
+        candidates.push({kind: 'answer', height: one.node.call.height, ...one})
+      )
+  if (held.length)
+    feed
+      .filter(
+        ({id, call}) =>
+          typeof id === 'number' &&
+          call.author !== me &&
+          !isBlocked(call.author) &&
+          isNew(call)
+      )
+      .forEach((node) =>
+        candidates.push({kind: 'post', height: node.call.height, node})
+      )
+  if (held.includes('message'))
+    conversations.forEach((conversation) => {
+      if (
+        conversation.isGroup ||
+        conversation.group ||
+        conversation.others.length !== 1 ||
+        conversation.others[0] === me ||
+        isBlocked(conversation.others[0])
+      )
+        return
+      const fresh = conversation.messages.filter(
+        (message) => message.from !== me && isNew(message)
+      )
+      if (fresh.length)
+        candidates.push({kind: 'chat', height: fresh[0].height, conversation})
+    })
+  candidates.sort((a, b) => a.height - b.height)
+
   const labels = new Map()
-  const sections = []
   let posts = 0
+  let chats = 0
   const label = (node, post) => {
     const found = [...labels.entries()].find(
       ([, item]) => item.kind === 'post' && item.node.id === node.id
@@ -72,110 +137,84 @@ export function socialDigest(social, held, {point, head}) {
     })
     return id
   }
-  const onPosts = held.some((name_) =>
-    ['reply', 'like', 'tip', 'message'].includes(name_)
-  )
-
-  // The answers to its own posts, replies and comments: what it is most likely to answer.
-  if (onPosts) {
-    const answers = walk(feed)
-      .filter(
-        ({node, parent}) =>
-          parent &&
-          parent.call.author === me &&
-          node.call.author !== me &&
-          !isBlocked(node.call.author) &&
-          typeof node.id === 'number' &&
-          after(from)(node.call) &&
-          node.call.message !== LIKE
-      )
-      .slice(-MAX_ANSWERS)
-    if (answers.length) {
-      const lines = ['Answers to you:']
-      answers.forEach(({node, parent, post}) => {
-        const yours = label(parent, post)
-        const id = label(node, post)
-        lines.push(
-          `${id} by ${name(
-            node.call.author
-          )}, answering your ${yours} ("${shownText(
-            parent.call.message,
-            parent.call.hasMedia
-          )}"): "${shownText(node.call.message, node.call.hasMedia)}"`
-        )
-      })
-      sections.push(lines.join('\n'))
+  const caps = {
+    answer: MAX_ANSWERS,
+    post: MAX_NEW_POSTS,
+    chat: MAX_CONVERSATIONS,
+  }
+  const counts = {answer: 0, post: 0, chat: 0}
+  const lines = {answer: [], post: [], chat: []}
+  let length = 0
+  let leftOut = null
+  let lastHeight = null
+  // eslint-disable-next-line no-restricted-syntax
+  for (const item of candidates) {
+    if (counts[item.kind] >= caps[item.kind]) {
+      leftOut = item
+      break
     }
+    const before = new Map(labels)
+    const kept = {posts, chats}
+    let text
+    if (item.kind === 'answer') {
+      const yours = label(item.parent, item.post)
+      const id = label(item.node, item.post)
+      text = `${id} by ${name(
+        item.node.call.author
+      )}, answering your ${yours} ("${shownText(
+        item.parent.call.message,
+        item.parent.call.hasMedia
+      )}"): "${shownText(item.node.call.message, item.node.call.hasMedia)}"`
+    } else if (item.kind === 'post') {
+      const id = label(item.node, item.node)
+      const likes = item.node.likeCalls.length
+      text = `${id} by ${name(item.node.call.author)}${
+        likes ? ` (${likes} like${likes > 1 ? 's' : ''})` : ''
+      }: "${shownText(item.node.call.message, item.node.call.hasMedia)}"`
+    } else {
+      chats += 1
+      const id = `c${chats}`
+      const {conversation} = item
+      labels.set(id, {kind: 'chat', conversation, others: conversation.others})
+      text = [
+        `${id} with ${name(conversation.others[0])}:`,
+        ...conversation.messages
+          .slice(-MESSAGES_SHOWN)
+          .map(
+            (message) =>
+              `  ${
+                message.from === me ? 'you' : name(message.from)
+              }: "${shownText(message.text, message.hasMedia)}"`
+          ),
+      ].join('\n')
+    }
+    if (length + text.length + 1 > MAX_DIGEST) {
+      // Not shown: its labels go, so the model cannot name it.
+      labels.clear()
+      before.forEach((value, key) => labels.set(key, value))
+      posts = kept.posts
+      chats = kept.chats
+      leftOut = item
+      break
+    }
+    length += text.length + 1
+    lastHeight = item.height
+    counts[item.kind] += 1
+    lines[item.kind].push(text)
   }
 
-  // The new posts of others, the newest first.
-  if (held.length) {
-    const fresh = feed
-      .filter(
-        ({id, call}) =>
-          typeof id === 'number' &&
-          call.author !== me &&
-          !isBlocked(call.author) &&
-          after(from)(call)
-      )
-      .slice(0, MAX_NEW_POSTS)
-    if (fresh.length) {
-      const lines = ['New posts:']
-      fresh.forEach((node) => {
-        const id = label(node, node)
-        const likes = node.likeCalls.length
-        lines.push(
-          `${id} by ${name(node.call.author)}${
-            likes ? ` (${likes} like${likes > 1 ? 's' : ''})` : ''
-          }: "${shownText(node.call.message, node.call.hasMedia)}"`
-        )
-      })
-      sections.push(lines.join('\n'))
-    }
-  }
-
-  // The private conversations (one other person: no group) with a message to it since the point.
-  if (held.includes('message')) {
-    const chats = conversations
-      .filter(
-        (conversation) =>
-          !conversation.isGroup &&
-          !conversation.group &&
-          conversation.others.length === 1 &&
-          conversation.others[0] !== me &&
-          !isBlocked(conversation.others[0]) &&
-          conversation.messages.some(
-            (message) => message.from !== me && after(from)(message)
-          )
-      )
-      .slice(0, MAX_CONVERSATIONS)
-    if (chats.length) {
-      const lines = ['Private messages to you:']
-      chats.forEach((conversation, i) => {
-        const id = `c${i + 1}`
-        labels.set(id, {
-          kind: 'chat',
-          conversation,
-          others: conversation.others,
-        })
-        lines.push(`${id} with ${name(conversation.others[0])}:`)
-        conversation.messages.slice(-MESSAGES_SHOWN).forEach((message) => {
-          lines.push(
-            `  ${
-              message.from === me ? 'you' : name(message.from)
-            }: "${shownText(message.text, message.hasMedia)}"`
-          )
-        })
-      })
-      sections.push(lines.join('\n'))
-    }
-  }
-
+  const sections = [
+    ['Answers to you:', lines.answer],
+    ['New posts:', lines.post],
+    ['Private messages to you:', lines.chat],
+  ]
+    .filter(([, list]) => list.length)
+    .map(([title, list]) => [title, ...list].join('\n'))
   const empty = sections.length === 0
   return {
     text: empty ? '' : `Since your last run:\n\n${sections.join('\n\n')}`,
     labels,
     empty,
-    readTo: head,
+    readTo: readUpTo(leftOut, lastHeight, from, scanned),
   }
 }

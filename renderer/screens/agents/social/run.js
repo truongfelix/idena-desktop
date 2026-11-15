@@ -59,19 +59,29 @@ export function plannedLine(planned, {names = {}, amount, fee}, t) {
     .join(' · ')
 }
 
+/** The last block the Social scan read: the feed and the messages hold nothing after it (the chain's head at most). */
+export function scannedHeight(social) {
+  const head =
+    typeof social.head === 'number' ? social.head : social.head?.height
+  const high = social.cache?.high
+  if (typeof high !== 'number') return head
+  return typeof head === 'number' ? Math.min(high, head) : high
+}
+
 /**
  * One run of `agent` over `social` (the feed, `me`, the conversations, the claimed `names`, `blocked`, the chain's
- * `head`). Returns {result, detail}: 'nothing new', 'done' (with how many actions went where), or what refused it.
+ * `head`, the scan's `cache`). Returns {result, detail}: 'nothing new', 'done' (with how many actions went where), or what refused it.
  */
 export async function runSocialAgent(agent, social, deps) {
   const {t} = deps
   const call = deps.agent
   const held = heldSocial(agent)
   if (!held.length) return {result: 'off', detail: t('no Social action on')}
-  const head =
-    typeof social.head === 'number' ? social.head : social.head?.height
+  const scanned = scannedHeight(social)
+  if (typeof scanned !== 'number')
+    return {result: 'failed', detail: t('Social has not read the chain yet')}
   const point = await call('readPoint', {agentId: agent.id})
-  const digest = socialDigest(social, held, {point, head})
+  const digest = socialDigest(social, held, {point, scanned})
   // Nothing to read, and no post of its own to write: the model is not asked (its service bills each question).
   if (digest.empty && !held.includes('post')) {
     await call('setReadPoint', {agentId: agent.id, height: digest.readTo})
@@ -90,10 +100,13 @@ export async function runSocialAgent(agent, social, deps) {
   )
   const log = (action, fields) =>
     call('didAction', {agentId: agent.id, action, ...fields})
+  // Read: the point moves before any action, so a run stopped midway (the app closed, the window reloaded) never
+  // shows the same items again, and never tips or messages twice; what it did not do yet is lost instead.
+  await call('setReadPoint', {agentId: agent.id, height: digest.readTo})
   // eslint-disable-next-line no-restricted-syntax
   // eslint-disable-next-line no-await-in-loop
-  for (const reason of plan.dropped.slice(0, DROPPED_LINES))
-    await log(held[0], {
+  for (const {action, reason} of plan.dropped.slice(0, DROPPED_LINES))
+    await log(SOCIAL_ACTIONS.includes(action) ? action : held[0], {
       skipped: true,
       detail: t('not done: {{reason}}', {reason, nsSeparator: '!!'}),
     })
@@ -170,7 +183,6 @@ export async function runSocialAgent(agent, social, deps) {
       })
     }
   }
-  await call('setReadPoint', {agentId: agent.id, height: digest.readTo})
   return {
     result: 'done',
     detail: t(

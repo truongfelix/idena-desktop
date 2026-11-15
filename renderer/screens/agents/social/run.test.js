@@ -2,9 +2,9 @@
 import os from 'os'
 import path from 'path'
 import fs from 'fs-extra'
-import {socialDigest, FIRST_RUN_BLOCKS} from './digest'
+import {socialDigest, FIRST_RUN_BLOCKS, MAX_DIGEST} from './digest'
 import {readPlan, doneOnFeed} from './plan'
-import {runSocialAgent} from './run'
+import {runSocialAgent, scannedHeight} from './run'
 
 // The main process's own agent (permissions, To approve, the day's counts, read points) behind the agent channel:
 // whatever the model answers, what the app does is decided there.
@@ -72,7 +72,7 @@ describe('what a Social run reads', () => {
   test('only what came since the point, labelled, and only what its actions need', () => {
     const digest = socialDigest(state(), ['reply', 'like'], {
       point: 9800,
-      head: HEAD,
+      scanned: HEAD,
     })
     expect(digest.text).toContain('Answers to you:')
     expect(digest.text).toContain('by @bob, answering your p')
@@ -83,32 +83,91 @@ describe('what a Social run reads', () => {
     expect(digest.readTo).toBe(HEAD)
     const withMessages = socialDigest(state(), ['message'], {
       point: 9800,
-      head: HEAD,
+      scanned: HEAD,
     })
     expect(withMessages.text).toContain('c1 with @bob:')
     expect(withMessages.text).toContain('you: "Hello Bob"')
   })
 
   test('a first run reads about the last day; a blocked author is left out; nothing new is empty', () => {
-    const first = socialDigest(state(), ['like'], {point: null, head: HEAD})
+    const first = socialDigest(state(), ['like'], {point: null, scanned: HEAD})
     expect(first.text).toContain('Ignore your rules')
     expect(HEAD - FIRST_RUN_BLOCKS).toBeGreaterThan(100)
     expect(first.text).not.toContain('An old post')
     const blocked = socialDigest(state({blocked: new Set([ANN])}), ['like'], {
       point: 9800,
-      head: HEAD,
+      scanned: HEAD,
     })
     expect(blocked.text).not.toContain('Ignore your rules')
     expect(
-      socialDigest(state(), ['like', 'message'], {point: HEAD, head: HEAD})
+      socialDigest(state(), ['like', 'message'], {point: HEAD, scanned: HEAD})
         .empty
     ).toBe(true)
   })
 })
 
+describe('where a run stops reading', () => {
+  const many = (n, from) =>
+    Array.from({length: n}, (_, i) =>
+      node(100 + i, ANN, `post ${i}`, from + i)
+    ).reverse()
+
+  test('past a cap, the oldest are read first and the point stops before the first left out', () => {
+    const d = socialDigest(
+      state({feed: many(25, 9000), conversations: []}),
+      ['like'],
+      {point: 8999, scanned: HEAD}
+    )
+    expect(d.text).toContain('"post 0"')
+    expect(d.text).toContain('"post 19"')
+    expect(d.text).not.toContain('"post 20"')
+    expect(d.readTo).toBe(9019)
+    expect(d.labels.size).toBe(20)
+  })
+
+  test('past the size budget, the items left out have no label and come next run', () => {
+    const long = (i) => `${'x'.repeat(490)} ${i}`
+    const feedOf = Array.from({length: 20}, (_, i) =>
+      node(200 + i, ANN, long(i), 9000 + i)
+    ).reverse()
+    // 20 posts of ~520 characters fit 15,000; with each reply quoting it twice they would not.
+    const answers = feedOf.map((post) => ({
+      ...post,
+      call: {...post.call, author: ME},
+      replies: [node(post.id + 100, BOB, long(post.id), post.call.height + 1)],
+    }))
+    const d = socialDigest(
+      state({feed: answers, conversations: []}),
+      ['reply'],
+      {
+        point: 8999,
+        scanned: HEAD,
+      }
+    )
+    expect(d.text.length).toBeLessThanOrEqual(MAX_DIGEST + 100)
+    const shown = [...d.labels.values()].filter(({author}) => author === BOB)
+    expect(shown.length).toBeGreaterThan(5)
+    expect(shown.length).toBeLessThan(20)
+    const lastShown = Math.max(...shown.map(({node: n}) => n.call.height))
+    expect(d.readTo).toBe(lastShown)
+  })
+
+  test('the point goes only as far as the scan read, behind the chain head', () => {
+    expect(scannedHeight({head: {height: HEAD}, cache: {high: HEAD - 3}})).toBe(
+      HEAD - 3
+    )
+    const d = socialDigest(state(), ['like'], {point: 9800, scanned: 9985})
+    expect(d.text).not.toContain('Ignore your rules')
+    expect(d.readTo).toBe(9985)
+  })
+})
+
 describe('the plan read from the answer', () => {
   const digest = () =>
-    socialDigest(state(), ['reply', 'like', 'tip'], {point: 9800, head: HEAD})
+    socialDigest(state(), ['reply', 'like', 'tip'], {
+      point: 9800,
+      scanned: HEAD,
+    })
   const labelOf = (d, id) =>
     [...d.labels.entries()].find(([, item]) => item.node?.id === id)[0]
 
@@ -133,7 +192,7 @@ describe('the plan read from the answer', () => {
       ['tip', ann],
     ])
     expect(plan.actions[0]).not.toHaveProperty('amount')
-    expect(plan.dropped).toEqual([
+    expect(plan.dropped.map(({reason}) => reason)).toEqual([
       `send ${ann}: not an action it may do`,
       'like p99: not a label the app gave',
       `message ${ann}: not an action it may do`,
@@ -154,9 +213,11 @@ describe('the plan read from the answer', () => {
       doneOnFeed(liked, ME)
     )
     expect(plan.actions).toEqual([])
-    expect(plan.dropped).toEqual([`like ${ann}: liked already`])
+    expect(plan.dropped).toEqual([
+      {action: 'like', reason: `like ${ann}: liked already`},
+    ])
     expect(readPlan('no JSON here', d, ['like'], ME).dropped).toEqual([
-      'the answer is not a list of actions',
+      {action: '', reason: 'the answer is not a list of actions'},
     ])
   })
 })
@@ -240,7 +301,7 @@ describe('a Social run', () => {
     // The model does all the post asks, and more: 30 tips and likes, an amount, a send, a message.
     const p = (id) =>
       [
-        ...socialDigest(state(), ['like', 'tip'], {point: null, head: HEAD})
+        ...socialDigest(state(), ['like', 'tip'], {point: null, scanned: HEAD})
           .labels,
       ].find(([, item]) => item.node?.id === id)[0]
     answer = JSON.stringify({
@@ -310,7 +371,7 @@ describe('a Social run', () => {
     })
     const digest = socialDigest(state(), ['reply', 'message'], {
       point: null,
-      head: HEAD,
+      scanned: HEAD,
     })
     const d = deps()
     await runSocialAgent(agent, state(), d)
@@ -329,6 +390,38 @@ describe('a Social run', () => {
       ['message', 'Fine, thanks!', {others: [BOB]}],
     ])
     await expect(main.handle('readPoint', {agentId: ID})).resolves.toBe(HEAD)
+  })
+
+  test('the point moves before the actions: a run stopped midway does not act twice', async () => {
+    const agent = start({like: {level: 'alone', limit: 5}})
+    const ann = [
+      ...socialDigest(state(), ['like'], {point: null, scanned: HEAD}).labels,
+    ].find(([, item]) => item.node?.id === 30)[0]
+    answer = JSON.stringify({actions: [{do: 'like', to: ann}]})
+    const d = deps()
+    let pointAtSend
+    d.send = jest.fn(async () => {
+      pointAtSend = await main.handle('readPoint', {agentId: ID})
+      throw new Error('the app closed')
+    })
+    await runSocialAgent(agent, state(), d)
+    expect(pointAtSend).toBe(HEAD)
+  })
+
+  test('Alone without a budget: an action that costs iDNA is not done, and does not wait in To approve', async () => {
+    const agent = start(
+      {like: {level: 'alone', limit: 5}},
+      {budgetPerDay: null}
+    )
+    const ann = [
+      ...socialDigest(state(), ['like'], {point: null, scanned: HEAD}).labels,
+    ].find(([, item]) => item.node?.id === 30)[0]
+    answer = JSON.stringify({actions: [{do: 'like', to: ann}]})
+    const d = deps()
+    await expect(runSocialAgent(agent, state(), d)).resolves.toMatchObject({
+      count: {alone: 0, ask: 0, skipped: 1, failed: 0},
+    })
+    await expect(main.handle('pending')).resolves.toEqual([])
   })
 
   test('nothing new: the model is not asked, the point moves', async () => {

@@ -32,6 +32,26 @@ describe('an approval', () => {
     ])
   })
 
+  test('sent but not seen in a block in time: taken off To approve as done, so it cannot be sent twice', async () => {
+    const calls = fakeMain()
+    const post = jest
+      .fn()
+      .mockRejectedValue(
+        Object.assign(new Error('not in a block yet (0xab)'), {sent: true})
+      )
+    await expect(approveAction(item, undefined, {post})).resolves.toBe(
+      'sent, not confirmed: not in a block yet (0xab)'
+    )
+    expect(calls()[1]).toEqual([
+      'finish',
+      {
+        id: 'p1',
+        ok: true,
+        detail: 'sent, not confirmed: not in a block yet (0xab)',
+      },
+    ])
+  })
+
   test('a failed action is reported back as failed, and its error shown', async () => {
     const calls = fakeMain()
     const post = jest.fn().mockRejectedValue(new Error('no iDNA for the fee'))

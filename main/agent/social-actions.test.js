@@ -143,6 +143,31 @@ describe('Social actions', () => {
     await expect(reply()).resolves.toMatchObject({decision: 'alone'})
   })
 
+  test('a tip given back frees what propose counted, the agent’s amount, whatever the caller says', async () => {
+    const agent = start([social({tip: {level: 'alone', limit: 4, amount: 2}})])
+    const tip = () =>
+      agent.handle('propose', {
+        agentId: ID,
+        action: 'tip',
+        cost: 2.01,
+        skipOverLimit: true,
+      })
+    await expect(tip()).resolves.toMatchObject({decision: 'alone'})
+    await expect(tip()).resolves.toMatchObject({decision: 'alone'})
+    // One of the two given back with a made-up amount: 2 iDNA come back, not 1000.
+    await agent.handle('didAction', {
+      agentId: ID,
+      action: 'tip',
+      ok: false,
+      release: true,
+      amount: 1000,
+      cost: 2.01,
+      detail: 'refused',
+    })
+    await expect(tip()).resolves.toMatchObject({decision: 'alone'})
+    await expect(tip()).resolves.toMatchObject({decision: 'skipped'})
+  })
+
   test('To approve keeps what an action acts on over a restart', async () => {
     start([social({message: {level: 'ask', limit: 3}})])
     await start().handle('propose', {
