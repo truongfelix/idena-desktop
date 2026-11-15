@@ -30,6 +30,7 @@ import {useIdentityState} from '../providers/identity-context'
 import {useEpochState} from '../providers/epoch-context'
 import {useChainState, useSyncStep} from '../providers/chain-context'
 import {SyncPhase} from '../utils/sync-steps'
+import {NodeStatus, nodeStatus, peerCounts} from '../utils/node-status'
 import {useAutoUpdate} from '../providers/update-context'
 import useRpc from '../hooks/use-rpc'
 import {usePoll} from '../hooks/use-interval'
@@ -121,12 +122,48 @@ export default function Sidebar({
   )
 }
 
+// The node's peers from net_peers, polled every 5 s: null while unknown (no answer yet, or an error: the node
+// serves only bcn_syncing while it opens its database), and how long (ms) the list has been empty.
+function useNodePeers() {
+  const [{result, error}] = usePoll(useRpc('net_peers'), 5000)
+  const peers = error || !Array.isArray(result) ? null : result
+  const emptySince = React.useRef(null)
+  const empty = Array.isArray(peers) && peers.length === 0
+  if (!empty) emptySince.current = null
+  else if (emptySince.current === null) emptySince.current = Date.now()
+  return {peers, emptyForMs: empty ? Date.now() - emptySince.current : 0}
+}
+
+// The status's step from the chain state, the IPFS conversion and the peers (B-245).
+function useNodeStatus({peers, emptyForMs}) {
+  const {syncing, compacting} = useChainState()
+  const {isBehind} = useSyncStep()
+  // The node's one-time IPFS conversion (main/ipfs-conversion.js): it does not sync meanwhile. Only the built-in
+  // node's, as the sync screen shows it (layout.js SyncingApp).
+  const [{ipfsConversion}] = useNode()
+  const {runInternalNode, useExternalNode} = useSettingsState()
+  const converting =
+    Boolean(ipfsConversion) && runInternalNode && !useExternalNode
+  return nodeStatus({
+    syncing,
+    compacting,
+    converting,
+    isBehind,
+    peers,
+    emptyForMs,
+  })
+}
+
 export function Status() {
   const {t} = useTranslation()
 
   const {loading, syncing, offline} = useChainState()
 
   const {wrongClientTime} = useTimingState()
+
+  const nodePeers = useNodePeers()
+  const {peers} = nodePeers
+  const status = useNodeStatus(nodePeers)
 
   switch (true) {
     case loading:
@@ -148,10 +185,18 @@ export function Status() {
         </StatusContent>
       )
 
-    case syncing:
+    // A wrong clock keeps the node from its peers: its own status says why (below).
+    case status === NodeStatus.NoPeers && !wrongClientTime:
+      return (
+        <StatusContent bg="red.020">
+          <ConnectionBandwidth peers={peers} status={status} />
+        </StatusContent>
+      )
+
+    case syncing || status === NodeStatus.Compacting:
       return (
         <StatusContent bg="orange.020">
-          <ConnectionBandwidth />
+          <ConnectionBandwidth peers={peers} status={status} />
         </StatusContent>
       )
 
@@ -198,7 +243,7 @@ export function Status() {
     default:
       return (
         <StatusContent bg="green.020">
-          <ConnectionBandwidth />
+          <ConnectionBandwidth peers={peers} status={status} />
         </StatusContent>
       )
   }
@@ -215,21 +260,15 @@ const StatusText = React.forwardRef((props, ref) => (
   <Text ref={ref} fontWeight={500} noOfLines={1} {...props} />
 ))
 
-function ConnectionBandwidth() {
+// eslint-disable-next-line react/prop-types
+function ConnectionBandwidth({peers, status}) {
   const {t} = useTranslation()
 
   const {syncing, chainBlock, currentBlock, headTime} = useChainState()
   const {step, isBehind} = useSyncStep()
-  // The node's one-time IPFS conversion (main/ipfs-conversion.js): it does not sync meanwhile. Only the built-in
-  // node's, as the sync screen shows it (layout.js SyncingApp).
-  const [{ipfsConversion}] = useNode()
-  const {runInternalNode, useExternalNode} = useSettingsState()
-  const converting =
-    Boolean(ipfsConversion) && runInternalNode && !useExternalNode
 
-  const [{result: peers}] = usePoll(useRpc('net_peers'), 5000)
-
-  const peersCount = (peers || []).length
+  const counts = peerCounts(peers)
+  const peersCount = counts.total
 
   let blocksLine
   if (!syncing)
@@ -256,13 +295,41 @@ function ConnectionBandwidth() {
     <Tooltip
       label={
         <>
-          <Text>
-            {t('Peers: {{peersCount}}', {
-              peersCount,
-              nsSeparator: '!!',
-            })}
-          </Text>
-          <Text>{blocksLine}</Text>
+          {status === NodeStatus.Compacting && (
+            <Text>
+              {t(
+                'The node is tidying its database, this can take several minutes; do not close it'
+              )}
+            </Text>
+          )}
+          {status !== NodeStatus.Compacting && (
+            <Text>
+              {counts.directions
+                ? t(
+                    'Peers: {{peersCount}} (in {{inbound}}, out {{outbound}}, direct {{direct}})',
+                    {
+                      peersCount,
+                      inbound: counts.inbound,
+                      outbound: counts.outbound,
+                      direct: counts.direct,
+                      nsSeparator: '!!',
+                    }
+                  )
+                : t('Peers: {{peersCount}}', {
+                    peersCount,
+                    nsSeparator: '!!',
+                  })}
+            </Text>
+          )}
+          {status === NodeStatus.NoPeers && (
+            <Text>
+              {t(
+                'Your node has no connection: what it sends cannot reach the network',
+                {nsSeparator: '|'}
+              )}
+            </Text>
+          )}
+          {status !== NodeStatus.Compacting && <Text>{blocksLine}</Text>}
           {isBehind && (
             <Text>
               {t('The newest block is {{minutes}} min old: looking for peers', {
@@ -277,18 +344,26 @@ function ConnectionBandwidth() {
     >
       <Stack isInline spacing={1}>
         <Bandwidth
-          peersCount={(peers || []).length}
+          peersCount={peersCount}
           isSyncing={syncing || isBehind}
+          isAlone={status === NodeStatus.NoPeers}
         />
-        {syncing && (
-          <StatusText color="orange.500">
-            {converting ? t('Converting') : t('Synchronizing')}
-          </StatusText>
+        {status === NodeStatus.Compacting && (
+          <StatusText color="orange.500">{t('Compacting')}</StatusText>
         )}
-        {!syncing && isBehind && (
+        {status === NodeStatus.NoPeers && (
+          <StatusText color="red.500">{t('No peers')}</StatusText>
+        )}
+        {status === NodeStatus.Converting && (
+          <StatusText color="orange.500">{t('Converting')}</StatusText>
+        )}
+        {status === NodeStatus.Synchronizing && (
+          <StatusText color="orange.500">{t('Synchronizing')}</StatusText>
+        )}
+        {status === NodeStatus.Behind && (
           <StatusText color="orange.500">{t('Behind')}</StatusText>
         )}
-        {!syncing && !isBehind && (
+        {status === NodeStatus.Synchronized && (
           <StatusText color="green.500">{t('Synchronized')}</StatusText>
         )}
       </Stack>
@@ -296,7 +371,7 @@ function ConnectionBandwidth() {
   )
 }
 
-function Bandwidth({peersCount, isSyncing, ...props}) {
+function Bandwidth({peersCount, isSyncing, isAlone, ...props}) {
   return (
     <Box pt="0.5" px="px" pb="3px" h="4" w="4" {...props}>
       <Stack
@@ -308,7 +383,8 @@ function Bandwidth({peersCount, isSyncing, ...props}) {
         {Array.from({length: 4}).map((_, idx) => (
           <BandwidthItem
             key={idx}
-            bg={`${isSyncing ? 'orange' : 'green'}.${
+            // eslint-disable-next-line no-nested-ternary
+            bg={`${isAlone ? 'red' : isSyncing ? 'orange' : 'green'}.${
               idx < peersCount ? '500' : '040'
             }`}
             height={`${(idx + 1) * 3}px`}

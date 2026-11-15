@@ -17,6 +17,8 @@ const initialState = {
   loading: true,
   offline: true,
   syncing: false,
+  // The node compacts its chain database at start (bcn_syncing's compacting, B-245).
+  compacting: false,
   currentBlock: null,
   highestBlock: null,
   progress: null,
@@ -29,7 +31,13 @@ const initialState = {
   headersPerSecond: null,
 }
 
-function chainReducer(state, action) {
+// The chain state's fields from one bcn_syncing answer: the node leaves `compacting` out when false, and the
+// reducer merges each answer into the last one, so it is set on every answer (B-245).
+export function syncFields(sync) {
+  return {...sync, compacting: sync.compacting === true}
+}
+
+export function chainReducer(state, action) {
   switch (action.type) {
     case SET_LOADING: {
       return {
@@ -49,6 +57,7 @@ function chainReducer(state, action) {
       return {
         ...state,
         syncing: false,
+        compacting: false,
         offline: true,
         loading: false,
       }
@@ -102,7 +111,7 @@ function ChainProvider({children}) {
         dispatch({
           type: FETCH_SYNC_SUCCEEDED,
           payload: {
-            ...sync,
+            ...syncFields(sync),
             chainBlock,
             headTime,
             blocksPerSecond,
