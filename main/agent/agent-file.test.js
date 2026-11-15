@@ -88,6 +88,30 @@ describe('an agent as a file', () => {
     })
   })
 
+  test("the model's longest answer and effort travel with the agent, only when set (B-265)", () => {
+    const set = exportAgent({
+      ...joke(),
+      maxTokens: 800,
+      effort: 'low',
+      reportThresholds: {},
+    })
+    expect(JSON.parse(set)).toMatchObject({maxTokens: 800, effort: 'low'})
+    expect(readAgentFile(set).agent).toMatchObject({
+      maxTokens: 800,
+      effort: 'low',
+    })
+    const unset = JSON.parse(
+      exportAgent({
+        ...joke(),
+        maxTokens: null,
+        effort: '',
+        reportThresholds: {},
+      })
+    )
+    expect(unset).not.toHaveProperty('maxTokens')
+    expect(unset).not.toHaveProperty('effort')
+  })
+
   test("an address that is not the service's default stays out (it may hold a secret)", () => {
     const text = exportAgent({
       ...joke(),

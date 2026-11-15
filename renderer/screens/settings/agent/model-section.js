@@ -6,6 +6,7 @@ import {PrimaryButton, SecondaryButton} from '../../../shared/components/button'
 import {
   FormControlWithLabel,
   Input,
+  Select,
   WarningAlert,
 } from '../../../shared/components/components'
 import {SettingsSection} from '../components'
@@ -49,6 +50,63 @@ function SavedOnBlurInput({value, onSave, ...props}) {
       }}
       {...props}
     />
+  )
+}
+
+/**
+ * The model's longest answer and effort (B-265), for an agent (the single agent's settings have none). An empty field
+ * leaves the app's choice for each task, and the model's default effort.
+ */
+function AnswerFields({settings, onChange}) {
+  const {t} = useTranslation()
+  const efforts =
+    settings.provider === 'anthropic'
+      ? ['low', 'medium', 'high', 'xhigh', 'max']
+      : ['low', 'medium', 'high']
+  const effortLabel = {
+    low: t('Low'),
+    medium: t('Medium'),
+    high: t('High'),
+    xhigh: t('Very high'),
+    max: t('Highest'),
+  }
+  return (
+    <Stack spacing={2}>
+      <SimpleGrid columns={[1, 2]} spacing={4}>
+        <FormControlWithLabel label={t('Longest answer, in tokens')}>
+          <SavedOnBlurInput
+            value={settings.maxTokens ? String(settings.maxTokens) : ''}
+            inputMode="numeric"
+            placeholder={t("The app's choice")}
+            onSave={(next) =>
+              onChange((s) => ({...s, maxTokens: next || null}))
+            }
+          />
+        </FormControlWithLabel>
+        <FormControlWithLabel label={t('Effort')}>
+          <Select
+            value={efforts.includes(settings.effort) ? settings.effort : ''}
+            onChange={(e) => {
+              const effort = e.target.value
+              onChange((s) => ({...s, effort}))
+            }}
+          >
+            <option value="">{t("The model's default")}</option>
+            {efforts.map((effort) => (
+              <option key={effort} value={effort}>
+                {effortLabel[effort]}
+              </option>
+            ))}
+          </Select>
+        </FormControlWithLabel>
+      </SimpleGrid>
+      <Text color="muted" fontSize="sm">
+        {t(
+          'More effort: better answers to hard questions, more tokens billed. An answer that reaches the longest answer is cut short, and Activity says so; a local model may ignore the effort.',
+          {nsSeparator: '!!'}
+        )}
+      </Text>
+    </Stack>
   )
 }
 
@@ -250,6 +308,9 @@ export function ModelSection({
             />
           </FormControlWithLabel>
         </SimpleGrid>
+        {'effort' in settings && (
+          <AnswerFields settings={settings} onChange={onChange} />
+        )}
         {settings.provider !== 'anthropic' &&
           settings.actions &&
           settings.actions.flipStory && (

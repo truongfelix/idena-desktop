@@ -169,6 +169,8 @@ function createAgent({
           provider: config.provider,
           address: config.address,
           model: config.model,
+          maxTokens: config.maxTokens,
+          effort: config.effort,
           key: key.read(destination(config)),
         },
         system,
@@ -202,7 +204,12 @@ function createAgent({
     const view = (agent) =>
       agent && {
         id: agent.id,
-        config: agentSettings(file, agent),
+        // Its model's longest answer and effort (B-265), beside the settings the validation reads.
+        config: {
+          ...agentSettings(file, agent),
+          maxTokens: agent.maxTokens,
+          effort: agent.effort,
+        },
         instructions: agent.instructions,
       }
     const answerer = validationAgent(file)
@@ -428,6 +435,8 @@ function createAgent({
             provider: agent.provider,
             address: agent.address,
             model: agent.model,
+            maxTokens: agent.maxTokens,
+            effort: agent.effort,
             key: key.read(destination(agent)),
           },
           agent.instructions,
@@ -477,6 +486,8 @@ function createAgent({
             provider: agent.provider,
             address: agent.address,
             model: agent.model,
+            maxTokens: agent.maxTokens,
+            effort: agent.effort,
             key: key.read(destination(agent)),
           },
           socialSystem(held, agent.instructions),
@@ -534,6 +545,8 @@ function createAgent({
             provider: agent.provider,
             address: agent.address,
             model: agent.model,
+            maxTokens: agent.maxTokens,
+            effort: agent.effort,
             key: key.read(destination(agent)),
           },
           system,

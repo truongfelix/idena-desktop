@@ -52,7 +52,12 @@ function createAgentCommands({profiles, key, log, onChange = () => {}}) {
     /** The settings of one agent as the permission check reads them (permissions.js), for its own requests. */
     config(agentId) {
       const {file, agent} = agentOf({agentId})
-      return {...agentSettings(file, agent), instructions: agent.instructions}
+      return {
+        ...agentSettings(file, agent),
+        maxTokens: agent.maxTokens,
+        effort: agent.effort,
+        instructions: agent.instructions,
+      }
     },
     commands: {
       agents: list,
