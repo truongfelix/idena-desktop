@@ -60,12 +60,16 @@ export function plannedLine(planned, {names = {}, amount, fee}, t) {
     .join(' · ')
 }
 
+/** Whether the agent reads private messages, or runs on them: its reading then waits for their decryption. */
+export const readsMessages = (agent) =>
+  Boolean(agent.reads?.messages || agent.events?.includes('message'))
+
 /** The last block the Social scan read: the feed and the messages hold nothing after it (the chain's head at most). */
-export function scannedHeight(social, held = []) {
+export function scannedHeight(social, withMessages = false) {
   const head =
     typeof social.head === 'number' ? social.head : social.head?.height
   // The private messages are decrypted after the scan: no further than they were read.
-  const read = held.includes('message') ? social.messagesRead : undefined
+  const read = withMessages ? social.messagesRead : undefined
   const high =
     typeof read === 'number' && typeof social.cache?.high === 'number'
       ? Math.min(read, social.cache.high)
@@ -83,7 +87,7 @@ export async function runSocialAgent(agent, social, deps) {
   const call = deps.agent
   const held = heldSocial(agent)
   if (!held.length) return {result: 'off', detail: t('no Social action on')}
-  const scanned = scannedHeight(social, held)
+  const scanned = scannedHeight(social, readsMessages(agent))
   if (typeof scanned !== 'number')
     return {result: 'failed', detail: t('Social has not read the chain yet')}
   const point = await call('readPoint', {agentId: agent.id})

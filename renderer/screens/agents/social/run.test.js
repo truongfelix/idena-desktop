@@ -4,7 +4,7 @@ import path from 'path'
 import fs from 'fs-extra'
 import {socialDigest, FIRST_RUN_BLOCKS, MAX_DIGEST} from './digest'
 import {readPlan, doneOnFeed} from './plan'
-import {plannedLine, runSocialAgent, scannedHeight} from './run'
+import {plannedLine, readsMessages, runSocialAgent, scannedHeight} from './run'
 
 // The main process's own agent (permissions, To approve, the day's counts, read points) behind the agent channel:
 // whatever the model answers, what the app does is decided there.
@@ -259,8 +259,15 @@ describe('where a run stops reading', () => {
     )
     // Messages still being decrypted: an agent that reads them stops there, the others do not wait for them.
     const behind = {head: HEAD, cache: {high: HEAD}, messagesRead: HEAD - 50}
-    expect(scannedHeight(behind, ['message'])).toBe(HEAD - 50)
-    expect(scannedHeight(behind, ['like'])).toBe(HEAD)
+    expect(scannedHeight(behind, true)).toBe(HEAD - 50)
+    expect(scannedHeight(behind, false)).toBe(HEAD)
+    expect(readsMessages({reads: {messages: true}, events: []})).toBe(true)
+    expect(readsMessages({reads: {messages: false}, events: ['message']})).toBe(
+      true
+    )
+    expect(readsMessages({reads: {messages: false}, events: ['tip']})).toBe(
+      false
+    )
     const d = socialDigest(state(), read(['like']), {
       point: 9800,
       scanned: 9985,

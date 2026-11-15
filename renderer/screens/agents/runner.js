@@ -6,7 +6,12 @@ import {blockedAddresses} from '../social/people'
 import {historyDone} from '../social/scan'
 import {agentsList, lastAgentsList, onAgentsChange} from '../settings/agent/api'
 import {executors} from './pending-api'
-import {heldSocial, runSocialAgent, scannedHeight} from './social/run'
+import {
+  heldSocial,
+  readsMessages,
+  runSocialAgent,
+  scannedHeight,
+} from './social/run'
 import {EVENT_MIN_MS, eventPending} from './social/events'
 import {
   prepareSocialAction,
@@ -181,7 +186,7 @@ export function AgentRunner() {
             () => null
           )
           // Up to where its run reads (its messages: as far as they were decrypted), not further.
-          const scanned = scannedHeight(state, heldSocial(agent))
+          const scanned = scannedHeight(state, readsMessages(agent))
           if (eventPending(agent.events, state, {point, scanned})) {
             lastEvent.set(agent.id, now)
             due.push(agent)

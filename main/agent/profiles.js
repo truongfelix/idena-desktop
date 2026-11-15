@@ -56,19 +56,21 @@ function normalizeReads(value) {
 }
 
 /**
- * What an agent saved before it had its own reads (B-239 builds) read: with a Social action, the new posts (up to 20),
- * its answers and tips, and its messages when it held Private messages. Without one, nothing.
+ * What an agent saved before it had its own reads (B-239 builds) read: with a Social action not Off, the new posts (up
+ * to 20); with one that answers others (not Post alone), its answers, likes and tips; with Private messages, its
+ * messages. Without one, nothing.
  */
 function readsBefore(actions) {
   const saved = actions && typeof actions === 'object' ? actions : {}
-  const social = ['post', 'reply', 'like', 'message', 'tip'].some(
-    (name) => saved[name]
+  // As the B-239 builds read: from the Social actions not Off.
+  const held = ['post', 'reply', 'like', 'message', 'tip'].filter(
+    (name) => saved[name] && saved[name].level !== 'off'
   )
-  if (!social) return undefined
+  if (!held.length) return undefined
   return {
     posts: {window: 'count', count: 20},
-    notifications: true,
-    messages: Boolean(saved.message),
+    notifications: held.some((name) => name !== 'post'),
+    messages: held.includes('message'),
   }
 }
 

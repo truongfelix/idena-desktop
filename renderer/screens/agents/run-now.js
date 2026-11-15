@@ -24,6 +24,16 @@ export function runLine({result, detail}, t) {
   }
 }
 
+/** Why Run now is off, or nothing. */
+function buttonTitle({paused, ready}, t) {
+  if (paused)
+    return t('Every agent is paused: none acts until you resume them.', {
+      nsSeparator: '!!',
+    })
+  if (!ready) return t('Waits for Social to read the chain up to now.')
+  return undefined
+}
+
 /**
  * Run now, in the agent page's header: one run at once, whatever its schedule, for an agent that is on and holds a
  * Social action; it waits for Social to read the chain up to now. What the run did shows in a message and Activity.
@@ -39,16 +49,7 @@ export function RunNow({agent, paused, onDone}) {
     <SecondaryButton
       isLoading={isRunning}
       isDisabled={!agent.enabled || paused || !ready}
-      title={
-        // eslint-disable-next-line no-nested-ternary
-        paused
-          ? t('Every agent is paused: none acts until you resume them.', {
-              nsSeparator: '!!',
-            })
-          : ready
-          ? undefined
-          : t('Waits for Social to read the chain up to now.')
-      }
+      title={buttonTitle({paused, ready}, t)}
       onClick={async () => {
         setIsRunning(true)
         let line

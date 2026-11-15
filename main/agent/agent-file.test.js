@@ -80,7 +80,7 @@ describe('an agent as a file', () => {
       // Saved before it had reads, with Post: it reads what it read then.
       reads: {
         posts: {window: 'count', count: 20},
-        notifications: true,
+        notifications: false,
         messages: false,
       },
       events: [],

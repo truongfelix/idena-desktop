@@ -88,6 +88,20 @@ describe('agent profiles', () => {
       notifications: true,
       messages: true,
     })
+    // Only actions not Off count; Post alone reads no notifications.
+    expect(
+      normalizeAgent({
+        actions: {reply: {level: 'alone'}, message: {level: 'off'}},
+      }).reads.messages
+    ).toBe(false)
+    expect(normalizeAgent({actions: {post: {level: 'alone'}}}).reads).toEqual({
+      posts: {window: 'count', count: 20},
+      notifications: false,
+      messages: false,
+    })
+    expect(
+      normalizeAgent({actions: {post: {level: 'off'}}}).reads.posts.window
+    ).toBe('off')
     expect(
       normalizeAgent({actions: {answerFlip: {level: 'alone'}}}).reads
     ).toEqual({
