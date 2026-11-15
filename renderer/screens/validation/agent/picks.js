@@ -26,6 +26,15 @@ export const MIN_FLIP_MS = 2 * 1000
 /** The longest error shown on the validation screen when the model gave no answer. */
 export const NO_ANSWER_MAX_CHARS = 160
 
+/** A flip's questions at most: the first and two more after a model error (B-263). */
+export const MAX_FLIP_TRIES = 3
+
+/**
+ * Whether a flip whose question failed (`tries` made so far) is asked again: fewer than MAX_FLIP_TRIES. It is asked
+ * after the flips not asked yet, and only while the session gives it a share of its time (the asking loop).
+ */
+export const askAgain = (tries) => tries < MAX_FLIP_TRIES
+
 /**
  * Why the agent gave no answer (the model's error, or the app's before the call), as the validation screen shows it: the error's text, cut to NO_ANSWER_MAX_CHARS;
  * null for a question stopped by a pause (asked again after the resume, not a failure).
@@ -72,9 +81,16 @@ export function isAskable(flip, {isShort, withoutWords = new Set()}) {
   return isShort || withoutWords.has(flip.hash) || decodedWithKeywords(flip)
 }
 
-/** The next flip to ask, in the order shown; `asked` holds the hashes already asked. */
-export function nextFlipToAsk(flips, asked, options) {
-  return flips.find((flip) => !asked.has(flip.hash) && isAskable(flip, options))
+/**
+ * The next flip to ask, in the order shown; `asked` holds the hashes already asked. The flips to ask again after a
+ * model error (`again`, the hashes; B-263) come after every flip not asked yet.
+ */
+export function nextFlipToAsk(flips, asked, options, again = new Map()) {
+  const askable = (flip) => !asked.has(flip.hash) && isAskable(flip, options)
+  return (
+    flips.find((flip) => askable(flip) && !again.has(flip.hash)) ||
+    flips.find(askable)
+  )
 }
 
 /** The flips not asked yet that can still be (not failed), to share the time left between them. */
@@ -111,9 +127,6 @@ export function answersToTake(flips, picks) {
 const unmarked = (flip) =>
   !flip.relevance || flip.relevance === RelevanceType.Abstained
 
-/** How good a flip must be, as the model says, for the agent to mark it best (B-260). */
-export const BEST_MIN_QUALITY = 0.8
-
 /** Whether the agent marks this flip's keywords alone: the reporting agent's level, or the one agent's. */
 export const marksAlone = (pick) =>
   (pick.markDecision ?? pick.decision) === 'alone'
@@ -126,10 +139,18 @@ export const bestSuggestionOf = (flips, picks) =>
   )?.hash ?? null
 
 /**
- * The flip the agent would mark best (B-260): among the flips approved (relevant) whose agent judged them relevant,
- * the one it found best, from BEST_MIN_QUALITY; null when none. The first of equals, in the session's order.
+ * The flip the agent would mark best (B-260, B-261): among the flips approved (relevant) whose agent judged them
+ * relevant, the one it found best (its quality; a flip without one comes after, by its surest answer). Every long
+ * session gets one when the agent approved a flip; null when none. The first of equals, in the session's order.
  */
 export function bestFlipOf(flips, picks) {
+  // A rule break half suspected comes last (chosen only when every approved flip is doubted).
+  const rank = (pick) => [
+    // eslint-disable-next-line no-nested-ternary
+    pick.doubted ? -2 : typeof pick.quality === 'number' ? pick.quality : -1,
+    pick.confidence || 0,
+  ]
+  const better = (a, b) => a[0] > b[0] || (a[0] === b[0] && a[1] > b[1])
   let best = null
   flips.forEach((flip) => {
     const pick = picks[flip.hash]
@@ -137,11 +158,10 @@ export function bestFlipOf(flips, picks) {
       !pick ||
       flip.relevance !== RelevanceType.Relevant ||
       pick.relevance !== 'relevant' ||
-      pick.report ||
-      !(pick.quality >= BEST_MIN_QUALITY)
+      pick.report
     )
       return
-    if (!best || pick.quality > picks[best.hash].quality) best = flip
+    if (!best || better(rank(pick), rank(picks[best.hash]))) best = flip
   })
   return best
 }
@@ -149,8 +169,8 @@ export function bestFlipOf(flips, picks) {
 /**
  * Autopilot's events: the answers its permission lets it give alone, and in the keywords check the marks its level
  * lets it make alone: the reports (the surest first when there are more than `reportsLeft`, the session's reports
- * not used yet, B-259), the approvals, then the best flip (B-260) once every approval it makes is in, when none is
- * marked yet (`hasBest`). `applied` holds what it already did, so a mark the person changed is never put back; the
+ * not used yet, B-259), the approvals, then the best flip (B-260, B-261) once every approval it makes is in and the
+ * flips are `settled`, when none is marked yet (`hasBest`). `applied` holds what it already did, so a mark the person changed is never put back; the
  * person's own answer is never replaced.
  */
 export function autopilotEvents({
@@ -160,6 +180,8 @@ export function autopilotEvents({
   isKeywords,
   reportsLeft = 0,
   hasBest = false,
+  // Every flip it can still ask was asked, none in flight (autopilot.js isSettled): the best flip waits for it.
+  settled = true,
 }) {
   const events = []
   flips.forEach((flip) => {
@@ -213,12 +235,8 @@ export function autopilotEvents({
         `best:${flip.hash}` === marked &&
         flip.relevance !== RelevanceType.Relevant
     )
-  // Every flip shown has its pick (one that never loaded gets none, it waits for no one).
-  const allIn = flips.every(
-    (flip) =>
-      !flip.decoded || (picks[flip.hash] && !picks[flip.hash].reportLater)
-  )
-  if (!hasBest && !approvals.length && allIn && (!marked || lost)) {
+  // `settled` holds the late reports still to ask too (the hook's): one that can never come holds nothing back.
+  if (!hasBest && !approvals.length && settled && (!marked || lost)) {
     const best = bestFlipOf(
       flips.filter(
         (flip) =>

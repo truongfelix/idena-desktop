@@ -2127,5 +2127,16 @@
   "Its actions spend no iDNA: no budget to set.": "Ses actions ne dépensent pas d'iDNA : pas de budget à fixer.",
   "For {{actions}}": "Pour {{actions}}",
   "Not added: {{actions}}. Another agent of yours already holds it.": "Non ajouté : {{actions}}. Un autre de vos agents l'a déjà.",
-  "Agent's pick · it would mark this flip best": "Choix de l'agent · il marquerait ce flip comme le meilleur"
+  "Agent's pick · it would mark this flip best": "Choix de l'agent · il marquerait ce flip comme le meilleur",
+  "Its actions on Social have nothing to act on: give it something to read.": "Ses actions sur Social n'ont rien sur quoi agir : donnez-lui quelque chose à lire.",
+  "Writes posts of its own.": "Écrit ses propres publications.",
+  "Read all Social posts": "Lire toutes les publications de Social",
+  "The new posts of everyone on Social: those of the last 24 hours, or the last N. It acts only on what it read.": "Les nouvelles publications de tout Social : celles des dernières 24 heures, ou les N dernières. Il n'agit que sur ce qu'il a lu.",
+  "Read its own posts": "Lire ses propres publications",
+  "Its own last posts, to go on from them (a series, what it already said).": "Ses dernières publications, pour en partir (une série, ce qu'il a déjà dit).",
+  "Read its notifications": "Lire ses notifications",
+  "Only its own: the likes, answers and tips to its posts, replies and comments.": "Seulement les siennes : les j'aime, réponses et pourboires sur ses publications, réponses et commentaires.",
+  "Read its private messages": "Lire ses messages privés",
+  "Its one-to-one conversations with a new message.": "Ses conversations à deux avec un nouveau message.",
+  "Which posts": "Quelles publications"
 }

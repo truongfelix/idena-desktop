@@ -2127,5 +2127,16 @@
   "Its actions spend no iDNA: no budget to set.": "Its actions spend no iDNA: no budget to set.",
   "For {{actions}}": "For {{actions}}",
   "Not added: {{actions}}. Another agent of yours already holds it.": "Not added: {{actions}}. Another agent of yours already holds it.",
-  "Agent's pick · it would mark this flip best": "Agent's pick · it would mark this flip best"
+  "Agent's pick · it would mark this flip best": "Agent's pick · it would mark this flip best",
+  "Its actions on Social have nothing to act on: give it something to read.": "Its actions on Social have nothing to act on: give it something to read.",
+  "Writes posts of its own.": "Writes posts of its own.",
+  "Read all Social posts": "Read all Social posts",
+  "The new posts of everyone on Social: those of the last 24 hours, or the last N. It acts only on what it read.": "The new posts of everyone on Social: those of the last 24 hours, or the last N. It acts only on what it read.",
+  "Read its own posts": "Read its own posts",
+  "Its own last posts, to go on from them (a series, what it already said).": "Its own last posts, to go on from them (a series, what it already said).",
+  "Read its notifications": "Read its notifications",
+  "Only its own: the likes, answers and tips to its posts, replies and comments.": "Only its own: the likes, answers and tips to its posts, replies and comments.",
+  "Read its private messages": "Read its private messages",
+  "Its one-to-one conversations with a new message.": "Its one-to-one conversations with a new message.",
+  "Which posts": "Which posts"
 }

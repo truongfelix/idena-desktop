@@ -108,6 +108,7 @@ describe('agent flips: the model answer', () => {
       report: false,
       reportConfidence: 0,
       quality: null,
+      doubted: false,
     })
     expect(
       readFlipAnswer('{"answer": "both", "confidence": 3}', {hasWords: false})
@@ -135,6 +136,7 @@ describe('agent flips: the model answer', () => {
       report: true,
       reportConfidence: REPORT_THRESHOLDS[4],
       quality: null,
+      doubted: true,
     })
     expect(readFlipAnswer(sure, {hasWords: false})).toMatchObject({
       reasons: [],

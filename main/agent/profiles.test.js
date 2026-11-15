@@ -52,6 +52,7 @@ describe('agent profiles', () => {
       // Reads nothing and runs on no event until the person says so (B-255).
       reads: {
         posts: {window: 'off', count: 10},
+        own: false,
         notifications: false,
         messages: false,
       },
@@ -77,7 +78,44 @@ describe('agent profiles', () => {
     })
     expect(
       normalizeAgent({reads: {posts: {window: 'week', count: 3}}}).reads.posts
-    ).toEqual({window: 'off', count: 3})
+    ).toEqual({window: 'off', count: 10})
+    // B-262: reads saved apart (B-255) become read actions, once; the reads are then derived from them.
+    const migrated = normalizeAgent({
+      actions: {post: {level: 'alone'}, reply: {level: 'ask'}},
+      reads: {
+        posts: {window: 'count', count: 7},
+        notifications: true,
+        messages: false,
+      },
+    })
+    expect(migrated.actions).toEqual({
+      post: {level: 'alone', limit: null},
+      reply: {level: 'ask', limit: 5},
+      readPosts: {level: 'alone', limit: null, window: 'count', count: 7},
+      readOwnPosts: {level: 'alone', limit: null},
+      readNotifications: {level: 'alone', limit: null},
+    })
+    expect(migrated.reads).toEqual({
+      posts: {window: 'count', count: 7},
+      own: true,
+      notifications: true,
+      messages: false,
+    })
+    // Once they are actions, a read turned off stays off (no migration again).
+    const off = normalizeAgent({
+      ...migrated,
+      actions: {...migrated.actions, readNotifications: {level: 'off'}},
+    })
+    expect(off.reads.notifications).toBe(false)
+    expect(normalizeAgent(off).actions.readNotifications.level).toBe('off')
+    // A read removed (its row gone) stays gone: the reads saved beside are this build's, no migration again.
+    const removed = {...off.actions}
+    delete removed.readOwnPosts
+    delete removed.readPosts
+    delete removed.readNotifications
+    const saved = normalizeAgent({...off, actions: removed})
+    expect(Object.keys(saved.actions)).toEqual(['post', 'reply'])
+    expect(normalizeAgent(saved).actions).not.toHaveProperty('readOwnPosts')
     // An agent saved before it had reads (B-239) reads what it read then.
     expect(
       normalizeAgent({
@@ -85,6 +123,7 @@ describe('agent profiles', () => {
       }).reads
     ).toEqual({
       posts: {window: 'count', count: 20},
+      own: false,
       notifications: true,
       messages: true,
     })
@@ -93,6 +132,7 @@ describe('agent profiles', () => {
       normalizeAgent({task: 'joke', actions: {post: {level: 'alone'}}}).reads
     ).toEqual({
       posts: {window: 'off', count: 10},
+      own: true,
       notifications: true,
       messages: false,
     })
@@ -104,6 +144,7 @@ describe('agent profiles', () => {
     ).toBe(false)
     expect(normalizeAgent({actions: {post: {level: 'alone'}}}).reads).toEqual({
       posts: {window: 'count', count: 20},
+      own: true,
       notifications: false,
       messages: false,
     })
@@ -114,6 +155,7 @@ describe('agent profiles', () => {
       normalizeAgent({actions: {answerFlip: {level: 'alone'}}}).reads
     ).toEqual({
       posts: {window: 'off', count: 10},
+      own: false,
       notifications: false,
       messages: false,
     })
@@ -140,10 +182,13 @@ describe('agent profiles', () => {
     expect(agent.name).toBe('Agent')
     expect(agent.enabled).toBe(false)
     expect(agent.address).toBe(DEFAULT_ADDRESSES.anthropic)
-    expect(agent.actions).toEqual({
-      post: {level: 'alone', limit: 1},
-      tip: {level: 'off', limit: 0, amount: 1},
-    })
+    expect(agent.actions).toEqual(
+      // Plus the read actions an old file's Social actions bring (B-262), tested apart.
+      expect.objectContaining({
+        post: {level: 'alone', limit: 1},
+        tip: {level: 'off', limit: 0, amount: 1},
+      })
+    )
     expect(agent.schedule).toEqual({kind: 'manual', time: '09:00'})
     expect(agent.budgetPerDay).toBeNull()
     expect(
@@ -236,11 +281,14 @@ describe('agent profiles', () => {
       schedule: {kind: 'validation', time: '09:00'},
     })
     // The validation's two actions at their levels, Off included; the rest only when it was not Off.
-    expect(agent.actions).toEqual({
-      answerFlip: {level: 'alone', limit: null},
-      report: {level: 'off', limit: null},
-      tip: {level: 'ask', limit: 2, amount: 1},
-    })
+    expect(agent.actions).toEqual(
+      // Plus the read actions an old file's Social actions bring (B-262), tested apart.
+      expect.objectContaining({
+        answerFlip: {level: 'alone', limit: null},
+        report: {level: 'off', limit: null},
+        tip: {level: 'ask', limit: 2, amount: 1},
+      })
+    )
     expect(agent.reportThresholds[1]).toBe(0.6)
     // The permission check reads the same answer as from the old setup.
     expect(
@@ -390,12 +438,15 @@ describe('agent profiles', () => {
         actions: {post: {level: 'ask', limit: null}},
       })
       expect(file.agents[1].enabled).toBe(true)
-      expect(file.agents[1].actions).toEqual({
-        answerFlip: {level: 'alone', limit: null},
-        // Not in its list before: read as Off, saved as Off.
-        report: {level: 'off', limit: null},
-        tip: {level: 'ask', limit: 1, amount: 1},
-      })
+      expect(file.agents[1].actions).toEqual(
+        // Plus the read actions an old file's Social actions bring (B-262), tested apart.
+        expect.objectContaining({
+          answerFlip: {level: 'alone', limit: null},
+          // Not in its list before: read as Off, saved as Off.
+          report: {level: 'off', limit: null},
+          tip: {level: 'ask', limit: 1, amount: 1},
+        })
+      )
     })
   })
 

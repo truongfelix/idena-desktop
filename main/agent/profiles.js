@@ -37,6 +37,60 @@ const DEFAULT_POSTS_READ = 10
 /** The events that start a run besides the schedule: a like, an answer, a tip or a private message to it. */
 const EVENTS = ['like', 'answer', 'tip', 'message']
 
+/** The read actions (B-262): what the agent is given to read on Social, each on or off. */
+const READ_ACTIONS = [
+  'readPosts',
+  'readOwnPosts',
+  'readNotifications',
+  'readMessages',
+]
+
+/** The posts' window of Read all Social posts: the last 24 hours, or the last N posts. */
+function postsWindow(row) {
+  const count = Number(row.count)
+  return {
+    window: row.window === 'count' ? 'count' : 'day',
+    count:
+      Number.isInteger(count) && count >= 1 && count <= MAX_POSTS_READ
+        ? count
+        : DEFAULT_POSTS_READ,
+  }
+}
+
+const isOn = (row) => Boolean(row) && row.level !== 'off'
+
+/** What the agent reads, from its read actions: the Social run's view (digest.js). */
+function readsOf(actions) {
+  const posts = actions.readPosts
+  return {
+    posts: isOn(posts)
+      ? {window: posts.window, count: posts.count}
+      : {window: 'off', count: (posts && posts.count) || DEFAULT_POSTS_READ},
+    own: isOn(actions.readOwnPosts),
+    notifications: isOn(actions.readNotifications),
+    messages: isOn(actions.readMessages),
+  }
+}
+
+/**
+ * The read actions of an agent saved before they were actions (B-255: its `reads`; B-239: readsBefore): what it read
+ * then, on; its own posts when it held Post (they came with it).
+ */
+function readActionsBefore(value, actions) {
+  const reads = normalizeReads(
+    value.reads === undefined ? readsBefore(value) : value.reads
+  )
+  const on = {level: 'alone', limit: null}
+  return {
+    ...(reads.posts.window !== 'off'
+      ? {readPosts: {...on, ...postsWindow(reads.posts)}}
+      : {}),
+    ...(isOn(actions.post) ? {readOwnPosts: on} : {}),
+    ...(reads.notifications ? {readNotifications: on} : {}),
+    ...(reads.messages ? {readMessages: on} : {}),
+  }
+}
+
 function normalizeReads(value) {
   const reads = value && typeof value === 'object' ? value : {}
   const posts =
@@ -129,6 +183,7 @@ function normalizeActions(value) {
             ...('amount' in fallback
               ? {amount: normalizeTipAmount(row.amount, fallback.amount)}
               : {}),
+            ...(name === 'readPosts' ? postsWindow(row) : {}),
           },
         ]
       })
@@ -140,6 +195,14 @@ function normalizeAgent(input, {id = newAgentId} = {}) {
   const value = input && typeof input === 'object' ? input : {}
   // The connection and the report thresholds are checked as the single agent's settings were.
   const {provider, address, model, reportThresholds} = normalizeSettings(value)
+  let actions = normalizeActions(value.actions)
+  // Saved before reads were actions (its reads without `own`, which every later save holds, or none at all): the
+  // reads it had become its read actions, once. Never after: a read removed stays removed.
+  const beforeReadActions =
+    !(value.reads && typeof value.reads === 'object' && 'own' in value.reads) &&
+    !READ_ACTIONS.some((name) => value.actions && value.actions[name])
+  if (beforeReadActions)
+    actions = {...actions, ...readActionsBefore(value, actions)}
   const schedule =
     value.schedule && typeof value.schedule === 'object' ? value.schedule : {}
   // A number, or a number written as text; anything else (an empty field included) is no budget.
@@ -161,10 +224,9 @@ function normalizeAgent(input, {id = newAgentId} = {}) {
     // The model that draws pictures, on the same service (B-236 Make the images); '' = none.
     imageModel: text(value.imageModel, 200, ''),
     instructions: text(value.instructions, MAX_INSTRUCTIONS_LENGTH, ''),
-    actions: normalizeActions(value.actions),
-    reads: normalizeReads(
-      value.reads === undefined ? readsBefore(value) : value.reads
-    ),
+    actions,
+    // Derived from its read actions, never set apart (B-262).
+    reads: readsOf(actions),
     events: normalizeEvents(value.events),
     schedule: {
       kind: SCHEDULES.includes(schedule.kind) ? schedule.kind : 'manual',
@@ -388,6 +450,7 @@ function validationAgentSettings(profiles) {
 
 module.exports = {
   EVENTS,
+  READ_ACTIONS,
   MAX_AGENTS,
   MAX_POSTS_READ,
   POST_WINDOWS,

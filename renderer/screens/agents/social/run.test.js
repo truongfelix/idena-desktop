@@ -137,6 +137,25 @@ describe('what a Social run reads', () => {
   })
 })
 
+describe('its own posts, a read of their own (B-262)', () => {
+  test('read only when it is given that read, whatever it may post', () => {
+    const mine = node(5, ME, 'My last joke', 9700)
+    const without = socialDigest(
+      state({feed: [mine], conversations: []}),
+      read(['post'], {...READ_ALL, own: false}),
+      {point: 9800, scanned: HEAD}
+    )
+    expect(without.text).not.toContain('My last joke')
+    const withOwn = socialDigest(
+      state({feed: [mine], conversations: []}),
+      read([], {...READ_ALL, own: true}),
+      {point: 9800, scanned: HEAD}
+    )
+    expect(withOwn.text).toContain('Your last posts, the newest last:')
+    expect(withOwn.text).toContain('My last joke')
+  })
+})
+
 describe('where a run stops reading', () => {
   const many = (n, from) =>
     Array.from({length: n}, (_, i) =>
@@ -458,7 +477,7 @@ describe('a Social run', () => {
     expect(result.count).toEqual({alone: 4, ask: 0, skipped: 0, failed: 0})
     // The permissions and limits are as they were.
     const [after] = (await main.handle('agents')).agents
-    expect(after.actions).toEqual({
+    expect(after.actions).toMatchObject({
       like: {level: 'alone', limit: 2},
       tip: {level: 'alone', limit: 2, amount: 1},
     })

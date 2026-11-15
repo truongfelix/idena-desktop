@@ -59,8 +59,8 @@ const DAY_S = 24 * 60 * 60
 
 /**
  * The digest of a run: `social` is the Social state (feed, me, conversations, profiles' claimed `names`, blocked
- * addresses `blocked`); `reads` what the agent reads (profiles.js: its posts' window, notifications, private
- * messages), `held` the Social actions it may do (not Off: with Post, its own last posts are read too); `point` its
+ * addresses `blocked`); `reads` what the agent reads (profiles.js readsOf, from its read actions: the posts' window,
+ * its own posts, its notifications, its private messages); `point` its
  * read point (null: a first run), `scanned` the last block the Social scan read (the feed holds nothing after it),
  * `now` in ms. The new items are taken oldest first, within each kind's cap and MAX_DIGEST; the first one left out
  * ends what is read (`readTo` stops before its block), so the next run shows it. Returns {text, labels, empty,
@@ -69,7 +69,7 @@ const DAY_S = 24 * 60 * 60
  */
 export function socialDigest(
   social,
-  {reads, held = []},
+  {reads},
   {point, scanned, now = Date.now()}
 ) {
   const {feed = [], me, names = {}, conversations = [], blocked} = social
@@ -210,8 +210,8 @@ export function socialDigest(
     labels.set(id, {kind: 'person', others: [address]})
     return id
   }
-  // Its own last posts: read first, whatever the point (no label: nothing to act on).
-  const own = held.includes('post')
+  // Its own last posts, whatever the point (no label: nothing to act on); only when it is given that read (B-262).
+  const own = reads?.own
     ? feed
         .filter(({call}) => call.author === me && call.height <= scanned)
         .slice(0, OWN_POSTS_SHOWN)

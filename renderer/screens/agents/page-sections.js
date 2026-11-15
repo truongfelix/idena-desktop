@@ -1,19 +1,18 @@
 /* eslint-disable react/prop-types */
 import * as React from 'react'
-import {Box, Checkbox, Flex, Stack, Switch, Text, Wrap} from '@chakra-ui/react'
+import {Box, Checkbox, Flex, Stack, Text, Wrap} from '@chakra-ui/react'
 import {useTranslation} from 'react-i18next'
 import {
   FormControlWithLabel,
-  HDivider,
   Input,
   Select,
   Textarea,
 } from '../../shared/components/components'
 import {SettingsSection} from '../settings/components'
-import {areaNames, readsList, spendingActions} from './catalog'
-import {readNumber} from './limit-fields'
+import {spendingActions} from './catalog'
 
-// The agent page's sections (B-255): its Instructions, what it reads, when it runs and what it spends. Each says
+// The agent page's sections (B-255): its Instructions, when it runs and what it spends (what it reads is among its
+// actions since B-262). Each says
 // what it is for in the ⓘ beside its title, written for any agent; no small print under the fields.
 
 /** A text field saved when it loses the focus, not at each key. */
@@ -99,61 +98,6 @@ export function InstructionsSection({agent, onChange}) {
   )
 }
 
-/** The posts' window: none, the last 24 hours, or the last N posts. */
-function PostsRead({reads, onChange}) {
-  const {t} = useTranslation()
-  const [count, setCount] = useDraft(String(reads.posts.count))
-  const setPosts = (change) =>
-    onChange((a) => ({
-      ...a,
-      reads: {...a.reads, posts: {...a.reads.posts, ...change}},
-    }))
-  return (
-    <Flex align="center" gap={3} wrap="wrap">
-      <Text flex="1 1 160px">{t('Posts')}</Text>
-      <Select
-        w="auto"
-        aria-label={t('Posts')}
-        value={reads.posts.window}
-        onChange={(e) => setPosts({window: e.target.value})}
-      >
-        <option value="off">{t('None')}</option>
-        <option value="day">{t('The last 24 hours')}</option>
-        <option value="count">{t('The last posts')}</option>
-      </Select>
-      {reads.posts.window === 'count' && (
-        <Input
-          type="number"
-          w="80px"
-          min={1}
-          max={50}
-          aria-label={t('How many posts')}
-          value={count}
-          onChange={(e) => setCount(e.target.value)}
-          onBlur={(e) => {
-            const next = readNumber(e.currentTarget.value, {min: 1})
-            if (next === null || next > 50) setCount(String(reads.posts.count))
-            else if (next !== reads.posts.count) setPosts({count: next})
-          }}
-        />
-      )}
-    </Flex>
-  )
-}
-
-function SwitchRow({label, isChecked, onToggle}) {
-  return (
-    <Flex align="center" justify="space-between" gap={3}>
-      <Text>{label}</Text>
-      <Switch
-        aria-label={label}
-        isChecked={isChecked}
-        onChange={(e) => onToggle(e.target.checked)}
-      />
-    </Flex>
-  )
-}
-
 /** Whether the agent holds actions on what others wrote (reply, like, tip, message) but reads nothing of it. */
 export function nothingToActOn({actions, reads}) {
   const acting = ['reply', 'like', 'tip', 'message'].some(
@@ -164,57 +108,6 @@ export function nothingToActOn({actions, reads}) {
     reads.posts.window === 'off' &&
     !reads.notifications &&
     !reads.messages
-  )
-}
-
-/** "What it reads": on Social, the posts' window, its notifications, its messages; and what its actions read. */
-export function ReadsSection({agent, catalog, onChange}) {
-  const {t} = useTranslation()
-  const names = areaNames(t)
-  const setRead = (name, value) =>
-    onChange((a) => ({...a, reads: {...a.reads, [name]: value}}))
-  return (
-    <SettingsSection
-      title={t('What it reads')}
-      foldId="agent.reads"
-      info={t(
-        'What the model is sent, and nothing else: what you turn on here, and what its actions need. It acts only on what it read. Reading spends nothing.',
-        {nsSeparator: '!!'}
-      )}
-      summary={readsList(agent, catalog, t).join(', ')}
-    >
-      <Stack spacing={3}>
-        <Text fontWeight={500}>{names.social}</Text>
-        <PostsRead reads={agent.reads} onChange={onChange} />
-        <SwitchRow
-          label={t('Notifications: likes, answers and tips to it', {
-            nsSeparator: '!!',
-          })}
-          isChecked={agent.reads.notifications}
-          onToggle={(on) => setRead('notifications', on)}
-        />
-        <SwitchRow
-          label={t('Private messages')}
-          isChecked={agent.reads.messages}
-          onToggle={(on) => setRead('messages', on)}
-        />
-        {nothingToActOn(agent) && (
-          <Text color="orange.500">
-            {t(
-              'Its actions on Social have nothing to act on: turn on what it reads.',
-              {nsSeparator: '!!'}
-            )}
-          </Text>
-        )}
-        <HDivider />
-        <Text color="muted">
-          {t('Everything it reads: {{list}}', {
-            list: readsList(agent, catalog, t).join(', '),
-            nsSeparator: '!!',
-          })}
-        </Text>
-      </Stack>
-    </SettingsSection>
   )
 }
 

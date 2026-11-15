@@ -2,6 +2,8 @@ import {AnswerType, RelevanceType} from '../../../shared/types'
 import {
   answersToTake,
   appliedKey,
+  askAgain,
+  MAX_FLIP_TRIES,
   autopilotEvents,
   bestFlipOf,
   flipDeadlineMs,
@@ -266,7 +268,7 @@ describe("Autopilot's marks in the keywords check (B-259, B-260)", () => {
     ])
   })
 
-  test('the best flip: after its approvals are in, the best one from 0.8, once, never over one marked', () => {
+  test('the best flip: after its approvals are in and the flips settled, the best one, once, never over one marked', () => {
     const picks = {
       a: pick({quality: 0.85}),
       b: pick({quality: 0.95}),
@@ -323,15 +325,25 @@ describe("Autopilot's marks in the keywords check (B-259, B-260)", () => {
       isKeywords: true,
     })
     expect(midway).toEqual([{type: 'APPROVE_WORDS', hash: 'b'}])
-    // A flip still waiting for its pick, or for its late report: no best flip yet.
+    // Flips still to ask, one in flight or a late report to ask (the hook's `settled`): no best flip yet.
+    expect(
+      autopilotEvents({
+        flips: approved,
+        picks,
+        applied: new Set(['mark:a', 'mark:b', 'mark:c', 'mark:d']),
+        isKeywords: true,
+        settled: false,
+      }).map(({type}) => type)
+    ).not.toContain('MARK_BEST')
+    // A flip never asked (no time left: settled all the same) does not hold it back (B-261).
     expect(
       autopilotEvents({
         flips: [...approved, flip('e', {option: AnswerType.Left})],
         picks,
         applied: new Set(['mark:a', 'mark:b', 'mark:c', 'mark:d']),
         isKeywords: true,
-      }).map(({type}) => type)
-    ).not.toContain('MARK_BEST')
+      })
+    ).toEqual([{type: 'MARK_BEST', hash: 'b'}])
     // The flip it marked lost its mark to a report: the next best; unmarked by the person (still approved): none.
     const reportedLater = approved.map((one) =>
       one.hash === 'b' ? {...one, relevance: RelevanceType.Irrelevant} : one
@@ -353,14 +365,58 @@ describe("Autopilot's marks in the keywords check (B-259, B-260)", () => {
         isKeywords: true,
       })
     ).toEqual([])
-    // None good enough: none.
+    // B-261: always one when it approved one, however low its quality; without any quality, its surest answer.
     expect(
       bestFlipOf(approved, {
         ...picks,
-        b: pick({quality: 0.7}),
-        a: pick({quality: 0.6}),
-      })
-    ).toBeNull()
+        a: pick({quality: 0.3}),
+        b: pick({quality: 0.2}),
+        d: pick({quality: 0.1}),
+      })?.hash
+    ).toBe('a')
+    expect(
+      bestFlipOf(approved, {
+        a: pick({quality: null, confidence: 0.6}),
+        b: pick({quality: null, confidence: 0.9}),
+        d: pick({quality: null, confidence: 0.7}),
+      })?.hash
+    ).toBe('b')
+    // A flip half suspected of a rule break comes last, chosen only when every approved flip is.
+    expect(
+      bestFlipOf(approved, {
+        a: pick({quality: null, doubted: true, confidence: 0.99}),
+        b: pick({quality: null, confidence: 0.5}),
+      })?.hash
+    ).toBe('b')
+    expect(
+      bestFlipOf(approved, {
+        a: pick({quality: null, doubted: true, confidence: 0.99}),
+      })?.hash
+    ).toBe('a')
+    // None approved: none.
+    expect(bestFlipOf(flips, picks)).toBeNull()
+  })
+})
+
+describe('a flip whose question failed (B-263)', () => {
+  test('asked again twice at most', () => {
+    expect(askAgain(1)).toBe(true)
+    expect(askAgain(2)).toBe(true)
+    expect(askAgain(MAX_FLIP_TRIES)).toBe(false)
+  })
+
+  test('asked again only after every flip not asked yet', () => {
+    const flips = [flip('a'), flip('b'), flip('c')]
+    const again = new Map([['a', 'the model answered HTTP 500']])
+    const opts = {isShort: true}
+    expect(nextFlipToAsk(flips, new Set(), opts, again).hash).toBe('b')
+    expect(nextFlipToAsk(flips, new Set(['b']), opts, again).hash).toBe('c')
+    expect(nextFlipToAsk(flips, new Set(['b', 'c']), opts, again).hash).toBe(
+      'a'
+    )
+    expect(
+      nextFlipToAsk(flips, new Set(['a', 'b', 'c']), opts, again)
+    ).toBeUndefined()
   })
 })
 
