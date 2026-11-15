@@ -8,6 +8,7 @@ import {
   persistedLongAnswersTx,
   timeLeftText,
   txWaitState,
+  validationAlert,
 } from './connection'
 
 jest.mock('../../shared/utils/utils', () => ({
@@ -137,5 +138,32 @@ describe('timeLeftText', () => {
     expect(timeLeftText(t, 10 * 60000 + 59000, 0)).toBe('About 10 min left')
     expect(timeLeftText(t, 59000, 0)).toBe('Under a minute left')
     expect(timeLeftText(t, 0, 5000)).toBe('Under a minute left')
+  })
+})
+
+describe('validationAlert', () => {
+  const base = {
+    offline: false,
+    syncing: false,
+    connectionLost: false,
+    shortAnswersTx: 'mined',
+    inLongSession: true,
+  }
+  it('says no connection while the node calls itself syncing', () => {
+    // A node with no peers answers bcn_syncing with syncing: true (devnet trial 2026-11-15).
+    expect(
+      validationAlert({...base, syncing: true, connectionLost: true})
+    ).toBe('noConnection')
+  })
+  it('keeps offline first and the others in order', () => {
+    expect(
+      validationAlert({...base, offline: true, connectionLost: true})
+    ).toBe('offline')
+    expect(validationAlert({...base, syncing: true})).toBe('syncing')
+    expect(validationAlert({...base, shortAnswersTx: 'late'})).toBe('shortLate')
+    expect(
+      validationAlert({...base, shortAnswersTx: 'late', inLongSession: false})
+    ).toBe(null)
+    expect(validationAlert(base)).toBe(null)
   })
 })

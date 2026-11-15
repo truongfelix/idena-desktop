@@ -23,6 +23,7 @@ import {
   timeLeftText,
   useAnswersTx,
   useNodeConnection,
+  validationAlert,
 } from '../screens/validation/connection'
 
 export default function ValidationPage() {
@@ -108,6 +109,13 @@ function ValidationSession({
   )
   const validationEnd =
     validationStart + (shortSessionDuration + longSessionDuration) * 1000
+  const alert = validationAlert({
+    offline,
+    syncing,
+    connectionLost,
+    shortAnswersTx,
+    inLongSession: state.matches('longSession'),
+  })
 
   return (
     <ValidationScreen
@@ -119,17 +127,17 @@ function ValidationSession({
       isExceededTooltipOpen={isExceededTooltipOpen}
       onCloseExceededTooltip={onCloseExceededTooltip}
     >
-      {syncing && (
+      {alert === 'syncing' && (
         <SynchronizingValidationAlert>
           {t('Synchronizing...')}
         </SynchronizingValidationAlert>
       )}
 
-      {offline && (
+      {alert === 'offline' && (
         <OfflineValidationAlert>{t('Offline')}</OfflineValidationAlert>
       )}
 
-      {!offline && !syncing && connectionLost && (
+      {alert === 'noConnection' && (
         <OfflineValidationAlert>
           {t(
             'Your node has no connection: your answers cannot reach the network',
@@ -138,18 +146,14 @@ function ValidationSession({
         </OfflineValidationAlert>
       )}
 
-      {!offline &&
-        !syncing &&
-        !connectionLost &&
-        shortAnswersTx === 'late' &&
-        state.matches('longSession') && (
-          <SynchronizingValidationAlert>
-            {`${t(
-              'Your short answers are not in a block yet: keep the app open and connected',
-              {nsSeparator: '|'}
-            )} (${timeLeftText(t, validationEnd, Date.now())})`}
-          </SynchronizingValidationAlert>
-        )}
+      {alert === 'shortLate' && (
+        <SynchronizingValidationAlert>
+          {`${t(
+            'Your short answers are not in a block yet: keep the app open and connected',
+            {nsSeparator: '|'}
+          )} (${timeLeftText(t, validationEnd, Date.now())})`}
+        </SynchronizingValidationAlert>
+      )}
 
       {state.matches('validationFailed') && (
         <ValidationFailedDialog isOpen onSubmit={() => router.push('/home')} />

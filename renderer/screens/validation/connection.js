@@ -94,6 +94,23 @@ export function useAnswersTx(hash, sentAt) {
   return txWaitState({mined, sentAt, seenSince: seenSince.current, now})
 }
 
+// The one alert the validation screen shows at the top: 'offline' (the node does not answer), 'noConnection' (no
+// peer or a head that does not move: bcn_syncing then says syncing too, a node without peers counts as syncing, so
+// this comes before 'syncing'), 'syncing', 'shortLate' (the short answers' hash not in a block, long session) or null.
+export function validationAlert({
+  offline,
+  syncing,
+  connectionLost: lost,
+  shortAnswersTx,
+  inLongSession,
+}) {
+  if (offline) return 'offline'
+  if (lost) return 'noConnection'
+  if (syncing) return 'syncing'
+  if (shortAnswersTx === 'late' && inLongSession) return 'shortLate'
+  return null
+}
+
 // "About N min left" until `end` (ms) at `now` (ms).
 export function timeLeftText(t, end, now) {
   const minutes = Math.floor(Math.max(0, end - now) / 60000)
