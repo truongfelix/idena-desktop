@@ -266,7 +266,7 @@ describe("Autopilot's marks in the keywords check (B-259, B-260)", () => {
     ])
   })
 
-  test('the best flip: after its approvals are in, the best one from 0.8, once, never over one marked', () => {
+  test('the best flip: after its approvals are in and the flips settled, the best one, once, never over one marked', () => {
     const picks = {
       a: pick({quality: 0.85}),
       b: pick({quality: 0.95}),
@@ -323,15 +323,33 @@ describe("Autopilot's marks in the keywords check (B-259, B-260)", () => {
       isKeywords: true,
     })
     expect(midway).toEqual([{type: 'APPROVE_WORDS', hash: 'b'}])
-    // A flip still waiting for its pick, or for its late report: no best flip yet.
+    // Flips still to ask, or one in flight (not settled), or a late report waiting: no best flip yet.
+    expect(
+      autopilotEvents({
+        flips: approved,
+        picks,
+        applied: new Set(['mark:a', 'mark:b', 'mark:c', 'mark:d']),
+        isKeywords: true,
+        settled: false,
+      }).map(({type}) => type)
+    ).not.toContain('MARK_BEST')
+    expect(
+      autopilotEvents({
+        flips: approved,
+        picks: {...picks, d: pick({quality: 0.5, reportLater: true})},
+        applied: new Set(['mark:a', 'mark:b', 'mark:c', 'mark:d']),
+        isKeywords: true,
+      }).map(({type}) => type)
+    ).not.toContain('MARK_BEST')
+    // A flip never asked (no time left: settled all the same) does not hold it back (B-261).
     expect(
       autopilotEvents({
         flips: [...approved, flip('e', {option: AnswerType.Left})],
         picks,
         applied: new Set(['mark:a', 'mark:b', 'mark:c', 'mark:d']),
         isKeywords: true,
-      }).map(({type}) => type)
-    ).not.toContain('MARK_BEST')
+      })
+    ).toEqual([{type: 'MARK_BEST', hash: 'b'}])
     // The flip it marked lost its mark to a report: the next best; unmarked by the person (still approved): none.
     const reportedLater = approved.map((one) =>
       one.hash === 'b' ? {...one, relevance: RelevanceType.Irrelevant} : one
@@ -353,14 +371,24 @@ describe("Autopilot's marks in the keywords check (B-259, B-260)", () => {
         isKeywords: true,
       })
     ).toEqual([])
-    // None good enough: none.
+    // B-261: always one when it approved one, however low its quality; without any quality, its surest answer.
     expect(
       bestFlipOf(approved, {
         ...picks,
-        b: pick({quality: 0.7}),
-        a: pick({quality: 0.6}),
-      })
-    ).toBeNull()
+        a: pick({quality: 0.3}),
+        b: pick({quality: 0.2}),
+        d: pick({quality: 0.1}),
+      })?.hash
+    ).toBe('a')
+    expect(
+      bestFlipOf(approved, {
+        a: pick({quality: null, confidence: 0.6}),
+        b: pick({quality: null, confidence: 0.9}),
+        d: pick({quality: null, confidence: 0.7}),
+      })?.hash
+    ).toBe('b')
+    // None approved: none.
+    expect(bestFlipOf(flips, picks)).toBeNull()
   })
 })
 

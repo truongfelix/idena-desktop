@@ -111,9 +111,6 @@ export function answersToTake(flips, picks) {
 const unmarked = (flip) =>
   !flip.relevance || flip.relevance === RelevanceType.Abstained
 
-/** How good a flip must be, as the model says, for the agent to mark it best (B-260). */
-export const BEST_MIN_QUALITY = 0.8
-
 /** Whether the agent marks this flip's keywords alone: the reporting agent's level, or the one agent's. */
 export const marksAlone = (pick) =>
   (pick.markDecision ?? pick.decision) === 'alone'
@@ -126,10 +123,16 @@ export const bestSuggestionOf = (flips, picks) =>
   )?.hash ?? null
 
 /**
- * The flip the agent would mark best (B-260): among the flips approved (relevant) whose agent judged them relevant,
- * the one it found best, from BEST_MIN_QUALITY; null when none. The first of equals, in the session's order.
+ * The flip the agent would mark best (B-260, B-261): among the flips approved (relevant) whose agent judged them
+ * relevant, the one it found best (its quality; a flip without one comes after, by its surest answer). Every long
+ * session gets one when the agent approved a flip; null when none. The first of equals, in the session's order.
  */
 export function bestFlipOf(flips, picks) {
+  const rank = (pick) => [
+    typeof pick.quality === 'number' ? pick.quality : -1,
+    pick.confidence || 0,
+  ]
+  const better = (a, b) => a[0] > b[0] || (a[0] === b[0] && a[1] > b[1])
   let best = null
   flips.forEach((flip) => {
     const pick = picks[flip.hash]
@@ -137,11 +140,10 @@ export function bestFlipOf(flips, picks) {
       !pick ||
       flip.relevance !== RelevanceType.Relevant ||
       pick.relevance !== 'relevant' ||
-      pick.report ||
-      !(pick.quality >= BEST_MIN_QUALITY)
+      pick.report
     )
       return
-    if (!best || pick.quality > picks[best.hash].quality) best = flip
+    if (!best || better(rank(pick), rank(picks[best.hash]))) best = flip
   })
   return best
 }
@@ -149,8 +151,8 @@ export function bestFlipOf(flips, picks) {
 /**
  * Autopilot's events: the answers its permission lets it give alone, and in the keywords check the marks its level
  * lets it make alone: the reports (the surest first when there are more than `reportsLeft`, the session's reports
- * not used yet, B-259), the approvals, then the best flip (B-260) once every approval it makes is in, when none is
- * marked yet (`hasBest`). `applied` holds what it already did, so a mark the person changed is never put back; the
+ * not used yet, B-259), the approvals, then the best flip (B-260, B-261) once every approval it makes is in and the
+ * flips are `settled`, when none is marked yet (`hasBest`). `applied` holds what it already did, so a mark the person changed is never put back; the
  * person's own answer is never replaced.
  */
 export function autopilotEvents({
@@ -160,6 +162,8 @@ export function autopilotEvents({
   isKeywords,
   reportsLeft = 0,
   hasBest = false,
+  // Every flip it can still ask was asked, none in flight (autopilot.js isSettled): the best flip waits for it.
+  settled = true,
 }) {
   const events = []
   flips.forEach((flip) => {
@@ -213,12 +217,15 @@ export function autopilotEvents({
         `best:${flip.hash}` === marked &&
         flip.relevance !== RelevanceType.Relevant
     )
-  // Every flip shown has its pick (one that never loaded gets none, it waits for no one).
-  const allIn = flips.every(
-    (flip) =>
-      !flip.decoded || (picks[flip.hash] && !picks[flip.hash].reportLater)
-  )
-  if (!hasBest && !approvals.length && allIn && (!marked || lost)) {
+  // No late report waiting (its flip's mark may still change).
+  const lateWaits = flips.some((flip) => picks[flip.hash]?.reportLater)
+  if (
+    !hasBest &&
+    !approvals.length &&
+    settled &&
+    !lateWaits &&
+    (!marked || lost)
+  ) {
     const best = bestFlipOf(
       flips.filter(
         (flip) =>

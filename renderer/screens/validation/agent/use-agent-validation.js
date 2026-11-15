@@ -334,11 +334,39 @@ export function useAgentValidation({
       isKeywords: phase === 'keywords',
       reportsLeft: reportsAllowed - reportsUsed,
       hasBest,
+      // Every flip it can still ask was asked (the same as Autopilot's submit waits for).
+      settled: isSettled(flips, asked.current, {
+        asking: asking || lateAsking,
+        outOfTime:
+          sessionEnd({
+            isShort,
+            validationStart,
+            shortSessionDuration,
+            longSessionDuration,
+          }) -
+            Date.now() -
+            END_MARGIN_MS <
+          MIN_FLIP_MS,
+      }),
     }).forEach((event) => {
       applied.current.add(appliedKey(event))
       send(event)
     })
-  }, [active, phase, flips, picks, reportsUsed, reportsAllowed, hasBest, send])
+    // `now` ticks the clock: a flip given up for lack of time settles the session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    active,
+    phase,
+    flips,
+    picks,
+    reportsUsed,
+    reportsAllowed,
+    hasBest,
+    send,
+    asking,
+    lateAsking,
+    now,
+  ])
 
   const end = sessionEnd({
     isShort,
