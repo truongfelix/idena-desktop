@@ -1,6 +1,7 @@
 import {socialDigest} from './digest'
 import {doneOnFeed, readPlan} from './plan'
 import {mostCost} from './execute'
+import {shortAddress} from '../../social/people'
 
 // One run of an agent on Idena Social (B-239, B-240): the app reads what came since its read point (digest.js), the
 // model answers with the actions it wants (planSocial in the main process: the app's frame and its Instructions),
@@ -36,7 +37,7 @@ const short = (text, n = 80) =>
 
 /** The line To approve and Activity show for a planned action. */
 export function plannedLine(planned, {names = {}, amount, fee}, t) {
-  const who = (address) => names[address] || address
+  const who = (address) => names[address] || shortAddress(address)
   const what = {
     post: () => t('a post'),
     reply: () => t('a reply to {{name}}', {name: who(planned.item.author)}),

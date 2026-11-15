@@ -4,7 +4,7 @@ import path from 'path'
 import fs from 'fs-extra'
 import {socialDigest, FIRST_RUN_BLOCKS, MAX_DIGEST} from './digest'
 import {readPlan, doneOnFeed} from './plan'
-import {runSocialAgent, scannedHeight} from './run'
+import {plannedLine, runSocialAgent, scannedHeight} from './run'
 
 // The main process's own agent (permissions, To approve, the day's counts, read points) behind the agent channel:
 // whatever the model answers, what the app does is decided there.
@@ -226,6 +226,18 @@ describe('the plan read from the answer', () => {
   })
 })
 
+describe('the line of a planned action', () => {
+  test('an author without a claimed name is shown by the short address', () => {
+    expect(
+      plannedLine(
+        {action: 'message', others: [ANN]},
+        {names: {}, fee: '0.01'},
+        t
+      )
+    ).toBe('a private message to 0xa110…0001 · fee about 0.01 iDNA')
+  })
+})
+
 describe('a Social run', () => {
   let dir
   let main
@@ -381,6 +393,8 @@ describe('a Social run', () => {
     await runSocialAgent(agent, state(), d)
     expect(d.sent).toEqual([])
     const items = await main.handle('pending')
+    // Named by its claimed name, else its short address.
+    expect(items[1].detail).toMatch(/^a private message to @bob · fee about/)
     // p1 is its own post, p2 Bob's answer to it.
     const first = digest.labels.get('p2')
     expect(
