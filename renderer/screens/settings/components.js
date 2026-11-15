@@ -124,7 +124,10 @@ function FoldingSection({
           )}
         </Flex>
       </Heading>
-      {isOpen && <Box id={contentId}>{children}</Box>}
+      {/* Hidden, not unmounted: what is typed in a folded section (a key not saved yet) stays. */}
+      <Box id={contentId} hidden={!isOpen}>
+        {children}
+      </Box>
     </Box>
   )
 }
