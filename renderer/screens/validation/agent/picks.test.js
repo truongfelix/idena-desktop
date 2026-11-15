@@ -399,11 +399,24 @@ describe("Autopilot's marks in the keywords check (B-259, B-260)", () => {
 })
 
 describe('a flip whose question failed (B-263)', () => {
-  test('asked again twice at most, and only while the session gives it time', () => {
-    expect(askAgain(1, 20000)).toBe(true)
-    expect(askAgain(2, 20000)).toBe(true)
-    expect(askAgain(MAX_FLIP_TRIES, 20000)).toBe(false)
-    expect(askAgain(1, null)).toBe(false)
+  test('asked again twice at most', () => {
+    expect(askAgain(1)).toBe(true)
+    expect(askAgain(2)).toBe(true)
+    expect(askAgain(MAX_FLIP_TRIES)).toBe(false)
+  })
+
+  test('asked again only after every flip not asked yet', () => {
+    const flips = [flip('a'), flip('b'), flip('c')]
+    const again = new Map([['a', 'the model answered HTTP 500']])
+    const opts = {isShort: true}
+    expect(nextFlipToAsk(flips, new Set(), opts, again).hash).toBe('b')
+    expect(nextFlipToAsk(flips, new Set(['b']), opts, again).hash).toBe('c')
+    expect(nextFlipToAsk(flips, new Set(['b', 'c']), opts, again).hash).toBe(
+      'a'
+    )
+    expect(
+      nextFlipToAsk(flips, new Set(['a', 'b', 'c']), opts, again)
+    ).toBeUndefined()
   })
 })
 

@@ -110,6 +110,8 @@ export function useAgentValidation({
   const asked = React.useRef(new Set())
   // Each flip's questions so far, by hash (B-263: a failed one is asked again a few times).
   const triesOf = React.useRef(new Map())
+  // The flips to ask again, by hash, with the last failure's reason (their failed pick when no time is left).
+  const again = React.useRef(new Map())
   const applied = React.useRef(new Set())
   const seen = React.useRef(new Map())
   const drawn = React.useRef(new Map())
@@ -143,11 +145,13 @@ export function useAgentValidation({
   const isShort = phase === 'short'
 
   // A pause cuts the countdown: after the resume, a new one, from its start. It also forgets the last failure: the
-  // agent asks again after the resume (the key may have been fixed meanwhile).
+  // agent asks again after the resume (the key may have been fixed meanwhile), each flip with all its tries.
   React.useEffect(() => {
     if (!active) {
       setCountdown({step: null, end: null})
       setNoAnswer(null)
+      triesOf.current = new Map()
+      again.current = new Map()
     } else setNow(Date.now())
   }, [active])
 
@@ -159,6 +163,7 @@ export function useAgentValidation({
     sessionRef.current = session
     asked.current = new Set()
     triesOf.current = new Map()
+    again.current = new Map()
     applied.current = new Set()
     seen.current = new Map()
     drawn.current = new Map()
@@ -199,10 +204,15 @@ export function useAgentValidation({
     if (!active || !phase || asking) return
     if (mode === 'report' && isShort) return
     // An agent that only reports needs the keywords: it never asks a flip without them.
-    const flip = nextFlipToAsk(flips, asked.current, {
-      isShort,
-      withoutWords: mode === 'report' ? new Set() : withoutWords,
-    })
+    const flip = nextFlipToAsk(
+      flips,
+      asked.current,
+      {
+        isShort,
+        withoutWords: mode === 'report' ? new Set() : withoutWords,
+      },
+      again.current
+    )
     if (!flip) return
     const timeoutMs = flipDeadlineMs({
       end: sessionEnd({
@@ -215,8 +225,21 @@ export function useAgentValidation({
       flipsLeft: flipsLeftToAsk(flips, asked.current),
       isShort,
     })
-    if (!timeoutMs) return
+    if (!timeoutMs) {
+      // No time left to ask them again (B-263): the flips that failed keep their failure, as after their last try.
+      if (again.current.size) {
+        const failed = {}
+        again.current.forEach((reason, hash) => {
+          asked.current.add(hash)
+          failed[hash] = {failed: true, reason}
+        })
+        again.current = new Map()
+        setPicks((current) => ({...current, ...failed}))
+      }
+      return
+    }
     asked.current.add(flip.hash)
+    again.current.delete(flip.hash)
     const token = `${session}:${flip.hash}`
     setAsking(token)
     const start = Date.now()
@@ -233,29 +256,14 @@ export function useAgentValidation({
       .then((answer) => {
         // Gone, or a question of the session before: dropped.
         if (!live.current || sessionRef.current !== session) return
-        // A model error (B-263): asked again, at most twice more, while the session gives the flip time; the error
-        // shows meanwhile.
+        // A model error (B-263): asked again, at most twice more, after the flips not asked yet and while the
+        // session gives the flip time; the error shows meanwhile.
         if (answer?.failed) {
           const tries = (triesOf.current.get(flip.hash) || 0) + 1
           triesOf.current.set(flip.hash, tries)
-          const left = new Set(asked.current)
-          left.delete(flip.hash)
-          const again = askAgain(
-            tries,
-            flipDeadlineMs({
-              end: sessionEnd({
-                isShort,
-                validationStart,
-                shortSessionDuration,
-                longSessionDuration,
-              }),
-              now: Date.now(),
-              flipsLeft: flipsLeftToAsk(flips, left),
-              isShort,
-            })
-          )
-          if (again) {
+          if (askAgain(tries)) {
             asked.current.delete(flip.hash)
+            again.current.set(flip.hash, answer.reason)
             setNoAnswer({reason: answer.reason})
             setAsking((current) => (current === token ? null : current))
             return

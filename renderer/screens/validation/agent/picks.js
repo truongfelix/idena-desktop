@@ -26,20 +26,19 @@ export const MIN_FLIP_MS = 2 * 1000
 /** The longest error shown on the validation screen when the model gave no answer. */
 export const NO_ANSWER_MAX_CHARS = 160
 
-/**
- * Why the agent gave no answer (the model's error, or the app's before the call), as the validation screen shows it: the error's text, cut to NO_ANSWER_MAX_CHARS;
- * null for a question stopped by a pause (asked again after the resume, not a failure).
- */
 /** A flip's questions at most: the first and two more after a model error (B-263). */
 export const MAX_FLIP_TRIES = 3
 
 /**
- * Whether a flip whose question failed (`tries` made so far) is asked again: fewer than MAX_FLIP_TRIES, and the
- * session still gives it a share of its time (`timeoutMs`, flipDeadlineMs of the flips left with it; null: none).
+ * Whether a flip whose question failed (`tries` made so far) is asked again: fewer than MAX_FLIP_TRIES. It is asked
+ * after the flips not asked yet, and only while the session gives it a share of its time (the asking loop).
  */
-export const askAgain = (tries, timeoutMs) =>
-  tries < MAX_FLIP_TRIES && Boolean(timeoutMs)
+export const askAgain = (tries) => tries < MAX_FLIP_TRIES
 
+/**
+ * Why the agent gave no answer (the model's error, or the app's before the call), as the validation screen shows it: the error's text, cut to NO_ANSWER_MAX_CHARS;
+ * null for a question stopped by a pause (asked again after the resume, not a failure).
+ */
 export function noAnswerReason(text) {
   const reason = String(text || '').trim()
   if (reason === 'stopped') return null
@@ -82,9 +81,16 @@ export function isAskable(flip, {isShort, withoutWords = new Set()}) {
   return isShort || withoutWords.has(flip.hash) || decodedWithKeywords(flip)
 }
 
-/** The next flip to ask, in the order shown; `asked` holds the hashes already asked. */
-export function nextFlipToAsk(flips, asked, options) {
-  return flips.find((flip) => !asked.has(flip.hash) && isAskable(flip, options))
+/**
+ * The next flip to ask, in the order shown; `asked` holds the hashes already asked. The flips to ask again after a
+ * model error (`again`, the hashes; B-263) come after every flip not asked yet.
+ */
+export function nextFlipToAsk(flips, asked, options, again = new Map()) {
+  const askable = (flip) => !asked.has(flip.hash) && isAskable(flip, options)
+  return (
+    flips.find((flip) => askable(flip) && !again.has(flip.hash)) ||
+    flips.find(askable)
+  )
 }
 
 /** The flips not asked yet that can still be (not failed), to share the time left between them. */
