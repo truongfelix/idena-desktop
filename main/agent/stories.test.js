@@ -148,4 +148,24 @@ describe('flip stories (B-236)', () => {
     )
     expect(story.prompts[2]).toBe('A flower in the pot.')
   })
+
+  test('a line of a prompt that only begins with a label word goes on', () => {
+    const text = [
+      '**Image Prompt 1:** A boy runs toward the',
+      'Goal posts at the end of a green field, no text.',
+      '**Image Prompt 2:** Two.',
+      '**Image Prompt 3:** Three.',
+    ].join('\n')
+    expect(readStory(text, 3).prompts[0]).toBe(
+      'A boy runs toward the\nGoal posts at the end of a green field, no text.'
+    )
+  })
+
+  test('a long keyword description is cut, the story still asked', () => {
+    const sent = storySystem(3, [
+      {name: 'ladder', desc: 'y'.repeat(900)},
+      {name: 'kite'},
+    ])
+    expect(sent).toContain(`Keyword 1: ladder (${'y'.repeat(200)})`)
+  })
 })

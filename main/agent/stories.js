@@ -159,14 +159,15 @@ function storySystem(panels, words, instructions = '') {
         typeof w.name === 'string' &&
         w.name.trim() &&
         w.name.length <= MAX_KEYWORD_LENGTH &&
-        (w.desc === undefined ||
-          w.desc === null ||
-          (typeof w.desc === 'string' && w.desc.length <= MAX_KEYWORD_LENGTH))
+        (w.desc === undefined || w.desc === null || typeof w.desc === 'string')
     )
   )
     throw new Error("a story needs the flip's two keywords")
-  const keyword = ({name, desc}) =>
-    desc && desc.trim() ? `${name.trim()} (${desc.trim()})` : name.trim()
+  // A description is cut, never refused: a long community one must not stop the story.
+  const keyword = ({name, desc}) => {
+    const about = (desc || '').trim().slice(0, MAX_KEYWORD_LENGTH)
+    return about ? `${name.trim()} (${about})` : name.trim()
+  }
   // A function as replacement: a "$&" in a keyword stays as it is.
   const text = (panels === 3 ? TEMPLATE_3 : TEMPLATE_4)
     .replace('{KEYWORD_1}', () => keyword(words[0]))
@@ -194,9 +195,10 @@ const LABELS = [
   'Keyword Integration',
   'Image Prompt \\d+',
 ]
-const NEXT = `\\n[ \\t]*(?:[-*][ \\t]+)?(?:\\*\\*|#{1,6}[ \\t]*)?(?:${LABELS.join(
-  '|'
-)})\\b|\\n#{1,6}[ \\t]|\\n[-*_]{3,}[ \\t]*(?:\\n|$)|$`
+const LABEL = `(?:${LABELS.join('|')})`
+// A label starts a line as bold ("**Goal"), a heading ("### Goal") or followed by its colon ("Goal:"): a line that
+// only begins with the word ("Goal posts …") goes on.
+const NEXT = `\\n[ \\t]*(?:[-*][ \\t]+)?(?:\\*\\*${LABEL}\\b|#{1,6}[ \\t]*${LABEL}\\b|${LABEL}(?:[ \\t]*\\([^)\\n]*\\))?[ \\t]*:)|\\n#{1,6}[ \\t]|\\n[-*_]{3,}[ \\t]*(?:\\n|$)|$`
 
 /**
  * The text after a label, written "**Goal:** …", "**Goal**: …", "### Goal", "Goal:" or with a note in brackets

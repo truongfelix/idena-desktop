@@ -32,54 +32,35 @@ export function storyAgentOf(list) {
   )
 }
 
-/** The flip's two keywords, as the agent is sent them; null without both. */
+/** The flip's two keywords, as the agent is sent them (a description cut at 200 characters); null without both. */
 export function storyWords(keywords) {
   const words = (keywords && keywords.words) || []
   if (words.length < 2 || !words[0].name || !words[1].name) return null
-  return words.slice(0, 2).map(({name, desc}) => ({name, desc: desc || ''}))
+  return words
+    .slice(0, 2)
+    .map(({name, desc}) => ({name, desc: (desc || '').slice(0, 200)}))
 }
 
-// The stories written in this window, by keywords and count of panels: the images step still shows the prompts the
-// keywords step got, and going back does not ask the model again.
+const names = (words) => words.map(({name}) => name)
+
+/**
+ * The draft's story (the flip machine's `story`, B-236) when it was written for these keywords; null otherwise (a
+ * story of other keywords, none yet, or a draft of an older version).
+ */
+export function storyForKeywords(saved, words) {
+  if (!saved || !words || !Array.isArray(saved.words)) return null
+  if (!Array.isArray(saved.prompts) || !saved.prompts.length) return null
+  return saved.words.join('|') === names(words).join('|') ? saved : null
+}
+
+/** A story as the draft keeps it: what the agent wrote, with its keywords. */
+export const draftStory = (story, words) => ({...story, words: names(words)})
+
+// The stories written in this window, by keywords and count: going between 3 and 4 pictures does not ask again.
 const written = new Map()
-// The story the keywords step shows for each pair of keywords: what the images step shows too.
-const latest = new Map()
 // Alone asks once per keywords and count in this window, a failed answer included: a retry is the person's click.
 const asked = new Set()
-const listeners = new Set()
-const wordsKey = (words) => words.map(({name}) => name).join('|')
-const storyKey = (words, panels) =>
-  `${panels}|${words.map(({name}) => name).join('|')}`
-
-/** A story written for these keywords and count, kept for this window. */
-export function rememberStory(words, panels, story) {
-  written.set(storyKey(words, panels), story)
-}
-
-/** The story kept for these keywords and count, now the one shown for the keywords (images step included). */
-export function pickStory(words, panels) {
-  const story = written.get(storyKey(words, panels)) || null
-  if (story) {
-    latest.set(wordsKey(words), story)
-    listeners.forEach((listener) => listener())
-  }
-  return story
-}
-
-/** The story shown for these keywords, whatever its count. */
-export function shownStory(words) {
-  return latest.get(wordsKey(words)) || null
-}
-
-/** Renders again when a story is shown: one may come after the person reached the images step. */
-function useShownStories() {
-  const [, setTick] = React.useState(0)
-  React.useEffect(() => {
-    const listener = () => setTick((n) => n + 1)
-    listeners.add(listener)
-    return () => listeners.delete(listener)
-  }, [])
-}
+const storyKey = (words, panels) => `${panels}|${names(words).join('|')}`
 
 function PromptRow({index, prompt}) {
   const {t} = useTranslation()
@@ -139,59 +120,66 @@ function StoryView({story, withSummary = true}) {
   )
 }
 
-/** The keywords step: write a story with the agent, 3 pictures (the 4th the person's) or 4, and its prompts. */
-export function FlipStoryHelper({keywords}) {
+/**
+ * The keywords step: write a story with the agent, 3 pictures (the 4th the person's) or 4, and its prompts. The story
+ * shown is the draft's (`story`); a new one goes to the draft through `onStory`.
+ */
+export function FlipStoryHelper({keywords, story: saved, onStory}) {
   const {t} = useTranslation()
   const {list} = useAgents()
   const agent = storyAgentOf(list)
   const words = storyWords(keywords)
-  const [panels, setPanels] = React.useState(3)
+  const kept = storyForKeywords(saved, words)
+  const [panels, setPanels] = React.useState(kept ? kept.prompts.length : 3)
   const key = words ? storyKey(words, panels) : null
-  // The first render reads only: the effect below makes it the shown story (no other component updated in a render).
-  const [story, setStory] = React.useState(
-    () => (key && written.get(key)) || null
-  )
+  const story =
+    kept && kept.prompts.length === panels
+      ? kept
+      : (key && written.get(key)) || null
   const [error, setError] = React.useState(null)
   const [isWriting, setIsWriting] = React.useState(false)
-  // Each write and each change of keywords or count: an answer for other keywords or another count is kept, never
-  // shown here.
+  // The keywords and count now: an answer for others is kept for this window, never shown nor saved here.
+  const current = React.useRef(key)
+  current.current = key
   const run = React.useRef(0)
 
   React.useEffect(() => {
     run.current += 1
     setIsWriting(false)
-    setStory((words && pickStory(words, panels)) || null)
     setError(null)
-    // words is rebuilt at each render: the key says when it changed.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
 
   const write = React.useCallback(async () => {
     if (!agent || !words) return
     const forWords = words
     const forPanels = panels
+    const forKey = storyKey(forWords, forPanels)
     run.current += 1
     const mine = run.current
-    asked.add(storyKey(forWords, forPanels))
+    asked.add(forKey)
     setIsWriting(true)
     setError(null)
     try {
-      const next = await writeFlipStory(agent.id, forPanels, forWords)
-      rememberStory(forWords, forPanels, next)
-      if (run.current === mine) setStory(pickStory(forWords, forPanels))
+      const next = draftStory(
+        await writeFlipStory(agent.id, forPanels, forWords),
+        forWords
+      )
+      written.set(forKey, next)
+      if (current.current === forKey) onStory(next)
     } catch (e) {
       if (run.current === mine) setError(agentErrorText(e))
     } finally {
       if (run.current === mine) setIsWriting(false)
     }
+    // words is rebuilt at each render: the key says when it changed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agent && agent.id, key])
+  }, [agent && agent.id, key, onStory])
 
   // Alone: as soon as the keywords show, once per keywords and count.
   const isAlone = agent && agent.actions.flipStory.level === 'alone'
   React.useEffect(() => {
-    if (isAlone && key && !written.has(key) && !asked.has(key)) write()
-  }, [isAlone, key, write])
+    if (isAlone && key && !story && !asked.has(key)) write()
+  }, [isAlone, key, story, write])
 
   if (!agent || !words) return null
   return (
@@ -215,7 +203,12 @@ export function FlipStoryHelper({keywords}) {
                 variant={panels === n ? 'solid' : 'outline'}
                 colorScheme={panels === n ? 'blue' : 'gray'}
                 isDisabled={isWriting}
-                onClick={() => setPanels(n)}
+                onClick={() => {
+                  setPanels(n)
+                  // A story of that count written earlier in this window: the draft keeps it again.
+                  const earlier = written.get(storyKey(words, n))
+                  if (earlier && earlier !== kept) onStory(earlier)
+                }}
               >
                 {n === 3 ? t('3 pictures, the 4th yours') : t('4 pictures')}
               </Button>
@@ -290,6 +283,7 @@ async function asFrame({mediaType, data}) {
  */
 export function FlipStoryPrompts({
   keywords,
+  story: saved,
   images = [],
   originalOrder,
   adversarialImageId,
@@ -307,14 +301,15 @@ export function FlipStoryPrompts({
     },
     []
   )
-  useShownStories()
   const agent = storyAgentOf(list)
   const words = storyWords(keywords)
-  if (!agent || !words) return null
-  const story = shownStory(words)
-  if (!story) return null
-  const count = story.prompts.length
+  const story = storyForKeywords(saved, words)
+  const count = story ? story.prompts.length : 0
   const slots = storySlots(originalOrder, adversarialImageId, count)
+  // The slots as the editor orders them now: a picture drawn after a move goes where the story's picture now is.
+  const slotsNow = React.useRef(slots)
+  slotsNow.current = slots
+  if (!agent || !story) return null
   const canDraw =
     agent.provider !== 'anthropic' && Boolean(agent.imageModel) && onImage
   const replaces = slots && slots.some((n) => images[n])
@@ -329,7 +324,8 @@ export function FlipStoryPrompts({
         const picture = await drawStoryPicture(agent.id, story.prompts[i])
         // eslint-disable-next-line no-await-in-loop
         const frame = await asFrame(picture)
-        if (alive.current) onImage(slots[i], frame)
+        if (!alive.current || !slotsNow.current) break
+        onImage(slotsNow.current[i], frame)
       }
     } catch (e) {
       if (alive.current) setError(agentErrorText(e))

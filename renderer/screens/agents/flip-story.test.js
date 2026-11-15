@@ -1,4 +1,11 @@
-import {fitContain, storyAgentOf, storySlots, storyWords} from './flip-story'
+import {
+  draftStory,
+  fitContain,
+  storyAgentOf,
+  storyForKeywords,
+  storySlots,
+  storyWords,
+} from './flip-story'
 
 // B-236: the flip editor shows the story panel only for an agent that is on and holds "Write flip stories".
 
@@ -101,5 +108,36 @@ describe('Make the images: which slots, and the picture in the frame', () => {
       width: 440,
       height: 293,
     })
+  })
+})
+
+describe("the draft's story for these keywords (B-236)", () => {
+  const words = [{name: 'ladder'}, {name: 'kite'}]
+  const saved = draftStory({title: 'T', prompts: ['a', 'b', 'c']}, words)
+
+  test('kept with its keywords, shown again for them', () => {
+    expect(saved.words).toEqual(['ladder', 'kite'])
+    expect(storyForKeywords(saved, words)).toBe(saved)
+  })
+
+  test('none for other keywords, without one, or for a draft that has none', () => {
+    expect(
+      storyForKeywords(saved, [{name: 'ladder'}, {name: 'boat'}])
+    ).toBeNull()
+    expect(storyForKeywords(null, words)).toBeNull()
+    expect(storyForKeywords({title: 'T', prompts: ['a']}, words)).toBeNull()
+    expect(
+      storyForKeywords({words: ['ladder', 'kite'], prompts: []}, words)
+    ).toBeNull()
+  })
+
+  test('a long description is cut for the agent, not refused', () => {
+    const [first] = storyWords({
+      words: [
+        {name: 'ladder', desc: 'x'.repeat(500)},
+        {name: 'kite', desc: ''},
+      ],
+    })
+    expect(first.desc).toHaveLength(200)
   })
 })

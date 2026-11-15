@@ -534,6 +534,43 @@ export const flipMachine = Machine(
   }
 )
 
+/** A flip's draft as the editor saves it (persistFlip's fields), for the story saved before any picture (B-236). */
+export function draftOf({
+  id,
+  type,
+  createdAt,
+  keywordPairId,
+  originalOrder,
+  order,
+  orderPermutations,
+  images,
+  scenes,
+  protectedImages,
+  noise,
+  adversarialImageId,
+  adversarialPlaced,
+  keywords,
+  story,
+}) {
+  return {
+    id,
+    type,
+    createdAt,
+    keywordPairId,
+    originalOrder,
+    order,
+    orderPermutations,
+    images,
+    scenes,
+    protectedImages,
+    noise,
+    adversarialImageId,
+    adversarialPlaced,
+    keywords,
+    story,
+  }
+}
+
 export const flipMasterMachine = Machine(
   {
     id: 'flipMaster',
@@ -555,6 +592,8 @@ export const flipMasterMachine = Machine(
       order: DEFAULT_FLIP_ORDER,
       orderPermutations: DEFAULT_FLIP_ORDER,
       adversarialImageId: 3,
+      // The story an agent wrote for this flip (B-236): kept with the draft, on this computer only, never submitted.
+      story: null,
       // The nonsense picture got its slot (B-210): it is placed once, on the way into the editor, and never moved after.
       adversarialPlaced: false,
       didShowBadFlip: true,
@@ -1002,6 +1041,23 @@ export const flipMasterMachine = Machine(
           },
         },
         on: {
+          // A story written by the agent (B-236), in any step: kept in the draft, which it creates when there is none.
+          CHANGE_STORY: {
+            actions: [
+              assign((context, {story}) =>
+                context.id
+                  ? {story}
+                  : {
+                      story,
+                      id: nanoid(),
+                      createdAt: new Date().toISOString(),
+                      type: FlipType.Draft,
+                    }
+              ),
+              'persistStory',
+              log(),
+            ],
+          },
           PICK_IMAGES: '.images',
           PICK_PROTECT: '.protect',
           PICK_KEYWORDS: '.keywords',
@@ -1054,6 +1110,7 @@ export const flipMasterMachine = Machine(
             adversarialImageId,
             adversarialPlaced,
             keywords,
+            story,
             type,
             createdAt,
           },
@@ -1081,6 +1138,7 @@ export const flipMasterMachine = Machine(
               adversarialImageId,
               adversarialPlaced,
               keywords,
+              story,
             }
 
             nextFlip = id
@@ -1125,6 +1183,16 @@ export const flipMasterMachine = Machine(
       }),
       persistFlip: (context) => {
         global.flipStore.updateDraft(context)
+      },
+      // The story with the draft (B-236): the fields persistFlip writes, the draft added when it is new.
+      persistStory: (context) => {
+        const draft = draftOf(context)
+        if (global.flipStore.getFlip(context.id))
+          global.flipStore.updateDraft({
+            ...draft,
+            modifiedAt: new Date().toISOString(),
+          })
+        else global.flipStore.addDraft(draft)
       },
       assignEpochNumber: assign({
         epochNumber: (_, {epochNumber}) => epochNumber,
