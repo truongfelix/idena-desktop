@@ -175,7 +175,8 @@ function PracticeReports({reports}) {
 
 /**
  * The Model section: where it runs, its address and name, the key of a hosted one, the practice test (`test`, for an
- * agent answering the validation; none otherwise). `sentLine` says what a hosted service is sent.
+ * agent answering the validation; none otherwise). `sentLine` says what a hosted service is sent; with `info` (an ⓘ
+ * beside the title, B-255), no line is shown under the section.
  */
 export function ModelSection({
   status,
@@ -185,6 +186,7 @@ export function ModelSection({
   test,
   sentLine,
   title,
+  info,
 }) {
   const {t} = useTranslation()
   const providers = useProviders()
@@ -194,6 +196,7 @@ export function ModelSection({
   return (
     <SettingsSection
       title={title || t('Model')}
+      info={info}
       foldId="agent.connection"
       summary={[
         (providers.find(({id}) => id === settings.provider) || {}).label,
@@ -284,14 +287,16 @@ export function ModelSection({
           </Flex>
         )}
         {test && <PracticeReports reports={test.reports} />}
-        <Text color="muted" fontSize="sm">
-          {sentLine ||
-            (isLocal
-              ? t('The flip pictures stay on this computer.')
-              : t(
-                  'During a validation, the flip pictures and keywords are sent to this service. They become public on the chain after the ceremony anyway; nothing else is sent.'
-                ))}
-        </Text>
+        {!info && (
+          <Text color="muted" fontSize="sm">
+            {sentLine ||
+              (isLocal
+                ? t('The flip pictures stay on this computer.')
+                : t(
+                    'During a validation, the flip pictures and keywords are sent to this service. They become public on the chain after the ceremony anyway; nothing else is sent.'
+                  ))}
+          </Text>
+        )}
       </Stack>
     </SettingsSection>
   )

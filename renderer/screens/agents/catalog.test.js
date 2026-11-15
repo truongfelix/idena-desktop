@@ -6,7 +6,8 @@ import {
   readsList,
   runsLine,
 } from './catalog'
-import {agentsCardTitle} from '../settings/agent/agent-card'
+import {agentsDot} from './menu-state'
+import {nothingToActOn} from './page-sections'
 import {activityText} from '../settings/agent/activity-section'
 
 const t = (text, values = {}) =>
@@ -18,6 +19,12 @@ const agent = (more = {}) => ({
   enabled: true,
   actions: {},
   schedule: {kind: 'manual', time: '09:00'},
+  reads: {
+    posts: {window: 'off', count: 10},
+    notifications: false,
+    messages: false,
+  },
+  events: [],
   budgetPerDay: null,
   ...more,
 })
@@ -37,12 +44,10 @@ describe('the Agents section lines', () => {
   })
 
   test('the model reads only what its actions that are not off need, each once', () => {
-    expect(readsList(agent(), catalog, t)).toEqual([
-      'Nothing: every action is off',
-    ])
+    expect(readsList(agent(), catalog, t)).toEqual(['Nothing'])
     expect(
       readsList(agent({actions: {answerFlip: {level: 'off'}}}), catalog, t)
-    ).toEqual(['Nothing: every action is off'])
+    ).toEqual(['Nothing'])
     expect(
       readsList(
         agent({actions: {answerFlip: {level: 'ask'}, report: {level: 'ask'}}}),
@@ -109,15 +114,31 @@ describe('the Agents section lines', () => {
     ).toBe('Answered a flip: left 0.80')
   })
 
-  test("the menu card's title counts the agents on", () => {
+  test("the menu's dot: orange while an action waits, green while an agent is on, none otherwise", () => {
     const list = (agents, paused = false) => ({paused, agents})
-    expect(agentsCardTitle(t, list([agent()]))).toBe('1 agent on')
+    expect(agentsDot(list([agent()]), 2)).toBe('waiting')
+    expect(agentsDot(list([agent()]), 0)).toBe('on')
+    expect(agentsDot(list([agent()], true), 0)).toBeNull()
+    expect(agentsDot(list([agent({enabled: false})]), 0)).toBeNull()
+    expect(agentsDot(null, 0)).toBeNull()
+  })
+
+  test('a warning when its Social actions have nothing to act on', () => {
+    const off = {
+      posts: {window: 'off', count: 10},
+      notifications: false,
+      messages: false,
+    }
+    const act = {reply: {level: 'alone'}}
+    expect(nothingToActOn({actions: act, reads: off})).toBe(true)
     expect(
-      agentsCardTitle(
-        t,
-        list([agent(), agent({id: 'b'}), agent({enabled: false})])
-      )
-    ).toBe('2 agents on')
-    expect(agentsCardTitle(t, list([agent()], true))).toBe('Agents paused')
+      nothingToActOn({actions: act, reads: {...off, notifications: true}})
+    ).toBe(false)
+    expect(
+      nothingToActOn({actions: {post: {level: 'alone'}}, reads: off})
+    ).toBe(false)
+    expect(nothingToActOn({actions: {reply: {level: 'off'}}, reads: off})).toBe(
+      false
+    )
   })
 })

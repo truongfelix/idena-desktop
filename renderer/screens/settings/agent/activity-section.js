@@ -103,6 +103,9 @@ export function ActivitySection({activity, onClear}) {
   return (
     <SettingsSection
       title={t('Activity')}
+      info={t(
+        'Everything the agent did, asked for or was refused, newest first. The log is kept until the app closes.'
+      )}
       foldId="agent.activity"
       summary={activity.length ? formatTime(activity[0].at) : t('Nothing yet.')}
     >
@@ -145,10 +148,7 @@ export function ActivitySection({activity, onClear}) {
           ))}
         </Stack>
       )}
-      <Flex mt={3} gap={4} align="center" justify="space-between">
-        <Text color="muted" fontSize="sm">
-          {t('The log is kept until the app closes.')}
-        </Text>
+      <Flex mt={3} gap={4} align="center" justify="flex-end">
         {onClear && rows.length > 0 && (
           <Button size="sm" variant="link" colorScheme="blue" onClick={onClear}>
             {t('Clear')}

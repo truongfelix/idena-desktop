@@ -1,4 +1,3 @@
-import {agentCardLine} from './agent-card'
 import {
   clearAgentKey,
   lastAgentStatus,
@@ -7,7 +6,6 @@ import {
 } from './api'
 import {agentMode} from '../../validation/agent/use-agent-validation'
 
-const t = (text) => text
 const settings = (level, more = {}) => ({
   enabled: true,
   paused: false,
@@ -39,19 +37,9 @@ afterEach(() => {
   delete global.ipcRenderer
 })
 
-describe("the agent's card in the menu", () => {
-  test('says what the agent does now', () => {
-    const line = (s, hasKey = true) => agentCardLine(t, {settings: s, hasKey})
-    expect(line(settings('alone'))).toBe('Autopilot in the validation')
-    expect(line(settings('ask'))).toBe('Suggests the answers in the validation')
-    expect(line(settings('off'))).toBe('Answers in the validation are off')
-    expect(line(settings('alone', {paused: true}))).toMatch(/^Paused/u)
-    expect(line(settings('alone', {model: ''}))).toBe('No model chosen yet')
-    expect(line(settings('alone', {provider: 'openai'}), false)).toBe(
-      'No API key kept for this service'
-    )
-  })
-
+// The agent's settings written from several places (api.js), and its mode in a validation; kept from the menu card's
+// tests when the card went (B-255).
+describe("the agent's settings, written in turn", () => {
   test('two quick changes from two places are both kept, one after the other', async () => {
     const saved = fakeMain(settings('ask'))
     // The page's field and the card's Pause, sent together.

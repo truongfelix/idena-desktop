@@ -16,7 +16,7 @@ import {VotingNotificationProvider} from '../shared/providers/voting-notificatio
 import {OnboardingProvider} from '../shared/providers/onboarding-context'
 import {DnaLinkProvider} from '../screens/dna/hooks'
 import {SocialProvider} from '../screens/social/provider'
-import {AgentRunner} from '../screens/agents/joke/runner'
+import {AgentRunner} from '../screens/agents/runner'
 import {ConfirmQuit} from '../shared/components/confirm-quit'
 import {DamagedStoresNotice} from '../shared/components/damaged-stores-notice'
 import {queryClient} from '../shared/utils/utils'

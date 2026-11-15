@@ -27,10 +27,63 @@ const SCHEDULES = ['validation', 'hourly', 'daily', 'manual']
 const DEFAULT_TIME = '09:00'
 
 /**
- * What an agent does when it runs, beyond its actions: the daily joke of 3615 IDENA (B-237, the app writes its
- * frame and counts its tips). None: it only acts within its actions.
+ * What an agent reads on Idena Social (B-255, notes/agent-areas.md): the posts (none, those of the last 24 hours, or
+ * the last N), its notifications (likes, answers, tips to it), its private messages. Reading spends nothing: it is
+ * what the model is sent.
  */
-const TASKS = ['joke']
+const POST_WINDOWS = ['off', 'day', 'count']
+const MAX_POSTS_READ = 50
+const DEFAULT_POSTS_READ = 10
+/** The events that start a run besides the schedule: a like, an answer, a tip or a private message to it. */
+const EVENTS = ['like', 'answer', 'tip', 'message']
+
+function normalizeReads(value) {
+  const reads = value && typeof value === 'object' ? value : {}
+  const posts =
+    reads.posts && typeof reads.posts === 'object' ? reads.posts : {}
+  const count = Number(posts.count)
+  return {
+    posts: {
+      window: POST_WINDOWS.includes(posts.window) ? posts.window : 'off',
+      count:
+        Number.isInteger(count) && count >= 1 && count <= MAX_POSTS_READ
+          ? count
+          : DEFAULT_POSTS_READ,
+    },
+    notifications: reads.notifications === true,
+    messages: reads.messages === true,
+  }
+}
+
+/**
+ * What an agent saved before it had its own reads (B-239 builds) read: with a Social action not Off, the new posts (up
+ * to 20); with one that answers others (not Post alone), its answers, likes and tips; with Private messages, its
+ * messages. Without one, nothing.
+ */
+function readsBefore(value) {
+  const saved =
+    value.actions && typeof value.actions === 'object' ? value.actions : {}
+  // A joke agent (B-237) read only its own jokes and the tips on them: its notifications, no one's posts.
+  if (value.task === 'joke' && saved.post && saved.post.level !== 'off')
+    return {
+      posts: {window: 'off', count: 10},
+      notifications: true,
+      messages: false,
+    }
+  // As the B-239 builds read: from the Social actions not Off.
+  const held = ['post', 'reply', 'like', 'message', 'tip'].filter(
+    (name) => saved[name] && saved[name].level !== 'off'
+  )
+  if (!held.length) return undefined
+  return {
+    posts: {window: 'count', count: 20},
+    notifications: held.some((name) => name !== 'post'),
+    messages: held.includes('message'),
+  }
+}
+
+const normalizeEvents = (value) =>
+  Array.isArray(value) ? EVENTS.filter((one) => value.includes(one)) : []
 
 /** The actions only one agent may hold: the validation has one agent answering it. */
 const SINGLE_HOLDER_ACTIONS = ['answerFlip']
@@ -106,13 +159,16 @@ function normalizeAgent(input, {id = newAgentId} = {}) {
     imageModel: text(value.imageModel, 200, ''),
     instructions: text(value.instructions, MAX_INSTRUCTIONS_LENGTH, ''),
     actions: normalizeActions(value.actions),
+    reads: normalizeReads(
+      value.reads === undefined ? readsBefore(value) : value.reads
+    ),
+    events: normalizeEvents(value.events),
     schedule: {
       kind: SCHEDULES.includes(schedule.kind) ? schedule.kind : 'manual',
       time: normalizeTime(schedule.time),
     },
     budgetPerDay: !Number.isFinite(budget) || budget < 0 ? null : budget,
     reportThresholds,
-    task: TASKS.includes(value.task) ? value.task : null,
   }
 }
 
@@ -290,10 +346,12 @@ function validationAgentSettings(profiles) {
 }
 
 module.exports = {
+  EVENTS,
   MAX_AGENTS,
+  MAX_POSTS_READ,
+  POST_WINDOWS,
   SCHEDULES,
   SINGLE_HOLDER_ACTIONS,
-  TASKS,
   agentSettings,
   createAgentProfiles,
   fromSingleAgent,

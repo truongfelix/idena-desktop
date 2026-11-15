@@ -224,9 +224,11 @@ export function Checkbox(props) {
   return <ChakraCheckbox borderColor="gray.100" {...props} />
 }
 
-export function Textarea(props) {
+// eslint-disable-next-line prefer-arrow-callback
+export const Textarea = React.forwardRef(function Textarea(props, ref) {
   return (
     <ChakraTextarea
+      ref={ref}
       borderColor="gray.300"
       p={3}
       pt={2}
@@ -237,7 +239,7 @@ export function Textarea(props) {
       {...props}
     />
   )
-}
+})
 
 export function ChainedInputGroup({addon, children, ...props}) {
   const {isDisabled} = props

@@ -60,7 +60,7 @@ import {TodoVotingCountBadge} from '../../screens/oracles/components'
 import {socialNewsCount} from '../../screens/social/news-count'
 import {useSocial} from '../../screens/social/provider'
 import {ReleaseNoteDialog} from './release-check'
-import {AgentCard} from '../../screens/settings/agent/agent-card'
+import {useAgentsState} from '../../screens/agents/menu-state'
 import {usePendingActions} from '../../screens/agents/pending-api'
 import {
   AdsIcon,
@@ -113,7 +113,6 @@ export default function Sidebar({
         <ActionPanel />
       </Flex>
       <Box flexShrink={0} mt={4}>
-        <AgentCard />
         <Version
           isForkAvailable={isForkAvailable}
           didActivateFork={didActivateFork}
@@ -346,6 +345,7 @@ function Navbar() {
   const [{todoCount}] = useVotingNotification()
   const socialNews = socialNewsCount(useSocial() || {})
   const toApprove = (usePendingActions() || []).length
+  const agents = useAgentsState(toApprove)
 
   return (
     <Nav>
@@ -377,16 +377,30 @@ function Navbar() {
         )}
       </NavItem>
       <NavItem href="/agents" icon={AgentIcon}>
-        {toApprove > 0 ? (
-          <Flex flex={1} align="center" justify="space-between">
+        <Flex flex={1} align="center" justify="space-between">
+          <Flex as="span" align="center" gap={2}>
             <Text as="span">{t('Agents')}</Text>
+            {agents.dot && (
+              <Box
+                as="span"
+                w={2}
+                h={2}
+                borderRadius="full"
+                bg={agents.dot === 'waiting' ? 'orange.500' : 'green.500'}
+                title={
+                  agents.dot === 'waiting'
+                    ? t('An agent waits for you')
+                    : t('An agent is on')
+                }
+              />
+            )}
+          </Flex>
+          {toApprove > 0 && (
             <TodoVotingCountBadge aria-label={t('To approve')}>
               {toApprove > 99 ? '99+' : toApprove}
             </TodoVotingCountBadge>
-          </Flex>
-        ) : (
-          t('Agents')
-        )}
+          )}
+        </Flex>
       </NavItem>
       <NavItem href="/oracles/list" icon={OracleIcon} display>
         {todoCount > 0 ? (

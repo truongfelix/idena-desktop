@@ -1,5 +1,8 @@
 import {
+  afterEventRun,
   afterHourlyRun,
+  eventsAllowed,
+  eventsRead,
   afterRun,
   hourlyDue,
   isSocialAgent,
@@ -7,7 +10,7 @@ import {
   socialState,
 } from './runner'
 
-jest.mock('../../social/provider', () => ({useSocial: () => null}))
+jest.mock('../social/provider', () => ({useSocial: () => null}))
 
 const DAY = 'Sat Nov 14 2026'
 const NOW = 1000000
@@ -41,11 +44,11 @@ describe("the agents' runs in the window", () => {
     )
   })
 
-  test('a Social agent: no joke task and a Social action not Off', () => {
-    const with_ = (actions, task = null) => ({actions, task})
+  test('a Social agent: a Social action not Off', () => {
+    const with_ = (actions) => ({actions})
     expect(isSocialAgent(with_({reply: {level: 'ask'}}))).toBe(true)
+    expect(isSocialAgent(with_({post: {level: 'alone'}}))).toBe(true)
     expect(isSocialAgent(with_({reply: {level: 'off'}}))).toBe(false)
-    expect(isSocialAgent(with_({post: {level: 'alone'}}, 'joke'))).toBe(false)
     expect(isSocialAgent(with_({answerFlip: {level: 'alone'}}))).toBe(false)
   })
 
@@ -61,5 +64,28 @@ describe("the agents' runs in the window", () => {
     })
     expect(state.names).toEqual({})
     expect([...state.blocked]).toEqual(['0xb'])
+  })
+
+  test('an event runs it only for what it reads, and stops for the day after 3 failed event runs', () => {
+    const agent = (reads) => ({
+      reads,
+      events: ['like', 'tip', 'message'],
+    })
+    expect(eventsRead(agent({notifications: true, messages: false}))).toEqual([
+      'like',
+      'tip',
+    ])
+    expect(eventsRead(agent({notifications: false, messages: true}))).toEqual([
+      'message',
+    ])
+    let fails
+    expect(eventsAllowed(fails, DAY)).toBe(true)
+    fails = afterEventRun(fails, DAY, 'done')
+    fails = afterEventRun(fails, DAY, 'failed')
+    fails = afterEventRun(fails, DAY, 'failed')
+    expect(eventsAllowed(fails, DAY)).toBe(true)
+    fails = afterEventRun(fails, DAY, 'failed')
+    expect(eventsAllowed(fails, DAY)).toBe(false)
+    expect(eventsAllowed(fails, 'Sun Nov 15 2026')).toBe(true)
   })
 })

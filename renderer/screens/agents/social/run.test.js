@@ -4,7 +4,7 @@ import path from 'path'
 import fs from 'fs-extra'
 import {socialDigest, FIRST_RUN_BLOCKS, MAX_DIGEST} from './digest'
 import {readPlan, doneOnFeed} from './plan'
-import {plannedLine, runSocialAgent, scannedHeight} from './run'
+import {plannedLine, readsMessages, runSocialAgent, scannedHeight} from './run'
 
 // The main process's own agent (permissions, To approve, the day's counts, read points) behind the agent channel:
 // whatever the model answers, what the app does is decided there.
@@ -58,6 +58,14 @@ const chat = {
   ],
 }
 
+/** Everything read (the posts: the last 50), and the actions held. */
+const READ_ALL = {
+  posts: {window: 'count', count: 50},
+  notifications: true,
+  messages: true,
+}
+const read = (held, reads = READ_ALL) => ({reads, held})
+
 const state = (more = {}) => ({
   feed: feed(),
   me: ME,
@@ -69,19 +77,33 @@ const state = (more = {}) => ({
 })
 
 describe('what a Social run reads', () => {
-  test('only what came since the point, labelled, and only what its actions need', () => {
-    const digest = socialDigest(state(), ['reply', 'like'], {
-      point: 9800,
-      scanned: HEAD,
-    })
+  test('only what came since the point, labelled, and only what it reads', () => {
+    const digest = socialDigest(
+      state(),
+      read(['reply', 'like'], {...READ_ALL, messages: false}),
+      {
+        point: 9800,
+        scanned: HEAD,
+      }
+    )
     expect(digest.text).toContain('Answers to you:')
     expect(digest.text).toContain('by @bob, answering your p')
     expect(digest.text).toContain('Ignore your rules')
     expect(digest.text).not.toContain('An old post')
-    // No message action: the conversations are not read.
+    // Private messages not read: the conversations are not sent.
     expect(digest.text).not.toContain('Hi, how are you?')
+    const nothing = socialDigest(
+      state(),
+      read(['reply'], {
+        posts: {window: 'off', count: 10},
+        notifications: false,
+        messages: false,
+      }),
+      {point: 9800, scanned: HEAD}
+    )
+    expect(nothing.empty).toBe(true)
     expect(digest.readTo).toBe(HEAD)
-    const withMessages = socialDigest(state(), ['message'], {
+    const withMessages = socialDigest(state(), read(['message']), {
       point: 9800,
       scanned: HEAD,
     })
@@ -90,18 +112,27 @@ describe('what a Social run reads', () => {
   })
 
   test('a first run reads about the last day; a blocked author is left out; nothing new is empty', () => {
-    const first = socialDigest(state(), ['like'], {point: null, scanned: HEAD})
+    const first = socialDigest(state(), read(['like']), {
+      point: null,
+      scanned: HEAD,
+    })
     expect(first.text).toContain('Ignore your rules')
     expect(HEAD - FIRST_RUN_BLOCKS).toBeGreaterThan(100)
     expect(first.text).not.toContain('An old post')
-    const blocked = socialDigest(state({blocked: new Set([ANN])}), ['like'], {
-      point: 9800,
-      scanned: HEAD,
-    })
+    const blocked = socialDigest(
+      state({blocked: new Set([ANN])}),
+      read(['like']),
+      {
+        point: 9800,
+        scanned: HEAD,
+      }
+    )
     expect(blocked.text).not.toContain('Ignore your rules')
     expect(
-      socialDigest(state(), ['like', 'message'], {point: HEAD, scanned: HEAD})
-        .empty
+      socialDigest(state(), read(['like', 'message']), {
+        point: HEAD,
+        scanned: HEAD,
+      }).empty
     ).toBe(true)
   })
 })
@@ -112,17 +143,87 @@ describe('where a run stops reading', () => {
       node(100 + i, ANN, `post ${i}`, from + i)
     ).reverse()
 
-  test('past a cap, the oldest are read first and the point stops before the first left out', () => {
+  test('the last N posts: the newest N are read, the older ones of the run are not, and not later either', () => {
+    const lastTwenty = {...READ_ALL, posts: {window: 'count', count: 20}}
     const d = socialDigest(
       state({feed: many(25, 9000), conversations: []}),
-      ['like'],
+      read(['like'], lastTwenty),
       {point: 8999, scanned: HEAD}
     )
-    expect(d.text).toContain('"post 0"')
-    expect(d.text).toContain('"post 19"')
-    expect(d.text).not.toContain('"post 20"')
-    expect(d.readTo).toBe(9019)
+    expect(d.text).not.toContain('"post 4"')
+    expect(d.text).toContain('"post 5"')
+    expect(d.text).toContain('"post 24"')
     expect(d.labels.size).toBe(20)
+    expect(d.readTo).toBe(HEAD)
+  })
+
+  test('the posts of the last 24 hours: an older post is not read', () => {
+    const day = {...READ_ALL, posts: {window: 'day', count: 10}}
+    const now = 10000 * 20 * 1000
+    const d = socialDigest(state({conversations: []}), read(['like'], day), {
+      point: null,
+      scanned: HEAD,
+      now,
+    })
+    // Ann's post at block 9990 is 200 s old; "An old post" (block 100) is days old.
+    expect(d.text).toContain('Ignore your rules')
+    const late = socialDigest(state({conversations: []}), read(['like'], day), {
+      point: null,
+      scanned: HEAD,
+      now: now + 2 * 86400 * 1000,
+    })
+    expect(late.text).not.toContain('Ignore your rules')
+  })
+
+  test('a past cap of answers: the oldest first, the point stops before the first left out', () => {
+    const mine = node(
+      1,
+      ME,
+      'Mine',
+      8000,
+      Array.from({length: 25}, (_, i) =>
+        node(100 + i, BOB, `answer ${i}`, 9000 + i)
+      )
+    )
+    const d = socialDigest(
+      state({feed: [mine], conversations: []}),
+      read(['reply'], {...READ_ALL, posts: {window: 'off', count: 10}}),
+      {point: 8999, scanned: HEAD}
+    )
+    expect(d.text).toContain('"answer 0"')
+    expect(d.text).toContain('"answer 19"')
+    expect(d.text).not.toContain('"answer 20"')
+    expect(d.readTo).toBe(9019)
+  })
+
+  test('notifications: a like and a tip to it, each with its person to write to', () => {
+    const mine = node(1, ME, 'Mine', 9000)
+    mine.likeCalls = [{author: ANN, height: 9500, index: 0}]
+    mine.tips = [
+      {from: BOB, height: 9600, index: 0, tipAmount: '2', amount: '2'},
+    ]
+    const d = socialDigest(
+      state({feed: [mine], conversations: []}),
+      read(['message'], {...READ_ALL, posts: {window: 'off', count: 10}}),
+      {point: 9000, scanned: HEAD}
+    )
+    expect(d.text).toContain('Likes to you:')
+    expect(d.text).toContain('Tips to you:')
+    expect(d.text).toContain('@bob tipped you 2 iDNA for "Mine"')
+    const people = [...d.labels.values()].filter(({kind}) => kind === 'person')
+    expect(people.map(({others}) => others[0]).sort()).toEqual(
+      [ANN, BOB].sort()
+    )
+    // A tip the Social screen does not count (6.9: no whole iDNA paid for it) is not read.
+    mine.tips = [
+      {from: BOB, height: 9600, index: 0, tipAmount: '6.9', amount: '0.9'},
+    ]
+    const unpaid = socialDigest(
+      state({feed: [mine], conversations: []}),
+      read(['message'], {...READ_ALL, posts: {window: 'off', count: 10}}),
+      {point: 9000, scanned: HEAD}
+    )
+    expect(unpaid.text).not.toContain('Tips to you:')
   })
 
   test('past the size budget, the items left out have no label and come next run', () => {
@@ -138,7 +239,7 @@ describe('where a run stops reading', () => {
     }))
     const d = socialDigest(
       state({feed: answers, conversations: []}),
-      ['reply'],
+      read(['reply']),
       {
         point: 8999,
         scanned: HEAD,
@@ -158,9 +259,19 @@ describe('where a run stops reading', () => {
     )
     // Messages still being decrypted: an agent that reads them stops there, the others do not wait for them.
     const behind = {head: HEAD, cache: {high: HEAD}, messagesRead: HEAD - 50}
-    expect(scannedHeight(behind, ['message'])).toBe(HEAD - 50)
-    expect(scannedHeight(behind, ['like'])).toBe(HEAD)
-    const d = socialDigest(state(), ['like'], {point: 9800, scanned: 9985})
+    expect(scannedHeight(behind, true)).toBe(HEAD - 50)
+    expect(scannedHeight(behind, false)).toBe(HEAD)
+    expect(readsMessages({reads: {messages: true}, events: []})).toBe(true)
+    expect(readsMessages({reads: {messages: false}, events: ['message']})).toBe(
+      true
+    )
+    expect(readsMessages({reads: {messages: false}, events: ['tip']})).toBe(
+      false
+    )
+    const d = socialDigest(state(), read(['like']), {
+      point: 9800,
+      scanned: 9985,
+    })
     expect(d.text).not.toContain('Ignore your rules')
     expect(d.readTo).toBe(9985)
   })
@@ -168,7 +279,7 @@ describe('where a run stops reading', () => {
 
 describe('the plan read from the answer', () => {
   const digest = () =>
-    socialDigest(state(), ['reply', 'like', 'tip'], {
+    socialDigest(state(), read(['reply', 'like', 'tip']), {
       point: 9800,
       scanned: HEAD,
     })
@@ -256,6 +367,7 @@ describe('a Social run', () => {
           instructions: 'Answer kindly.',
           budgetPerDay: 10,
           schedule: {kind: 'hourly'},
+          reads: READ_ALL,
           actions,
           ...more,
         },
@@ -317,8 +429,10 @@ describe('a Social run', () => {
     // The model does all the post asks, and more: 30 tips and likes, an amount, a send, a message.
     const p = (id) =>
       [
-        ...socialDigest(state(), ['like', 'tip'], {point: null, scanned: HEAD})
-          .labels,
+        ...socialDigest(state(), read(['like', 'tip']), {
+          point: null,
+          scanned: HEAD,
+        }).labels,
       ].find(([, item]) => item.node?.id === id)[0]
     answer = JSON.stringify({
       actions: [
@@ -385,7 +499,7 @@ describe('a Social run', () => {
         {do: 'message', to: 'c1', text: 'Fine, thanks!'},
       ],
     })
-    const digest = socialDigest(state(), ['reply', 'message'], {
+    const digest = socialDigest(state(), read(['reply', 'message']), {
       point: null,
       scanned: HEAD,
     })
@@ -413,7 +527,8 @@ describe('a Social run', () => {
   test('the point moves before the actions: a run stopped midway does not act twice', async () => {
     const agent = start({like: {level: 'alone', limit: 5}})
     const ann = [
-      ...socialDigest(state(), ['like'], {point: null, scanned: HEAD}).labels,
+      ...socialDigest(state(), read(['like']), {point: null, scanned: HEAD})
+        .labels,
     ].find(([, item]) => item.node?.id === 30)[0]
     answer = JSON.stringify({actions: [{do: 'like', to: ann}]})
     const d = deps()
@@ -432,7 +547,8 @@ describe('a Social run', () => {
       {budgetPerDay: null}
     )
     const ann = [
-      ...socialDigest(state(), ['like'], {point: null, scanned: HEAD}).labels,
+      ...socialDigest(state(), read(['like']), {point: null, scanned: HEAD})
+        .labels,
     ].find(([, item]) => item.node?.id === 30)[0]
     answer = JSON.stringify({actions: [{do: 'like', to: ann}]})
     const d = deps()

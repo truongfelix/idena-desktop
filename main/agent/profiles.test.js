@@ -49,10 +49,76 @@ describe('agent profiles', () => {
       schedule: {kind: 'manual', time: '09:00'},
       budgetPerDay: null,
       reportThresholds: REPORT_THRESHOLDS,
-      task: null,
+      // Reads nothing and runs on no event until the person says so (B-255).
+      reads: {
+        posts: {window: 'off', count: 10},
+        notifications: false,
+        messages: false,
+      },
+      events: [],
     })
-    expect(normalizeAgent({task: 'joke'}).task).toBe('joke')
-    expect(normalizeAgent({task: 'constructor'}).task).toBeNull()
+    // What it reads and its events: each field checked (B-255).
+    expect(
+      normalizeAgent({
+        reads: {
+          posts: {window: 'count', count: 500},
+          notifications: 'yes',
+          messages: true,
+        },
+        events: ['tip', 'launch', 'tip', 'message'],
+      })
+    ).toMatchObject({
+      reads: {
+        posts: {window: 'count', count: 10},
+        notifications: false,
+        messages: true,
+      },
+      events: ['tip', 'message'],
+    })
+    expect(
+      normalizeAgent({reads: {posts: {window: 'week', count: 3}}}).reads.posts
+    ).toEqual({window: 'off', count: 3})
+    // An agent saved before it had reads (B-239) reads what it read then.
+    expect(
+      normalizeAgent({
+        actions: {reply: {level: 'alone'}, message: {level: 'ask'}},
+      }).reads
+    ).toEqual({
+      posts: {window: 'count', count: 20},
+      notifications: true,
+      messages: true,
+    })
+    // A joke agent (B-237) read its tips, not others' posts.
+    expect(
+      normalizeAgent({task: 'joke', actions: {post: {level: 'alone'}}}).reads
+    ).toEqual({
+      posts: {window: 'off', count: 10},
+      notifications: true,
+      messages: false,
+    })
+    // Only actions not Off count; Post alone reads no notifications.
+    expect(
+      normalizeAgent({
+        actions: {reply: {level: 'alone'}, message: {level: 'off'}},
+      }).reads.messages
+    ).toBe(false)
+    expect(normalizeAgent({actions: {post: {level: 'alone'}}}).reads).toEqual({
+      posts: {window: 'count', count: 20},
+      notifications: false,
+      messages: false,
+    })
+    expect(
+      normalizeAgent({actions: {post: {level: 'off'}}}).reads.posts.window
+    ).toBe('off')
+    expect(
+      normalizeAgent({actions: {answerFlip: {level: 'alone'}}}).reads
+    ).toEqual({
+      posts: {window: 'off', count: 10},
+      notifications: false,
+      messages: false,
+    })
+    // The daily joke's routine is gone (B-255): a saved task is not kept.
+    expect(normalizeAgent({task: 'joke'})).not.toHaveProperty('task')
   })
 
   test('each field is checked: unknown actions, levels, times and budgets fall back', () => {

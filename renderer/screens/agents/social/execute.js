@@ -146,5 +146,5 @@ export async function sendSocialAction(
 export function socialExecutors(getSocial, deps = {}) {
   const run = async (item) =>
     sendSocialAction(await prepareSocialAction(item, getSocial(), deps), deps)
-  return {reply: run, like: run, tip: run, message: run}
+  return {post: run, reply: run, like: run, tip: run, message: run}
 }
