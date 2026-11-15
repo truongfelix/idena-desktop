@@ -145,7 +145,7 @@ export function useAgentValidation({
   const isShort = phase === 'short'
 
   // A pause cuts the countdown: after the resume, a new one, from its start. It also forgets the last failure: the
-  // agent asks again after the resume (the key may have been fixed meanwhile), each flip with all its tries.
+  // agent asks again after the resume (the key may have been fixed meanwhile); a flip to ask again gets all its tries.
   React.useEffect(() => {
     if (!active) {
       setCountdown({step: null, end: null})
@@ -186,6 +186,31 @@ export function useAgentValidation({
     const timer = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(timer)
   }, [needsClock])
+
+  // Without the clock, one tick when the session has no time left for a question: `outOfTime` settles the flips.
+  React.useEffect(() => {
+    if (!active || !phase || needsClock) return undefined
+    const wait =
+      sessionEnd({
+        isShort,
+        validationStart,
+        shortSessionDuration,
+        longSessionDuration,
+      }) -
+      END_MARGIN_MS -
+      MIN_FLIP_MS -
+      Date.now()
+    const timer = setTimeout(() => setNow(Date.now()), Math.max(0, wait) + 50)
+    return () => clearTimeout(timer)
+  }, [
+    active,
+    phase,
+    needsClock,
+    isShort,
+    validationStart,
+    shortSessionDuration,
+    longSessionDuration,
+  ])
 
   // A long flip loaded without its keywords is asked without them after KEYWORDS_WAIT_MS, from when it loaded.
   flips.forEach((flip) => {
@@ -347,6 +372,7 @@ export function useAgentValidation({
               reportSide: late.reportSide,
               reportConfidence: late.reportConfidence,
               quality: late.quality,
+              doubted: late.doubted,
               reportLater: false,
             },
           }))
