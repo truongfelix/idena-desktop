@@ -4,6 +4,7 @@ import {
   budgetLine,
   heldBy,
   readsList,
+  spendingActions,
   runsLine,
 } from './catalog'
 import {agentsDot} from './menu-state'
@@ -140,5 +141,29 @@ describe('the Agents section lines', () => {
     expect(nothingToActOn({actions: {reply: {level: 'off'}}, reads: off})).toBe(
       false
     )
+  })
+
+  test('the budget counts only the actions that spend iDNA', () => {
+    const names = (actions) =>
+      spendingActions(agent({actions}), catalog).map(({id}) => id)
+    expect(
+      names({answerFlip: {level: 'alone'}, report: {level: 'alone'}})
+    ).toEqual([])
+    expect(names({flipStory: {level: 'alone'}})).toEqual([])
+    expect(
+      names({post: {level: 'off'}, tip: {level: 'alone'}, answerFlip: {}})
+    ).toEqual(['post', 'tip'])
+  })
+
+  test('Report flips is added alone; only one agent answers, only one reports', () => {
+    const report = catalog.find(({id}) => id === 'report')
+    expect(report.needs).toBeUndefined()
+    const one = agent({id: 'a', name: 'Solver', actions: {answerFlip: {}}})
+    const two = agent({id: 'b', name: 'Checker', actions: {report: {}}})
+    const three = agent({id: 'c'})
+    expect(heldBy('report', three, [one, two, three])).toBe('Checker')
+    expect(heldBy('answerFlip', three, [one, two, three])).toBe('Solver')
+    expect(heldBy('report', two, [one, two, three])).toBeNull()
+    expect(heldBy('post', three, [one, two, three])).toBeNull()
   })
 })

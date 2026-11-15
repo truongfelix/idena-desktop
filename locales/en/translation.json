@@ -2012,7 +2012,6 @@
   "It asks for these actions": "It asks for these actions",
   "All start Off. Turn each one on yourself, on the agent page, once you have read its instructions.": "All start Off. Turn each one on yourself, on the agent page, once you have read its instructions.",
   "Asked for: {{what}}": "Asked for: {{what}}",
-  "Not added: {{actions}}. Another agent of yours answers the validation.": "Not added: {{actions}}. Another agent of yours answers the validation.",
   "Add the agent": "Add the agent",
   "Agent exported to a file": "Agent exported to a file",
   "Agent imported from a file": "Agent imported from a file",
@@ -2121,5 +2120,11 @@
   "Everything the agent did, asked for or was refused, newest first. The log is kept until the app closes.": "Everything the agent did, asked for or was refused, newest first. The log is kept until the app closes.",
   "Turn the agent on first.": "Turn the agent on first.",
   "Also runs when it gets (what it reads: its notifications, its private messages)": "Also runs when it gets (what it reads: its notifications, its private messages)",
-  "Its actions on Social have nothing to act on: turn on what it reads.": "Its actions on Social have nothing to act on: turn on what it reads."
+  "Its actions on Social have nothing to act on: turn on what it reads.": "Its actions on Social have nothing to act on: turn on what it reads.",
+  "Agent: reports": "Agent: reports",
+  "Check the keywords yourself.": "Check the keywords yourself.",
+  "{{name}} already reports in the validation": "{{name}} already reports in the validation",
+  "Its actions spend no iDNA: no budget to set.": "Its actions spend no iDNA: no budget to set.",
+  "For {{actions}}": "For {{actions}}",
+  "Not added: {{actions}}. Another agent of yours already holds it.": "Not added: {{actions}}. Another agent of yours already holds it."
 }

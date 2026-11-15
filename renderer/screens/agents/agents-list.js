@@ -110,7 +110,7 @@ function AgentCard({agent, catalog, last, paused, onToggle}) {
         <Fact label={t('Reads')}>
           {readsList(agent, catalog, t).join(', ')}
         </Fact>
-        <Fact label={t('Budget')}>{budgetLine(agent, t)}</Fact>
+        <Fact label={t('Budget')}>{budgetLine(agent, t, catalog)}</Fact>
       </Box>
       <Flex
         justify="space-between"

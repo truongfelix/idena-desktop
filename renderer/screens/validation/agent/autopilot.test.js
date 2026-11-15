@@ -46,6 +46,18 @@ describe('Autopilot through the validation', () => {
       answer('timeout', AnswerType.Right),
       answer('picked', AnswerType.Right),
     ])
+    // B-257: the reporting agent's side (the answering model failed) is no answer: a random side, as without a pick.
+    const reported = {
+      picked: {
+        answer: null,
+        answers: false,
+        reportSide: 'right',
+        failed: false,
+      },
+    }
+    expect(
+      fallbackAnswers([flip('picked')], reported, {all: true, random: left})
+    ).toEqual([answer('picked', AnswerType.Left)])
   })
 
   test('a flip gets one random side, however often it is asked for', () => {

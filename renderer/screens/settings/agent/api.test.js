@@ -78,6 +78,18 @@ describe("the agent's settings, written in turn", () => {
 })
 
 describe("the agent's mode in a validation", () => {
+  test('an agent that only reports: its own mode, it never answers (B-257)', () => {
+    const view = (answer, report, enabled = true) => ({
+      enabled,
+      permissions: {answerFlip: {level: answer}, report: {level: report}},
+    })
+    expect(agentMode(view('off', 'alone'))).toBe('report')
+    expect(agentMode(view('off', 'ask'))).toBe('report')
+    expect(agentMode(view('off', 'off'))).toBeNull()
+    expect(agentMode(view('alone', 'alone'))).toBe('autopilot')
+    expect(agentMode(view('off', 'alone', false))).toBeNull()
+  })
+
   test('follows the settings: off, Suggest, Autopilot', () => {
     expect(agentMode(settings('ask'))).toBe('suggest')
     expect(agentMode(settings('alone'))).toBe('autopilot')

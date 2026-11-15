@@ -2,7 +2,7 @@ const {checkAction} = require('./permissions')
 const {createAgentCommands} = require('./agent-commands')
 const {createPending} = require('./pending')
 const {createReadPoints} = require('./read-points')
-const {agentSettings, validationAgent} = require('./profiles')
+const {agentSettings, reportAgent, validationAgent} = require('./profiles')
 const {checkFlip, flipQuestion, mediaType, readFlipAnswer} = require('./flips')
 const {readStory, storySystem} = require('./stories')
 const {socialHeld, socialSystem} = require('./social')
@@ -95,6 +95,13 @@ function createAgent({
     ? createReadPoints({file: readPointsFile, logger})
     : null
 
+  // The agents of the validation that are on (answering, reporting), by id: one that stops being so ends its question.
+  const validationActive = (file) =>
+    [validationAgent(file), reportAgent(file)]
+      .filter((agent) => agent && agent.enabled)
+      .map((agent) => agent.id)
+  let lastActive = profiles ? validationActive(profiles.read()) : []
+
   const agents = profiles
     ? createAgentCommands({
         profiles,
@@ -103,8 +110,12 @@ function createAgent({
         // The validation's question in flight ends when its agent is turned off, removed or paused; an action
         // waiting for an agent removed, or an action turned Off, leaves To approve.
         onChange: (file) => {
-          const current = settings.read()
-          if (current.paused || !current.enabled) stop(solving)
+          // The pause, or an agent of the validation turned off or gone (B-257): its question ends. Not at an edit of
+          // another agent while one of them stays off.
+          const active = validationActive(file)
+          if (file.paused || lastActive.some((id) => !active.includes(id)))
+            stop(solving)
+          lastActive = active
           if (file.paused) stop(writing)
           pending.prune()
           readPoints.keepOnly(file.agents.map((agent) => agent.id))
@@ -173,61 +184,171 @@ function createAgent({
     }
   }
 
-  const solveFlip = async ({flip, reportsUsed = 0, timeoutMs} = {}) => {
-    const config = settings.read()
-    const agentId = validationId()
-    const answerCheck = checkAction(config, 'answerFlip')
-    if (answerCheck.decision === 'off') {
-      log({
-        agentId,
-        action: 'answerFlip',
-        decision: 'off',
-        detail: answerCheck.reason,
-      })
-      return {decision: 'off', reason: answerCheck.reason}
+  /**
+   * The agents of the validation (B-257): the one answering and the one reporting, each with its settings and
+   * Instructions; the same object when one agent does both. Without the file of agents (the single agent's
+   * settings), that one agent.
+   */
+  const validationAgents = () => {
+    if (!profiles) {
+      const one = {
+        id: undefined,
+        config: settings.read(),
+        instructions: instructionsOf(undefined),
+      }
+      return {answering: one, reporting: one}
     }
-    let answer
-    try {
-      answer = await askFlip(
-        config,
-        flip,
-        timeoutMs,
-        solving,
-        instructionsOf(undefined)
-      )
-    } catch (error) {
+    const file = profiles.read()
+    const view = (agent) =>
+      agent && {
+        id: agent.id,
+        config: agentSettings(file, agent),
+        instructions: agent.instructions,
+      }
+    const answerer = validationAgent(file)
+    const reporter = reportAgent(file)
+    const answering = view(answerer)
+    const reporting =
+      reporter && answerer && reporter.id === answerer.id
+        ? answering
+        : view(reporter)
+    return {answering, reporting}
+  }
+
+  /**
+   * A flip of the validation: the answering agent's answer and, from the reporting agent (the same one, or another
+   * asked at the same time once the flip has its keywords), the report and the keywords' mark. `decision` is what may
+   * be done with the answer (`answers`: whether there is one to give), `markDecision` with the keywords' mark,
+   * `reportDecision` with the report. `reportLater`: another agent reports, the flip has no keywords yet: ask again
+   * with `reportOnly` once it has them. `answerError`: the answering model failed, the report may still be there.
+   */
+  const solveFlip = async ({
+    flip,
+    reportsUsed = 0,
+    timeoutMs,
+    reportOnly = false,
+  } = {}) => {
+    const {answering, reporting} = validationAgents()
+    const answerCheck =
+      answering && !reportOnly
+        ? checkAction(answering.config, 'answerFlip')
+        : {decision: 'off', reason: 'no agent answers'}
+    const reportAllowed = reporting
+      ? checkAction(reporting.config, 'report', {usage: reportsUsed})
+      : {decision: 'off', reason: 'no agent reports'}
+    if (answerCheck.decision === 'off' && reportAllowed.decision === 'off') {
+      // The reason of the agent that would have acted: the answering one, else the reporting one.
+      const byAnswer = Boolean(answering) && !reportOnly
+      const reason = byAnswer ? answerCheck.reason : reportAllowed.reason
       log({
-        agentId,
+        agentId: byAnswer || !reporting ? validationId() : reporting.id,
+        action: byAnswer || !reporting ? 'answerFlip' : 'report',
+        decision: 'off',
+        detail: reason,
+      })
+      return {decision: 'off', reason}
+    }
+    // Another agent that may report: asked apart. One that is off changes nothing for the answering agent.
+    const separate =
+      Boolean(reporting) &&
+      reporting !== answering &&
+      reportAllowed.decision !== 'off'
+    const hasWords = Boolean(flip && flip.words && flip.words.length)
+    const asksAnswer = answerCheck.decision !== 'off'
+    // The same agent that does not answer reads its report from its own question too.
+    const asksReport =
+      reportAllowed.decision !== 'off' && hasWords && (separate || !asksAnswer)
+    const asker = asksReport && separate ? reporting : answering || reporting
+    // Both at once: a flip's time is shared, not doubled.
+    const [answered, reported] = await Promise.allSettled([
+      asksAnswer
+        ? askFlip(
+            answering.config,
+            flip,
+            timeoutMs,
+            solving,
+            answering.instructions
+          )
+        : Promise.resolve(null),
+      asksReport
+        ? askFlip(asker.config, flip, timeoutMs, solving, asker.instructions)
+        : Promise.resolve(null),
+    ])
+    const answer = answered.status === 'fulfilled' ? answered.value : null
+    if (answered.status === 'rejected')
+      log({
+        agentId: answering.id,
         action: 'answerFlip',
         decision: 'failed',
-        detail: error.message,
+        detail: answered.reason.message,
       })
-      throw error
-    }
-    const reportCheck = answer.report
-      ? checkAction(config, 'report', {usage: reportsUsed})
-      : {decision: 'off', reason: 'nothing to report'}
-    const report = answer.report && reportCheck.decision !== 'off'
-    // A report is never more automatic than the answer: with answers asked first, so is the report.
+    if (reported.status === 'rejected')
+      log({
+        agentId: asker.id,
+        action: 'report',
+        decision: 'failed',
+        detail: reported.reason.message,
+      })
+    const reportFailed = reported.status === 'rejected'
+    // Nothing came back: the error, as before.
+    if (answered.status === 'rejected' && (!asksReport || reportFailed))
+      throw answered.reason
+    if (!asksAnswer && reportFailed) throw reported.reason
+    // What the report is read from: the same answer, or the reporting question.
+    const reading = asksReport ? reported.value : !separate && answer
+    const reportCheck =
+      reading && reading.report
+        ? reportAllowed
+        : {decision: 'off', reason: 'nothing to report'}
+    const report =
+      Boolean(reading && reading.report) && reportCheck.decision !== 'off'
+    // One agent: a report is never more automatic than its answer (asked first, so is the report).
     const reportDecision =
-      report && answerCheck.decision === 'ask' ? 'ask' : reportCheck.decision
+      report && !separate && asksAnswer && answerCheck.decision === 'ask'
+        ? 'ask'
+        : reportCheck.decision
+    // The side shown: the answer's; a reporting agent's side only places its report, it is never an answer.
+    const shown = answer || null
+    const relevanceOf = (read) =>
+      read && (report || read.relevance !== 'irrelevant')
+        ? read.relevance
+        : null
+    // The keywords' marks: the reporting agent's when another reports (none when its question failed, or before the
+    // keywords); else the answering agent's, as before.
+    let markDecision = reportAllowed.decision
+    if (separate) markDecision = reading ? reportAllowed.decision : 'off'
+    else if (asksAnswer) markDecision = answerCheck.decision
     const result = {
-      decision: answerCheck.decision,
-      answer: answer.answer,
-      confidence: answer.confidence,
-      relevance:
-        report || answer.relevance !== 'irrelevant' ? answer.relevance : null,
+      decision: answer ? answerCheck.decision : reportAllowed.decision,
+      answers: Boolean(answer),
+      answer: shown ? shown.answer : null,
+      reportSide: reading ? reading.answer : null,
+      confidence: (shown || reading || {confidence: 0}).confidence,
+      relevance: relevanceOf(reading || (separate ? null : answer)),
       report,
       reportDecision: report ? reportDecision : 'off',
+      markDecision,
+      reportLater: separate && !hasWords,
+      ...(answered.status === 'rejected'
+        ? {answerError: answered.reason.message}
+        : {}),
     }
-    log({
-      agentId,
-      action: 'answerFlip',
-      decision: result.decision,
-      detail: `${result.answer || 'skip'} ${result.confidence.toFixed(2)}${
-        report ? ` report (${result.reportDecision})` : ''
-      }`,
-    })
+    if (answer)
+      log({
+        agentId: answering.id,
+        action: 'answerFlip',
+        decision: result.decision,
+        detail: `${result.answer || 'skip'} ${answer.confidence.toFixed(2)}${
+          report && !separate ? ` report (${result.reportDecision})` : ''
+        }`,
+      })
+    if (asksReport && reading)
+      log({
+        agentId: asker.id,
+        action: 'report',
+        decision: report ? result.reportDecision : reportAllowed.decision,
+        detail: report ? 'report' : 'no report',
+      })
     return result
   }
 

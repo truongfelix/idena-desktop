@@ -38,7 +38,6 @@ export function actionCatalog(t) {
         'Reports the flips that break a rule, as When to report sets it.'
       ),
       reads: [t('The flips and keywords of the session')],
-      needs: 'answerFlip',
     },
     {
       id: 'post',
@@ -48,6 +47,8 @@ export function actionCatalog(t) {
       reads: [t('Its own last posts')],
       defaults: {level: 'off', limit: 1},
       perDay: 'count',
+      // It spends iDNA (fees, a tip's amount): the budget counts it.
+      spends: true,
     },
     {
       id: 'reply',
@@ -57,6 +58,8 @@ export function actionCatalog(t) {
       reads: [],
       defaults: {level: 'off', limit: 5},
       perDay: 'count',
+      // It spends iDNA (fees, a tip's amount): the budget counts it.
+      spends: true,
     },
     {
       id: 'like',
@@ -66,6 +69,8 @@ export function actionCatalog(t) {
       reads: [],
       defaults: {level: 'off', limit: 10},
       perDay: 'count',
+      // It spends iDNA (fees, a tip's amount): the budget counts it.
+      spends: true,
     },
     {
       id: 'message',
@@ -78,6 +83,8 @@ export function actionCatalog(t) {
       reads: [],
       defaults: {level: 'off', limit: 3},
       perDay: 'count',
+      // It spends iDNA (fees, a tip's amount): the budget counts it.
+      spends: true,
     },
     {
       id: 'tip',
@@ -89,6 +96,8 @@ export function actionCatalog(t) {
       reads: [],
       defaults: {level: 'off', limit: 5, amount: 1},
       perDay: 'idna',
+      // It spends iDNA (fees, a tip's amount): the budget counts it.
+      spends: true,
     },
   ]
 }
@@ -265,7 +274,15 @@ export function readsList(agent, catalog, t) {
   return reads.length ? reads : [t('Nothing')]
 }
 
-export function budgetLine({budgetPerDay}, t) {
+/** The agent's actions that spend iDNA (the budget counts them), by label. */
+export const spendingActions = (agent, catalog) =>
+  catalog.filter(({id, spends}) => spends && agent.actions[id])
+
+/** Its budget, in words; none for an agent whose actions spend nothing (`catalog` given), whatever was set before. */
+export function budgetLine(agent, t, catalog = null) {
+  const {budgetPerDay} = agent
+  if (catalog && spendingActions(agent, catalog).length === 0)
+    return t('Spends no iDNA')
   if (budgetPerDay === null || budgetPerDay === 0) return t('Spends no iDNA')
   return t('Up to {{amount}} iDNA a day', {amount: budgetPerDay})
 }
@@ -283,14 +300,17 @@ export function connectionLine({provider, model}, t) {
 /** The letter on the agent's badge. */
 export const initialOf = (name) => (name.trim()[0] || 'A').toUpperCase()
 
+/** The actions only one agent may hold (main/agent/profiles.js SINGLE_HOLDER_ACTIONS). */
+export const SINGLE_HOLDER = ['answerFlip', 'report']
+
 /**
- * Whether the agent can be given an action: one only one agent may hold (the validation's answers) is held by
- * another agent, named. Returns null when it can.
+ * Whether the agent can be given an action: one only one agent may hold (the validation's answers, its reports) is
+ * held by another agent, named. Returns null when it can.
  */
 export function heldBy(actionId, agent, agents) {
-  if (actionId !== 'answerFlip') return null
+  if (!SINGLE_HOLDER.includes(actionId)) return null
   const holder = agents.find(
-    (other) => other.id !== agent.id && other.actions.answerFlip
+    (other) => other.id !== agent.id && other.actions[actionId]
   )
   return holder ? holder.name : null
 }

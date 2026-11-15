@@ -27,9 +27,7 @@ export function ActionsSection({agent, agents, catalog, onChange}) {
   const [isAdding, setIsAdding] = React.useState(false)
   const names = areaNames(t)
   const rows = catalog.filter(({id}) => agent.actions[id])
-  const addable = catalog.filter(
-    ({id, needs}) => !agent.actions[id] && (!needs || agent.actions[needs])
-  )
+  const addable = catalog.filter(({id}) => !agent.actions[id])
 
   const setActions = (change) =>
     onChange((a) => ({...a, actions: change(a.actions)}))
@@ -82,13 +80,7 @@ export function ActionsSection({agent, agents, catalog, onChange}) {
                           key={id}
                           variant="outline"
                           isDisabled={Boolean(holder)}
-                          title={
-                            holder
-                              ? t('{{name}} already answers the validation', {
-                                  name: holder,
-                                })
-                              : undefined
-                          }
+                          title={holder ? heldText(id, holder, t) : undefined}
                           onClick={() =>
                             setActions((actions) => ({
                               ...actions,
@@ -127,7 +119,6 @@ export function ActionsSection({agent, agents, catalog, onChange}) {
                     info={info}
                     perDay={perDay}
                     row={agent.actions[id]}
-                    catalog={catalog}
                     setActions={setActions}
                   />
                 ))}
@@ -140,7 +131,14 @@ export function ActionsSection({agent, agents, catalog, onChange}) {
   )
 }
 
-function ActionRow({id, label, info, perDay, row, catalog, setActions}) {
+/** Who already holds an action only one agent may hold. */
+function heldText(id, name, t) {
+  return id === 'report'
+    ? t('{{name}} already reports in the validation', {name})
+    : t('{{name}} already answers the validation', {name})
+}
+
+function ActionRow({id, label, info, perDay, row, setActions}) {
   const {t} = useTranslation()
   return (
     <>
@@ -195,10 +193,6 @@ function ActionRow({id, label, info, perDay, row, catalog, setActions}) {
             setActions((actions) => {
               const next = {...actions}
               delete next[id]
-              // An action that needs this one goes with it (reports need the answers).
-              catalog
-                .filter(({needs}) => needs === id)
-                .forEach(({id: other}) => delete next[other])
               return next
             })
           }

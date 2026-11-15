@@ -178,6 +178,58 @@ describe('the agent in a validation', () => {
   })
 })
 
+describe('the validation answered by one agent, reported by another (B-257)', () => {
+  const pick = (more) => ({
+    decision: 'alone',
+    answer: 'left',
+    confidence: 0.9,
+    relevance: 'relevant',
+    report: false,
+    reportDecision: 'off',
+    ...more,
+  })
+
+  test('a reporting agent alone never answers, never fills the answers in; it marks within its own level', () => {
+    const picks = {
+      a: pick({answers: false, markDecision: 'alone'}),
+      b: pick({
+        answers: false,
+        markDecision: 'alone',
+        report: true,
+        reportDecision: 'alone',
+        relevance: 'irrelevant',
+      }),
+    }
+    const events = autopilotEvents({
+      flips: [flip('a'), flip('b')],
+      picks,
+      applied: new Set(),
+      isKeywords: true,
+      reportsLeft: 1,
+    })
+    expect(events).toEqual([
+      {type: 'APPROVE_WORDS', hash: 'a'},
+      {type: 'REPORT_WORDS', hash: 'b'},
+    ])
+    expect(answersToTake([flip('a')], picks)).toEqual([])
+  })
+
+  test("the marks follow the reporting agent's level, the answer the answering agent's", () => {
+    const picks = {a: pick({answers: true, markDecision: 'ask'})}
+    const events = autopilotEvents({
+      flips: [flip('a')],
+      picks,
+      applied: new Set(),
+      isKeywords: true,
+      reportsLeft: 1,
+    })
+    // Answered alone; the reporting agent asks first: no mark.
+    expect(events).toEqual([
+      {type: 'ANSWER', hash: 'a', option: expect.anything()},
+    ])
+  })
+})
+
 describe('why the model gave no answer', () => {
   test("the model's error is shown as it came", () => {
     expect(

@@ -5,7 +5,7 @@ import {
   onAgentChange,
   solveAgentFlip,
   stopAgentSolve,
-  updateAgentSettings,
+  setAgentsPaused,
 } from '../../settings/agent/api'
 import {
   END_MARGIN_MS,
@@ -60,10 +60,18 @@ async function agentFlip(flip, {isShort}) {
   }
 }
 
-/** 'autopilot' | 'suggest' from the settings, or null when the agent does not answer; a pause is apart. */
+/**
+ * 'autopilot' | 'suggest' from the answering agent's level, 'report' when an agent only reports (B-257: it never
+ * answers nor submits), or null when no agent acts in the validation; a pause is apart.
+ */
 export function agentMode(settings) {
+  if (!settings.enabled) return null
   const {level} = settings.permissions.answerFlip
-  if (!settings.enabled || level === 'off') return null
+  if (level === 'off')
+    return settings.permissions.report?.level &&
+      settings.permissions.report.level !== 'off'
+      ? 'report'
+      : null
   return level === 'alone' ? 'autopilot' : 'suggest'
 }
 
@@ -178,10 +186,16 @@ export function useAgentValidation({
       .map(({hash}) => hash)
   )
 
-  // One flip at a time, the next one as soon as the last is answered.
+  // One flip at a time, the next one as soon as the last is answered. An agent that only reports reads the flips once
+  // they have their keywords: the long session.
   React.useEffect(() => {
     if (!active || !phase || asking) return
-    const flip = nextFlipToAsk(flips, asked.current, {isShort, withoutWords})
+    if (mode === 'report' && isShort) return
+    // An agent that only reports needs the keywords: it never asks a flip without them.
+    const flip = nextFlipToAsk(flips, asked.current, {
+      isShort,
+      withoutWords: mode === 'report' ? new Set() : withoutWords,
+    })
     if (!flip) return
     const timeoutMs = flipDeadlineMs({
       end: sessionEnd({
@@ -216,13 +230,20 @@ export function useAgentValidation({
         const pick = answer?.decision === 'off' ? null : answer
         if (pick) {
           setPicks((current) => ({...current, [flip.hash]: pick}))
-          setNoAnswer(pick.failed ? {reason: pick.reason} : null)
+          // eslint-disable-next-line no-nested-ternary
+          const failure = pick.failed
+            ? pick.reason
+            : pick.answerError
+            ? noAnswerReason(pick.answerError)
+            : null
+          setNoAnswer(failure === null ? null : {reason: failure})
         } else asked.current.delete(flip.hash)
         setAsking((current) => (current === token ? null : current))
       })
     // withoutWords changes with the clock; its size says when a flip joined it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
+    mode,
     active,
     phase,
     asking,
@@ -236,9 +257,71 @@ export function useAgentValidation({
     longSessionDuration,
   ])
 
-  // Autopilot: what its permissions let it do alone, once per flip.
+  // Another agent reports (B-257): a flip asked before its keywords came is asked again for its report once they
+  // have, one at a time; a question stopped (a pause) is asked again, a failed one is given up.
+  const reportedLater = React.useRef(new Set())
+  const [lateAsking, setLateAsking] = React.useState(null)
   React.useEffect(() => {
-    if (mode !== 'autopilot' || !active || !phase) return
+    if (!active || isShort || !phase || lateAsking) return
+    const flip = flips.find(
+      (one) =>
+        picks[one.hash]?.reportLater &&
+        one.words?.length &&
+        !reportedLater.current.has(`${session}:${one.hash}`)
+    )
+    if (!flip) return
+    const timeoutMs = flipDeadlineMs({
+      end: sessionEnd({
+        isShort,
+        validationStart,
+        shortSessionDuration,
+        longSessionDuration,
+      }),
+      now: Date.now(),
+      flipsLeft: 1,
+      isShort,
+    })
+    // No time left for it in the session: not asked.
+    if (!timeoutMs) return
+    const key = `${session}:${flip.hash}`
+    reportedLater.current.add(key)
+    setLateAsking(key)
+    agentFlip(flip, {isShort})
+      .then((data) =>
+        solveAgentFlip(data, {reportsUsed, timeoutMs, reportOnly: true})
+      )
+      .then(
+        (late) => {
+          if (!live.current || sessionRef.current !== session) return
+          setPicks((current) => ({
+            ...current,
+            [flip.hash]: {
+              ...current[flip.hash],
+              report: late.report,
+              reportDecision: late.reportDecision,
+              markDecision: late.markDecision,
+              relevance: late.relevance,
+              reportSide: late.reportSide,
+              reportLater: false,
+            },
+          }))
+        },
+        (error) => {
+          // Stopped by a pause: asked again after the resume.
+          if (noAnswerReason(agentErrorText(error)) === null)
+            reportedLater.current.delete(key)
+        }
+      )
+      .finally(() =>
+        setLateAsking((current) => (current === key ? null : current))
+      )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, isShort, phase, flips, picks, session, lateAsking])
+
+  // What the agents may do alone, once per flip: Autopilot's answers, the reporting agent's marks and reports (in any
+  // mode: the reporting agent's level is its own).
+  React.useEffect(() => {
+    if (!active || !phase) return
     autopilotEvents({
       flips,
       picks,
@@ -249,7 +332,7 @@ export function useAgentValidation({
       applied.current.add(appliedKey(event))
       send(event)
     })
-  }, [mode, active, phase, flips, picks, reportsUsed, reportsAllowed, send])
+  }, [active, phase, flips, picks, reportsUsed, reportsAllowed, send])
 
   const end = sessionEnd({
     isShort,
@@ -281,8 +364,17 @@ export function useAgentValidation({
       step,
       flips,
       picks,
+      // A late report in flight, or one to ask, holds the submit too (B-257).
       settled: isSettled(flips, asked.current, {
-        asking,
+        asking:
+          asking ||
+          lateAsking ||
+          flips.some(
+            (one) =>
+              picks[one.hash]?.reportLater &&
+              one.words?.length &&
+              !reportedLater.current.has(`${session}:${one.hash}`)
+          ),
         outOfTime: end - at - END_MARGIN_MS < MIN_FLIP_MS,
       }),
       now: at,
@@ -313,6 +405,7 @@ export function useAgentValidation({
     session,
     countdownEnd,
     send,
+    lateAsking,
   ])
 
   if (!mode) return null
@@ -330,14 +423,12 @@ export function useAgentValidation({
         ? Math.max(0, Math.ceil((countdownEnd - now) / 1000))
         : null,
     // The pause is the agent's everywhere (the menu card shows it too); here it stops the agent at once.
+    // The pause of every agent (the Agents page has it too), not a write of one agent's settings.
     pause: () => {
       setPausing(true)
-      updateAgentSettings((s) => ({...s, paused: true})).catch(() =>
-        setPausing(false)
-      )
+      setAgentsPaused(true).catch(() => setPausing(false))
     },
-    resume: () =>
-      updateAgentSettings((s) => ({...s, paused: false})).catch(() => {}),
+    resume: () => setAgentsPaused(false).catch(() => {}),
     takeRest: () => toTake.forEach(send),
     canTakeRest:
       mode === 'suggest' &&

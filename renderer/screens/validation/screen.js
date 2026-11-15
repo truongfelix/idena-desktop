@@ -110,13 +110,21 @@ export function ValidationScreen({
   // check, a report it leaves to the person (Suggest, or Autopilot with reports on Ask me) until the flip is marked.
   const pick = agent && currentFlip ? agent.picks[currentFlip.hash] : null
   const agentPickFor = (variant) => {
-    if (!pick || pickedSide(pick) !== variant) return null
+    if (!pick) return null
     const isKeywords = isLongSessionKeywords(state)
+    // A report shows on the reporting agent's side (B-257: another agent, or no answer); an answer on its own.
+    const side = isKeywords
+      ? pickedSide({answer: pick.reportSide ?? pick.answer})
+      : pickedSide(pick)
+    if (side !== variant) return null
     const show = isKeywords
       ? Boolean(pick.report) &&
         !currentFlip.relevance &&
-        !(agent.mode === 'autopilot' && pick.reportDecision === 'alone')
-      : agent.mode === 'suggest' && !currentFlip.option
+        // A report the agent makes alone is made, not shown (B-257: whatever the answering agent's mode).
+        pick.reportDecision !== 'alone'
+      : agent.mode === 'suggest' &&
+        pick.answers !== false &&
+        !currentFlip.option
     return show
       ? {
           percent: Math.round((pick.confidence || 0) * 100),
@@ -422,11 +430,7 @@ export function ValidationScreen({
                   })}
                 </Text>
               )}
-              <Text fontWeight={500}>
-                {agent.mode === 'autopilot'
-                  ? t('A flip without an answer gets a random one.')
-                  : t('Answer the flips yourself.')}
-              </Text>
+              <Text fontWeight={500}>{agentHelpText(agent, t)}</Text>
             </Stack>
           )}
           {agent?.canTakeRest && isSolving(state) && !isSubmitting(state) && (
@@ -626,9 +630,18 @@ const AUTOPILOT_STEPS = [
 function agentBadgeText(agent, t) {
   if (agent.paused) return t('Agent: paused', {nsSeparator: '!!'})
   if (agent.noAnswer) return t('Agent: no answer', {nsSeparator: '!!'})
+  if (agent.mode === 'report') return t('Agent: reports', {nsSeparator: '!!'})
   return agent.mode === 'autopilot'
     ? t('Agent: Autopilot', {nsSeparator: '!!'})
     : t('Agent: Suggest', {nsSeparator: '!!'})
+}
+
+/** What the person does when the agent gives no answer: by its mode. */
+function agentHelpText(agent, t) {
+  if (agent.mode === 'report') return t('Check the keywords yourself.')
+  return agent.mode === 'autopilot'
+    ? t('A flip without an answer gets a random one.')
+    : t('Answer the flips yourself.')
 }
 
 /** The validation's step for Autopilot (agent/autopilot.js autopilotPlan), or null where it does nothing. */
