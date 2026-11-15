@@ -223,6 +223,38 @@ describe('a practice through the validation machine', () => {
     expect(service.state.context.submitShortAnswersHash).toBe('0xshort')
   })
 
+  it('moves on when the node already holds the same answers', async () => {
+    // A retried submit: the node calls throw an Error with the node's message (renderer/shared/api/validation.js).
+    const duplicate = () =>
+      Promise.reject(new Error('tx with same hash already exists'))
+    const practice = createPractice(sample)
+    const service = startPractice(practice, {
+      ...practiceNodeCalls(practice),
+      submitShortAnswers: duplicate,
+      submitLongAnswers: duplicate,
+    })
+
+    await advance(3000)
+    for (const {hash, answer} of practice.short)
+      service.send({type: 'ANSWER', hash, option: answer})
+    service.send('SUBMIT')
+    await settle()
+    expect(service.state.matches('longSession')).toBe(true)
+
+    await advance(12000)
+    service.send('START_LONG_SESSION')
+    for (const {hash, answer} of practice.long)
+      service.send({type: 'ANSWER', hash, option: answer})
+    service.send('FINISH_FLIPS')
+    service.send('START_KEYWORDS_QUALIFICATION')
+    for (const {hash} of practice.long)
+      service.send({type: 'APPROVE_WORDS', hash})
+    service.send('SUBMIT')
+    service.send('SUBMIT')
+    await settle()
+    expect(service.state.matches('validationSucceeded')).toBe(true)
+  })
+
   it('fails when the short session ends with too few answers', async () => {
     const practice = createPractice(sample)
     const service = startPractice(practice)

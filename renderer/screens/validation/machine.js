@@ -40,6 +40,14 @@ const validationNodeCalls = {
   fetchKeywords,
 }
 
+// Whether a submit failed because the node already holds the same transaction (a retried submit): the answers
+// are with the node. The node calls throw an Error with the node's message.
+export function isDuplicateTx(error) {
+  return String(error?.message ?? error).includes(
+    'tx with same hash already exists'
+  )
+}
+
 export const createValidationMachine = ({
   epoch,
   validationStart,
@@ -451,8 +459,7 @@ export const createValidationMachine = ({
                             onError: [
                               {
                                 target: '#validation.longSession',
-                                cond: (_, {data}) =>
-                                  data === 'tx with same hash already exists',
+                                cond: (_, {data}) => isDuplicateTx(data),
                               },
                               {
                                 target: 'fail',
@@ -970,8 +977,7 @@ export const createValidationMachine = ({
                             onError: [
                               {
                                 target: '#validation.validationSucceeded',
-                                cond: (_, {data}) =>
-                                  data === 'tx with same hash already exists',
+                                cond: (_, {data}) => isDuplicateTx(data),
                               },
                               {
                                 target: 'fail',
