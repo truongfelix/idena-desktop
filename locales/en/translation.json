@@ -2120,5 +2120,6 @@
   "Also runs when it gets": "Also runs when it gets",
   "Budget a day, in iDNA": "Budget a day, in iDNA",
   "An agent waits for you": "An agent waits for you",
-  "An agent is on": "An agent is on"
+  "An agent is on": "An agent is on",
+  "Everything the agent did, asked for or was refused, newest first. The log is kept until the app closes.": "Everything the agent did, asked for or was refused, newest first. The log is kept until the app closes."
 }

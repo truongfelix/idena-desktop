@@ -2120,5 +2120,6 @@
   "Also runs when it gets": "Passe aussi quand il reçoit",
   "Budget a day, in iDNA": "Budget par jour, en iDNA",
   "An agent waits for you": "Un agent vous attend",
-  "An agent is on": "Un agent est activé"
+  "An agent is on": "Un agent est activé",
+  "Everything the agent did, asked for or was refused, newest first. The log is kept until the app closes.": "Tout ce que l'agent a fait, demandé ou s'est vu refuser, le plus récent d'abord. Le journal est gardé jusqu'à la fermeture de l'app."
 }
