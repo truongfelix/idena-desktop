@@ -95,7 +95,7 @@ export async function runSocialAgent(agent, social, deps) {
   }
   const {answer} = await call('planSocial', {
     agentId: agent.id,
-    input: digest.text || 'Nothing new since your last run.',
+    input: digest.text,
   })
   const plan = readPlan(
     answer,

@@ -1,36 +1,29 @@
 import * as React from 'react'
 import {useTranslation} from 'react-i18next'
-import {useSocial} from '../../social/provider'
-import {shownNames} from '../../social/profiles'
-import {blockedAddresses} from '../../social/people'
-import {
-  agentsList,
-  lastAgentsList,
-  onAgentsChange,
-} from '../../settings/agent/api'
-import {executors} from '../pending-api'
-import {dueToday, runJokeAgent, socialReadyForJokes} from './run'
-import {postCost, postOnSocial} from './social-post'
-import {heldSocial, runSocialAgent} from '../social/run'
+import {useSocial} from '../social/provider'
+import {shownNames} from '../social/profiles'
+import {blockedAddresses} from '../social/people'
+import {historyDone} from '../social/scan'
+import {agentsList, lastAgentsList, onAgentsChange} from '../settings/agent/api'
+import {executors} from './pending-api'
+import {heldSocial, runSocialAgent} from './social/run'
 import {
   prepareSocialAction,
   sendSocialAction,
   socialExecutors,
-} from '../social/execute'
+} from './social/execute'
 
-// The agents' runs in the window (B-243, B-237): every minute, each joke agent on, not paused, whose time of the day
-// has come, runs once that day, when the Social scan is up to date. An approved post (To approve) is posted with
-// the same code.
-
-executors.post = (item) => postOnSocial(item.body)
+// The agents' runs in the window (B-243, B-239): every minute, each agent on, not paused, holding a Social action,
+// runs when its time comes (every hour, or once a day after its time), when the Social scan is up to date. An
+// approved action (To approve) is done with the same code.
 
 const CHECK_MS = 60 * 1000
 const HOUR_MS = 60 * 60 * 1000
 /** A run that failed (the model or the node did not answer) is tried again after this, a few times a day. */
 const RETRY_MS = 15 * 60 * 1000
 const MAX_TRIES = 3
-// Each agent's runs today, in this window: {day, done, tries, retryAt} (a reload runs it again: the run's own checks
-// hold, a joke posted or waiting today stops it, and the main process counts the day's post).
+// Each agent's runs today, in this window: {day, done, tries, retryAt} (a reload runs it again: its read point and
+// the main process's counts of the day hold).
 const runs = new Map()
 // The agents running now: one run at a time each, the scheduled run and Run now alike.
 const running = new Set()
@@ -51,33 +44,48 @@ export const socialState = (social) => ({
   messagesRead: social.readThrough?.(),
 })
 
-/** Whether the agent runs on Idena Social: no task of its own (the joke), and a Social action not Off. */
-export const isSocialAgent = (agent) =>
-  agent.task !== 'joke' && heldSocial(agent).length > 0
+/** Whether the agent runs on Idena Social: a Social action not Off. */
+export const isSocialAgent = (agent) => heldSocial(agent).length > 0
 
-/** One run of a joke agent now, whatever its schedule (the agent page's Run now, or its time come). */
+/**
+ * Whether the Social scan holds the account's history up to the chain's head: before, what a run reads (its posts,
+ * the tips on them) would be wrong.
+ */
+export function socialReady(social) {
+  const {ready, cache, head, me} = social || {}
+  const height = typeof head === 'number' ? head : head?.height
+  return Boolean(
+    ready &&
+      me &&
+      cache &&
+      historyDone(cache) &&
+      typeof height === 'number' &&
+      cache.high >= height - 3
+  )
+}
+
+/** Whether the agent's time of the day has come (a daily agent). */
+export function dueToday(schedule, now) {
+  if (schedule.kind !== 'daily') return false
+  const [hours, minutes] = schedule.time.split(':').map(Number)
+  const at = new Date(now)
+  at.setHours(hours, minutes, 0, 0)
+  return now >= at.getTime()
+}
+
+/** One run of an agent now, whatever its schedule (the agent page's Run now, or its time come). */
 export async function runAgentNow(agent, social, t) {
   if (running.has(agent.id)) return {result: 'running', detail: ''}
   running.add(agent.id)
   try {
-    if (isSocialAgent(agent)) {
-      const state = socialState(social)
-      return await runSocialAgent(agent, state, {
-        t,
-        agent: agentCall,
-        prepare: (item) => prepareSocialAction(item, state),
-        send: (pending) => sendSocialAction(pending),
-      })
-    }
-    return await runJokeAgent(
-      agent,
-      {
-        feed: social.feed,
-        me: social.me,
-        names: shownNames(social.profiles || {}),
-      },
-      {t, agent: agentCall, prepare: postCost, post: postOnSocial}
-    )
+    if (!isSocialAgent(agent)) return {result: 'off', detail: ''}
+    const state = socialState(social)
+    return await runSocialAgent(agent, state, {
+      t,
+      agent: agentCall,
+      prepare: (item) => prepareSocialAction(item, state),
+      send: (pending) => sendSocialAction(pending),
+    })
   } finally {
     running.delete(agent.id)
   }
@@ -143,17 +151,12 @@ export function AgentRunner() {
       const now = Date.now()
       const day = new Date(now).toDateString()
       const due = list.agents.filter((agent) => {
-        if (!agent.enabled) return false
+        if (!agent.enabled || !isSocialAgent(agent)) return false
         const state = runs.get(agent.id)
-        if (isSocialAgent(agent) && agent.schedule.kind === 'hourly')
-          return hourlyDue(state, now)
-        const runsDaily =
-          (agent.task === 'joke' && agent.actions.post) || isSocialAgent(agent)
-        return (
-          runsDaily && runDue(state, day, now) && dueToday(agent.schedule, now)
-        )
+        if (agent.schedule.kind === 'hourly') return hourlyDue(state, now)
+        return runDue(state, day, now) && dueToday(agent.schedule, now)
       })
-      if (!due.length || !socialReadyForJokes(socialRef.current)) return
+      if (!due.length || !socialReady(socialRef.current)) return
       busy.current = true
       try {
         for (const agent of due) {

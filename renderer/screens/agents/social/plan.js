@@ -73,7 +73,7 @@ export function readPlan(answer, digest, held, me, done = {}) {
     const key = `${action}:${label}`
     if (seen.has(key)) return drop('asked twice')
     if (action === 'message') {
-      const others = item.kind === 'chat' ? item.others : [item.author]
+      const others = item.others || [item.author]
       if (others.includes(me)) return drop('its own account')
       const to = `message:${others.join(',')}`
       if (seen.has(to)) return drop('asked twice')

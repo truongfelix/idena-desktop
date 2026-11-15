@@ -1,6 +1,7 @@
 import {LIKE} from '../../social/contract'
 import {postTargets} from '../../social/feed'
 import {shortAddress} from '../../social/people'
+import {validTipAmount} from '../../social/calls'
 
 // What an agent reads on Idena Social when it runs (B-239): what came after its read point (a block height), and
 // only what its actions need. Each item gets a label (p1, c1) that its answer names; the app keeps what each label
@@ -11,6 +12,9 @@ import {shortAddress} from '../../social/people'
 export const MAX_NEW_POSTS = 20
 export const MAX_ANSWERS = 20
 export const MAX_CONVERSATIONS = 10
+export const MAX_TIPS = 30
+/** Its own last posts it reads, to go on from them (a numbered series, what it said already). */
+export const OWN_POSTS_SHOWN = 10
 export const MESSAGES_SHOWN = 5
 export const MAX_TEXT = 500
 /** A first run reads about the last day of blocks (20 s each). */
@@ -121,6 +125,19 @@ export function socialDigest(social, held, {point, scanned}) {
           conversation,
         })
     })
+  // The tips to its posts, replies and comments: who, how much, on what.
+  if (held.length)
+    walk(feed)
+      .filter(({node}) => node.call.author === me)
+      .forEach(({node}) =>
+        node.tips
+          .filter(
+            (tip) => tip.from !== me && !isBlocked(tip.from) && isNew(tip)
+          )
+          .forEach((tip) =>
+            candidates.push({kind: 'tip', height: tip.height, tip, node})
+          )
+      )
   candidates.sort((a, b) => a.height - b.height)
 
   const labels = new Map()
@@ -146,10 +163,31 @@ export function socialDigest(social, held, {point, scanned}) {
     answer: MAX_ANSWERS,
     post: MAX_NEW_POSTS,
     chat: MAX_CONVERSATIONS,
+    tip: MAX_TIPS,
   }
-  const counts = {answer: 0, post: 0, chat: 0}
-  const lines = {answer: [], post: [], chat: []}
-  let length = 0
+  const counts = {answer: 0, post: 0, chat: 0, tip: 0}
+  const lines = {answer: [], post: [], chat: [], tip: []}
+  // A person (a tipper) once: the agent may write to them.
+  let people = 0
+  const personLabel = (address) => {
+    const found = [...labels.entries()].find(
+      ([, item]) => item.kind === 'person' && item.others[0] === address
+    )
+    if (found) return found[0]
+    people += 1
+    const id = `u${people}`
+    labels.set(id, {kind: 'person', others: [address]})
+    return id
+  }
+  // Its own last posts: read first, whatever the point (no label: nothing to act on).
+  const own = held.includes('post')
+    ? feed
+        .filter(({call}) => call.author === me && call.height <= scanned)
+        .slice(0, OWN_POSTS_SHOWN)
+        .reverse()
+        .map(({call}) => `- "${shownText(call.message, call.hasMedia)}"`)
+    : []
+  let {length} = own.join('\n')
   let leftOut = null
   let lastHeight = null
   // eslint-disable-next-line no-restricted-syntax
@@ -159,7 +197,7 @@ export function socialDigest(social, held, {point, scanned}) {
       break
     }
     const before = new Map(labels)
-    const kept = {posts, chats}
+    const kept = {posts, chats, people}
     let text
     if (item.kind === 'answer') {
       const yours = label(item.parent, item.post)
@@ -176,6 +214,15 @@ export function socialDigest(social, held, {point, scanned}) {
       text = `${id} by ${name(item.node.call.author)}${
         likes ? ` (${likes} like${likes > 1 ? 's' : ''})` : ''
       }: "${shownText(item.node.call.message, item.node.call.hasMedia)}"`
+    } else if (item.kind === 'tip') {
+      const id = personLabel(item.tip.from)
+      const amount = validTipAmount(item.tip)
+      text = `${id} ${name(
+        item.tip.from
+      )} tipped you ${amount} iDNA for "${shownText(
+        item.node.call.message,
+        item.node.call.hasMedia
+      )}"`
     } else {
       chats += 1
       const id = `c${chats}`
@@ -199,6 +246,7 @@ export function socialDigest(social, held, {point, scanned}) {
       before.forEach((value, key) => labels.set(key, value))
       posts = kept.posts
       chats = kept.chats
+      people = kept.people
       leftOut = item
       break
     }
@@ -209,6 +257,7 @@ export function socialDigest(social, held, {point, scanned}) {
   }
 
   const sections = [
+    ['Tips to you:', lines.tip],
     ['Answers to you:', lines.answer],
     ['New posts:', lines.post],
     ['Private messages to you:', lines.chat],
@@ -216,8 +265,15 @@ export function socialDigest(social, held, {point, scanned}) {
     .filter(([, list]) => list.length)
     .map(([title, list]) => [title, ...list].join('\n'))
   const empty = sections.length === 0
+  const ownText = own.length
+    ? `Your last posts, the newest last:\n${own.join('\n')}\n\n`
+    : ''
   return {
-    text: empty ? '' : `Since your last run:\n\n${sections.join('\n\n')}`,
+    text: `${ownText}${
+      empty
+        ? 'Nothing new since your last run.'
+        : `Since your last run:\n\n${sections.join('\n\n')}`
+    }`,
     labels,
     empty,
     readTo: readUpTo(leftOut, lastHeight, from, scanned),

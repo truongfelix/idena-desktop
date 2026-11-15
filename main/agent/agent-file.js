@@ -1,7 +1,7 @@
 const {DEFAULT_ADDRESSES} = require('./settings')
 const {SINGLE_HOLDER_ACTIONS, normalizeAgent} = require('./profiles')
 
-// One agent as a file (B-243, owner 2026-11-14 "like skills"): its name, instructions and task, its actions with
+// One agent as a file (B-243, owner 2026-11-14 "like skills"): its name, instructions, its actions with
 // their levels and limits, when it runs, its model and its budget, the report thresholds. Never the key, nor the
 // Activity. The service's address goes in only when it is the service's public default: another may hold a secret
 // (a token in the address) or a private server. An imported agent starts off, each action Off, until the person
@@ -20,7 +20,6 @@ function exportAgent(agent) {
       format: FORMAT,
       v: VERSION,
       name: agent.name,
-      task: agent.task,
       instructions: agent.instructions,
       provider,
       ...(address === DEFAULT_ADDRESSES[provider] ? {address} : {}),

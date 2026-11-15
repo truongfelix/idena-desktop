@@ -70,7 +70,6 @@ describe('an agent as a file', () => {
       format: 'idena-agent',
       v: 1,
       name: 'Joke agent',
-      task: 'joke',
       instructions: 'Write one joke.',
       provider: 'anthropic',
       address: 'https://api.anthropic.com',
@@ -111,7 +110,7 @@ describe('an agent as a file', () => {
     const {savedId, agents} = await two.handle('importAgent', {text})
     expect(savedId).not.toBe(JOKE)
     const imported = agents[0]
-    expect(imported).toMatchObject({enabled: false, task: 'joke'})
+    expect(imported).toMatchObject({enabled: false, name: 'Joke agent'})
     const post = (agent, id) =>
       agent.handle('propose', {
         agentId: id,
