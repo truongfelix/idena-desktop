@@ -115,6 +115,8 @@ export const previewAgentFile = (text) => agent('previewAgent', {text})
 /** Adds the agent a file holds, off and each action Off; resolves with `savedId`. */
 export const importAgentFile = (text) =>
   writeAgents(() => agent('importAgent', {text}))
+/** The flip question the app asks when an agent has none of its own. */
+export const flipPromptDefault = () => agent('flipPromptDefault')
 export const agentActivity = (agentId) =>
   agent('activity', agentId === undefined ? undefined : {agentId})
 export const stopAgentTest = () => agent('stopTest')

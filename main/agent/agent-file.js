@@ -29,6 +29,7 @@ function exportAgent(agent) {
       schedule: agent.schedule,
       budgetPerDay: agent.budgetPerDay,
       reportThresholds: agent.reportThresholds,
+      ...(agent.flipPrompt ? {flipPrompt: agent.flipPrompt} : {}),
     },
     null,
     2

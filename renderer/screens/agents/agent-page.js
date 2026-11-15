@@ -39,6 +39,7 @@ import {ReportRulesSection} from '../settings/agent/report-rules-section'
 import {ActivitySection} from '../settings/agent/activity-section'
 import {ActionsSection} from './actions-section'
 import {TaskSection} from './task-section'
+import {FlipQuestionSection} from './flip-question-section'
 import {saveAgentFile} from './agent-file'
 import {DEFAULT_JOKE_INSTRUCTIONS} from './joke/joke'
 import {AgentBadge} from './agents-list'
@@ -99,7 +100,7 @@ function InstructionsSection({agent, onChange}) {
       {agent.actions.answerFlip && (
         <Text fontSize="sm" color="muted" mt={2}>
           {t(
-            "In the validation, the model is asked the app's own flip question; these instructions are not sent with it.",
+            'In the validation, the model is asked the flip question below; these instructions are not sent with it.',
             {nsSeparator: '!!'}
           )}
         </Text>
@@ -378,6 +379,12 @@ export function AgentPage({id}) {
         onChange={save}
       />
       <ScheduleSection agent={agent} catalog={catalog} onChange={save} />
+      {agent.actions.answerFlip && (
+        <FlipQuestionSection
+          agent={agent}
+          onSave={(flipPrompt) => updateAgent(id, (a) => ({...a, flipPrompt}))}
+        />
+      )}
       {agent.actions.report && (
         <ReportRulesSection settings={agent} onChange={save} />
       )}

@@ -1907,7 +1907,6 @@
   "Remove {{action}}": "Remove {{action}}",
   "Instructions": "Instructions",
   "What the model is asked, every time it runs": "What the model is asked, every time it runs",
-  "In the validation, the model is asked the app's own flip question; these instructions are not sent with it.": "In the validation, the model is asked the app's own flip question; these instructions are not sent with it.",
   "What it reads": "What it reads",
   "Set by its actions; the model is sent nothing else.": "Set by its actions; the model is sent nothing else.",
   "When and how much": "When and how much",
@@ -2021,5 +2020,18 @@
   "Add the agent": "Add the agent",
   "Agent exported to a file": "Agent exported to a file",
   "Agent imported from a file": "Agent imported from a file",
-  "The file names another address for its service: not taken. The agent uses the service's usual address; change it on the agent page if you trust the other one.": "The file names another address for its service: not taken. The agent uses the service's usual address; change it on the agent page if you trust the other one."
+  "The file names another address for its service: not taken. The agent uses the service's usual address; change it on the agent page if you trust the other one.": "The file names another address for its service: not taken. The agent uses the service's usual address; change it on the agent page if you trust the other one.",
+  "In the validation, the model is asked the flip question below; these instructions are not sent with it.": "In the validation, the model is asked the flip question below; these instructions are not sent with it.",
+  "The question must keep {{parts}}, once each: the app fills them with the rules and the answer it reads.": "The question must keep {{parts}}, once each: the app fills them with the rules and the answer it reads.",
+  "The flip question": "The flip question",
+  "What the model is asked for each flip of the validation and of the practice test. {RULES} and {ANSWER_FORMAT} are filled by the app: the numbered report rules, and the answer it reads.": "What the model is asked for each flip of the validation and of the practice test. {RULES} and {ANSWER_FORMAT} are filled by the app: the numbered report rules, and the answer it reads.",
+  "Save the question": "Save the question",
+  "Back to default": "Back to default",
+  "All reasons at {{percent}}": "All reasons at {{percent}}",
+  "Custom thresholds": "Custom thresholds",
+  "Reasons {{runs}}": "Reasons {{runs}}",
+  "{{reason}} at {{percent}}": "{{reason}} at {{percent}}",
+  "{{from}}-{{to}} at {{percent}}": "{{from}}-{{to}} at {{percent}}",
+  "Fold": "Fold",
+  "Change": "Change"
 }

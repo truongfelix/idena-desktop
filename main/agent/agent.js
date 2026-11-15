@@ -117,9 +117,20 @@ function createAgent({
   }
 
   /** One flip to the model, the answer read. Throws the provider's error. */
-  const askFlip = async (config, flip, timeoutMs, running) => {
+  // The flip question of the agent `agentId` (the validation agent's without one): its own text, or the app's ('').
+  const flipPromptOf = (agentId) => {
+    if (!profiles) return ''
+    const file = profiles.read()
+    const agent =
+      agentId !== undefined
+        ? file.agents.find((one) => one.id === agentId)
+        : validationAgent(file)
+    return agent ? agent.flipPrompt : ''
+  }
+
+  const askFlip = async (config, flip, timeoutMs, running, prompt = '') => {
     const checked = checkFlip(flip)
-    const {system, parts} = flipQuestion(checked)
+    const {system, parts} = flipQuestion(checked, prompt)
     const controller = new AbortController()
     running.add(controller)
     try {
@@ -158,7 +169,13 @@ function createAgent({
     }
     let answer
     try {
-      answer = await askFlip(config, flip, timeoutMs, solving)
+      answer = await askFlip(
+        config,
+        flip,
+        timeoutMs,
+        solving,
+        flipPromptOf(undefined)
+      )
     } catch (error) {
       log({
         agentId,
@@ -296,7 +313,13 @@ function createAgent({
           : settings.read()
       const logged = agentId !== undefined ? agentId : validationId()
       try {
-        const answer = await askFlip(config, flip, timeoutMs, testing)
+        const answer = await askFlip(
+          config,
+          flip,
+          timeoutMs,
+          testing,
+          flipPromptOf(agentId)
+        )
         log({
           agentId: logged,
           action: 'test',
