@@ -194,7 +194,9 @@ describe('the validation answered by one agent, reported by another', () => {
       agentRow(R, 'Checker', 'reports', {report: {level: 'alone'}}),
     ])
     const solving = agent.handle('solveFlip', {flip: longFlip})
-    await new Promise((resolve) => setImmediate(resolve))
+    await new Promise((resolve) => {
+      setImmediate(resolve)
+    })
     // The reporting model was asked before the answering one finished.
     expect(ask).toHaveBeenCalledTimes(2)
     releaseReport()
