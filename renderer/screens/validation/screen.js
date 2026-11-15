@@ -117,18 +117,22 @@ export function ValidationScreen({
       ? pickedSide({answer: pick.reportSide ?? pick.answer})
       : pickedSide(pick)
     if (side !== variant) return null
+    // The flip it would mark best (B-260), shown for the person's click.
+    const best = isKeywords && agent.bestSuggestion === currentFlip.hash
     const show = isKeywords
-      ? Boolean(pick.report) &&
-        !currentFlip.relevance &&
-        // A report the agent makes alone is made, not shown (B-257: whatever the answering agent's mode).
-        pick.reportDecision !== 'alone'
+      ? best ||
+        (Boolean(pick.report) &&
+          !currentFlip.relevance &&
+          // A report the agent makes alone is made, not shown (B-257: whatever the answering agent's mode).
+          pick.reportDecision !== 'alone')
       : agent.mode === 'suggest' &&
         pick.answers !== false &&
         !currentFlip.option
     return show
       ? {
           percent: Math.round((pick.confidence || 0) * 100),
-          report: isKeywords,
+          report: isKeywords && !best,
+          best,
           isDark: isShortSession(state),
         }
       : null

@@ -1,7 +1,9 @@
 import {AnswerType, RelevanceType} from '../../../shared/types'
 import {
   answersToTake,
+  appliedKey,
   autopilotEvents,
+  bestFlipOf,
   flipDeadlineMs,
   flipsLeftToAsk,
   nextFlipToAsk,
@@ -145,9 +147,10 @@ describe('the agent in a validation', () => {
       isKeywords: true,
       reportsLeft: 1,
     })
+    // The reports first (B-259), then the approvals.
     expect(marks).toEqual([
-      {type: 'APPROVE_WORDS', hash: 'a'},
       {type: 'REPORT_WORDS', hash: 'f'},
+      {type: 'APPROVE_WORDS', hash: 'a'},
     ])
     // No report left in the session: the flip it would report is left to the person, not approved.
     expect(
@@ -208,8 +211,8 @@ describe('the validation answered by one agent, reported by another (B-257)', ()
       reportsLeft: 1,
     })
     expect(events).toEqual([
-      {type: 'APPROVE_WORDS', hash: 'a'},
       {type: 'REPORT_WORDS', hash: 'b'},
+      {type: 'APPROVE_WORDS', hash: 'a'},
     ])
     expect(answersToTake([flip('a')], picks)).toEqual([])
   })
@@ -227,6 +230,107 @@ describe('the validation answered by one agent, reported by another (B-257)', ()
     expect(events).toEqual([
       {type: 'ANSWER', hash: 'a', option: expect.anything()},
     ])
+  })
+})
+
+describe("Autopilot's marks in the keywords check (B-259, B-260)", () => {
+  const pick = (more) => ({
+    decision: 'alone',
+    answer: 'left',
+    confidence: 0.9,
+    relevance: 'relevant',
+    report: false,
+    reportDecision: 'off',
+    ...more,
+  })
+  const bad = (reportConfidence) =>
+    pick({
+      report: true,
+      reportDecision: 'alone',
+      relevance: 'irrelevant',
+      reportConfidence,
+    })
+
+  test('more reports wanted than allowed: the surest ones', () => {
+    const picks = {a: bad(0.71), b: bad(0.99), c: bad(0.8), d: bad(0.95)}
+    const events = autopilotEvents({
+      flips: ['a', 'b', 'c', 'd'].map((hash) => flip(hash)),
+      picks,
+      applied: new Set(),
+      isKeywords: true,
+      reportsLeft: 2,
+    })
+    expect(events.filter(({type}) => type === 'REPORT_WORDS')).toEqual([
+      {type: 'REPORT_WORDS', hash: 'b'},
+      {type: 'REPORT_WORDS', hash: 'd'},
+    ])
+  })
+
+  test('the best flip: after its approvals are in, the best one from 0.8, once, never over one marked', () => {
+    const picks = {
+      a: pick({quality: 0.85}),
+      b: pick({quality: 0.95}),
+      c: pick({quality: 0.99, report: true, reportDecision: 'alone'}),
+      d: pick({quality: 0.5}),
+    }
+    // Answered already: only the marks are at stake here.
+    const flips = ['a', 'b', 'c', 'd'].map((hash) =>
+      flip(hash, {option: AnswerType.Left})
+    )
+    const applied = new Set()
+    // First pass: the approvals; no best flip yet (they are not in the flips).
+    const first = autopilotEvents({
+      flips,
+      picks,
+      applied,
+      isKeywords: true,
+      reportsLeft: 1,
+    })
+    expect(first.map(({type}) => type)).not.toContain('FAVORITE')
+    first.forEach((event) => applied.add(appliedKey(event)))
+    const approved = flips.map((one) =>
+      ['a', 'b', 'd'].includes(one.hash)
+        ? {...one, relevance: RelevanceType.Relevant}
+        : {...one, relevance: RelevanceType.Irrelevant}
+    )
+    const second = autopilotEvents({
+      flips: approved,
+      picks,
+      applied,
+      isKeywords: true,
+      reportsLeft: 0,
+    })
+    expect(second).toEqual([{type: 'FAVORITE', hash: 'b'}])
+    applied.add(appliedKey(second[0]))
+    expect(
+      autopilotEvents({flips: approved, picks, applied, isKeywords: true})
+    ).toEqual([])
+    // A best flip marked already (the person's): none.
+    expect(
+      autopilotEvents({
+        flips: approved,
+        picks,
+        applied: new Set(['mark:a', 'mark:b', 'mark:c', 'mark:d']),
+        isKeywords: true,
+        hasBest: true,
+      })
+    ).toEqual([])
+    // One flip approved already, a better one still to approve: no best flip before that approval is in.
+    const midway = autopilotEvents({
+      flips: [{...flips[0], relevance: RelevanceType.Relevant}, flips[1]],
+      picks,
+      applied: new Set(['mark:a']),
+      isKeywords: true,
+    })
+    expect(midway).toEqual([{type: 'APPROVE_WORDS', hash: 'b'}])
+    // None good enough: none.
+    expect(
+      bestFlipOf(approved, {
+        ...picks,
+        b: pick({quality: 0.7}),
+        a: pick({quality: 0.6}),
+      })
+    ).toBeNull()
   })
 })
 

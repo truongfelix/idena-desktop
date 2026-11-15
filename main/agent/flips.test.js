@@ -106,6 +106,7 @@ describe('agent flips: the model answer', () => {
       relevance: null,
       reasons: [],
       report: false,
+      quality: null,
     })
     expect(
       readFlipAnswer('{"answer": "both", "confidence": 3}', {hasWords: false})
@@ -131,6 +132,7 @@ describe('agent flips: the model answer', () => {
         {reason: 1, confidence: 0.5},
       ],
       report: true,
+      quality: null,
     })
     expect(readFlipAnswer(sure, {hasWords: false})).toMatchObject({
       reasons: [],
@@ -153,6 +155,14 @@ describe('agent flips: the model answer', () => {
     const storySure =
       '{"answer":"left","confidence":0.99,"keywords":"not shown","reasons":[]}'
     expect(readFlipAnswer(storySure, {hasWords: true}).report).toBe(false)
+    // How good a flip it is (B-260): read with keywords only, kept within 0 to 1.
+    const good =
+      '{"answer":"left","confidence":0.9,"keywords":"shown","reasons":[],"quality":0.85}'
+    expect(readFlipAnswer(good, {hasWords: true}).quality).toBe(0.85)
+    expect(readFlipAnswer(good, {hasWords: false}).quality).toBeNull()
+    expect(
+      readFlipAnswer(good.replace('0.85', '7'), {hasWords: true}).quality
+    ).toBe(1)
   })
 
   test('each reason is held against its own threshold', () => {

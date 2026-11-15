@@ -109,6 +109,7 @@ function ValidationSession({
     reportsUsed: state.context.reports.size,
     // The machine's own limit: every long flip counts, ready or not.
     reportsAllowed: availableReportsNumber(state.context.longFlips),
+    hasBest: Object.keys(state.context.bestFlipHashes || {}).length > 0,
     step: autopilotStep(state),
     send,
     validationStart,

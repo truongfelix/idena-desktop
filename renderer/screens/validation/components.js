@@ -180,7 +180,10 @@ export function Flip({
           px={2}
           py={1}
         >
-          {agentPick.report
+          {/* eslint-disable-next-line no-nested-ternary */}
+          {agentPick.best
+            ? t("Agent's pick · it would mark this flip best")
+            : agentPick.report
             ? t(
                 "Agent's pick · {{percent}}% sure · it would report this flip",
                 {

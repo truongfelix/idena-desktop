@@ -327,6 +327,10 @@ function createAgent({
       relevance: relevanceOf(reading || (separate ? null : answer)),
       report,
       reportDecision: report ? reportDecision : 'off',
+      // How sure the report is (its surest reason): Autopilot reports the surest first when it may not report all.
+      reportConfidence: report ? reading.reasons[0].confidence : 0,
+      // How good a flip it is, from the agent that marks the keywords (B-260: the best flip).
+      quality: (reading || (separate ? null : answer) || {}).quality ?? null,
       markDecision,
       reportLater: separate && !hasWords,
       ...(answered.status === 'rejected'

@@ -111,11 +111,38 @@ export function answersToTake(flips, picks) {
 const unmarked = (flip) =>
   !flip.relevance || flip.relevance === RelevanceType.Abstained
 
+/** How good a flip must be, as the model says, for the agent to mark it best (B-260). */
+export const BEST_MIN_QUALITY = 0.8
+
+const marksAlone = (pick) => (pick.markDecision ?? pick.decision) === 'alone'
+
 /**
- * Autopilot's events: the answers its permission lets it give alone, and in the keywords check its marks (a
- * report only when its report permission is Alone too). `applied` holds what it already did, so a mark the person
- * changed is never put back; the person's own answer is never replaced. `reportsLeft`: the session's reports not
- * used yet (the permission was checked when the flip was asked, before any report).
+ * The flip the agent would mark best (B-260): among the flips approved (relevant) whose agent judged them relevant,
+ * the one it found best, from BEST_MIN_QUALITY; null when none. The first of equals, in the session's order.
+ */
+export function bestFlipOf(flips, picks) {
+  let best = null
+  flips.forEach((flip) => {
+    const pick = picks[flip.hash]
+    if (
+      !pick ||
+      flip.relevance !== RelevanceType.Relevant ||
+      pick.relevance !== 'relevant' ||
+      pick.report ||
+      !(pick.quality >= BEST_MIN_QUALITY)
+    )
+      return
+    if (!best || pick.quality > picks[best.hash].quality) best = flip
+  })
+  return best
+}
+
+/**
+ * Autopilot's events: the answers its permission lets it give alone, and in the keywords check the marks its level
+ * lets it make alone: the reports (the surest first when there are more than `reportsLeft`, the session's reports
+ * not used yet, B-259), the approvals, then the best flip (B-260) once every approval it makes is in, when none is
+ * marked yet (`hasBest`). `applied` holds what it already did, so a mark the person changed is never put back; the
+ * person's own answer is never replaced.
  */
 export function autopilotEvents({
   flips,
@@ -123,15 +150,15 @@ export function autopilotEvents({
   applied,
   isKeywords,
   reportsLeft = 0,
+  hasBest = false,
 }) {
   const events = []
-  let left = reportsLeft
   flips.forEach((flip) => {
     const pick = picks[flip.hash]
-    if (!pick) return
     // An answer only from the agent answering (B-257: a reporting agent alone gives none).
     const side = pickedSide(pick)
     if (
+      pick &&
       pick.answers !== false &&
       pick.decision === 'alone' &&
       side &&
@@ -139,21 +166,47 @@ export function autopilotEvents({
       !applied.has(`answer:${flip.hash}`)
     )
       events.push({type: 'ANSWER', hash: flip.hash, option: side})
-    if (!isKeywords || applied.has(`mark:${flip.hash}`) || !unmarked(flip))
-      return
-    // The keywords' marks: the reporting agent's level, or the answering agent's when one agent does both.
-    if ((pick.markDecision ?? pick.decision) !== 'alone') return
-    if (pick.report) {
-      if (pick.reportDecision === 'alone' && left > 0) {
-        left -= 1
-        events.push({type: 'REPORT_WORDS', hash: flip.hash})
-      }
-    } else if (pick.relevance === 'relevant')
-      events.push({type: 'APPROVE_WORDS', hash: flip.hash})
   })
+  if (!isKeywords) return events
+  // The keywords' marks: the reporting agent's level, or the answering agent's when one agent does both.
+  const markable = flips.filter((flip) => {
+    const pick = picks[flip.hash]
+    return (
+      pick &&
+      marksAlone(pick) &&
+      !applied.has(`mark:${flip.hash}`) &&
+      unmarked(flip)
+    )
+  })
+  const confidence = (flip) => picks[flip.hash].reportConfidence || 0
+  markable
+    .filter(
+      (flip) =>
+        picks[flip.hash].report && picks[flip.hash].reportDecision === 'alone'
+    )
+    .sort((a, b) => confidence(b) - confidence(a))
+    .slice(0, Math.max(0, reportsLeft))
+    .forEach((flip) => events.push({type: 'REPORT_WORDS', hash: flip.hash}))
+  const approvals = markable.filter(
+    (flip) =>
+      !picks[flip.hash].report && picks[flip.hash].relevance === 'relevant'
+  )
+  approvals.forEach((flip) =>
+    events.push({type: 'APPROVE_WORDS', hash: flip.hash})
+  )
+  // The best flip: once its approvals are in the flips (a later pass), never over the person's own.
+  if (!hasBest && !approvals.length && !applied.has('best')) {
+    const best = bestFlipOf(
+      flips.filter((flip) => marksAlone(picks[flip.hash] || {})),
+      picks
+    )
+    if (best) events.push({type: 'FAVORITE', hash: best.hash})
+  }
   return events
 }
 
 /** What `applied` records for an event sent. */
-export const appliedKey = ({type, hash}) =>
-  `${type === 'ANSWER' ? 'answer' : 'mark'}:${hash}`
+export function appliedKey({type, hash}) {
+  if (type === 'FAVORITE') return 'best'
+  return `${type === 'ANSWER' ? 'answer' : 'mark'}:${hash}`
+}

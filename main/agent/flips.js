@@ -56,7 +56,8 @@ const RULES_AND_FORMAT = [
   'Reply with one JSON object and nothing else:',
   '{"answer": "left" | "right", "confidence": how sure the answer is, from 0 to 1,',
   '"keywords": "shown" | "not shown" | null,',
-  '"reasons": [{"reason": rule number, "confidence": how sure the flip breaks it, from 0 to 1}]}',
+  '"reasons": [{"reason": rule number, "confidence": how sure the flip breaks it, from 0 to 1}],',
+  '"quality": with keywords, how good a flip it is, from 0 to 1 (a clear story, both keywords shown, no rule broken); else null}',
 ].join('\n')
 
 /** The question's text: the app's task, the agent's Instructions when it has some, then the rules and the format. */
@@ -198,7 +199,8 @@ function readReasons(list) {
 /**
  * The model's answer, read strictly: anything unreadable is no answer. `answer` 'left' | 'right' | null,
  * `relevance` 'relevant' | 'irrelevant' | null, `reasons` the report reasons it gave (with keywords only), `report`
- * when one of them reaches its threshold (`thresholds`, by reason; the defaults when left out).
+ * when one of them reaches its threshold (`thresholds`, by reason; the defaults when left out), `quality` how good a
+ * flip it is (with keywords only; null when not given).
  */
 function readFlipAnswer(text, {hasWords, thresholds = REPORT_THRESHOLDS}) {
   const reply = firstJsonObject(text)
@@ -208,6 +210,7 @@ function readFlipAnswer(text, {hasWords, thresholds = REPORT_THRESHOLDS}) {
     relevance: null,
     reasons: [],
     report: false,
+    quality: null,
   }
   if (!reply || typeof reply !== 'object') return none
   const answer = ['left', 'right'].includes(reply.answer) ? reply.answer : null
@@ -220,12 +223,18 @@ function readFlipAnswer(text, {hasWords, thresholds = REPORT_THRESHOLDS}) {
   let relevance = null
   if (report) relevance = 'irrelevant'
   else if (hasWords && reply.keywords === 'shown') relevance = 'relevant'
+  // How good a flip it is (B-260: the best flip's mark), with keywords only; none when the model gave none.
+  const quality =
+    hasWords && reply.quality !== null && reply.quality !== undefined
+      ? unit(reply.quality)
+      : null
   return {
     answer,
     confidence: unit(reply.confidence),
     relevance,
     reasons,
     report,
+    quality,
   }
 }
 
