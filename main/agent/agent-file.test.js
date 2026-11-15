@@ -77,10 +77,10 @@ describe('an agent as a file', () => {
       actions: {post: {level: 'alone', limit: 1}},
       schedule: {kind: 'daily', time: '09:00'},
       budgetPerDay: 0.05,
-      // Saved before it had reads, with Post: it reads what it read then.
+      // A joke agent saved before it had reads: its tips, as it read them, no one's posts.
       reads: {
-        posts: {window: 'count', count: 20},
-        notifications: false,
+        posts: {window: 'off', count: 10},
+        notifications: true,
         messages: false,
       },
       events: [],

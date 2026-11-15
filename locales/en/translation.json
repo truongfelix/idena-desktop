@@ -2115,9 +2115,11 @@
   "a tip": "a tip",
   "a private message": "a private message",
   "When it runs: on its schedule, and when something comes to it. The budget is the most it may spend a day in iDNA, fees included, on what it does alone; with none, it spends nothing alone. The model's own service bills apart.": "When it runs: on its schedule, and when something comes to it. The budget is the most it may spend a day in iDNA, fees included, on what it does alone; with none, it spends nothing alone. The model's own service bills apart.",
-  "Also runs when it gets": "Also runs when it gets",
   "Budget a day, in iDNA": "Budget a day, in iDNA",
   "An agent waits for you": "An agent waits for you",
   "An agent is on": "An agent is on",
-  "Everything the agent did, asked for or was refused, newest first. The log is kept until the app closes.": "Everything the agent did, asked for or was refused, newest first. The log is kept until the app closes."
+  "Everything the agent did, asked for or was refused, newest first. The log is kept until the app closes.": "Everything the agent did, asked for or was refused, newest first. The log is kept until the app closes.",
+  "Turn the agent on first.": "Turn the agent on first.",
+  "Also runs when it gets (what it reads: its notifications, its private messages)": "Also runs when it gets (what it reads: its notifications, its private messages)",
+  "Its actions on Social have nothing to act on: turn on what it reads.": "Its actions on Social have nothing to act on: turn on what it reads."
 }

@@ -1,5 +1,8 @@
 import {
+  afterEventRun,
   afterHourlyRun,
+  eventsAllowed,
+  eventsRead,
   afterRun,
   hourlyDue,
   isSocialAgent,
@@ -61,5 +64,28 @@ describe("the agents' runs in the window", () => {
     })
     expect(state.names).toEqual({})
     expect([...state.blocked]).toEqual(['0xb'])
+  })
+
+  test('an event runs it only for what it reads, and stops for the day after 3 failed event runs', () => {
+    const agent = (reads) => ({
+      reads,
+      events: ['like', 'tip', 'message'],
+    })
+    expect(eventsRead(agent({notifications: true, messages: false}))).toEqual([
+      'like',
+      'tip',
+    ])
+    expect(eventsRead(agent({notifications: false, messages: true}))).toEqual([
+      'message',
+    ])
+    let fails
+    expect(eventsAllowed(fails, DAY)).toBe(true)
+    fails = afterEventRun(fails, DAY, 'done')
+    fails = afterEventRun(fails, DAY, 'failed')
+    fails = afterEventRun(fails, DAY, 'failed')
+    expect(eventsAllowed(fails, DAY)).toBe(true)
+    fails = afterEventRun(fails, DAY, 'failed')
+    expect(eventsAllowed(fails, DAY)).toBe(false)
+    expect(eventsAllowed(fails, 'Sun Nov 15 2026')).toBe(true)
   })
 })

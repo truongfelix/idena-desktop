@@ -7,6 +7,7 @@ import {
   runsLine,
 } from './catalog'
 import {agentsDot} from './menu-state'
+import {nothingToActOn} from './page-sections'
 import {activityText} from '../settings/agent/activity-section'
 
 const t = (text, values = {}) =>
@@ -120,5 +121,24 @@ describe('the Agents section lines', () => {
     expect(agentsDot(list([agent()], true), 0)).toBeNull()
     expect(agentsDot(list([agent({enabled: false})]), 0)).toBeNull()
     expect(agentsDot(null, 0)).toBeNull()
+  })
+
+  test('a warning when its Social actions have nothing to act on', () => {
+    const off = {
+      posts: {window: 'off', count: 10},
+      notifications: false,
+      messages: false,
+    }
+    const act = {reply: {level: 'alone'}}
+    expect(nothingToActOn({actions: act, reads: off})).toBe(true)
+    expect(
+      nothingToActOn({actions: act, reads: {...off, notifications: true}})
+    ).toBe(false)
+    expect(
+      nothingToActOn({actions: {post: {level: 'alone'}}, reads: off})
+    ).toBe(false)
+    expect(nothingToActOn({actions: {reply: {level: 'off'}}, reads: off})).toBe(
+      false
+    )
   })
 })

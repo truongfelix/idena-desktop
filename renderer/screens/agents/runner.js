@@ -31,8 +31,28 @@ const MAX_TRIES = 3
 // Each agent's runs today, in this window: {day, done, tries, retryAt} (a reload runs it again: its read point and
 // the main process's counts of the day hold).
 const runs = new Map()
-// When an event last ran each agent, in this window.
+// When an event last ran each agent, in this window, and its event runs that failed today: {day, n}.
 const lastEvent = new Map()
+const eventFails = new Map()
+
+/** The events that may run the agent: only those it reads (likes, answers, tips: Notifications; messages). */
+export function eventsRead(agent) {
+  const {reads = {}, events = []} = agent
+  return events.filter((one) =>
+    one === 'message' ? reads.messages : reads.notifications
+  )
+}
+
+/** Whether an event may still run the agent today: not after MAX_TRIES failed event runs that day. */
+export const eventsAllowed = (fails, day) =>
+  !fails || fails.day !== day || fails.n < MAX_TRIES
+
+/** The failed event runs of the day after a run that gave `result`. */
+export function afterEventRun(fails, day, result) {
+  if (result !== 'failed') return fails
+  const n = fails && fails.day === day ? fails.n : 0
+  return {day, n: n + 1}
+}
 // The agents running now: one run at a time each, the scheduled run and Run now alike.
 const running = new Set()
 
@@ -174,9 +194,11 @@ export function AgentRunner() {
         const state = socialState(socialRef.current)
         // eslint-disable-next-line no-restricted-syntax
         for (const agent of active) {
+          const events = eventsRead(agent)
           if (
             due.includes(agent) ||
-            !agent.events.length ||
+            !events.length ||
+            !eventsAllowed(eventFails.get(agent.id), day) ||
             now - (lastEvent.get(agent.id) || 0) < EVENT_MIN_MS
           )
             // eslint-disable-next-line no-continue
@@ -187,7 +209,7 @@ export function AgentRunner() {
           )
           // Up to where its run reads (its messages: as far as they were decrypted), not further.
           const scanned = scannedHeight(state, readsMessages(agent))
-          if (eventPending(agent.events, state, {point, scanned})) {
+          if (eventPending(events, state, {point, scanned})) {
             lastEvent.set(agent.id, now)
             due.push(agent)
           }
@@ -200,7 +222,12 @@ export function AgentRunner() {
               return {result: 'failed'}
             }
           )
-          if (result !== 'running' && lastEvent.get(agent.id) !== now)
+          if (lastEvent.get(agent.id) === now)
+            eventFails.set(
+              agent.id,
+              afterEventRun(eventFails.get(agent.id), day, result)
+            )
+          else if (result !== 'running')
             runs.set(
               agent.id,
               agent.schedule.kind === 'hourly'

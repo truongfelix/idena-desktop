@@ -28,6 +28,7 @@ export function eventPending(
       events.includes('answer') &&
       parent &&
       parent.call.author === me &&
+      typeof node.id === 'number' &&
       fromOther(node.call.author) &&
       node.call.message !== LIKE &&
       isNew(node.call)

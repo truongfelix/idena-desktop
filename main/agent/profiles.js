@@ -60,8 +60,16 @@ function normalizeReads(value) {
  * to 20); with one that answers others (not Post alone), its answers, likes and tips; with Private messages, its
  * messages. Without one, nothing.
  */
-function readsBefore(actions) {
-  const saved = actions && typeof actions === 'object' ? actions : {}
+function readsBefore(value) {
+  const saved =
+    value.actions && typeof value.actions === 'object' ? value.actions : {}
+  // A joke agent (B-237) read only its own jokes and the tips on them: its notifications, no one's posts.
+  if (value.task === 'joke' && saved.post && saved.post.level !== 'off')
+    return {
+      posts: {window: 'off', count: 10},
+      notifications: true,
+      messages: false,
+    }
   // As the B-239 builds read: from the Social actions not Off.
   const held = ['post', 'reply', 'like', 'message', 'tip'].filter(
     (name) => saved[name] && saved[name].level !== 'off'
@@ -152,7 +160,7 @@ function normalizeAgent(input, {id = newAgentId} = {}) {
     instructions: text(value.instructions, MAX_INSTRUCTIONS_LENGTH, ''),
     actions: normalizeActions(value.actions),
     reads: normalizeReads(
-      value.reads === undefined ? readsBefore(value.actions) : value.reads
+      value.reads === undefined ? readsBefore(value) : value.reads
     ),
     events: normalizeEvents(value.events),
     schedule: {

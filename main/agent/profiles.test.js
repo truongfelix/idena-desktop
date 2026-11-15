@@ -88,6 +88,14 @@ describe('agent profiles', () => {
       notifications: true,
       messages: true,
     })
+    // A joke agent (B-237) read its tips, not others' posts.
+    expect(
+      normalizeAgent({task: 'joke', actions: {post: {level: 'alone'}}}).reads
+    ).toEqual({
+      posts: {window: 'off', count: 10},
+      notifications: true,
+      messages: false,
+    })
     // Only actions not Off count; Post alone reads no notifications.
     expect(
       normalizeAgent({

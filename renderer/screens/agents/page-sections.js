@@ -154,6 +154,19 @@ function SwitchRow({label, isChecked, onToggle}) {
   )
 }
 
+/** Whether the agent holds actions on what others wrote (reply, like, tip, message) but reads nothing of it. */
+export function nothingToActOn({actions, reads}) {
+  const acting = ['reply', 'like', 'tip', 'message'].some(
+    (name) => actions[name] && actions[name].level !== 'off'
+  )
+  return (
+    acting &&
+    reads.posts.window === 'off' &&
+    !reads.notifications &&
+    !reads.messages
+  )
+}
+
 /** "What it reads": on Social, the posts' window, its notifications, its messages; and what its actions read. */
 export function ReadsSection({agent, catalog, onChange}) {
   const {t} = useTranslation()
@@ -185,6 +198,14 @@ export function ReadsSection({agent, catalog, onChange}) {
           isChecked={agent.reads.messages}
           onToggle={(on) => setRead('messages', on)}
         />
+        {nothingToActOn(agent) && (
+          <Text color="orange.500">
+            {t(
+              'Its actions on Social have nothing to act on: turn on what it reads.',
+              {nsSeparator: '!!'}
+            )}
+          </Text>
+        )}
         <HDivider />
         <Text color="muted">
           {t('Everything it reads: {{list}}', {
@@ -267,11 +288,22 @@ export function ScheduleSection({agent, onChange}) {
           )}
         </Flex>
         <Stack spacing={2}>
-          <Text>{t('Also runs when it gets')}</Text>
+          <Text>
+            {t(
+              'Also runs when it gets (what it reads: its notifications, its private messages)',
+              {nsSeparator: '!!'}
+            )}
+          </Text>
           <Wrap spacing={4}>
             {Object.entries(events).map(([id, label]) => (
               <Checkbox
                 key={id}
+                // An event it does not read could start a run that shows it nothing (B-255).
+                isDisabled={
+                  !(id === 'message'
+                    ? agent.reads.messages
+                    : agent.reads.notifications)
+                }
                 isChecked={agent.events.includes(id)}
                 onChange={(e) => {
                   const on = e.target.checked

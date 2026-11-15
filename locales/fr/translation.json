@@ -2115,9 +2115,11 @@
   "a tip": "un pourboire",
   "a private message": "un message privé",
   "When it runs: on its schedule, and when something comes to it. The budget is the most it may spend a day in iDNA, fees included, on what it does alone; with none, it spends nothing alone. The model's own service bills apart.": "Quand il passe : selon son horaire, et quand quelque chose lui arrive. Le budget est le plus qu'il peut dépenser par jour en iDNA, frais compris, pour ce qu'il fait seul ; sans budget, il ne dépense rien seul. Le service du modèle facture à part.",
-  "Also runs when it gets": "Passe aussi quand il reçoit",
   "Budget a day, in iDNA": "Budget par jour, en iDNA",
   "An agent waits for you": "Un agent vous attend",
   "An agent is on": "Un agent est activé",
-  "Everything the agent did, asked for or was refused, newest first. The log is kept until the app closes.": "Tout ce que l'agent a fait, demandé ou s'est vu refuser, le plus récent d'abord. Le journal est gardé jusqu'à la fermeture de l'app."
+  "Everything the agent did, asked for or was refused, newest first. The log is kept until the app closes.": "Tout ce que l'agent a fait, demandé ou s'est vu refuser, le plus récent d'abord. Le journal est gardé jusqu'à la fermeture de l'app.",
+  "Turn the agent on first.": "Activez d'abord l'agent.",
+  "Also runs when it gets (what it reads: its notifications, its private messages)": "Passe aussi quand il reçoit (ce qu'il lit : ses notifications, ses messages privés)",
+  "Its actions on Social have nothing to act on: turn on what it reads.": "Ses actions sur Social n'ont rien sur quoi agir : activez ce qu'il lit."
 }

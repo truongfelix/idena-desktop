@@ -52,6 +52,14 @@ describe('the events that run an agent', () => {
     ).toBe(false)
   })
 
+  test('an answer on an older contract version (a text id, never shown to the run) is no event', () => {
+    const old = {
+      feed: [mine({replies: [{...node(ANN, 200), id: 'v5:12'}]})],
+      me: ME,
+    }
+    expect(eventPending(['answer'], old, at)).toBe(false)
+  })
+
   test('a group conversation starts no run (its run does not read groups)', () => {
     const group = {
       feed: [],

@@ -25,7 +25,8 @@ export function runLine({result, detail}, t) {
 }
 
 /** Why Run now is off, or nothing. */
-function buttonTitle({paused, ready}, t) {
+function buttonTitle({enabled, paused, ready}, t) {
+  if (!enabled) return t('Turn the agent on first.')
   if (paused)
     return t('Every agent is paused: none acts until you resume them.', {
       nsSeparator: '!!',
@@ -49,7 +50,7 @@ export function RunNow({agent, paused, onDone}) {
     <SecondaryButton
       isLoading={isRunning}
       isDisabled={!agent.enabled || paused || !ready}
-      title={buttonTitle({paused, ready}, t)}
+      title={buttonTitle({enabled: agent.enabled, paused, ready}, t)}
       onClick={async () => {
         setIsRunning(true)
         let line
