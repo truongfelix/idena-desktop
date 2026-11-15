@@ -91,7 +91,13 @@ function readAgentFile(text, agents = []) {
   const actions = Object.fromEntries(
     Object.entries(asked).map(([name, row]) => [name, {...row, level: 'off'}])
   )
-  return {agent: {...read, actions}, asked, dropped, addressLeft}
+  // Its reads follow its actions, Off as imported (B-262).
+  return {
+    agent: {...read, actions, reads: normalizeAgent({...read, actions}).reads},
+    asked,
+    dropped,
+    addressLeft,
+  }
 }
 
 module.exports = {

@@ -196,8 +196,12 @@ function normalizeAgent(input, {id = newAgentId} = {}) {
   // The connection and the report thresholds are checked as the single agent's settings were.
   const {provider, address, model, reportThresholds} = normalizeSettings(value)
   let actions = normalizeActions(value.actions)
-  // Saved before reads were actions: the reads it had become its read actions, once.
-  if (!READ_ACTIONS.some((name) => value.actions && value.actions[name]))
+  // Saved before reads were actions (its reads without `own`, which every later save holds, or none at all): the
+  // reads it had become its read actions, once. Never after: a read removed stays removed.
+  const beforeReadActions =
+    !(value.reads && typeof value.reads === 'object' && 'own' in value.reads) &&
+    !READ_ACTIONS.some((name) => value.actions && value.actions[name])
+  if (beforeReadActions)
     actions = {...actions, ...readActionsBefore(value, actions)}
   const schedule =
     value.schedule && typeof value.schedule === 'object' ? value.schedule : {}

@@ -331,6 +331,7 @@ function createAgent({
       reportConfidence: report ? reading.reportConfidence : 0,
       // How good a flip it is, from the agent that marks the keywords (B-260: the best flip).
       quality: (reading || (separate ? null : answer) || {}).quality ?? null,
+      doubted: Boolean((reading || (separate ? null : answer) || {}).doubted),
       markDecision,
       reportLater: separate && !hasWords,
       ...(answered.status === 'rejected'

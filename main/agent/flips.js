@@ -214,6 +214,7 @@ function readFlipAnswer(text, {hasWords, thresholds = REPORT_THRESHOLDS}) {
     report: false,
     reportConfidence: 0,
     quality: null,
+    doubted: false,
   }
   if (!reply || typeof reply !== 'object') return none
   const answer = ['left', 'right'].includes(reply.answer) ? reply.answer : null
@@ -247,6 +248,8 @@ function readFlipAnswer(text, {hasWords, thresholds = REPORT_THRESHOLDS}) {
     report,
     reportConfidence,
     quality,
+    // A rule break half suspected: such a flip comes last for the best flip (B-261).
+    doubted,
   }
 }
 

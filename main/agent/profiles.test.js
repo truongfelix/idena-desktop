@@ -108,6 +108,14 @@ describe('agent profiles', () => {
     })
     expect(off.reads.notifications).toBe(false)
     expect(normalizeAgent(off).actions.readNotifications.level).toBe('off')
+    // A read removed (its row gone) stays gone: the reads saved beside are this build's, no migration again.
+    const removed = {...off.actions}
+    delete removed.readOwnPosts
+    delete removed.readPosts
+    delete removed.readNotifications
+    const saved = normalizeAgent({...off, actions: removed})
+    expect(Object.keys(saved.actions)).toEqual(['post', 'reply'])
+    expect(normalizeAgent(saved).actions).not.toHaveProperty('readOwnPosts')
     // An agent saved before it had reads (B-239) reads what it read then.
     expect(
       normalizeAgent({

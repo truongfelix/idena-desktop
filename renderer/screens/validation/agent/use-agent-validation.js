@@ -323,6 +323,25 @@ export function useAgentValidation({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, isShort, phase, flips, picks, session, lateAsking])
 
+  // A late report still to ask (its keywords came, not asked yet), and whether the session has no time left for more:
+  // both settle the flips (Autopilot's submit, the best flip). The clock changes `outOfTime` once.
+  const latePending = flips.some(
+    (one) =>
+      picks[one.hash]?.reportLater &&
+      one.words?.length &&
+      !reportedLater.current.has(`${session}:${one.hash}`)
+  )
+  const outOfTime =
+    sessionEnd({
+      isShort,
+      validationStart,
+      shortSessionDuration,
+      longSessionDuration,
+    }) -
+      now -
+      END_MARGIN_MS <
+    MIN_FLIP_MS
+
   // What the agents may do alone, once per flip: Autopilot's answers, the reporting agent's marks and reports (in any
   // mode: the reporting agent's level is its own).
   React.useEffect(() => {
@@ -334,26 +353,15 @@ export function useAgentValidation({
       isKeywords: phase === 'keywords',
       reportsLeft: reportsAllowed - reportsUsed,
       hasBest,
-      // Every flip it can still ask was asked (the same as Autopilot's submit waits for).
+      // Every flip it can still ask was asked, late reports included (the same as Autopilot's submit waits for).
       settled: isSettled(flips, asked.current, {
-        asking: asking || lateAsking,
-        outOfTime:
-          sessionEnd({
-            isShort,
-            validationStart,
-            shortSessionDuration,
-            longSessionDuration,
-          }) -
-            Date.now() -
-            END_MARGIN_MS <
-          MIN_FLIP_MS,
+        asking: asking || lateAsking || latePending,
+        outOfTime,
       }),
     }).forEach((event) => {
       applied.current.add(appliedKey(event))
       send(event)
     })
-    // `now` ticks the clock: a flip given up for lack of time settles the session.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     active,
     phase,
@@ -365,7 +373,8 @@ export function useAgentValidation({
     send,
     asking,
     lateAsking,
-    now,
+    latePending,
+    outOfTime,
   ])
 
   const end = sessionEnd({

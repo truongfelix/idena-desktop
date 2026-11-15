@@ -323,7 +323,7 @@ describe("Autopilot's marks in the keywords check (B-259, B-260)", () => {
       isKeywords: true,
     })
     expect(midway).toEqual([{type: 'APPROVE_WORDS', hash: 'b'}])
-    // Flips still to ask, or one in flight (not settled), or a late report waiting: no best flip yet.
+    // Flips still to ask, one in flight or a late report to ask (the hook's `settled`): no best flip yet.
     expect(
       autopilotEvents({
         flips: approved,
@@ -331,14 +331,6 @@ describe("Autopilot's marks in the keywords check (B-259, B-260)", () => {
         applied: new Set(['mark:a', 'mark:b', 'mark:c', 'mark:d']),
         isKeywords: true,
         settled: false,
-      }).map(({type}) => type)
-    ).not.toContain('MARK_BEST')
-    expect(
-      autopilotEvents({
-        flips: approved,
-        picks: {...picks, d: pick({quality: 0.5, reportLater: true})},
-        applied: new Set(['mark:a', 'mark:b', 'mark:c', 'mark:d']),
-        isKeywords: true,
       }).map(({type}) => type)
     ).not.toContain('MARK_BEST')
     // A flip never asked (no time left: settled all the same) does not hold it back (B-261).
@@ -387,6 +379,18 @@ describe("Autopilot's marks in the keywords check (B-259, B-260)", () => {
         d: pick({quality: null, confidence: 0.7}),
       })?.hash
     ).toBe('b')
+    // A flip half suspected of a rule break comes last, chosen only when every approved flip is.
+    expect(
+      bestFlipOf(approved, {
+        a: pick({quality: null, doubted: true, confidence: 0.99}),
+        b: pick({quality: null, confidence: 0.5}),
+      })?.hash
+    ).toBe('b')
+    expect(
+      bestFlipOf(approved, {
+        a: pick({quality: null, doubted: true, confidence: 0.99}),
+      })?.hash
+    ).toBe('a')
     // None approved: none.
     expect(bestFlipOf(flips, picks)).toBeNull()
   })

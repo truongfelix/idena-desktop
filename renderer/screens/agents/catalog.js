@@ -288,9 +288,13 @@ export function actionsLine(agent, catalog, t) {
   const rows = catalog.filter(({id}) => agent.actions[id])
   if (!rows.length) return t('None yet')
   return rows
-    .map(
-      ({id, label}) => `${label} (${levelLabel(agent.actions[id].level, t)})`
-    )
+    .map(({id, label, kind}) => {
+      const {level} = agent.actions[id]
+      // A read is on or off (B-262).
+      if (kind === 'read')
+        return `${label} (${level === 'off' ? t('Off') : t('On')})`
+      return `${label} (${levelLabel(level, t)})`
+    })
     .join(', ')
 }
 

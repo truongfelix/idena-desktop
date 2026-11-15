@@ -5,6 +5,7 @@ import {useTranslation} from 'react-i18next'
 import {HDivider, Input, Select} from '../../shared/components/components'
 import {InfoTip} from '../../shared/components/info-tip'
 import {readNumber} from './limit-fields'
+import {useDraft} from './page-sections'
 
 /** The most posts "the last N" reads (main/agent/profiles.js MAX_POSTS_READ). */
 const MAX_POSTS_READ = 50
@@ -12,8 +13,7 @@ const MAX_POSTS_READ = 50
 /** Read all Social posts: the last 24 hours, or the last N posts. */
 function PostsWindow({row, onChange}) {
   const {t} = useTranslation()
-  const [count, setCount] = React.useState(String(row.count))
-  React.useEffect(() => setCount(String(row.count)), [row.count])
+  const [count, setCount] = useDraft(String(row.count))
   return (
     <Flex align="center" gap={3} wrap="wrap">
       <Select

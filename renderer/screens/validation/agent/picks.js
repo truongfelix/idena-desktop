@@ -128,8 +128,10 @@ export const bestSuggestionOf = (flips, picks) =>
  * session gets one when the agent approved a flip; null when none. The first of equals, in the session's order.
  */
 export function bestFlipOf(flips, picks) {
+  // A rule break half suspected comes last (chosen only when every approved flip is doubted).
   const rank = (pick) => [
-    typeof pick.quality === 'number' ? pick.quality : -1,
+    // eslint-disable-next-line no-nested-ternary
+    pick.doubted ? -2 : typeof pick.quality === 'number' ? pick.quality : -1,
     pick.confidence || 0,
   ]
   const better = (a, b) => a[0] > b[0] || (a[0] === b[0] && a[1] > b[1])
@@ -217,15 +219,8 @@ export function autopilotEvents({
         `best:${flip.hash}` === marked &&
         flip.relevance !== RelevanceType.Relevant
     )
-  // No late report waiting (its flip's mark may still change).
-  const lateWaits = flips.some((flip) => picks[flip.hash]?.reportLater)
-  if (
-    !hasBest &&
-    !approvals.length &&
-    settled &&
-    !lateWaits &&
-    (!marked || lost)
-  ) {
+  // `settled` holds the late reports still to ask too (the hook's): one that can never come holds nothing back.
+  if (!hasBest && !approvals.length && settled && (!marked || lost)) {
     const best = bestFlipOf(
       flips.filter(
         (flip) =>

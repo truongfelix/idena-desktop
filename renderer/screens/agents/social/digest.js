@@ -210,8 +210,7 @@ export function socialDigest(
     labels.set(id, {kind: 'person', others: [address]})
     return id
   }
-  // Its own last posts: read first, whatever the point (no label: nothing to act on).
-  // Its own last posts: only when it is given that read (B-262).
+  // Its own last posts, whatever the point (no label: nothing to act on); only when it is given that read (B-262).
   const own = reads?.own
     ? feed
         .filter(({call}) => call.author === me && call.height <= scanned)

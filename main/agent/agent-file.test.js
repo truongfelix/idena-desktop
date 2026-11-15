@@ -123,6 +123,8 @@ describe('an agent as a file', () => {
     expect(savedId).not.toBe(JOKE)
     const imported = agents[0]
     expect(imported).toMatchObject({enabled: false, name: 'Joke agent'})
+    // Its reads follow its actions, Off as imported (B-262).
+    expect(imported.reads).toMatchObject({own: false, notifications: false})
     const post = (agent, id) =>
       agent.handle('propose', {
         agentId: id,
