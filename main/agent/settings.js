@@ -19,15 +19,21 @@ const LEVELS = ['off', 'ask', 'alone']
 
 /**
  * The actions the agent can ask for, each with its default level and limit (`null`: none). The first version
- * acts in the validation only; the other actions are listed Off so a saved file already carries their rows.
- * `limit` counts actions per validation for `report`, iDNA per day for `send`.
+ * acted in the validation only; the other actions are listed Off so a saved file already carries their rows.
+ * `limit` counts actions per validation for `report`, iDNA per day for `send` and `tip`, actions per day for
+ * `post`, `reply`, `like` and `message`. A tip's row also holds `amount`: the whole iDNA of each tip, set by the
+ * person (the model only picks the posts).
  */
 const ACTIONS = {
   answerFlip: {level: 'ask', limit: null},
   report: {level: 'ask', limit: null},
   send: {level: 'off', limit: 0},
   post: {level: 'off', limit: null},
-  tip: {level: 'off', limit: 0},
+  // Idena Social (B-239): replies and comments, likes, private messages.
+  reply: {level: 'off', limit: null},
+  like: {level: 'off', limit: null},
+  message: {level: 'off', limit: null},
+  tip: {level: 'off', limit: 0, amount: 1},
   ads: {level: 'off', limit: null},
   oracleVote: {level: 'off', limit: null},
   invite: {level: 'off', limit: null},
@@ -59,6 +65,14 @@ function normalizeThreshold(value, fallback) {
     return fallback
   if (number < 0.5 || number > 1) return fallback
   return Math.round(number * 100) / 100
+}
+
+/** A tip's amount: a whole number of iDNA from 1 (a tip's decimals are not counted by the apps), else `fallback`. */
+function normalizeTipAmount(value, fallback) {
+  const number = Number(value)
+  if (value === null || value === '' || !Number.isInteger(number))
+    return fallback
+  return number >= 1 ? number : fallback
 }
 
 function normalizeLimit(value, fallback) {
@@ -101,6 +115,9 @@ function normalizeSettings(input) {
             'limit' in row
               ? normalizeLimit(row.limit, fallback.limit)
               : fallback.limit,
+          ...('amount' in fallback
+            ? {amount: normalizeTipAmount(row.amount, fallback.amount)}
+            : {}),
         },
       ]
     })
@@ -158,4 +175,5 @@ module.exports = {
   defaultSettings,
   normalizeLimit,
   normalizeSettings,
+  normalizeTipAmount,
 }

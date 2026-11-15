@@ -6,6 +6,7 @@ import {HDivider} from '../../shared/components/components'
 import {SecondaryButton} from '../../shared/components/button'
 import {SettingsSection} from '../settings/components'
 import {LEVELS, heldBy, levelLabel} from './catalog'
+import {LimitFields} from './limit-fields'
 
 /**
  * "What it may do": the agent's actions, each Off, Ask me or Alone, and the catalog to add one from. The list starts
@@ -102,8 +103,10 @@ export function ActionsSection({agent, agents, catalog, onChange}) {
         </Text>
       ) : (
         <Stack spacing={0}>
-          {rows.map(({id, label, limit}) => {
+          {rows.map(({id, label, limit, perDay}) => {
             const row = agent.actions[id]
+            // The joke agent posts once a day, its task's rule (B-237): no field for it.
+            const fields = perDay && !(id === 'post' && agent.task === 'joke')
             return (
               <React.Fragment key={id}>
                 <HDivider />
@@ -119,6 +122,18 @@ export function ActionsSection({agent, agents, catalog, onChange}) {
                     <Text fontSize="sm" color="muted">
                       {limit}
                     </Text>
+                    {fields && (
+                      <LimitFields
+                        kind={perDay}
+                        row={row}
+                        onChange={(change) =>
+                          setActions((actions) => ({
+                            ...actions,
+                            [id]: {...actions[id], ...change},
+                          }))
+                        }
+                      />
+                    )}
                   </Stack>
                   <ButtonGroup
                     isAttached

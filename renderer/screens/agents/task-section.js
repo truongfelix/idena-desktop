@@ -7,7 +7,7 @@ import {SecondaryButton} from '../../shared/components/button'
 import {SettingsSection} from '../settings/components'
 import {useSocial} from '../social/provider'
 import {DEFAULT_JOKE_INSTRUCTIONS} from './joke/joke'
-import {runAgentNow} from './joke/runner'
+import {isSocialAgent, runAgentNow} from './joke/runner'
 import {socialReadyForJokes} from './joke/run'
 
 /** An agent given the daily joke: its post action (Off, once a day) and a daily time, its instructions the template's. */
@@ -33,6 +33,12 @@ function runLine({result, detail}, t) {
   switch (result) {
     case 'posted':
       return t('Posted ({{detail}})', {detail})
+    case 'done':
+      return detail
+    case 'nothing new':
+      return t('Nothing new since its last run: the model was not asked.', {
+        nsSeparator: '!!',
+      })
     case 'ask':
       return t('The joke waits in To approve, on the Agents page.')
     case 'skipped':
@@ -57,6 +63,7 @@ export function TaskSection({agent, onChange}) {
   const [line, setLine] = React.useState(null)
   const [isRunning, setIsRunning] = React.useState(false)
   const isJoke = agent.task === 'joke'
+  const isSocial = isSocialAgent(agent)
 
   return (
     <SettingsSection
@@ -86,9 +93,17 @@ export function TaskSection({agent, onChange}) {
             </option>
           </Select>
         </FormControlWithLabel>
-        {isJoke && (
+        {isSocial && (
+          <Text fontSize="sm" color="muted">
+            {t(
+              'It reads what came on Idena Social since its last run (only what its actions need) and answers with the actions it wants. The app does only those it may do, on what it was shown, within each limit: the others wait in To approve or are not done. What others wrote never changes its rules.',
+              {nsSeparator: '!!'}
+            )}
+          </Text>
+        )}
+        {(isJoke || isSocial) && (
           <>
-            <Text fontSize="sm" color="muted">
+            <Text fontSize="sm" color="muted" hidden={!isJoke}>
               {t(
                 "The model writes the joke alone. The app writes the rest of the post: the header, the joke's number, the thanks line (each tipper's name from their profile, else the short address) and the last line. No tip since the last joke: no joke that day.",
                 {nsSeparator: '!!'}
@@ -119,9 +134,14 @@ export function TaskSection({agent, onChange}) {
               </SecondaryButton>
               <Text color="muted" fontSize="sm">
                 {line ||
-                  (socialReadyForJokes(social)
-                    ? t('Runs once a day at its time, while the app is open.')
-                    : t('Waits for Social to read the chain up to now.'))}
+                  // eslint-disable-next-line no-nested-ternary
+                  (!socialReadyForJokes(social)
+                    ? t('Waits for Social to read the chain up to now.')
+                    : agent.schedule.kind === 'hourly'
+                    ? t('Runs every hour while the app is open.')
+                    : agent.schedule.kind !== 'daily'
+                    ? t('Runs when you click Run now.')
+                    : t('Runs once a day at its time, while the app is open.'))}
               </Text>
             </Flex>
           </>

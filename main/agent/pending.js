@@ -13,9 +13,41 @@ const MAX_PENDING = 50
 /** One agent's share of the list: an agent proposing too often cannot shut the others out. */
 const MAX_PENDING_PER_AGENT = 20
 const MAX_TEXT_LENGTH = 10000
-/** The actions whose limit counts them per day (the joke agent's post): the others count iDNA, or per validation. */
-const DAILY_COUNT_ACTIONS = new Set(['post'])
+/**
+ * The actions whose limit counts them per day (posts, replies, likes, private messages); a tip's limit counts the
+ * iDNA tipped per day (DAILY_AMOUNT_ACTIONS); the others count iDNA sent, or per validation.
+ */
+const DAILY_COUNT_ACTIONS = new Set(['post', 'reply', 'like', 'message'])
+const DAILY_AMOUNT_ACTIONS = new Set(['tip'])
 const MAX_DETAIL_LENGTH = 500
+/** The reasons an action Alone waits for the person because it went past what it may spend or do today. */
+const OVER_LIMIT = ['above the limit', 'above the budget']
+/** What an action is done on (a post's id, a conversation's people), as the app's code wrote it: at most this long. */
+const MAX_TARGET_LENGTH = 2000
+
+/** What one action of `action` adds to its day's count: 1, its iDNA (a tip), or nothing (not counted per day). */
+function dailyCount(action, amount) {
+  if (DAILY_COUNT_ACTIONS.has(action)) return 1
+  if (DAILY_AMOUNT_ACTIONS.has(action))
+    return typeof amount === 'number' && Number.isFinite(amount) && amount > 0
+      ? amount
+      : 0
+  return 0
+}
+
+const isDaily = (action) =>
+  DAILY_COUNT_ACTIONS.has(action) || DAILY_AMOUNT_ACTIONS.has(action)
+
+/** A target the app's code gave (a plain object, JSON-sized), or null. */
+function readTarget(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  try {
+    const json = JSON.stringify(value)
+    return json.length <= MAX_TARGET_LENGTH ? JSON.parse(json) : null
+  } catch {
+    return null
+  }
+}
 
 const newPendingId = () => crypto.randomBytes(8).toString('hex')
 
@@ -42,6 +74,9 @@ function readItem(value) {
     body: text(value.body, MAX_TEXT_LENGTH),
     detail: text(value.detail, MAX_DETAIL_LENGTH),
     editable: value.editable === true,
+    target: readTarget(value.target),
+    amount:
+      Number.isFinite(value.amount) && value.amount > 0 ? value.amount : null,
     at: Number.isFinite(value.at) ? value.at : 0,
     state: 'waiting',
     error: running ? INTERRUPTED : text(value.error, MAX_DETAIL_LENGTH) || null,
@@ -216,19 +251,30 @@ function createPending({
       body,
       detail,
       editable,
+      target,
       usage,
-      amount,
-      cost,
+      amount: given,
+      cost: givenCost,
+      skipOverLimit,
     } = {}) {
       if (!Object.prototype.hasOwnProperty.call(ACTIONS, action))
         return {decision: 'off', reason: 'unknown action'}
+      // A tip's amount is the person's, from the agent's row: whatever the caller says (a model's answer) changes
+      // nothing. Its cost must hold it.
+      let amount = given
+      let cost = givenCost
+      if (DAILY_AMOUNT_ACTIONS.has(action)) {
+        const agent = profiles.read().agents.find((one) => one.id === agentId)
+        const row = agent && agent.actions[action]
+        if (!row) return {decision: 'off', reason: 'action off'}
+        amount = row.amount
+        if (!(typeof cost === 'number' && cost >= amount)) cost = undefined
+      }
       // The limit is checked on what the action spends: above it, the action waits for the person; so does an
       // action that would pass the agent's daily budget (`cost`: iDNA, fees included).
       // A daily count also counts what the main process saw done today (a post just sent is not scanned yet). A
       // usage that is not a count stays as it is: the check then asks the person ("count unknown").
-      const counted = DAILY_COUNT_ACTIONS.has(action)
-        ? doneToday(agentId, action)
-        : 0
+      const counted = isDaily(action) ? doneToday(agentId, action) : 0
       const isCount = typeof usage === 'number' && Number.isFinite(usage)
       let counts = usage !== undefined ? {usage} : {}
       if (counted && (isCount || usage === undefined))
@@ -240,13 +286,21 @@ function createPending({
       if (check.decision === 'alone') check = withinBudget(agentId, cost)
       if (check.decision === 'alone') {
         // Counted now, not once done: a second run meanwhile finds the day's post taken and the budget spent.
-        addTally(agentId, action, {
-          n: DAILY_COUNT_ACTIONS.has(action) ? 1 : 0,
-          cost,
-        })
+        addTally(agentId, action, {n: dailyCount(action, amount), cost})
         save()
       }
-      if (check.decision !== 'ask') return check
+      const withAmount = DAILY_AMOUNT_ACTIONS.has(action) ? {amount} : {}
+      // An agent acting alone that reached its limit or budget (a Social run): the action is not done, and does not
+      // wait in To approve either, where each run would add one more.
+      if (
+        skipOverLimit === true &&
+        check.decision === 'ask' &&
+        OVER_LIMIT.includes(check.reason)
+      ) {
+        log({agentId, action, decision: 'skipped', detail: check.reason})
+        return {decision: 'skipped', reason: check.reason, ...withAmount}
+      }
+      if (check.decision !== 'ask') return {...check, ...withAmount}
       if (
         items.length >= MAX_PENDING ||
         items.filter((one) => one.agentId === agentId).length >=
@@ -260,6 +314,8 @@ function createPending({
         body: text(body, MAX_TEXT_LENGTH),
         detail: text(detail, MAX_DETAIL_LENGTH),
         editable: editable === true,
+        target: readTarget(target),
+        amount: DAILY_AMOUNT_ACTIONS.has(action) ? amount : null,
         at: now(),
         state: 'waiting',
         error: null,
@@ -267,7 +323,7 @@ function createPending({
       items.push(item)
       log({agentId, action, decision: 'ask', detail: ''})
       changed()
-      return {...check, item: {...item}}
+      return {...check, ...withAmount, item: {...item}}
     },
     commands: {
       pending: list,
@@ -284,7 +340,7 @@ function createPending({
         const cost = Number(data.cost)
         if (data.ok !== true && data.release === true) {
           addTally(agentId, action, {
-            n: DAILY_COUNT_ACTIONS.has(action) ? -1 : 0,
+            n: -dailyCount(action, Number(data.amount)),
             cost: Number.isFinite(cost) && cost > 0 ? -cost : 0,
           })
           save()
@@ -335,8 +391,10 @@ function createPending({
         const detail = text(data.detail, MAX_DETAIL_LENGTH)
         if (data.ok === true) {
           remove(item.id)
-          if (DAILY_COUNT_ACTIONS.has(item.action))
-            addTally(item.agentId, item.action, {n: 1})
+          if (isDaily(item.action))
+            addTally(item.agentId, item.action, {
+              n: dailyCount(item.action, item.amount),
+            })
           log({
             agentId: item.agentId,
             action: item.action,

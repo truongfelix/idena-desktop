@@ -26,12 +26,65 @@ export function actionCatalog(t) {
       id: 'post',
       label: t('Post on Social'),
       limit: t('At most once a day; with Alone, within its budget'),
-      reads: [
+      // The joke agent's post (B-237) reads its own; another agent's, the Social run's (B-239).
+      jokeReads: [
         t('The tips on its posts since its last joke'),
         t('Its last 30 jokes, not to repeat them'),
         t("The tippers' names from their profiles"),
       ],
+      reads: [t('The new posts since its last run')],
       defaults: {level: 'off', limit: 1},
+      perDay: 'count',
+    },
+    {
+      id: 'reply',
+      label: t('Reply and comment'),
+      limit: t(
+        'Answers posts, replies and comments it read; with Alone, at most the number a day below, within its budget'
+      ),
+      reads: [
+        t('The new posts since its last run'),
+        t('The answers to its posts, replies and comments'),
+      ],
+      defaults: {level: 'off', limit: 5},
+      perDay: 'count',
+    },
+    {
+      id: 'like',
+      label: t('Like posts'),
+      limit: t('With Alone, at most the number a day below, within its budget'),
+      reads: [
+        t('The new posts since its last run'),
+        t('The answers to its posts, replies and comments'),
+      ],
+      defaults: {level: 'off', limit: 10},
+      perDay: 'count',
+    },
+    {
+      id: 'message',
+      label: t('Private messages'),
+      limit: t(
+        'Answers the people who wrote to it, or writes to the author of a post it read; no group. With Alone, at most the number a day below.'
+      ),
+      reads: [
+        t('Its private conversations with a new message'),
+        t('The new posts since its last run'),
+      ],
+      defaults: {level: 'off', limit: 3},
+      perDay: 'count',
+    },
+    {
+      id: 'tip',
+      label: t('Tip posts'),
+      limit: t(
+        'You set the amount of each tip; the agent only picks the posts. With Alone, at most the total a day below, within its budget.'
+      ),
+      reads: [
+        t('The new posts since its last run'),
+        t('The answers to its posts, replies and comments'),
+      ],
+      defaults: {level: 'off', limit: 5, amount: 1},
+      perDay: 'idna',
     },
     {
       id: 'flipStory',
@@ -58,6 +111,12 @@ export function actionWants(action, t) {
       return t('wants to post on Social')
     case 'tip':
       return t('wants to tip a post')
+    case 'reply':
+      return t('wants to reply on Social')
+    case 'like':
+      return t('wants to like a post')
+    case 'message':
+      return t('wants to send a private message')
     case 'ads':
       return t('wants to change an ad')
     case 'oracleVote':
@@ -82,6 +141,14 @@ export function actionName(action, t) {
       return t('Post on Social')
     case 'tip':
       return t('Tip posts')
+    case 'reply':
+      return t('Reply and comment')
+    case 'like':
+      return t('Like posts')
+    case 'message':
+      return t('Private messages')
+    case 'social':
+      return t('Idena Social')
     case 'ads':
       return t('Ads')
     case 'oracleVote':
@@ -167,6 +234,7 @@ export function actionsLine(agent, catalog, t) {
 /** When it runs, in words. */
 export function runsLine({schedule}, t) {
   if (schedule.kind === 'validation') return t('At each validation')
+  if (schedule.kind === 'hourly') return t('Every hour')
   if (schedule.kind === 'daily')
     return t('Every day at {{time}}', {time: schedule.time})
   return t('When I ask')
@@ -177,9 +245,10 @@ export function runsLine({schedule}, t) {
  */
 export function readsList(agent, catalog, t) {
   const reads = []
-  catalog.forEach(({id, reads: needs}) => {
+  catalog.forEach(({id, reads: other, jokeReads}) => {
     const row = agent.actions[id]
     if (!row || row.level === 'off') return
+    const needs = agent.task === 'joke' && jokeReads ? jokeReads : other
     needs.forEach((item) => {
       if (!reads.includes(item)) reads.push(item)
     })

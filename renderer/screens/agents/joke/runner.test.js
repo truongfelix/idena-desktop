@@ -1,4 +1,11 @@
-import {afterRun, runDue} from './runner'
+import {
+  afterHourlyRun,
+  afterRun,
+  hourlyDue,
+  isSocialAgent,
+  runDue,
+  socialState,
+} from './runner'
 
 jest.mock('../../social/provider', () => ({useSocial: () => null}))
 
@@ -22,5 +29,37 @@ describe("the agents' runs in the window", () => {
       expect(
         runDue(afterRun(undefined, DAY, NOW, result), DAY, NOW + 3600 * 1000)
       ).toBe(false)
+  })
+
+  test('an hourly agent runs again an hour after a run, 15 minutes after a failed one', () => {
+    expect(hourlyDue(undefined, NOW)).toBe(true)
+    const done = afterHourlyRun(NOW, 'done')
+    expect(hourlyDue(done, NOW + 59 * 60 * 1000)).toBe(false)
+    expect(hourlyDue(done, NOW + 60 * 60 * 1000)).toBe(true)
+    expect(hourlyDue(afterHourlyRun(NOW, 'failed'), NOW + 15 * 60 * 1000)).toBe(
+      true
+    )
+  })
+
+  test('a Social agent: no joke task and a Social action not Off', () => {
+    const with_ = (actions, task = null) => ({actions, task})
+    expect(isSocialAgent(with_({reply: {level: 'ask'}}))).toBe(true)
+    expect(isSocialAgent(with_({reply: {level: 'off'}}))).toBe(false)
+    expect(isSocialAgent(with_({post: {level: 'alone'}}, 'joke'))).toBe(false)
+    expect(isSocialAgent(with_({answerFlip: {level: 'alone'}}))).toBe(false)
+  })
+
+  test('a Social run is sent the names claimed in profiles, never the private names given here', () => {
+    const state = socialState({
+      feed: [],
+      me: '0x1',
+      profiles: {},
+      people: {
+        '0xb': {address: '0xb', name: 'Mum', blocked: true},
+      },
+      names: {'0xb': '@bob · Mum'},
+    })
+    expect(state.names).toEqual({})
+    expect([...state.blocked]).toEqual(['0xb'])
   })
 })

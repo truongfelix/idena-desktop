@@ -6,6 +6,7 @@ const {
   defaultSettings,
   normalizeLimit,
   normalizeSettings,
+  normalizeTipAmount,
 } = require('./settings')
 
 // The agents of this identity (B-243): several models, each with its own name, connection, instructions, actions,
@@ -21,8 +22,8 @@ const MAX_NAME_LENGTH = 60
 const MAX_INSTRUCTIONS_LENGTH = 20000
 const ID_PATTERN = /^[0-9a-f]{16}$/u
 
-/** When an agent runs: at each validation, every day at a time, or only when the person asks. */
-const SCHEDULES = ['validation', 'daily', 'manual']
+/** When an agent runs: at each validation, every hour, every day at a time, or only when the person asks. */
+const SCHEDULES = ['validation', 'hourly', 'daily', 'manual']
 const DEFAULT_TIME = '09:00'
 
 /**
@@ -69,6 +70,9 @@ function normalizeActions(value) {
               'limit' in row
                 ? normalizeLimit(row.limit, fallback.limit)
                 : fallback.limit,
+            ...('amount' in fallback
+              ? {amount: normalizeTipAmount(row.amount, fallback.amount)}
+              : {}),
           },
         ]
       })
@@ -189,7 +193,7 @@ function agentSettings(file, agent) {
     permissions: Object.fromEntries(
       Object.entries(ACTIONS).map(([name, fallback]) => [
         name,
-        agent.actions[name] || {level: 'off', limit: fallback.limit},
+        agent.actions[name] || {...fallback, level: 'off'},
       ])
     ),
     reportThresholds: agent.reportThresholds,
