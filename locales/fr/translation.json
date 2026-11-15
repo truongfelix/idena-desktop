@@ -1822,5 +1822,9 @@
   "Compacting the database...": "Compactage de la base de données...",
   "The node is tidying its database, this can take several minutes; do not close it": "Le nœud range sa base de données, cela peut prendre plusieurs minutes ; ne le fermez pas",
   "Peers: {{peersCount}} (in {{inbound}}, out {{outbound}}, direct {{direct}})": "Connexions : {{peersCount}} (entrantes {{inbound}}, sortantes {{outbound}}, directes {{direct}})",
-  "Your node has no connection: what it sends cannot reach the network": "Votre nœud n'a aucune connexion : ce qu'il envoie ne peut pas atteindre le réseau"
+  "Your node has no connection: what it sends cannot reach the network": "Votre nœud n'a aucune connexion : ce qu'il envoie ne peut pas atteindre le réseau",
+  "Your node has no connection: your answers cannot reach the network": "Votre nœud n'a aucune connexion : vos réponses ne peuvent pas atteindre le réseau",
+  "Your short answers are not in a block yet: keep the app open and connected": "Vos réponses courtes ne sont pas encore dans un bloc : gardez l'application ouverte et connectée",
+  "Your answers are not in a block yet: keep the app open and connected": "Vos réponses ne sont pas encore dans un bloc : gardez l'application ouverte et connectée",
+  "Your answers were sent to your node": "Vos réponses ont été transmises à votre nœud"
 }

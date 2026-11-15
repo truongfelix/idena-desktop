@@ -58,7 +58,7 @@ async function advance(ms) {
   }
 }
 
-function startPractice(practice) {
+function startPractice(practice, nodeCalls = practiceNodeCalls(practice)) {
   const machine = createValidationMachine({
     epoch: 0,
     validationStart: Date.now(),
@@ -66,7 +66,7 @@ function startPractice(practice) {
     longSessionDuration:
       practice.long.length * PRACTICE_LONG_SESSION_DURATION_PER_FLIP,
     locale: 'en',
-    nodeCalls: practiceNodeCalls(practice),
+    nodeCalls,
   }).withConfig({
     services: practiceServices(practice),
     actions: {onExceededReports: jest.fn(), onValidationSucceeded: jest.fn()},
@@ -185,6 +185,74 @@ describe('a practice through the validation machine', () => {
     expect(results.longFlips.filter(({isBest}) => isBest)).toEqual([
       expect.objectContaining({hash: best.hash, story: 'right'}),
     ])
+  })
+
+  it('keeps both answers transactions and when they went to the node', async () => {
+    const practice = createPractice(sample)
+    const service = startPractice(practice, {
+      ...practiceNodeCalls(practice),
+      submitShortAnswers: () => Promise.resolve('0xshort'),
+      submitLongAnswers: () => Promise.resolve('0xlong'),
+    })
+
+    await advance(3000)
+    for (const {hash, answer} of practice.short)
+      service.send({type: 'ANSWER', hash, option: answer})
+    const shortSentAt = Date.now()
+    service.send('SUBMIT')
+    await settle()
+    expect(service.state.context.submitShortAnswersHash).toBe('0xshort')
+    expect(service.state.context.submitShortAnswersAt).toBe(shortSentAt)
+
+    await advance(12000)
+    service.send('START_LONG_SESSION')
+    for (const {hash, answer} of practice.long)
+      service.send({type: 'ANSWER', hash, option: answer})
+    service.send('FINISH_FLIPS')
+    service.send('START_KEYWORDS_QUALIFICATION')
+    for (const {hash} of practice.long)
+      service.send({type: 'APPROVE_WORDS', hash})
+    const longSentAt = Date.now()
+    service.send('SUBMIT')
+    service.send('SUBMIT')
+    await settle()
+
+    expect(service.state.matches('validationSucceeded')).toBe(true)
+    expect(service.state.context.submitLongAnswersHash).toBe('0xlong')
+    expect(service.state.context.submitLongAnswersAt).toBe(longSentAt)
+    expect(service.state.context.submitShortAnswersHash).toBe('0xshort')
+  })
+
+  it('moves on when the node already holds the same answers', async () => {
+    // A retried submit: the node calls throw an Error with the node's message (renderer/shared/api/validation.js).
+    const duplicate = () =>
+      Promise.reject(new Error('tx with same hash already exists'))
+    const practice = createPractice(sample)
+    const service = startPractice(practice, {
+      ...practiceNodeCalls(practice),
+      submitShortAnswers: duplicate,
+      submitLongAnswers: duplicate,
+    })
+
+    await advance(3000)
+    for (const {hash, answer} of practice.short)
+      service.send({type: 'ANSWER', hash, option: answer})
+    service.send('SUBMIT')
+    await settle()
+    expect(service.state.matches('longSession')).toBe(true)
+
+    await advance(12000)
+    service.send('START_LONG_SESSION')
+    for (const {hash, answer} of practice.long)
+      service.send({type: 'ANSWER', hash, option: answer})
+    service.send('FINISH_FLIPS')
+    service.send('START_KEYWORDS_QUALIFICATION')
+    for (const {hash} of practice.long)
+      service.send({type: 'APPROVE_WORDS', hash})
+    service.send('SUBMIT')
+    service.send('SUBMIT')
+    await settle()
+    expect(service.state.matches('validationSucceeded')).toBe(true)
   })
 
   it('fails when the short session ends with too few answers', async () => {
