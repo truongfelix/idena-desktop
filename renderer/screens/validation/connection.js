@@ -24,6 +24,13 @@ export function connectionLost({noPeerChecks, headTime, now}) {
   )
 }
 
+// The transaction hash in what flip_submitShortAnswers / flip_submitLongAnswers returned: the node answers
+// {txHash}, an older saved state may hold the bare hash; null otherwise.
+export function answersTxHash(value) {
+  if (typeof value === 'string') return value || null
+  return (value && typeof value.txHash === 'string' && value.txHash) || null
+}
+
 // Whether a transaction read with bcn_transaction (`tx`, null when the node does not know it) is in a block.
 export function isInBlock(tx) {
   return Boolean(tx && tx.blockHash && tx.blockHash !== HASH_IN_MEMPOOL)
@@ -67,7 +74,8 @@ export function useNodeConnection() {
 
 // Follows the answers transaction `hash` until a block holds it: 'mined', 'waiting', 'late' (sent more than
 // TX_LATE_SECONDS ago, `sentAt` in ms) or null without a hash.
-export function useAnswersTx(hash, sentAt) {
+export function useAnswersTx(submitted, sentAt) {
+  const hash = answersTxHash(submitted)
   const [mined, setMined] = React.useState(false)
   const [now, setNow] = React.useState(() => Date.now())
   const seenSince = React.useRef(Date.now())

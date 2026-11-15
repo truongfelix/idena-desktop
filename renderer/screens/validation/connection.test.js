@@ -3,6 +3,7 @@ import {
   HEAD_STUCK_SECONDS,
   TX_LATE_SECONDS,
   afterSubmitStatus,
+  answersTxHash,
   connectionLost,
   isInBlock,
   persistedLongAnswersTx,
@@ -165,5 +166,16 @@ describe('validationAlert', () => {
       validationAlert({...base, shortAnswersTx: 'late', inLongSession: false})
     ).toBe(null)
     expect(validationAlert(base)).toBe(null)
+  })
+})
+
+describe('answersTxHash', () => {
+  it('reads the hash the node returns as {txHash}', () => {
+    // flip_submitLongAnswers answers {"txHash": "0x…"} (devnet trial 2026-11-15).
+    expect(answersTxHash({txHash: '0xabc'})).toBe('0xabc')
+    expect(answersTxHash('0xabc')).toBe('0xabc')
+    expect(answersTxHash(null)).toBe(null)
+    expect(answersTxHash({})).toBe(null)
+    expect(answersTxHash('')).toBe(null)
   })
 })
