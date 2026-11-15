@@ -51,7 +51,9 @@ export async function postOnSocial(
   })
   if (mined.result === 'dropped') throw new Error('the node dropped the post')
   if (mined.result !== 'mined')
-    throw sentError(`the post is not in a block yet (${hash})`)
+    throw Object.assign(sentError(`the post is not in a block yet (${hash})`), {
+      unconfirmed: true,
+    })
   if (mined.error) throw sentError(mined.error)
   return `block ${mined.height}`
 }

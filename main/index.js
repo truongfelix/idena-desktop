@@ -196,6 +196,7 @@ const agent = createAgent({
   settings: validationAgentSettings(agentProfiles),
   profiles: agentProfiles,
   pendingFile: () => agentFile('pending.json'),
+  readPointsFile: () => agentFile('agent-read.json'),
   notify: (event) => sendMainWindowMsg('agent-event', event),
   key: createAgentKey({
     file: () => agentFile('keys.enc'),

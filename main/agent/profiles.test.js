@@ -67,7 +67,7 @@ describe('agent profiles', () => {
         launchRockets: {level: 'alone'},
         send: 'alone',
       },
-      schedule: {kind: 'hourly', time: '25:00'},
+      schedule: {kind: 'weekly', time: '25:00'},
       budgetPerDay: -3,
     })
     expect(agent.id).toMatch(/^[0-9a-f]{16}$/u)
@@ -76,7 +76,7 @@ describe('agent profiles', () => {
     expect(agent.address).toBe(DEFAULT_ADDRESSES.anthropic)
     expect(agent.actions).toEqual({
       post: {level: 'alone', limit: 1},
-      tip: {level: 'off', limit: 0},
+      tip: {level: 'off', limit: 0, amount: 1},
     })
     expect(agent.schedule).toEqual({kind: 'manual', time: '09:00'})
     expect(agent.budgetPerDay).toBeNull()
@@ -173,7 +173,7 @@ describe('agent profiles', () => {
     expect(agent.actions).toEqual({
       answerFlip: {level: 'alone', limit: null},
       report: {level: 'off', limit: null},
-      tip: {level: 'ask', limit: 2},
+      tip: {level: 'ask', limit: 2, amount: 1},
     })
     expect(agent.reportThresholds[1]).toBe(0.6)
     // The permission check reads the same answer as from the old setup.
@@ -328,7 +328,7 @@ describe('agent profiles', () => {
         answerFlip: {level: 'alone', limit: null},
         // Not in its list before: read as Off, saved as Off.
         report: {level: 'off', limit: null},
-        tip: {level: 'ask', limit: 1},
+        tip: {level: 'ask', limit: 1, amount: 1},
       })
     })
   })

@@ -1,9 +1,11 @@
 const {checkAction} = require('./permissions')
 const {createAgentCommands} = require('./agent-commands')
 const {createPending} = require('./pending')
+const {createReadPoints} = require('./read-points')
 const {agentSettings, validationAgent} = require('./profiles')
 const {checkFlip, flipQuestion, mediaType, readFlipAnswer} = require('./flips')
 const {readStory, storySystem} = require('./stories')
+const {socialHeld, socialSystem} = require('./social')
 const providers = require('./providers')
 
 // The agent part of the main process: the renderer's one way to the agent (the "agent" channel). It keeps the
@@ -16,6 +18,9 @@ const MAX_ACTIVITY = 200
 /** What an agent is given to read for a text (the joke agent: its recent jokes), and what its answer may be. */
 const MAX_INPUT_TEXT = 20000
 const MAX_ANSWER_TEXT = 4000
+// A run's plan on Idena Social: several actions, each with a text of a post's length.
+const MAX_PLAN_TEXT = 12000
+const PLAN_MAX_TOKENS = 4096
 // A story and four prompts of up to 120 words: about 1,500 tokens; room for a longer one.
 const STORY_MAX_TOKENS = 4096
 
@@ -36,6 +41,7 @@ function createAgent({
   settings,
   profiles = null,
   pendingFile = null,
+  readPointsFile = null,
   key,
   logger,
   notify = () => {},
@@ -84,6 +90,11 @@ function createAgent({
       })
     : null
 
+  // How far each agent read Idena Social (read-points.js).
+  const readPoints = profiles
+    ? createReadPoints({file: readPointsFile, logger})
+    : null
+
   const agents = profiles
     ? createAgentCommands({
         profiles,
@@ -96,6 +107,7 @@ function createAgent({
           if (current.paused || !current.enabled) stop(solving)
           if (file.paused) stop(writing)
           pending.prune()
+          readPoints.keepOnly(file.agents.map((agent) => agent.id))
         },
       })
     : null
@@ -222,6 +234,7 @@ function createAgent({
   const handlers = {
     ...(agents ? agents.commands : {}),
     ...(pending ? pending.commands : {}),
+    ...(readPoints ? readPoints.commands : {}),
     /** An action an agent prepared (pending.js propose): refused, to do alone, or waiting in To approve. */
     ...(pending ? {propose: (data) => pending.propose(data)} : {}),
     status,
@@ -304,6 +317,64 @@ function createAgent({
         return String(answer || '').slice(0, MAX_ANSWER_TEXT)
       } catch (error) {
         log({agentId, action, decision: 'failed', detail: error.message})
+        throw error
+      } finally {
+        writing.delete(controller)
+      }
+    },
+    /**
+     * A run of the agent `agentId` on Idena Social (B-239): `input` is what the app gives it to read (the posts, replies
+     * and messages since its last run, labelled); the system text is the app's frame with its Instructions and the
+     * Social actions it holds (not Off). Returns the model's answer, a plan the app reads and checks action by action
+     * (each one then goes through propose).
+     */
+    async planSocial({agentId, input, timeoutMs} = {}) {
+      if (!profiles) throw new Error('no agents')
+      const file = profiles.read()
+      const agent = file.agents.find((one) => one.id === agentId)
+      if (!agent) throw new Error('no such agent')
+      const config = agentSettings(file, agent)
+      const held = socialHeld(
+        Object.keys(agent.actions).filter(
+          (name) => checkAction(config, name).decision !== 'off'
+        )
+      )
+      if (!held.length) {
+        const {reason} = checkAction(config, 'reply')
+        log({agentId, action: 'social', decision: 'off', detail: reason})
+        throw new Error(`the agent may not do it (${reason})`)
+      }
+      const controller = new AbortController()
+      writing.add(controller)
+      try {
+        const answer = await ask(
+          {
+            provider: agent.provider,
+            address: agent.address,
+            model: agent.model,
+            key: key.read(destination(agent)),
+          },
+          socialSystem(held, agent.instructions),
+          [
+            {
+              type: 'text',
+              text: String(input || '').slice(0, MAX_INPUT_TEXT),
+            },
+          ],
+          {
+            timeoutMs: clampTimeout(timeoutMs),
+            signal: controller.signal,
+            maxTokens: PLAN_MAX_TOKENS,
+          }
+        )
+        return {held, answer: String(answer || '').slice(0, MAX_PLAN_TEXT)}
+      } catch (error) {
+        log({
+          agentId,
+          action: 'social',
+          decision: 'failed',
+          detail: error.message,
+        })
         throw error
       } finally {
         writing.delete(controller)

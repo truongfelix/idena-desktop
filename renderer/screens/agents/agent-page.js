@@ -157,6 +157,7 @@ function ScheduleSection({agent, catalog, onChange}) {
         summary={
           {
             validation: t('At each validation'),
+            hourly: t('Every hour'),
             daily: t('Every day'),
             manual: t('When I ask'),
           }[agent.schedule.kind]
@@ -172,6 +173,7 @@ function ScheduleSection({agent, catalog, onChange}) {
               }}
             >
               <option value="validation">{t('At each validation')}</option>
+              <option value="hourly">{t('Every hour')}</option>
               <option value="daily">{t('Every day')}</option>
               <option value="manual">{t('When I ask')}</option>
             </Select>
