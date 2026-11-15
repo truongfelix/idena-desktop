@@ -118,6 +118,12 @@ export const importAgentFile = (text) =>
 export const agentActivity = (agentId) =>
   agent('activity', agentId === undefined ? undefined : {agentId})
 export const clearAgentActivity = (agentId) => agent('clearActivity', {agentId})
+/** A flip's story by the agent `agentId` (B-236): {title, character, goal, panels, keywords, prompts}. */
+export const writeFlipStory = (agentId, panels, words) =>
+  agent('writeStory', {agentId, panels, words})
+/** One picture of a story's prompt by the agent's image model: {mediaType, data} (base64). */
+export const drawStoryPicture = (agentId, prompt) =>
+  agent('drawStoryPicture', {agentId, prompt})
 export const stopAgentTest = () => agent('stopTest')
 export const stopAgentSolve = () => agent('stopSolve')
 export const testAgentFlip = (flip, timeoutMs, agentId) =>

@@ -45,6 +45,10 @@ import {
 } from '../../screens/flips/utils'
 import {Step} from '../../screens/flips/types'
 import {
+  FlipStoryHelper,
+  FlipStoryPrompts,
+} from '../../screens/agents/flip-story'
+import {
   ImageSearchConsentDialog,
   useAdversarialSearch,
 } from '../../screens/flips/components/image-search'
@@ -156,6 +160,7 @@ export default function NewFlipPage() {
     adversarialImage,
     noise,
     adversarialImageId,
+    story,
     originalOrder,
     order,
     showTranslation,
@@ -163,6 +168,13 @@ export default function NewFlipPage() {
     didShowBadFlip,
     txHash,
   } = current.context
+
+  // Pictures the agent drew into the slots (B-236 Make the images): the editor is mounted again after each.
+  const [drawnPictures, setDrawnPictures] = useState(0)
+  const onStory = React.useCallback(
+    (next) => send('CHANGE_STORY', {story: next}),
+    [send]
+  )
 
   const not = (state) => !current.matches({editing: state})
   const is = (state) => current.matches({editing: state})
@@ -333,6 +345,13 @@ export default function NewFlipPage() {
                         )}
                       </FlipKeywordPanel>
                       {isOffline && <CommunityTranslationUnavailable />}
+                      {is('keywords.loaded') && (
+                        <FlipStoryHelper
+                          keywords={keywords}
+                          story={story}
+                          onStory={onStory}
+                        />
+                      )}
                     </Box>
                     <FlipStoryAside>
                       <IconButton2
@@ -359,6 +378,7 @@ export default function NewFlipPage() {
               )}
               {is('images') && (
                 <FlipEditorStep
+                  key={`editor-${drawnPictures}`}
                   keywords={keywords}
                   showTranslation={showTranslation}
                   originalOrder={originalOrder}
@@ -375,6 +395,24 @@ export default function NewFlipPage() {
                   onPainting={() => send('PAINTING')}
                   onChangeAdversarialId={(newIndex) => {
                     send('CHANGE_ADVERSARIAL_ID', {newIndex})
+                  }}
+                />
+              )}
+              {is('images') && (
+                <FlipStoryPrompts
+                  keywords={keywords}
+                  story={story}
+                  images={images}
+                  originalOrder={originalOrder}
+                  adversarialImageId={adversarialImageId}
+                  onImage={(slot, image) => {
+                    send('CHANGE_IMAGES', {
+                      image,
+                      currentIndex: slot,
+                      scene: null,
+                    })
+                    // Each slot's editor reads its picture when it mounts: a new one makes them read the drawn one.
+                    setDrawnPictures((n) => n + 1)
                   }}
                 />
               )}

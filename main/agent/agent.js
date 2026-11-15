@@ -2,7 +2,8 @@ const {checkAction} = require('./permissions')
 const {createAgentCommands} = require('./agent-commands')
 const {createPending} = require('./pending')
 const {agentSettings, validationAgent} = require('./profiles')
-const {checkFlip, flipQuestion, readFlipAnswer} = require('./flips')
+const {checkFlip, flipQuestion, mediaType, readFlipAnswer} = require('./flips')
+const {readStory, storySystem} = require('./stories')
 const providers = require('./providers')
 
 // The agent part of the main process: the renderer's one way to the agent (the "agent" channel). It keeps the
@@ -15,6 +16,8 @@ const MAX_ACTIVITY = 200
 /** What an agent is given to read for a text (the joke agent: its recent jokes), and what its answer may be. */
 const MAX_INPUT_TEXT = 20000
 const MAX_ANSWER_TEXT = 4000
+// A story and four prompts of up to 120 words: about 1,500 tokens; room for a longer one.
+const STORY_MAX_TOKENS = 4096
 
 function clampTimeout(value) {
   // null, '' and booleans are numbers to Number(): 0, a 1 s deadline. Only a real number counts.
@@ -37,6 +40,7 @@ function createAgent({
   logger,
   notify = () => {},
   ask = providers.ask,
+  draw = providers.drawImage,
   now = Date.now,
 }) {
   // The questions in flight: the validation's (stopped when the agent is paused or turned off) and the practice
@@ -300,6 +304,122 @@ function createAgent({
         return String(answer || '').slice(0, MAX_ANSWER_TEXT)
       } catch (error) {
         log({agentId, action, decision: 'failed', detail: error.message})
+        throw error
+      } finally {
+        writing.delete(controller)
+      }
+    },
+    /**
+     * A flip's story (B-236): for the agent `agentId` holding "Write flip stories" (not Off), one story of `panels`
+     * (3 or 4) panels for the flip's two keywords `words`, and one image prompt per panel, read from its answer. Nothing
+     * goes to the chain: the person copies the prompts, or the images come into the flip editor for them to check.
+     */
+    async writeStory({agentId, panels, words, timeoutMs} = {}) {
+      if (!profiles) throw new Error('no agents')
+      const file = profiles.read()
+      const agent = file.agents.find((one) => one.id === agentId)
+      if (!agent) throw new Error('no such agent')
+      const check = checkAction(agentSettings(file, agent), 'flipStory')
+      if (check.decision === 'off') {
+        log({
+          agentId,
+          action: 'flipStory',
+          decision: 'off',
+          detail: check.reason,
+        })
+        throw new Error(`the agent may not do it (${check.reason})`)
+      }
+      const system = storySystem(panels, words, agent.instructions)
+      const controller = new AbortController()
+      writing.add(controller)
+      try {
+        const answer = await ask(
+          {
+            provider: agent.provider,
+            address: agent.address,
+            model: agent.model,
+            key: key.read(destination(agent)),
+          },
+          system,
+          [{type: 'text', text: 'Write the story and its prompts now.'}],
+          {
+            timeoutMs: clampTimeout(timeoutMs),
+            signal: controller.signal,
+            maxTokens: STORY_MAX_TOKENS,
+          }
+        )
+        const story = readStory(answer, panels)
+        log({
+          agentId,
+          action: 'flipStory',
+          decision: check.decision,
+          detail: story.title,
+        })
+        return story
+      } catch (error) {
+        log({
+          agentId,
+          action: 'flipStory',
+          decision: 'failed',
+          detail: error.message,
+        })
+        throw error
+      } finally {
+        writing.delete(controller)
+      }
+    },
+    /**
+     * One picture of a flip's story (B-236 Make the images), drawn by the image model of the agent `agentId`, which
+     * must hold "Write flip stories" (not Off): {mediaType, data}. It goes into the flip editor for the person to check.
+     */
+    async drawStoryPicture({agentId, prompt, timeoutMs} = {}) {
+      if (!profiles) throw new Error('no agents')
+      const file = profiles.read()
+      const agent = file.agents.find((one) => one.id === agentId)
+      if (!agent) throw new Error('no such agent')
+      const check = checkAction(agentSettings(file, agent), 'flipStory')
+      if (check.decision === 'off') {
+        log({
+          agentId,
+          action: 'flipImage',
+          decision: 'off',
+          detail: check.reason,
+        })
+        throw new Error(`the agent may not do it (${check.reason})`)
+      }
+      if (typeof prompt !== 'string' || !prompt.trim())
+        throw new Error('no prompt')
+      const controller = new AbortController()
+      writing.add(controller)
+      try {
+        const picture = await draw(
+          {
+            provider: agent.provider,
+            address: agent.address,
+            imageModel: agent.imageModel,
+            key: key.read(destination(agent)),
+          },
+          prompt,
+          {
+            timeoutMs: clampTimeout(timeoutMs),
+            signal: controller.signal,
+            mediaTypeOf: mediaType,
+          }
+        )
+        log({
+          agentId,
+          action: 'flipImage',
+          decision: check.decision,
+          detail: '',
+        })
+        return picture
+      } catch (error) {
+        log({
+          agentId,
+          action: 'flipImage',
+          decision: 'failed',
+          detail: error.message,
+        })
         throw error
       } finally {
         writing.delete(controller)

@@ -230,6 +230,7 @@ function readFlipAnswer(text, {hasWords, thresholds = REPORT_THRESHOLDS}) {
 }
 
 module.exports = {
+  mediaType,
   REPORT_REASONS,
   REPORT_THRESHOLDS,
   SYSTEM,

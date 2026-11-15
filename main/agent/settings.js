@@ -31,6 +31,8 @@ const ACTIONS = {
   ads: {level: 'off', limit: null},
   oracleVote: {level: 'off', limit: null},
   invite: {level: 'off', limit: null},
+  // A flip's story and image prompts, written for the person in the flip editor (B-236); nothing reaches the chain.
+  flipStory: {level: 'off', limit: null},
 }
 
 const MAX_MODEL_LENGTH = 200

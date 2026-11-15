@@ -98,6 +98,8 @@ function normalizeAgent(input, {id = newAgentId} = {}) {
     provider,
     address,
     model,
+    // The model that draws pictures, on the same service (B-236 Make the images); '' = none.
+    imageModel: text(value.imageModel, 200, ''),
     instructions: text(value.instructions, MAX_INSTRUCTIONS_LENGTH, ''),
     actions: normalizeActions(value.actions),
     schedule: {
