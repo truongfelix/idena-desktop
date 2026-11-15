@@ -41,12 +41,6 @@ export default function AfterValidationPage() {
 
   const {data: validationState} = usePersistedValidationState()
 
-  // Success only once a block holds the answers: a node without peers keeps them in its pool (B-244).
-  const longAnswers = persistedLongAnswersTx(validationState)
-  const answersTx = useAnswersTx(longAnswers.hash, longAnswers.sentAt)
-  const {lost: connectionLost} = useNodeConnection()
-  const {status, warning} = afterSubmitStatus({answersTx, connectionLost})
-
   const epoch = useEpochState()
   const currentPeriod = epoch?.currentPeriod
 
@@ -61,6 +55,22 @@ export default function AfterValidationPage() {
   const [identity] = useIdentity()
 
   const isEligible = canValidate(identity)
+
+  // Success only once a block holds the answers: a node without peers keeps them in its pool (B-244). Followed
+  // only while the page shows it.
+  const showsAnswers = isValidationCeremony && isEligible
+  const longAnswers = persistedLongAnswersTx(validationState, epoch?.epoch)
+  const answersTx = useAnswersTx(
+    longAnswers.hash,
+    longAnswers.sentAt,
+    showsAnswers
+  )
+  const {lost: connectionLost, offline} = useNodeConnection(showsAnswers)
+  const {status, warning} = afterSubmitStatus({
+    answersTx,
+    connectionLost,
+    offline,
+  })
 
   const isValidated = [
     IdentityStatus.Newbie,
@@ -124,7 +134,7 @@ export default function AfterValidationPage() {
                 </Text>
               )}
 
-              {isValidationCeremony && isEligible && (
+              {showsAnswers && (
                 <Text color="xwhite.050" fontSize="mdx">
                   {status === 'submitted' &&
                     t('Your answers are successfully submitted')}
@@ -139,7 +149,7 @@ export default function AfterValidationPage() {
               <ValidationCountdown duration={validationEnd.diff(dayjs())} />
             )}
 
-            {isValidationCeremony && isEligible && warning && (
+            {showsAnswers && warning && (
               <ErrorAlert>
                 {`${
                   warning === 'noConnection'

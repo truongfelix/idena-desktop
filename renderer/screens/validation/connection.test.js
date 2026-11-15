@@ -1,6 +1,5 @@
 import {State, createMachine, interpret} from 'xstate'
 import {
-  HEAD_STUCK_SECONDS,
   TX_LATE_SECONDS,
   afterSubmitStatus,
   answersTxHash,
@@ -22,22 +21,19 @@ const now = 1_800_000_000
 
 describe('connectionLost', () => {
   it('waits for a second empty peer list', () => {
-    expect(connectionLost({noPeerChecks: 0, headTime: now, now})).toBe(false)
-    expect(connectionLost({noPeerChecks: 1, headTime: now, now})).toBe(false)
-    expect(connectionLost({noPeerChecks: 2, headTime: now, now})).toBe(true)
+    expect(connectionLost({noPeerChecks: 0, isBehind: false})).toBe(false)
+    expect(connectionLost({noPeerChecks: 1, isBehind: false})).toBe(false)
+    expect(connectionLost({noPeerChecks: 2, isBehind: false})).toBe(true)
   })
 
-  it('counts a head block that has not moved', () => {
-    const at = (age) =>
-      connectionLost({noPeerChecks: 0, headTime: now - age, now})
-    expect(at(20)).toBe(false)
-    expect(at(HEAD_STUCK_SECONDS)).toBe(false)
-    expect(at(HEAD_STUCK_SECONDS + 1)).toBe(true)
+  it('counts a node that says it is synced on an old head', () => {
+    expect(connectionLost({noPeerChecks: 0, isBehind: true})).toBe(true)
   })
 
-  it('reads no head time as unknown', () => {
-    expect(connectionLost({noPeerChecks: 0, headTime: null, now})).toBe(false)
-    expect(connectionLost({noPeerChecks: 0, headTime: 0, now})).toBe(false)
+  it('leaves a node catching up with its peers to the syncing alert', () => {
+    // The chain state's isBehind is false while bcn_syncing says syncing, whatever the head's age or the clock.
+    expect(connectionLost({noPeerChecks: 0, isBehind: false})).toBe(false)
+    expect(connectionLost({noPeerChecks: 0})).toBe(false)
   })
 })
 
@@ -106,6 +102,23 @@ describe('afterSubmitStatus', () => {
       {status: 'sent', warning: null}
     )
   })
+
+  it('warns when the node does not answer at all', () => {
+    expect(
+      afterSubmitStatus({
+        answersTx: 'waiting',
+        connectionLost: false,
+        offline: true,
+      })
+    ).toEqual({status: 'pending', warning: 'noConnection'})
+    expect(
+      afterSubmitStatus({
+        answersTx: 'mined',
+        connectionLost: false,
+        offline: true,
+      })
+    ).toEqual({status: 'submitted', warning: null})
+  })
 })
 
 describe('persistedLongAnswersTx', () => {
@@ -114,17 +127,26 @@ describe('persistedLongAnswersTx', () => {
       id: 'validation',
       predictableActionArguments: true,
       initial: 'done',
-      context: {submitLongAnswersHash: '0xlong', submitLongAnswersAt: 42},
+      context: {
+        epoch: 7,
+        submitLongAnswersHash: '0xlong',
+        submitLongAnswersAt: 42,
+      },
       states: {done: {}},
     })
     const service = interpret(machine).start()
     // What the page reads back: the saved definition made a State again.
     const restored = State.create(JSON.parse(JSON.stringify(service.state)))
-    expect(persistedLongAnswersTx(restored)).toEqual({
+    expect(persistedLongAnswersTx(restored, 7)).toEqual({
       hash: '0xlong',
       sentAt: 42,
     })
-    expect(persistedLongAnswersTx(undefined)).toEqual({
+    // A validation saved in an earlier epoch is not this ceremony's.
+    expect(persistedLongAnswersTx(restored, 8)).toEqual({
+      hash: null,
+      sentAt: null,
+    })
+    expect(persistedLongAnswersTx(undefined, 7)).toEqual({
       hash: null,
       sentAt: null,
     })
@@ -135,10 +157,11 @@ describe('persistedLongAnswersTx', () => {
 describe('timeLeftText', () => {
   const t = (key, values) =>
     key.replace(/{{(\w+)}}/g, (_, name) => String(values[name]))
-  it('counts whole minutes until the end', () => {
-    expect(timeLeftText(t, 10 * 60000 + 59000, 0)).toBe('About 10 min left')
-    expect(timeLeftText(t, 59000, 0)).toBe('Under a minute left')
+  it('says the time left as the sidebar does', () => {
+    expect(timeLeftText(t, 10 * 60000 + 20000, 0)).toBe('About 10 min left')
+    expect(timeLeftText(t, 29000, 0)).toBe('Under a minute left')
     expect(timeLeftText(t, 0, 5000)).toBe('Under a minute left')
+    expect(timeLeftText(t, 75 * 60000, 0)).toBe('About 1 h 15 min left')
   })
 })
 
