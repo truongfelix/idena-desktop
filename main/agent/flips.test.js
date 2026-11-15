@@ -106,6 +106,7 @@ describe('agent flips: the model answer', () => {
       relevance: null,
       reasons: [],
       report: false,
+      reportConfidence: 0,
       quality: null,
     })
     expect(
@@ -132,6 +133,7 @@ describe('agent flips: the model answer', () => {
         {reason: 1, confidence: 0.5},
       ],
       report: true,
+      reportConfidence: REPORT_THRESHOLDS[4],
       quality: null,
     })
     expect(readFlipAnswer(sure, {hasWords: false})).toMatchObject({
@@ -163,6 +165,22 @@ describe('agent flips: the model answer', () => {
     expect(
       readFlipAnswer(good.replace('0.85', '7'), {hasWords: true}).quality
     ).toBe(1)
+    // A rule break half suspected, even below its threshold: no quality, never the best flip.
+    const doubtful =
+      '{"answer":"left","confidence":0.9,"keywords":"shown","reasons":[{"reason":6,"confidence":0.85}],"quality":0.9}'
+    expect(readFlipAnswer(doubtful, {hasWords: true})).toMatchObject({
+      report: false,
+      quality: null,
+    })
+    // The report's certainty: its surest reason among those reaching their threshold, not the surest overall.
+    const mixed = reply([
+      {reason: 5, confidence: 0.88},
+      {reason: 1, confidence: 0.71},
+    ])
+    expect(readFlipAnswer(mixed, {hasWords: true})).toMatchObject({
+      report: true,
+      reportConfidence: 0.71,
+    })
   })
 
   test('each reason is held against its own threshold', () => {

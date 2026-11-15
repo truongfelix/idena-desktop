@@ -4,6 +4,8 @@
 // screen, each with the model's confidence; a flip is reported when one reason reaches that reason's threshold.
 
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024
+/** A rule break the model is this sure of, even below its threshold, keeps a flip from being marked best. */
+const DOUBT = 0.5
 const MAX_WORD_LENGTH = 200
 
 /**
@@ -210,22 +212,31 @@ function readFlipAnswer(text, {hasWords, thresholds = REPORT_THRESHOLDS}) {
     relevance: null,
     reasons: [],
     report: false,
+    reportConfidence: 0,
     quality: null,
   }
   if (!reply || typeof reply !== 'object') return none
   const answer = ['left', 'right'].includes(reply.answer) ? reply.answer : null
   const reasons = hasWords ? readReasons(reply.reasons) : []
-  const report = reasons.some(
+  const reaching = reasons.filter(
     ({reason, confidence}) =>
       confidence >= (thresholds[reason] ?? REPORT_THRESHOLDS[reason])
   )
+  const report = reaching.length > 0
+  // How sure the report is: its surest reason among those that reach their threshold (B-259 ranks reports by it).
+  const reportConfidence = report ? reaching[0].confidence : 0
   // A report marks the flip irrelevant; "not shown" alone, below its threshold, leaves it unmarked.
   let relevance = null
   if (report) relevance = 'irrelevant'
   else if (hasWords && reply.keywords === 'shown') relevance = 'relevant'
-  // How good a flip it is (B-260: the best flip's mark), with keywords only; none when the model gave none.
+  // How good a flip it is (B-260: the best flip's mark), with keywords only; none when the model gave none, or when
+  // it half suspects the flip of breaking a rule (a reason from DOUBT, even below its threshold).
+  const doubted = reasons.some(({confidence}) => confidence >= DOUBT)
   const quality =
-    hasWords && reply.quality !== null && reply.quality !== undefined
+    hasWords &&
+    !doubted &&
+    reply.quality !== null &&
+    reply.quality !== undefined
       ? unit(reply.quality)
       : null
   return {
@@ -234,6 +245,7 @@ function readFlipAnswer(text, {hasWords, thresholds = REPORT_THRESHOLDS}) {
     relevance,
     reasons,
     report,
+    reportConfidence,
     quality,
   }
 }

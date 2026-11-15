@@ -13,7 +13,7 @@ import {
   answersToTake,
   appliedKey,
   autopilotEvents,
-  bestFlipOf,
+  bestSuggestionOf,
   flipDeadlineMs,
   flipsLeftToAsk,
   nextFlipToAsk,
@@ -305,6 +305,8 @@ export function useAgentValidation({
               markDecision: late.markDecision,
               relevance: late.relevance,
               reportSide: late.reportSide,
+              reportConfidence: late.reportConfidence,
+              quality: late.quality,
               reportLater: false,
             },
           }))
@@ -438,13 +440,7 @@ export function useAgentValidation({
     // or a best flip is marked.
     bestSuggestion:
       active && phase === 'keywords' && !hasBest
-        ? bestFlipOf(
-            flips.filter((flip) => {
-              const pick = picks[flip.hash]
-              return pick && (pick.markDecision ?? pick.decision) !== 'alone'
-            }),
-            picks
-          )?.hash ?? null
+        ? bestSuggestionOf(flips, picks)
         : null,
     canTakeRest:
       mode === 'suggest' &&

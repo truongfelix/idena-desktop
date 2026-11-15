@@ -352,4 +352,29 @@ describe('the validation answered by one agent, reported by another', () => {
       detail: 'paused',
     })
   })
+
+  test("the marks' scores come from the agent that marks: its certainty and quality, never the answering one's", async () => {
+    ask = jest.fn(async (config) =>
+      config.model === 'reports'
+        ? '{"answer":"right","confidence":0.6,"keywords":"shown","reasons":[],"quality":0.9}'
+        : '{"answer":"left","confidence":0.8,"keywords":"shown","reasons":[],"quality":0.2}'
+    )
+    const agent = start([
+      agentRow(A, 'Solver', 'answers', {answerFlip: {level: 'alone'}}),
+      agentRow(R, 'Checker', 'reports', {report: {level: 'alone'}}),
+    ])
+    await expect(
+      agent.handle('solveFlip', {flip: longFlip})
+    ).resolves.toMatchObject({quality: 0.9, reportConfidence: 0})
+    ask = jest.fn(async () => REPLIES.reports)
+    const one = start([
+      agentRow(A, 'Both', 'm', {
+        answerFlip: {level: 'alone'},
+        report: {level: 'alone'},
+      }),
+    ])
+    await expect(
+      one.handle('solveFlip', {flip: longFlip})
+    ).resolves.toMatchObject({report: true, reportConfidence: 0.95})
+  })
 })

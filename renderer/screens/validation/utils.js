@@ -220,6 +220,10 @@ export function shouldPollLongFlips(
 export const decodedWithKeywords = ({decoded, words}) =>
   decoded && words?.length > 0
 
+/** Whether a best flip is marked in the validation's context. */
+export const hasBestFlip = ({bestFlipHashes}) =>
+  Object.keys(bestFlipHashes || {}).length > 0
+
 export function availableReportsNumber(flips) {
   return Math.floor(flips.length / 3)
 }

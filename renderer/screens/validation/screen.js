@@ -116,9 +116,10 @@ export function ValidationScreen({
     const side = isKeywords
       ? pickedSide({answer: pick.reportSide ?? pick.answer})
       : pickedSide(pick)
-    if (side !== variant) return null
-    // The flip it would mark best (B-260), shown for the person's click.
+    // The flip it would mark best (B-260), shown for the person's click; on the left when the agent took no side.
     const best = isKeywords && agent.bestSuggestion === currentFlip.hash
+    if (side !== variant && !(best && !side && variant === AnswerType.Left))
+      return null
     const show = isKeywords
       ? best ||
         (Boolean(pick.report) &&

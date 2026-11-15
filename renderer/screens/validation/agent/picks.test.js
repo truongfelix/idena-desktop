@@ -286,7 +286,7 @@ describe("Autopilot's marks in the keywords check (B-259, B-260)", () => {
       isKeywords: true,
       reportsLeft: 1,
     })
-    expect(first.map(({type}) => type)).not.toContain('FAVORITE')
+    expect(first.map(({type}) => type)).not.toContain('MARK_BEST')
     first.forEach((event) => applied.add(appliedKey(event)))
     const approved = flips.map((one) =>
       ['a', 'b', 'd'].includes(one.hash)
@@ -300,7 +300,7 @@ describe("Autopilot's marks in the keywords check (B-259, B-260)", () => {
       isKeywords: true,
       reportsLeft: 0,
     })
-    expect(second).toEqual([{type: 'FAVORITE', hash: 'b'}])
+    expect(second).toEqual([{type: 'MARK_BEST', hash: 'b'}])
     applied.add(appliedKey(second[0]))
     expect(
       autopilotEvents({flips: approved, picks, applied, isKeywords: true})
@@ -323,6 +323,36 @@ describe("Autopilot's marks in the keywords check (B-259, B-260)", () => {
       isKeywords: true,
     })
     expect(midway).toEqual([{type: 'APPROVE_WORDS', hash: 'b'}])
+    // A flip still waiting for its pick, or for its late report: no best flip yet.
+    expect(
+      autopilotEvents({
+        flips: [...approved, flip('e', {option: AnswerType.Left})],
+        picks,
+        applied: new Set(['mark:a', 'mark:b', 'mark:c', 'mark:d']),
+        isKeywords: true,
+      }).map(({type}) => type)
+    ).not.toContain('MARK_BEST')
+    // The flip it marked lost its mark to a report: the next best; unmarked by the person (still approved): none.
+    const reportedLater = approved.map((one) =>
+      one.hash === 'b' ? {...one, relevance: RelevanceType.Irrelevant} : one
+    )
+    const marks = new Set(['mark:a', 'mark:b', 'mark:c', 'mark:d', 'best:b'])
+    expect(
+      autopilotEvents({
+        flips: reportedLater,
+        picks,
+        applied: marks,
+        isKeywords: true,
+      })
+    ).toEqual([{type: 'MARK_BEST', hash: 'a'}])
+    expect(
+      autopilotEvents({
+        flips: approved,
+        picks,
+        applied: marks,
+        isKeywords: true,
+      })
+    ).toEqual([])
     // None good enough: none.
     expect(
       bestFlipOf(approved, {

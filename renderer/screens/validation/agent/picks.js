@@ -114,7 +114,16 @@ const unmarked = (flip) =>
 /** How good a flip must be, as the model says, for the agent to mark it best (B-260). */
 export const BEST_MIN_QUALITY = 0.8
 
-const marksAlone = (pick) => (pick.markDecision ?? pick.decision) === 'alone'
+/** Whether the agent marks this flip's keywords alone: the reporting agent's level, or the one agent's. */
+export const marksAlone = (pick) =>
+  (pick.markDecision ?? pick.decision) === 'alone'
+
+/** The flip the agent would mark best for the person's click (its marks asked first: Ask me), or null. */
+export const bestSuggestionOf = (flips, picks) =>
+  bestFlipOf(
+    flips.filter((flip) => picks[flip.hash] && !marksAlone(picks[flip.hash])),
+    picks
+  )?.hash ?? null
 
 /**
  * The flip the agent would mark best (B-260): among the flips approved (relevant) whose agent judged them relevant,
@@ -194,19 +203,36 @@ export function autopilotEvents({
   approvals.forEach((flip) =>
     events.push({type: 'APPROVE_WORDS', hash: flip.hash})
   )
-  // The best flip: once its approvals are in the flips (a later pass), never over the person's own.
-  if (!hasBest && !approvals.length && !applied.has('best')) {
+  // The best flip: once every flip has its pick and every approval is in the flips (a later pass); never over the
+  // person's own. Chosen again only when the flip it marked lost its mark to a report (a person's unmarking stays).
+  const marked = [...applied].find((key) => key.startsWith('best:'))
+  const lost =
+    marked &&
+    flips.some(
+      (flip) =>
+        `best:${flip.hash}` === marked &&
+        flip.relevance !== RelevanceType.Relevant
+    )
+  // Every flip shown has its pick (one that never loaded gets none, it waits for no one).
+  const allIn = flips.every(
+    (flip) =>
+      !flip.decoded || (picks[flip.hash] && !picks[flip.hash].reportLater)
+  )
+  if (!hasBest && !approvals.length && allIn && (!marked || lost)) {
     const best = bestFlipOf(
-      flips.filter((flip) => marksAlone(picks[flip.hash] || {})),
+      flips.filter(
+        (flip) =>
+          marksAlone(picks[flip.hash] || {}) && `best:${flip.hash}` !== marked
+      ),
       picks
     )
-    if (best) events.push({type: 'FAVORITE', hash: best.hash})
+    if (best) events.push({type: 'MARK_BEST', hash: best.hash})
   }
   return events
 }
 
 /** What `applied` records for an event sent. */
 export function appliedKey({type, hash}) {
-  if (type === 'FAVORITE') return 'best'
+  if (type === 'MARK_BEST') return `best:${hash}`
   return `${type === 'ANSWER' ? 'answer' : 'mark'}:${hash}`
 }
