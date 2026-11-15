@@ -25,8 +25,13 @@ describe('the events that run an agent', () => {
       me: ME,
     }
     expect(eventPending(['like'], liked, at)).toBe(true)
-    const tipped = {feed: [mine({tips: [{from: ANN, height: 200}]})], me: ME}
-    expect(eventPending(['tip'], tipped, at)).toBe(true)
+    const tip = (tipAmount) => ({
+      feed: [mine({tips: [{from: ANN, height: 200, tipAmount, amount: '2'}]})],
+      me: ME,
+    })
+    expect(eventPending(['tip'], tip('2'), at)).toBe(true)
+    // A tip not counted (more than was paid) is no event.
+    expect(eventPending(['tip'], tip('5'), at)).toBe(false)
   })
 
   test('a private message to it; not one it wrote, not one before the point, not from a blocked person', () => {
@@ -45,6 +50,17 @@ describe('the events that run an agent', () => {
         at
       )
     ).toBe(false)
+  })
+
+  test('a group conversation starts no run (its run does not read groups)', () => {
+    const group = {
+      feed: [],
+      me: ME,
+      conversations: [
+        {others: [ANN], isGroup: true, messages: [{from: ANN, height: 200}]},
+      ],
+    }
+    expect(eventPending(['message'], group, at)).toBe(false)
   })
 
   test('no event chosen, or no read point yet (its first run is the schedule’s): nothing', () => {

@@ -48,9 +48,9 @@ export function SettingsFormLabel(props) {
 
 /**
  * A section of a settings page. With `foldId`, it folds (B-250): its title is the button, an arrow before it (right:
- * folded, down: open), `summary` shown beside the folded title, its state remembered on this computer.
+ * folded, down: open), `summary` shown beside the folded title, its state remembered on this computer. `info`: what
+ * it is for, in an ⓘ beside its title (B-255).
  */
-/** A section of a settings page; `info`: what it is for, in an ⓘ beside its title. */
 export function SettingsSection({
   title,
   children,

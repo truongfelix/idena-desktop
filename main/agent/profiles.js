@@ -55,6 +55,23 @@ function normalizeReads(value) {
   }
 }
 
+/**
+ * What an agent saved before it had its own reads (B-239 builds) read: with a Social action, the new posts (up to 20),
+ * its answers and tips, and its messages when it held Private messages. Without one, nothing.
+ */
+function readsBefore(actions) {
+  const saved = actions && typeof actions === 'object' ? actions : {}
+  const social = ['post', 'reply', 'like', 'message', 'tip'].some(
+    (name) => saved[name]
+  )
+  if (!social) return undefined
+  return {
+    posts: {window: 'count', count: 20},
+    notifications: true,
+    messages: Boolean(saved.message),
+  }
+}
+
 const normalizeEvents = (value) =>
   Array.isArray(value) ? EVENTS.filter((one) => value.includes(one)) : []
 
@@ -132,7 +149,9 @@ function normalizeAgent(input, {id = newAgentId} = {}) {
     imageModel: text(value.imageModel, 200, ''),
     instructions: text(value.instructions, MAX_INSTRUCTIONS_LENGTH, ''),
     actions: normalizeActions(value.actions),
-    reads: normalizeReads(value.reads),
+    reads: normalizeReads(
+      value.reads === undefined ? readsBefore(value.actions) : value.reads
+    ),
     events: normalizeEvents(value.events),
     schedule: {
       kind: SCHEDULES.includes(schedule.kind) ? schedule.kind : 'manual',

@@ -167,7 +167,6 @@ export function AgentRunner() {
         // An event (a like, an answer, a tip, a message to it) after its read point runs it too, at most every
         // EVENT_MIN_MS.
         const state = socialState(socialRef.current)
-        const scanned = scannedHeight(state)
         // eslint-disable-next-line no-restricted-syntax
         for (const agent of active) {
           if (
@@ -181,6 +180,8 @@ export function AgentRunner() {
           const point = await agentCall('readPoint', {agentId: agent.id}).catch(
             () => null
           )
+          // Up to where its run reads (its messages: as far as they were decrypted), not further.
+          const scanned = scannedHeight(state, heldSocial(agent))
           if (eventPending(agent.events, state, {point, scanned})) {
             lastEvent.set(agent.id, now)
             due.push(agent)

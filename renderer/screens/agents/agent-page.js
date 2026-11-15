@@ -165,7 +165,7 @@ export function AgentPage({id}) {
           </Box>
         </Flex>
         <Flex gap={3} align="center">
-          <RunNow agent={agent} onDone={refreshActivity} />
+          <RunNow agent={agent} paused={list.paused} onDone={refreshActivity} />
           <SecondaryButton
             onClick={() =>
               run(() => saveAgentFile(id)).then(() => refreshActivity())

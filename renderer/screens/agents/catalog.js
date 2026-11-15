@@ -262,9 +262,7 @@ export function readsList(agent, catalog, t) {
     })
   })
   socialReadsList(agent, t).forEach((item) => reads.push(item))
-  return reads.length
-    ? reads
-    : [t('Nothing: every action is off', {nsSeparator: '!!'})]
+  return reads.length ? reads : [t('Nothing', {nsSeparator: '!!'})]
 }
 
 export function budgetLine({budgetPerDay}, t) {

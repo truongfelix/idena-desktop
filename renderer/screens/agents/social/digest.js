@@ -115,7 +115,14 @@ export function socialDigest(
           })
         )
       node.tips
-        .filter((tip) => tip.from !== me && !isBlocked(tip.from) && isNew(tip))
+        // A tip the Social screen does not count (no whole iDNA paid) is no tip.
+        .filter(
+          (tip) =>
+            tip.from !== me &&
+            !isBlocked(tip.from) &&
+            isNew(tip) &&
+            validTipAmount(tip) !== null
+        )
         .forEach((tip) =>
           candidates.push({kind: 'tip', height: tip.height, tip, node})
         )

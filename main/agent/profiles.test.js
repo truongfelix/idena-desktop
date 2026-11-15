@@ -78,6 +78,23 @@ describe('agent profiles', () => {
     expect(
       normalizeAgent({reads: {posts: {window: 'week', count: 3}}}).reads.posts
     ).toEqual({window: 'off', count: 3})
+    // An agent saved before it had reads (B-239) reads what it read then.
+    expect(
+      normalizeAgent({
+        actions: {reply: {level: 'alone'}, message: {level: 'ask'}},
+      }).reads
+    ).toEqual({
+      posts: {window: 'count', count: 20},
+      notifications: true,
+      messages: true,
+    })
+    expect(
+      normalizeAgent({actions: {answerFlip: {level: 'alone'}}}).reads
+    ).toEqual({
+      posts: {window: 'off', count: 10},
+      notifications: false,
+      messages: false,
+    })
     // The daily joke's routine is gone (B-255): a saved task is not kept.
     expect(normalizeAgent({task: 'joke'})).not.toHaveProperty('task')
   })

@@ -214,6 +214,16 @@ describe('where a run stops reading', () => {
     expect(people.map(({others}) => others[0]).sort()).toEqual(
       [ANN, BOB].sort()
     )
+    // A tip the Social screen does not count (6.9: no whole iDNA paid for it) is not read.
+    mine.tips = [
+      {from: BOB, height: 9600, index: 0, tipAmount: '6.9', amount: '0.9'},
+    ]
+    const unpaid = socialDigest(
+      state({feed: [mine], conversations: []}),
+      read(['message'], {...READ_ALL, posts: {window: 'off', count: 10}}),
+      {point: 9000, scanned: HEAD}
+    )
+    expect(unpaid.text).not.toContain('Tips to you:')
   })
 
   test('past the size budget, the items left out have no label and come next run', () => {

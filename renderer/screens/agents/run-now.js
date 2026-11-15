@@ -28,7 +28,7 @@ export function runLine({result, detail}, t) {
  * Run now, in the agent page's header: one run at once, whatever its schedule, for an agent that is on and holds a
  * Social action; it waits for Social to read the chain up to now. What the run did shows in a message and Activity.
  */
-export function RunNow({agent, onDone}) {
+export function RunNow({agent, paused, onDone}) {
   const {t} = useTranslation()
   const social = useSocial()
   const toast = useSuccessToast()
@@ -38,9 +38,16 @@ export function RunNow({agent, onDone}) {
   return (
     <SecondaryButton
       isLoading={isRunning}
-      isDisabled={!agent.enabled || !ready}
+      isDisabled={!agent.enabled || paused || !ready}
       title={
-        ready ? undefined : t('Waits for Social to read the chain up to now.')
+        // eslint-disable-next-line no-nested-ternary
+        paused
+          ? t('Every agent is paused: none acts until you resume them.', {
+              nsSeparator: '!!',
+            })
+          : ready
+          ? undefined
+          : t('Waits for Social to read the chain up to now.')
       }
       onClick={async () => {
         setIsRunning(true)

@@ -43,12 +43,10 @@ describe('the Agents section lines', () => {
   })
 
   test('the model reads only what its actions that are not off need, each once', () => {
-    expect(readsList(agent(), catalog, t)).toEqual([
-      'Nothing: every action is off',
-    ])
+    expect(readsList(agent(), catalog, t)).toEqual(['Nothing'])
     expect(
       readsList(agent({actions: {answerFlip: {level: 'off'}}}), catalog, t)
-    ).toEqual(['Nothing: every action is off'])
+    ).toEqual(['Nothing'])
     expect(
       readsList(
         agent({actions: {answerFlip: {level: 'ask'}, report: {level: 'ask'}}}),

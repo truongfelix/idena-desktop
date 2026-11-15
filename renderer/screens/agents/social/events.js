@@ -1,4 +1,5 @@
 import {LIKE} from '../../social/contract'
+import {validTipAmount} from '../../social/calls'
 
 // The events that start an agent's run besides its schedule (B-255): a like, an answer, a tip or a private message
 // to it after its read point, as the Social scan holds them.
@@ -41,7 +42,10 @@ export function eventPending(
     if (
       mine &&
       events.includes('tip') &&
-      node.tips.some((tip) => fromOther(tip.from) && isNew(tip))
+      node.tips.some(
+        (tip) =>
+          fromOther(tip.from) && isNew(tip) && validTipAmount(tip) !== null
+      )
     )
       found = true
     node.replies.forEach((child) => visit(child, node))
@@ -51,6 +55,7 @@ export function eventPending(
     found = conversations.some(
       (conversation) =>
         !conversation.group &&
+        !conversation.isGroup &&
         conversation.others.length === 1 &&
         conversation.messages.some(
           (message) => fromOther(message.from) && isNew(message)
