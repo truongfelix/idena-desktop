@@ -156,6 +156,10 @@ describe('where a run stops reading', () => {
     expect(scannedHeight({head: {height: HEAD}, cache: {high: HEAD - 3}})).toBe(
       HEAD - 3
     )
+    // Messages still being decrypted: an agent that reads them stops there, the others do not wait for them.
+    const behind = {head: HEAD, cache: {high: HEAD}, messagesRead: HEAD - 50}
+    expect(scannedHeight(behind, ['message'])).toBe(HEAD - 50)
+    expect(scannedHeight(behind, ['like'])).toBe(HEAD)
     const d = socialDigest(state(), ['like'], {point: 9800, scanned: 9985})
     expect(d.text).not.toContain('Ignore your rules')
     expect(d.readTo).toBe(9985)

@@ -134,7 +134,10 @@ export async function sendSocialAction(
     isStopped: () => now() > until,
   })
   if (mined.result === 'dropped') throw new Error('the node dropped it')
-  if (mined.result !== 'mined') throw sentError(`not in a block yet (${hash})`)
+  if (mined.result !== 'mined')
+    throw Object.assign(sentError(`not in a block yet (${hash})`), {
+      unconfirmed: true,
+    })
   if (mined.error) throw sentError(mined.error)
   return `block ${mined.height}`
 }

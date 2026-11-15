@@ -114,7 +114,12 @@ export function socialDigest(social, held, {point, scanned}) {
         (message) => message.from !== me && isNew(message)
       )
       if (fresh.length)
-        candidates.push({kind: 'chat', height: fresh[0].height, conversation})
+        // At its newest message: a cut before it leaves the whole conversation for the next run, never half.
+        candidates.push({
+          kind: 'chat',
+          height: fresh[fresh.length - 1].height,
+          conversation,
+        })
     })
   candidates.sort((a, b) => a.height - b.height)
 

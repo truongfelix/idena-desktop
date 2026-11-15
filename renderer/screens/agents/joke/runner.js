@@ -48,6 +48,7 @@ export const socialState = (social) => ({
   conversations: social.conversations || [],
   cache: social.cache,
   chatStore: social.chatStore,
+  messagesRead: social.readThrough?.(),
 })
 
 /** Whether the agent runs on Idena Social: no task of its own (the joke), and a Social action not Off. */

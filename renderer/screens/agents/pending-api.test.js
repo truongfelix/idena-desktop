@@ -34,11 +34,12 @@ describe('an approval', () => {
 
   test('sent but not seen in a block in time: taken off To approve as done, so it cannot be sent twice', async () => {
     const calls = fakeMain()
-    const post = jest
-      .fn()
-      .mockRejectedValue(
-        Object.assign(new Error('not in a block yet (0xab)'), {sent: true})
-      )
+    const post = jest.fn().mockRejectedValue(
+      Object.assign(new Error('not in a block yet (0xab)'), {
+        sent: true,
+        unconfirmed: true,
+      })
+    )
     await expect(approveAction(item, undefined, {post})).resolves.toBe(
       'sent, not confirmed: not in a block yet (0xab)'
     )
@@ -50,6 +51,16 @@ describe('an approval', () => {
         detail: 'sent, not confirmed: not in a block yet (0xab)',
       },
     ])
+  })
+
+  test('refused in its block: failed, it waits again', async () => {
+    fakeMain()
+    const post = jest
+      .fn()
+      .mockRejectedValue(Object.assign(new Error('out of gas'), {sent: true}))
+    await expect(approveAction(item, undefined, {post})).rejects.toThrow(
+      'out of gas'
+    )
   })
 
   test('a failed action is reported back as failed, and its error shown', async () => {

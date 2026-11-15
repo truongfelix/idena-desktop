@@ -33,8 +33,8 @@ export async function approveAction(item, body, run = executors) {
     detail = String((await execute(approved)) || '')
   } catch (error) {
     // Sent, but not seen in a block in time: it may still be. Taken off the list as done, so that a second Approve
-    // cannot send it twice; the line says so.
-    if (error?.sent) {
+    // cannot send it twice; the line says so. One refused in its block (`sent`, not `unconfirmed`) failed: it waits.
+    if (error?.unconfirmed) {
       const sent = `sent, not confirmed: ${agentErrorText(error)}`
       await agent('finish', {id: item.id, ok: true, detail: sent}).catch(
         () => {}
