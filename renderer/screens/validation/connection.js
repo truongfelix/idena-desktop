@@ -2,7 +2,7 @@ import React from 'react'
 import {useInterval} from '../../shared/hooks/use-interval'
 import {useChainState} from '../../shared/providers/chain-context'
 import {HASH_IN_MEMPOOL, callRpc} from '../../shared/utils/utils'
-import {durationParts} from '../../shared/utils/sync-steps'
+import {durationParts, headIsStale} from '../../shared/utils/sync-steps'
 
 // No peer twice in a row means the answers the node sends reach no one.
 export const NO_PEER_CHECKS = 2
@@ -13,7 +13,7 @@ const PEERS_POLL_MS = 5 * 1000
 const TX_POLL_MS = 10 * 1000
 
 // Whether the node has no connection: `noPeerChecks` net_peers answers in a row were empty, or the node says it
-// is synced while its head block is old (the chain state's `isBehind`; a node catching up with peers is syncing).
+// is synced while its head block is old (`isBehind`, as the sidebar's; a node catching up with peers is syncing).
 export function connectionLost({noPeerChecks, isBehind}) {
   return noPeerChecks >= NO_PEER_CHECKS || Boolean(isBehind)
 }
@@ -39,24 +39,29 @@ export function txWaitState({mined, sentAt, seenSince, now}) {
 }
 
 // The node's connection while the validation runs: `lost` once the node answers but has no peer or an old head
-// (a node that does not answer at all is the chain state's `offline`, returned too). Polls only while `enabled`.
+// (a node that does not answer at all is the chain state's `offline`, returned too). Polls only while `enabled`;
+// each poll renders again, so a time shown beside it stays current.
 export function useNodeConnection(enabled = true) {
-  const {offline, isBehind} = useChainState()
+  const {offline, syncing, headTime} = useChainState()
   const [noPeerChecks, setNoPeerChecks] = React.useState(0)
+  const [now, setNow] = React.useState(() => Date.now())
 
   useInterval(
     async () => {
+      setNow(Date.now())
       try {
         const peers = await callRpc('net_peers')
         setNoPeerChecks((n) => ((peers || []).length > 0 ? 0 : n + 1))
       } catch {
-        // The node does not answer: the chain state shows it offline.
+        // The node does not answer: the chain state shows it offline; count again from zero once it is back.
+        setNoPeerChecks(0)
       }
     },
     enabled ? PEERS_POLL_MS : null,
     true
   )
 
+  const isBehind = !syncing && headIsStale(headTime, now / 1000)
   return {offline, lost: !offline && connectionLost({noPeerChecks, isBehind})}
 }
 
