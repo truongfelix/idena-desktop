@@ -2055,7 +2055,7 @@
   "High": "High",
   "Very high": "Very high",
   "Highest": "Highest",
-  "More effort: better answers to hard questions, more tokens billed. An answer that reaches the longest answer is cut short, and Activity says so; a local model may ignore the effort.": "More effort: better answers to hard questions, more tokens billed. An answer that reaches the longest answer is cut short, and Activity says so; a local model may ignore the effort.",
+  "More effort: better answers to hard questions, more tokens billed. An answer that reaches the longest answer is cut short, and Activity says so. A model without effort may refuse it (Activity shows its error) or ignore it.": "More effort: better answers to hard questions, more tokens billed. An answer that reaches the longest answer is cut short, and Activity says so. A model without effort may refuse it (Activity shows its error) or ignore it.",
   "Picture {{n}} of {{count}}": "Picture {{n}} of {{count}}",
   "Make the images": "Make the images",
   "The story has 4 pictures: unlock the nonsense picture first, or write one with 3.": "The story has 4 pictures: unlock the nonsense picture first, or write one with 3.",

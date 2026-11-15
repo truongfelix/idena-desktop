@@ -12,6 +12,9 @@ import {
 import {SettingsSection} from '../components'
 import {REPORT_REASONS} from '../../validation/practice'
 
+/** The largest longest answer kept (main/agent/settings.js MAX_ANSWER_TOKENS). */
+const MAX_ANSWER_TOKENS = 128000
+
 /** Where the model runs, the choices of an agent page (main/agent/settings.js PROVIDERS). */
 function useProviders() {
   const {t} = useTranslation()
@@ -53,6 +56,37 @@ function SavedOnBlurInput({value, onSave, ...props}) {
   )
 }
 
+/** A whole number of tokens from 1, else null: what the main process keeps (settings.js normalizeMaxTokens). */
+function readTokens(text) {
+  const number = Number(text.replace(/[\s,._]/gu, ''))
+  return text.trim() && Number.isInteger(number) && number >= 1
+    ? Math.min(number, MAX_ANSWER_TOKENS)
+    : null
+}
+
+/** The longest answer's field: on leaving it, it shows what was saved (empty for a number it cannot read). */
+function TokensInput({value, onSave, ...props}) {
+  const shown = value ? String(value) : ''
+  const [draft, setDraft] = React.useState(shown)
+  React.useEffect(() => setDraft(shown), [shown])
+  return (
+    <Input
+      value={draft}
+      inputMode="numeric"
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={(e) => {
+        const next = readTokens(e.currentTarget.value)
+        setDraft(next ? String(next) : '')
+        if (next !== (value || null)) onSave(next)
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur()
+      }}
+      {...props}
+    />
+  )
+}
+
 /**
  * The model's longest answer and effort (B-265), for an agent (the single agent's settings have none). An empty field
  * leaves the app's choice for each task, and the model's default effort.
@@ -74,13 +108,10 @@ function AnswerFields({settings, onChange}) {
     <Stack spacing={2}>
       <SimpleGrid columns={[1, 2]} spacing={4}>
         <FormControlWithLabel label={t('Longest answer, in tokens')}>
-          <SavedOnBlurInput
-            value={settings.maxTokens ? String(settings.maxTokens) : ''}
-            inputMode="numeric"
+          <TokensInput
+            value={settings.maxTokens}
             placeholder={t("The app's choice")}
-            onSave={(next) =>
-              onChange((s) => ({...s, maxTokens: next || null}))
-            }
+            onSave={(maxTokens) => onChange((s) => ({...s, maxTokens}))}
           />
         </FormControlWithLabel>
         <FormControlWithLabel label={t('Effort')}>
@@ -102,7 +133,7 @@ function AnswerFields({settings, onChange}) {
       </SimpleGrid>
       <Text color="muted" fontSize="sm">
         {t(
-          'More effort: better answers to hard questions, more tokens billed. An answer that reaches the longest answer is cut short, and Activity says so; a local model may ignore the effort.',
+          'More effort: better answers to hard questions, more tokens billed. An answer that reaches the longest answer is cut short, and Activity says so. A model without effort may refuse it (Activity shows its error) or ignore it.',
           {nsSeparator: '!!'}
         )}
       </Text>
@@ -281,7 +312,13 @@ export function ModelSection({
               borderColor={settings.provider === id ? 'blue.500' : 'gray.100'}
               onClick={() =>
                 settings.provider !== id &&
-                onChange((s) => ({...s, provider: id, address: ''}))
+                // Its effort too: another service takes other efforts (B-265).
+                onChange((s) => ({
+                  ...s,
+                  provider: id,
+                  address: '',
+                  ...('effort' in s ? {effort: ''} : {}),
+                }))
               }
             >
               <Box>

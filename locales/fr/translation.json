@@ -2055,7 +2055,7 @@
   "High": "Élevé",
   "Very high": "Très élevé",
   "Highest": "Maximal",
-  "More effort: better answers to hard questions, more tokens billed. An answer that reaches the longest answer is cut short, and Activity says so; a local model may ignore the effort.": "Plus d'effort : de meilleures réponses aux questions difficiles, plus de jetons facturés. Une réponse qui atteint la longueur maximale est coupée, et l'Activité le dit ; un modèle local peut ignorer l'effort.",
+  "More effort: better answers to hard questions, more tokens billed. An answer that reaches the longest answer is cut short, and Activity says so. A model without effort may refuse it (Activity shows its error) or ignore it.": "Plus d'effort : de meilleures réponses aux questions difficiles, plus de jetons facturés. Une réponse qui atteint la longueur maximale est coupée, et l'Activité le dit. Un modèle sans effort peut le refuser (l'Activité montre son erreur) ou l'ignorer.",
   "Picture {{n}} of {{count}}": "Image {{n}} sur {{count}}",
   "Make the images": "Créer les images",
   "The story has 4 pictures: unlock the nonsense picture first, or write one with 3.": "L'histoire a 4 images : déverrouillez d'abord l'image absurde, ou écrivez-en une avec 3.",

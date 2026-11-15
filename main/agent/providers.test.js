@@ -113,8 +113,12 @@ describe('agent provider requests', () => {
       parts,
       {maxTokens: 8000}
     ).body
-    expect(set.max_tokens).toBe(1500)
+    // The task's own room stays (a story, a plan); a smaller task gets the agent's limit.
+    expect(set.max_tokens).toBe(8000)
     expect(set.output_config).toEqual({effort: 'low'})
+    expect(
+      buildRequest({...anthropic, maxTokens: 1500}, 's', parts).body.max_tokens
+    ).toBe(1500)
   })
 
   test('OpenAI-compatible: nothing added unless set; OpenAI itself takes max_completion_tokens (B-265)', () => {
@@ -151,6 +155,9 @@ describe('agent provider requests', () => {
   test('why the model stopped: cut, refused, or nothing to say (B-265)', () => {
     expect(stopProblem('anthropic', {stop_reason: 'max_tokens'})).toBe('cut')
     expect(stopProblem('anthropic', {stop_reason: 'refusal'})).toBe('refused')
+    expect(
+      stopProblem('anthropic', {stop_reason: 'model_context_window_exceeded'})
+    ).toBe('cut')
     expect(stopProblem('anthropic', {stop_reason: 'end_turn'})).toBeNull()
     expect(stopProblem('anthropic', {})).toBeNull()
     expect(stopProblem('openai', {choices: [{finish_reason: 'length'}]})).toBe(
