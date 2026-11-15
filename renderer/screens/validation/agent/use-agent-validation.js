@@ -191,7 +191,11 @@ export function useAgentValidation({
   React.useEffect(() => {
     if (!active || !phase || asking) return
     if (mode === 'report' && isShort) return
-    const flip = nextFlipToAsk(flips, asked.current, {isShort, withoutWords})
+    // An agent that only reports needs the keywords: it never asks a flip without them.
+    const flip = nextFlipToAsk(flips, asked.current, {
+      isShort,
+      withoutWords: mode === 'report' ? new Set() : withoutWords,
+    })
     if (!flip) return
     const timeoutMs = flipDeadlineMs({
       end: sessionEnd({
@@ -226,7 +230,13 @@ export function useAgentValidation({
         const pick = answer?.decision === 'off' ? null : answer
         if (pick) {
           setPicks((current) => ({...current, [flip.hash]: pick}))
-          setNoAnswer(pick.failed ? {reason: pick.reason} : null)
+          // eslint-disable-next-line no-nested-ternary
+          const failure = pick.failed
+            ? pick.reason
+            : pick.answerError
+            ? noAnswerReason(pick.answerError)
+            : null
+          setNoAnswer(failure === null ? null : {reason: failure})
         } else asked.current.delete(flip.hash)
         setAsking((current) => (current === token ? null : current))
       })
@@ -247,9 +257,60 @@ export function useAgentValidation({
     longSessionDuration,
   ])
 
-  // Autopilot, or an agent that only reports: what its permissions let it do alone, once per flip.
+  // Another agent reports (B-257): a flip asked before its keywords came is asked again for its report once they have.
+  const reportedLater = React.useRef(new Set())
   React.useEffect(() => {
-    if ((mode !== 'autopilot' && mode !== 'report') || !active || !phase) return
+    if (!active || isShort || !phase) return
+    const flip = flips.find(
+      (one) =>
+        picks[one.hash]?.reportLater &&
+        one.words?.length &&
+        !reportedLater.current.has(`${session}:${one.hash}`)
+    )
+    if (!flip) return
+    reportedLater.current.add(`${session}:${flip.hash}`)
+    agentFlip(flip, {isShort})
+      .then((data) =>
+        solveAgentFlip(data, {
+          reportsUsed,
+          timeoutMs: flipDeadlineMs({
+            end: sessionEnd({
+              isShort,
+              validationStart,
+              shortSessionDuration,
+              longSessionDuration,
+            }),
+            now: Date.now(),
+            flipsLeft: 1,
+            isShort,
+          }),
+          reportOnly: true,
+        })
+      )
+      .then(
+        (late) => {
+          if (!live.current || sessionRef.current !== session) return
+          setPicks((current) => ({
+            ...current,
+            [flip.hash]: {
+              ...current[flip.hash],
+              report: late.report,
+              reportDecision: late.reportDecision,
+              markDecision: late.markDecision,
+              relevance: late.relevance,
+              reportLater: false,
+            },
+          }))
+        },
+        () => {}
+      )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, isShort, phase, flips, picks, session])
+
+  // What the agents may do alone, once per flip: Autopilot's answers, the reporting agent's marks and reports (in any
+  // mode: the reporting agent's level is its own).
+  React.useEffect(() => {
+    if (!active || !phase) return
     autopilotEvents({
       flips,
       picks,
@@ -260,7 +321,7 @@ export function useAgentValidation({
       applied.current.add(appliedKey(event))
       send(event)
     })
-  }, [mode, active, phase, flips, picks, reportsUsed, reportsAllowed, send])
+  }, [active, phase, flips, picks, reportsUsed, reportsAllowed, send])
 
   const end = sessionEnd({
     isShort,

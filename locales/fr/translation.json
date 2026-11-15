@@ -2012,7 +2012,6 @@
   "It asks for these actions": "Il demande ces actions",
   "All start Off. Turn each one on yourself, on the agent page, once you have read its instructions.": "Toutes commencent désactivées. Activez chacune vous-même, sur la page de l'agent, après avoir lu ses instructions.",
   "Asked for: {{what}}": "Demandé : {{what}}",
-  "Not added: {{actions}}. Another agent of yours answers the validation.": "Non ajouté : {{actions}}. Un autre de vos agents répond à la validation.",
   "Add the agent": "Ajouter l'agent",
   "Agent exported to a file": "Agent exporté dans un fichier",
   "Agent imported from a file": "Agent importé depuis un fichier",
@@ -2126,5 +2125,6 @@
   "Check the keywords yourself.": "Vérifiez vous-même les mots-clés.",
   "{{name}} already reports in the validation": "{{name}} signale déjà dans la validation",
   "Its actions spend no iDNA: no budget to set.": "Ses actions ne dépensent pas d'iDNA : pas de budget à fixer.",
-  "For {{actions}}": "Pour {{actions}}"
+  "For {{actions}}": "Pour {{actions}}",
+  "Not added: {{actions}}. Another agent of yours already holds it.": "Non ajouté : {{actions}}. Un autre de vos agents l'a déjà."
 }

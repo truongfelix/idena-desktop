@@ -128,8 +128,10 @@ export const stopAgentTest = () => agent('stopTest')
 export const stopAgentSolve = () => agent('stopSolve')
 export const testAgentFlip = (flip, timeoutMs, agentId) =>
   agent('testFlip', {flip, timeoutMs, agentId})
-export const solveAgentFlip = (flip, {reportsUsed, timeoutMs}) =>
-  agent('solveFlip', {flip, reportsUsed, timeoutMs})
+export const solveAgentFlip = (
+  flip,
+  {reportsUsed, timeoutMs, reportOnly = false}
+) => agent('solveFlip', {flip, reportsUsed, timeoutMs, reportOnly})
 
 /** An error from the main process, without Electron's "Error invoking remote method" prefix. */
 export function agentErrorText(error) {

@@ -179,4 +179,98 @@ describe('the validation answered by one agent, reported by another', () => {
     expect(view.permissions.report.level).toBe('off')
     expect(view.enabled).toBe(true)
   })
+
+  test('both models are asked at once: the answer does not wait for the report', async () => {
+    let releaseReport
+    ask = jest.fn((config) =>
+      config.model === 'reports'
+        ? new Promise((resolve) => {
+            releaseReport = () => resolve(REPLIES.reports)
+          })
+        : Promise.resolve(REPLIES.answers)
+    )
+    const agent = start([
+      agentRow(A, 'Solver', 'answers', {answerFlip: {level: 'alone'}}),
+      agentRow(R, 'Checker', 'reports', {report: {level: 'alone'}}),
+    ])
+    const solving = agent.handle('solveFlip', {flip: longFlip})
+    await new Promise((resolve) => setImmediate(resolve))
+    // The reporting model was asked before the answering one finished.
+    expect(ask).toHaveBeenCalledTimes(2)
+    releaseReport()
+    await expect(solving).resolves.toMatchObject({answer: 'left', report: true})
+  })
+
+  test("the answering model fails: the report still comes, with the answer's error", async () => {
+    ask = jest.fn(async (config) => {
+      if (config.model === 'answers') throw new Error('key revoked')
+      return REPLIES.reports
+    })
+    const agent = start([
+      agentRow(A, 'Solver', 'answers', {answerFlip: {level: 'alone'}}),
+      agentRow(R, 'Checker', 'reports', {report: {level: 'alone'}}),
+    ])
+    await expect(
+      agent.handle('solveFlip', {flip: longFlip})
+    ).resolves.toMatchObject({
+      answers: false,
+      report: true,
+      answerError: 'key revoked',
+    })
+  })
+
+  test("the reporting model fails: no mark, never the answering model's opinion in its place", async () => {
+    ask = jest.fn(async (config) => {
+      if (config.model === 'reports') throw new Error('timeout')
+      return REPLIES.answers
+    })
+    const agent = start([
+      agentRow(A, 'Solver', 'answers', {answerFlip: {level: 'alone'}}),
+      agentRow(R, 'Checker', 'reports', {report: {level: 'alone'}}),
+    ])
+    await expect(
+      agent.handle('solveFlip', {flip: longFlip})
+    ).resolves.toMatchObject({
+      answer: 'left',
+      report: false,
+      relevance: null,
+      markDecision: 'off',
+    })
+  })
+
+  test('a reporting agent that is off changes nothing for the answering one', async () => {
+    const agent = start([
+      agentRow(A, 'Solver', 'answers', {answerFlip: {level: 'alone'}}),
+      agentRow(
+        R,
+        'Checker',
+        'reports',
+        {report: {level: 'alone'}},
+        {enabled: false}
+      ),
+    ])
+    await expect(
+      agent.handle('solveFlip', {flip: longFlip})
+    ).resolves.toMatchObject({markDecision: 'alone', report: false})
+    expect(ask).toHaveBeenCalledTimes(1)
+  })
+
+  test('before the keywords, the report is asked later, alone', async () => {
+    const agent = start([
+      agentRow(A, 'Solver', 'answers', {answerFlip: {level: 'alone'}}),
+      agentRow(R, 'Checker', 'reports', {report: {level: 'alone'}}),
+    ])
+    await expect(
+      agent.handle('solveFlip', {flip: {...longFlip, words: []}})
+    ).resolves.toMatchObject({reportLater: true, markDecision: 'off'})
+    ask.mockClear()
+    await expect(
+      agent.handle('solveFlip', {flip: longFlip, reportOnly: true})
+    ).resolves.toMatchObject({
+      answers: false,
+      report: true,
+      reportLater: false,
+    })
+    expect(ask.mock.calls.map(([config]) => config.model)).toEqual(['reports'])
+  })
 })

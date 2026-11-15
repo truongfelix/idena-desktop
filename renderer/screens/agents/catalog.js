@@ -278,7 +278,11 @@ export function readsList(agent, catalog, t) {
 export const spendingActions = (agent, catalog) =>
   catalog.filter(({id, spends}) => spends && agent.actions[id])
 
-export function budgetLine({budgetPerDay}, t) {
+/** Its budget, in words; none for an agent whose actions spend nothing (`catalog` given), whatever was set before. */
+export function budgetLine(agent, t, catalog = null) {
+  const {budgetPerDay} = agent
+  if (catalog && spendingActions(agent, catalog).length === 0)
+    return t('Spends no iDNA')
   if (budgetPerDay === null || budgetPerDay === 0) return t('Spends no iDNA')
   return t('Up to {{amount}} iDNA a day', {amount: budgetPerDay})
 }

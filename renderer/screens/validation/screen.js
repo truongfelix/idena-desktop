@@ -115,7 +115,8 @@ export function ValidationScreen({
     const show = isKeywords
       ? Boolean(pick.report) &&
         !currentFlip.relevance &&
-        !(agent.mode !== 'suggest' && pick.reportDecision === 'alone')
+        // A report the agent makes alone is made, not shown (B-257: whatever the answering agent's mode).
+        pick.reportDecision !== 'alone'
       : agent.mode === 'suggest' &&
         pick.answers !== false &&
         !currentFlip.option

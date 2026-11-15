@@ -157,7 +157,7 @@ function ImportDialog({preview, onCancel, onAdd, isAdding, error}) {
             {dropped.length > 0 && (
               <Text fontSize="sm" color="muted" pt={2}>
                 {t(
-                  'Not added: {{actions}}. Another agent of yours answers the validation.',
+                  'Not added: {{actions}}. Another agent of yours already holds it.',
                   {
                     actions: dropped
                       .map((name) => actionName(name, t))
