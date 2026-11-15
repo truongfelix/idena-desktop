@@ -7,7 +7,6 @@ const {
   normalizeLimit,
   normalizeSettings,
 } = require('./settings')
-const {flipPromptProblem} = require('./flips')
 
 // The agents of this identity (B-243): several models, each with its own name, connection, instructions, actions,
 // schedule and budget, kept by the main process in one JSON file of the user data folder (never a key: see
@@ -108,13 +107,6 @@ function normalizeAgent(input, {id = newAgentId} = {}) {
     budgetPerDay: !Number.isFinite(budget) || budget < 0 ? null : budget,
     reportThresholds,
     task: TASKS.includes(value.task) ? value.task : null,
-    // The flip question the person wrote (B-235), or '' for the app's own; one that cannot be used reads as ''.
-    flipPrompt:
-      typeof value.flipPrompt === 'string' &&
-      value.flipPrompt.trim() &&
-      !flipPromptProblem(value.flipPrompt)
-        ? value.flipPrompt
-        : '',
   }
 }
 

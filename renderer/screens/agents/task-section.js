@@ -59,7 +59,15 @@ export function TaskSection({agent, onChange}) {
   const isJoke = agent.task === 'joke'
 
   return (
-    <SettingsSection title={t('Task')}>
+    <SettingsSection
+      title={t('Task')}
+      foldId="agent.task"
+      summary={
+        isJoke
+          ? t('The daily joke of 3615 IDENA, paid by tips')
+          : t('Only the actions below')
+      }
+    >
       <Stack spacing={4}>
         <FormControlWithLabel label={t('What it does when it runs')}>
           <Select

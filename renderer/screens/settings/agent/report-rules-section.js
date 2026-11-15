@@ -1,6 +1,6 @@
 /* eslint-disable react/prop-types */
 import * as React from 'react'
-import {Button, Flex, Stack, Text} from '@chakra-ui/react'
+import {Flex, Stack, Text} from '@chakra-ui/react'
 import {useTranslation} from 'react-i18next'
 import {HDivider, Select} from '../../../shared/components/components'
 import {SettingsSection} from '../components'
@@ -53,105 +53,73 @@ export function thresholdsSummary(thresholds, t) {
   })
 }
 
-// Whether the person left the thresholds open: remembered on this computer (a convenience; none = folded).
-const OPEN_KEY = 'agent.reportRulesOpen'
-function readOpen() {
-  try {
-    return window.localStorage.getItem(OPEN_KEY) === '1'
-  } catch {
-    return false
-  }
-}
-function writeOpen(open) {
-  try {
-    window.localStorage.setItem(OPEN_KEY, open ? '1' : '0')
-  } catch {
-    // Not kept: the section opens folded next time.
-  }
-}
-
 /** A saved threshold as one of the steps' values ("0.7"); a value between two steps shows as it is. */
 const optionValue = (threshold) => String(Math.round(threshold * 100) / 100)
 
 export function ReportRulesSection({settings, onChange}) {
   const {t} = useTranslation()
   const thresholds = settings.reportThresholds || {}
-  const [isOpen, setIsOpen] = React.useState(readOpen)
-  const toggle = () => {
-    writeOpen(!isOpen)
-    setIsOpen(!isOpen)
-  }
 
   return (
-    <SettingsSection title={t('When to report')}>
-      <Flex justify="space-between" align="center" gap={4} mb={isOpen ? 3 : 0}>
-        <Text fontWeight={500}>{thresholdsSummary(thresholds, t)}</Text>
-        <Button
-          size="sm"
-          variant="link"
-          colorScheme="blue"
-          aria-expanded={isOpen}
-          onClick={toggle}
-        >
-          {isOpen ? t('Fold') : t('Change')}
-        </Button>
-      </Flex>
-      {isOpen && (
-        <>
-          <Text color="muted" mb={3}>
-            {t(
-              'The agent reports a flip when it is at least this sure that the flip breaks one of these rules. The right values depend on the model: the practice test shows how sure it was, flip by flip.',
-              {nsSeparator: '!!'}
-            )}
-          </Text>
-          <Stack spacing={0}>
-            {Object.keys(REPORT_REASONS).map((reason) => {
-              const value = thresholds[reason]
-              const steps = STEPS.map((step) => optionValue(step / 100))
-              const current =
-                value === undefined ? undefined : optionValue(value)
-              return (
-                <React.Fragment key={reason}>
-                  <HDivider />
-                  <Flex py={3} gap={4} align="center" justify="space-between">
-                    <Text flex="1 1 auto" minW={0}>
-                      {t(REPORT_REASONS[reason])}
-                    </Text>
-                    <Select
-                      aria-label={t(REPORT_REASONS[reason])}
-                      w={24}
-                      flexShrink={0}
-                      value={current}
-                      isDisabled={value === undefined}
-                      onChange={(e) => {
-                        const next = Number(e.target.value)
-                        onChange((s) => ({
-                          ...s,
-                          reportThresholds: {
-                            ...s.reportThresholds,
-                            [reason]: next,
-                          },
-                        }))
-                      }}
-                    >
-                      {current !== undefined && !steps.includes(current) && (
-                        <option value={current}>{`${Math.round(
-                          value * 100
-                        )}%`}</option>
-                      )}
-                      {STEPS.map((step) => (
-                        <option key={step} value={optionValue(step / 100)}>
-                          {`${step}%`}
-                        </option>
-                      ))}
-                    </Select>
-                  </Flex>
-                </React.Fragment>
-              )
-            })}
-          </Stack>
-        </>
-      )}
+    <SettingsSection
+      title={t('When to report')}
+      foldId="agent.reportRules"
+      defaultOpen={false}
+      summary={thresholdsSummary(thresholds, t)}
+    >
+      <>
+        <Text color="muted" mb={3}>
+          {t(
+            'The agent reports a flip when it is at least this sure that the flip breaks one of these rules. The right values depend on the model: the practice test shows how sure it was, flip by flip.',
+            {nsSeparator: '!!'}
+          )}
+        </Text>
+        <Stack spacing={0}>
+          {Object.keys(REPORT_REASONS).map((reason) => {
+            const value = thresholds[reason]
+            const steps = STEPS.map((step) => optionValue(step / 100))
+            const current = value === undefined ? undefined : optionValue(value)
+            return (
+              <React.Fragment key={reason}>
+                <HDivider />
+                <Flex py={3} gap={4} align="center" justify="space-between">
+                  <Text flex="1 1 auto" minW={0}>
+                    {t(REPORT_REASONS[reason])}
+                  </Text>
+                  <Select
+                    aria-label={t(REPORT_REASONS[reason])}
+                    w={24}
+                    flexShrink={0}
+                    value={current}
+                    isDisabled={value === undefined}
+                    onChange={(e) => {
+                      const next = Number(e.target.value)
+                      onChange((s) => ({
+                        ...s,
+                        reportThresholds: {
+                          ...s.reportThresholds,
+                          [reason]: next,
+                        },
+                      }))
+                    }}
+                  >
+                    {current !== undefined && !steps.includes(current) && (
+                      <option value={current}>{`${Math.round(
+                        value * 100
+                      )}%`}</option>
+                    )}
+                    {STEPS.map((step) => (
+                      <option key={step} value={optionValue(step / 100)}>
+                        {`${step}%`}
+                      </option>
+                    ))}
+                  </Select>
+                </Flex>
+              </React.Fragment>
+            )
+          })}
+        </Stack>
+      </>
     </SettingsSection>
   )
 }

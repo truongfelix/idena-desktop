@@ -23,7 +23,20 @@ export function ActionsSection({agent, agents, catalog, onChange}) {
     onChange((a) => ({...a, actions: change(a.actions)}))
 
   return (
-    <SettingsSection title={t('What it may do')}>
+    <SettingsSection
+      title={t('What it may do')}
+      foldId="agent.actions"
+      summary={
+        rows.length
+          ? rows
+              .map(
+                ({id, label}) =>
+                  `${label}: ${levelLabel(agent.actions[id].level, t)}`
+              )
+              .join(', ')
+          : t('Nothing', {nsSeparator: '!!'})
+      }
+    >
       <Flex justify="space-between" align="flex-start" gap={4} mb={3}>
         <Text color="muted">
           {t(
@@ -41,15 +54,7 @@ export function ActionsSection({agent, agents, catalog, onChange}) {
         </SecondaryButton>
       </Flex>
       {isAdding && (
-        <Stack
-          borderWidth={1}
-          borderColor="blue.050"
-          bg="blue.010"
-          borderRadius="md"
-          p={3}
-          mb={2}
-          spacing={2}
-        >
+        <Stack borderWidth={1} borderRadius="md" p={3} mb={2} spacing={2}>
           <Wrap spacing={2}>
             {addable.map(({id, label, defaults}) => {
               const holder = heldBy(id, agent, agents)
@@ -58,7 +63,6 @@ export function ActionsSection({agent, agents, catalog, onChange}) {
                   key={id}
                   size="sm"
                   variant="outline"
-                  bg="white"
                   isDisabled={Boolean(holder)}
                   title={
                     holder

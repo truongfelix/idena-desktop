@@ -49,7 +49,6 @@ describe('agent profiles', () => {
       budgetPerDay: null,
       reportThresholds: REPORT_THRESHOLDS,
       task: null,
-      flipPrompt: '',
     })
     expect(normalizeAgent({task: 'joke'}).task).toBe('joke')
     expect(normalizeAgent({task: 'constructor'}).task).toBeNull()

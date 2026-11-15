@@ -53,8 +53,7 @@ function askedLine(row, t) {
 function ImportDialog({preview, onCancel, onAdd, isAdding, error}) {
   const {t} = useTranslation()
   const [showInstructions, setShowInstructions] = React.useState(false)
-  const {agent, asked, dropped, addressLeft, flipPromptLeft, hasKey} = preview
-  const [showQuestion, setShowQuestion] = React.useState(false)
+  const {agent, asked, dropped, addressLeft, hasKey} = preview
   const fact = (label, value) => (
     <Flex gap={4}>
       <Text color="muted" w={28} flexShrink={0}>
@@ -94,53 +93,10 @@ function ImportDialog({preview, onCancel, onAdd, isAdding, error}) {
                 {agent.instructions || t('None')}
               </Box>
             )}
-            {agent.flipPrompt &&
-              fact(
-                t('Flip question'),
-                <Flex gap={3} align="center" wrap="wrap">
-                  <Text>{t('Its own')}</Text>
-                  <SecondaryButton
-                    size="sm"
-                    onClick={() => setShowQuestion(!showQuestion)}
-                  >
-                    {showQuestion ? t('Hide it') : t('Read it')}
-                  </SecondaryButton>
-                </Flex>
-              )}
-            {showQuestion && agent.flipPrompt && (
-              <Box
-                borderWidth={1}
-                borderColor="gray.100"
-                borderRadius="md"
-                p={3}
-                maxH="48"
-                overflowY="auto"
-                whiteSpace="pre-wrap"
-                fontSize="sm"
-              >
-                {agent.flipPrompt}
-              </Box>
-            )}
             {fact(t('Runs'), runsLine(agent, t))}
             {fact(t('Budget'), budgetLine(agent, t))}
             {fact(t('Model'), connectionLine(agent, t))}
           </Stack>
-          {agent.flipPrompt && (
-            <Text fontSize="sm" color="orange.500">
-              {t(
-                'It brings its own flip question, which decides the validation answers and reports: read it before turning Answer the flips on.',
-                {nsSeparator: '!!'}
-              )}
-            </Text>
-          )}
-          {flipPromptLeft && (
-            <Text fontSize="sm" color="muted">
-              {t(
-                "The file's flip question cannot be used (a part the app fills is missing): the agent asks the app's own.",
-                {nsSeparator: '!!'}
-              )}
-            </Text>
-          )}
           {addressLeft && (
             <Text fontSize="sm" color="muted">
               {t(

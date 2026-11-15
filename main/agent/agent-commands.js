@@ -10,7 +10,6 @@ const {
 // agents (profiles.js), which checks each field; the keys stay in the keychain (key.js) and never come back.
 
 const {agentFileName, exportAgent, readAgentFile} = require('./agent-file')
-const {DEFAULT_FLIP_PROMPT, flipPromptProblem} = require('./flips')
 
 const destination = ({provider, address}) => ({provider, address})
 
@@ -57,20 +56,12 @@ function createAgentCommands({profiles, key, log, onChange = () => {}}) {
     },
     commands: {
       agents: list,
-      /** The flip question the app asks when the agent has none of its own, its filled parts named. */
-      flipPromptDefault: () => DEFAULT_FLIP_PROMPT,
       /**
        * One agent saved whole: an unknown or missing id is a new agent (at most MAX_AGENTS). An action only one
        * agent may hold (answering the validation) is refused while another agent holds it.
        */
       saveAgent(data) {
         const file = profiles.read()
-        // A flip question that cannot be used is refused, not dropped: the person sees why.
-        const problem =
-          data && typeof data.flipPrompt === 'string' && data.flipPrompt.trim()
-            ? flipPromptProblem(data.flipPrompt)
-            : null
-        if (problem) throw new Error(problem)
         const isNew = !data || data.id === undefined || data.id === null
         const current = isNew ? null : find(file, data.id)
         // An agent removed meanwhile (another window, a page left open) is not added back by a late save.
@@ -129,14 +120,15 @@ function createAgentCommands({profiles, key, log, onChange = () => {}}) {
       /** What an agent file holds, as it would be added (readAgentFile), and whether its service has a key here. */
       previewAgent(data) {
         const {agents} = profiles.read()
-        const {agent, asked, dropped, addressLeft, flipPromptLeft} =
-          readAgentFile(data && data.text, agents)
+        const {agent, asked, dropped, addressLeft} = readAgentFile(
+          data && data.text,
+          agents
+        )
         return {
           agent,
           asked,
           dropped,
           addressLeft,
-          flipPromptLeft,
           hasKey: key.has(destination(agent)),
         }
       },

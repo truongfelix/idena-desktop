@@ -28,6 +28,7 @@ import {PrimaryButton, SecondaryButton} from '../../shared/components/button'
 import {SettingsSection} from '../settings/components'
 import {
   agentActivity,
+  clearAgentActivity,
   clearServiceKey,
   removeAgent,
   setServiceKey,
@@ -39,7 +40,6 @@ import {ReportRulesSection} from '../settings/agent/report-rules-section'
 import {ActivitySection} from '../settings/agent/activity-section'
 import {ActionsSection} from './actions-section'
 import {TaskSection} from './task-section'
-import {FlipQuestionSection} from './flip-question-section'
 import {saveAgentFile} from './agent-file'
 import {DEFAULT_JOKE_INSTRUCTIONS} from './joke/joke'
 import {AgentBadge} from './agents-list'
@@ -80,9 +80,19 @@ function InstructionsSection({agent, onChange}) {
   const {t} = useTranslation()
   const [draft, setDraft] = useDraft(agent.instructions)
   return (
-    <SettingsSection title={t('Instructions')}>
+    <SettingsSection
+      title={t('Instructions')}
+      foldId="agent.instructions"
+      summary={
+        agent.instructions.trim().split('\n')[0] ||
+        t("None: the app's own text for each action", {nsSeparator: '!!'})
+      }
+    >
       <FormControlWithLabel
-        label={t('What the model is asked, every time it runs')}
+        label={t(
+          'Sent to the model with each of its actions: solving a flip, writing a post',
+          {nsSeparator: '!!'}
+        )}
       >
         <Textarea
           rows={6}
@@ -97,14 +107,12 @@ function InstructionsSection({agent, onChange}) {
           }}
         />
       </FormControlWithLabel>
-      {agent.actions.answerFlip && (
-        <Text fontSize="sm" color="muted" mt={2}>
-          {t(
-            'In the validation, the model is asked the flip question below; these instructions are not sent with it.',
-            {nsSeparator: '!!'}
-          )}
-        </Text>
-      )}
+      <Text fontSize="sm" color="muted" mt={2}>
+        {t(
+          'The app adds what each action needs, and that part stays as it is: for a flip, its pictures and keywords, the report rules and the format of the answer it reads.',
+          {nsSeparator: '!!'}
+        )}
+      </Text>
       {agent.task === 'joke' &&
         agent.instructions !== DEFAULT_JOKE_INSTRUCTIONS && (
           <SecondaryButton
@@ -132,7 +140,7 @@ function ScheduleSection({agent, catalog, onChange}) {
   const [time, setTime] = useDraft(agent.schedule.time)
   return (
     <SimpleGrid minChildWidth="280px" spacing={6} w="full">
-      <SettingsSection title={t('What it reads')}>
+      <SettingsSection title={t('What it reads')} foldId="agent.reads">
         <Text fontSize="sm" color="muted" mb={2}>
           {t('Set by its actions; the model is sent nothing else.')}
         </Text>
@@ -143,7 +151,17 @@ function ScheduleSection({agent, catalog, onChange}) {
           </React.Fragment>
         ))}
       </SettingsSection>
-      <SettingsSection title={t('When and how much')}>
+      <SettingsSection
+        title={t('When and how much')}
+        foldId="agent.schedule"
+        summary={
+          {
+            validation: t('At each validation'),
+            daily: t('Every day'),
+            manual: t('When I ask'),
+          }[agent.schedule.kind]
+        }
+      >
         <Stack spacing={4}>
           <FormControlWithLabel label={t('Runs')}>
             <Select
@@ -218,18 +236,17 @@ function ScheduleSection({agent, catalog, onChange}) {
   )
 }
 
-function RemoveAgent({agent, onRemove}) {
+/** Delete, in the page's header (B-253), with its confirmation. */
+function DeleteAgent({agent, onRemove}) {
   const {t} = useTranslation()
   const [isOpen, setIsOpen] = React.useState(false)
   return (
     <>
-      <Box>
-        <SecondaryButton color="red.500" onClick={() => setIsOpen(true)}>
-          {t('Remove the agent')}
-        </SecondaryButton>
-      </Box>
+      <SecondaryButton color="red.500" onClick={() => setIsOpen(true)}>
+        {t('Delete')}
+      </SecondaryButton>
       <Dialog
-        title={t('Remove {{name}}?', {name: agent.name})}
+        title={t('Delete {{name}}?', {name: agent.name})}
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
       >
@@ -251,7 +268,7 @@ function RemoveAgent({agent, onRemove}) {
               onRemove()
             }}
           >
-            {t('Remove the agent')}
+            {t('Delete the agent')}
           </PrimaryButton>
         </DialogFooter>
       </Dialog>
@@ -323,6 +340,12 @@ export function AgentPage({id}) {
           >
             {t('Export')}
           </SecondaryButton>
+          <DeleteAgent
+            agent={agent}
+            onRemove={async () => {
+              if (await run(() => removeAgent(id))) router.push('/agents')
+            }}
+          />
           <Switch
             size="lg"
             aria-label={t('{{name}} on', {name: agent.name})}
@@ -379,21 +402,12 @@ export function AgentPage({id}) {
         onChange={save}
       />
       <ScheduleSection agent={agent} catalog={catalog} onChange={save} />
-      {agent.actions.answerFlip && (
-        <FlipQuestionSection
-          agent={agent}
-          onSave={(flipPrompt) => updateAgent(id, (a) => ({...a, flipPrompt}))}
-        />
-      )}
       {agent.actions.report && (
         <ReportRulesSection settings={agent} onChange={save} />
       )}
-      <ActivitySection activity={activity} />
-      <RemoveAgent
-        agent={agent}
-        onRemove={async () => {
-          if (await run(() => removeAgent(id))) router.push('/agents')
-        }}
+      <ActivitySection
+        activity={activity}
+        onClear={() => run(() => clearAgentActivity(id)).then(refreshActivity)}
       />
     </Stack>
   )

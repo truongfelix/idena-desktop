@@ -29,7 +29,6 @@ function exportAgent(agent) {
       schedule: agent.schedule,
       budgetPerDay: agent.budgetPerDay,
       reportThresholds: agent.reportThresholds,
-      ...(agent.flipPrompt ? {flipPrompt: agent.flipPrompt} : {}),
     },
     null,
     2
@@ -93,18 +92,7 @@ function readAgentFile(text, agents = []) {
   const actions = Object.fromEntries(
     Object.entries(asked).map(([name, row]) => [name, {...row, level: 'off'}])
   )
-  // A flip question in the file the app cannot use (a part it fills missing): the agent asks the app's own.
-  const flipPromptLeft =
-    typeof value.flipPrompt === 'string' &&
-    value.flipPrompt.trim() !== '' &&
-    read.flipPrompt === ''
-  return {
-    agent: {...read, actions},
-    asked,
-    dropped,
-    addressLeft,
-    flipPromptLeft,
-  }
+  return {agent: {...read, actions}, asked, dropped, addressLeft}
 }
 
 module.exports = {
