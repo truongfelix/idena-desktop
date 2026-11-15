@@ -107,6 +107,11 @@ export function useAgentValidation({
   // Why the model's last answer failed ({reason}), until one comes back: the person is told the agent gives none.
   const [noAnswer, setNoAnswer] = React.useState(null)
   const [asking, setAsking] = React.useState(null)
+  // The same, set the moment a question starts (B-267): a render that comes before `asking` lands (Autopilot's own
+  // answer re-renders the screen) never starts a second one.
+  const askingNow = React.useRef(null)
+  // The late report's question in flight, the same way (lateAsking, below).
+  const lateNow = React.useRef(null)
   const asked = React.useRef(new Set())
   // Each flip's questions so far, by hash (B-263: a failed one is asked again a few times).
   const triesOf = React.useRef(new Map())
@@ -170,6 +175,8 @@ export function useAgentValidation({
     setPicks({})
     setNoAnswer(null)
     setAsking(null)
+    askingNow.current = null
+    lateNow.current = null
     stopAgentSolve().catch(() => {})
   }, [phase, session])
 
@@ -226,7 +233,7 @@ export function useAgentValidation({
   // One flip at a time, the next one as soon as the last is answered. An agent that only reports reads the flips once
   // they have their keywords: the long session.
   React.useEffect(() => {
-    if (!active || !phase || asking) return
+    if (!active || !phase || asking || askingNow.current) return
     if (mode === 'report' && isShort) return
     // An agent that only reports needs the keywords: it never asks a flip without them.
     const flip = nextFlipToAsk(
@@ -266,6 +273,7 @@ export function useAgentValidation({
     asked.current.add(flip.hash)
     again.current.delete(flip.hash)
     const token = `${session}:${flip.hash}`
+    askingNow.current = token
     setAsking(token)
     const start = Date.now()
     agentFlip(flip, {isShort})
@@ -290,6 +298,7 @@ export function useAgentValidation({
             asked.current.delete(flip.hash)
             again.current.set(flip.hash, answer.reason)
             setNoAnswer({reason: answer.reason})
+            if (askingNow.current === token) askingNow.current = null
             setAsking((current) => (current === token ? null : current))
             return
           }
@@ -306,6 +315,7 @@ export function useAgentValidation({
             : null
           setNoAnswer(failure === null ? null : {reason: failure})
         } else asked.current.delete(flip.hash)
+        if (askingNow.current === token) askingNow.current = null
         setAsking((current) => (current === token ? null : current))
       })
     // withoutWords changes with the clock; its size says when a flip joined it.
@@ -330,7 +340,7 @@ export function useAgentValidation({
   const reportedLater = React.useRef(new Set())
   const [lateAsking, setLateAsking] = React.useState(null)
   React.useEffect(() => {
-    if (!active || isShort || !phase || lateAsking) return
+    if (!active || isShort || !phase || lateAsking || lateNow.current) return
     const flip = flips.find(
       (one) =>
         picks[one.hash]?.reportLater &&
@@ -353,6 +363,7 @@ export function useAgentValidation({
     if (!timeoutMs) return
     const key = `${session}:${flip.hash}`
     reportedLater.current.add(key)
+    lateNow.current = key
     setLateAsking(key)
     agentFlip(flip, {isShort})
       .then((data) =>
@@ -383,9 +394,10 @@ export function useAgentValidation({
             reportedLater.current.delete(key)
         }
       )
-      .finally(() =>
+      .finally(() => {
+        if (lateNow.current === key) lateNow.current = null
         setLateAsking((current) => (current === key ? null : current))
-      )
+      })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, isShort, phase, flips, picks, session, lateAsking])
 
