@@ -104,4 +104,48 @@ describe('flip stories (B-236)', () => {
       'no prompt for panel 1'
     )
   })
+
+  test('labels as headings, without bold, or with a note in brackets', () => {
+    const text = [
+      '### Story Title',
+      'The Seed',
+      '**Story Summary:**',
+      '- Panel 1: She plants a seed she will water in Panel 3.',
+      '- **Panel 2:** Rain falls.',
+      '- Panel 3: A flower.',
+      '**Image Prompt 1 (Panel 1):** First prompt.',
+      '### Image Prompt 2',
+      'Second prompt.',
+      'Image Prompt 3: Third prompt.',
+    ].join('\n')
+    const story = readStory(text, 3)
+    expect(story.title).toBe('The Seed')
+    expect(story.prompts).toEqual([
+      'First prompt.',
+      'Second prompt.',
+      'Third prompt.',
+    ])
+    // Each panel's own line, not a mention of panel 3 inside line 1.
+    expect(story.panels).toEqual([
+      'She plants a seed she will water in Panel 3.',
+      'Rain falls.',
+      'A flower.',
+    ])
+  })
+
+  test('a bold phrase inside a prompt stays in it; closing words after the last prompt do not', () => {
+    const text = [
+      '**Image Prompt 1:** A seed in a pot,',
+      '**no text, no letters, no numbers**, square 1:1.',
+      '**Image Prompt 2:** Rain on the pot.',
+      '**Image Prompt 3:** A flower in the pot.',
+      '',
+      'I hope you enjoy this story! Let me know if you want another.',
+    ].join('\n')
+    const story = readStory(text, 3)
+    expect(story.prompts[0]).toBe(
+      'A seed in a pot,\n**no text, no letters, no numbers**, square 1:1.'
+    )
+    expect(story.prompts[2]).toBe('A flower in the pot.')
+  })
 })

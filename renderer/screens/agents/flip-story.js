@@ -42,11 +42,44 @@ export function storyWords(keywords) {
 // The stories written in this window, by keywords and count of panels: the images step still shows the prompts the
 // keywords step got, and going back does not ask the model again.
 const written = new Map()
-// The last story written for each pair of keywords, whatever its count: what the images step shows.
+// The story the keywords step shows for each pair of keywords: what the images step shows too.
 const latest = new Map()
+// Alone asks once per keywords and count in this window, a failed answer included: a retry is the person's click.
+const asked = new Set()
+const listeners = new Set()
 const wordsKey = (words) => words.map(({name}) => name).join('|')
 const storyKey = (words, panels) =>
   `${panels}|${words.map(({name}) => name).join('|')}`
+
+/** A story written for these keywords and count, kept for this window. */
+export function rememberStory(words, panels, story) {
+  written.set(storyKey(words, panels), story)
+}
+
+/** The story kept for these keywords and count, now the one shown for the keywords (images step included). */
+export function pickStory(words, panels) {
+  const story = written.get(storyKey(words, panels)) || null
+  if (story) {
+    latest.set(wordsKey(words), story)
+    listeners.forEach((listener) => listener())
+  }
+  return story
+}
+
+/** The story shown for these keywords, whatever its count. */
+export function shownStory(words) {
+  return latest.get(wordsKey(words)) || null
+}
+
+/** Renders again when a story is shown: one may come after the person reached the images step. */
+function useShownStories() {
+  const [, setTick] = React.useState(0)
+  React.useEffect(() => {
+    const listener = () => setTick((n) => n + 1)
+    listeners.add(listener)
+    return () => listeners.delete(listener)
+  }, [])
+}
 
 function PromptRow({index, prompt}) {
   const {t} = useTranslation()
@@ -114,42 +147,50 @@ export function FlipStoryHelper({keywords}) {
   const words = storyWords(keywords)
   const [panels, setPanels] = React.useState(3)
   const key = words ? storyKey(words, panels) : null
+  // The first render reads only: the effect below makes it the shown story (no other component updated in a render).
   const [story, setStory] = React.useState(
     () => (key && written.get(key)) || null
   )
   const [error, setError] = React.useState(null)
   const [isWriting, setIsWriting] = React.useState(false)
-  const asked = React.useRef(new Set())
+  // Each write and each change of keywords or count: an answer for other keywords or another count is kept, never
+  // shown here.
+  const run = React.useRef(0)
 
   React.useEffect(() => {
-    setStory((key && written.get(key)) || null)
+    run.current += 1
+    setIsWriting(false)
+    setStory((words && pickStory(words, panels)) || null)
     setError(null)
+    // words is rebuilt at each render: the key says when it changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
 
   const write = React.useCallback(async () => {
     if (!agent || !words) return
-    const forKey = storyKey(words, panels)
-    asked.current.add(forKey)
+    const forWords = words
+    const forPanels = panels
+    run.current += 1
+    const mine = run.current
+    asked.add(storyKey(forWords, forPanels))
     setIsWriting(true)
     setError(null)
     try {
-      const next = await writeFlipStory(agent.id, panels, words)
-      written.set(forKey, next)
-      latest.set(wordsKey(words), next)
-      setStory(next)
+      const next = await writeFlipStory(agent.id, forPanels, forWords)
+      rememberStory(forWords, forPanels, next)
+      if (run.current === mine) setStory(pickStory(forWords, forPanels))
     } catch (e) {
-      setError(agentErrorText(e))
+      if (run.current === mine) setError(agentErrorText(e))
     } finally {
-      setIsWriting(false)
+      if (run.current === mine) setIsWriting(false)
     }
-    // words is rebuilt at each render: the key says when it changed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agent && agent.id, key, panels])
+  }, [agent && agent.id, key])
 
   // Alone: as soon as the keywords show, once per keywords and count.
   const isAlone = agent && agent.actions.flipStory.level === 'alone'
   React.useEffect(() => {
-    if (isAlone && key && !written.has(key) && !asked.current.has(key)) write()
+    if (isAlone && key && !written.has(key) && !asked.has(key)) write()
   }, [isAlone, key, write])
 
   if (!agent || !words) return null
@@ -258,10 +299,19 @@ export function FlipStoryPrompts({
   const {list} = useAgents()
   const [progress, setProgress] = React.useState(null)
   const [error, setError] = React.useState(null)
+  // Leaving the step stops the drawing: no picture is asked for, or put in, after that.
+  const alive = React.useRef(true)
+  React.useEffect(
+    () => () => {
+      alive.current = false
+    },
+    []
+  )
+  useShownStories()
   const agent = storyAgentOf(list)
   const words = storyWords(keywords)
   if (!agent || !words) return null
-  const story = latest.get(wordsKey(words))
+  const story = shownStory(words)
   if (!story) return null
   const count = story.prompts.length
   const slots = storySlots(originalOrder, adversarialImageId, count)
@@ -272,18 +322,19 @@ export function FlipStoryPrompts({
   const drawAll = async () => {
     setError(null)
     try {
-      for (let i = 0; i < count; i += 1) {
+      for (let i = 0; i < count && alive.current; i += 1) {
         setProgress(i + 1)
         // One after the other: each lands in its slot as soon as it is drawn.
         // eslint-disable-next-line no-await-in-loop
         const picture = await drawStoryPicture(agent.id, story.prompts[i])
         // eslint-disable-next-line no-await-in-loop
-        onImage(slots[i], await asFrame(picture))
+        const frame = await asFrame(picture)
+        if (alive.current) onImage(slots[i], frame)
       }
     } catch (e) {
-      setError(agentErrorText(e))
+      if (alive.current) setError(agentErrorText(e))
     } finally {
-      setProgress(null)
+      if (alive.current) setProgress(null)
     }
   }
 

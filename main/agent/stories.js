@@ -184,15 +184,35 @@ function storySystem(panels, words, instructions = '') {
 
 const MAX_FIELD = 2000
 
-/** The text after a bold label ("**Goal:** …") up to the next bold label or heading. */
+// The labels of the template's output format: a field runs to the next one of them (or a heading, or a rule), so a
+// bold phrase inside a prompt does not cut it.
+const LABELS = [
+  'Story Title',
+  'Main Character',
+  'Goal',
+  'Story Summary',
+  'Keyword Integration',
+  'Image Prompt \\d+',
+]
+const NEXT = `\\n[ \\t]*(?:[-*][ \\t]+)?(?:\\*\\*|#{1,6}[ \\t]*)?(?:${LABELS.join(
+  '|'
+)})\\b|\\n#{1,6}[ \\t]|\\n[-*_]{3,}[ \\t]*(?:\\n|$)|$`
+
+/**
+ * The text after a label, written "**Goal:** …", "**Goal**: …", "### Goal", "Goal:" or with a note in brackets
+ * ("**Image Prompt 1 (Panel 1):**"), up to the next label.
+ */
 function field(text, label) {
   const escaped = label.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')
   const match = new RegExp(
-    `\\*\\*${escaped}:?\\*\\*:?\\s*([\\s\\S]*?)(?=\\n\\s*\\*\\*[^*\\n]+\\*\\*|\\n#{1,6} |$)`,
+    `(?:^|\\n)[ \\t]*(?:[-*][ \\t]+)?(?:\\*\\*|#{1,6}[ \\t]*)?${escaped}(?:[ \\t]*\\([^)\\n]*\\))?[ \\t]*:?[ \\t]*(?:\\*\\*)?[ \\t]*:?([\\s\\S]*?)(?=${NEXT})`,
     'iu'
   ).exec(text)
   return match ? match[1].trim().slice(0, MAX_FIELD) : ''
 }
+
+/** A prompt: its first paragraph, so that closing words after it are not sent to the image model. */
+const firstParagraph = (value) => value.split(/\n[ \t]*\n/u)[0].trim()
 
 /**
  * The model's answer read: the story's title, character, goal, its panels' summary, why each keyword matters, and one
@@ -201,12 +221,18 @@ function field(text, label) {
 function readStory(text, panels) {
   const reply = String(text || '').slice(0, 64 * 1024)
   const summary = field(reply, 'Story Summary')
+  // Each panel's own line ("- Panel 2: …"), never a mention of a panel inside another line.
   const panelLines = Array.from({length: panels}, (_, i) => {
-    const m = new RegExp(`Panel ${i + 1}:?\\s*(.+)`, 'iu').exec(summary)
+    const m = new RegExp(
+      `^[ \\t]*(?:[-*][ \\t]+)?(?:\\*\\*)?Panel ${
+        i + 1
+      }[ \\t]*:?(?:\\*\\*)?:?[ \\t]*(.+)$`,
+      'imu'
+    ).exec(summary)
     return m ? m[1].replace(/\*\*/gu, '').trim().slice(0, MAX_FIELD) : ''
   })
   const prompts = Array.from({length: panels}, (_, i) =>
-    field(reply, `Image Prompt ${i + 1}`)
+    firstParagraph(field(reply, `Image Prompt ${i + 1}`))
   )
   const missing = prompts.findIndex((p) => !p)
   if (missing >= 0)
