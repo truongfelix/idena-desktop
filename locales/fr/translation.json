@@ -2121,5 +2121,10 @@
   "Everything the agent did, asked for or was refused, newest first. The log is kept until the app closes.": "Tout ce que l'agent a fait, demandé ou s'est vu refuser, le plus récent d'abord. Le journal est gardé jusqu'à la fermeture de l'app.",
   "Turn the agent on first.": "Activez d'abord l'agent.",
   "Also runs when it gets (what it reads: its notifications, its private messages)": "Passe aussi quand il reçoit (ce qu'il lit : ses notifications, ses messages privés)",
-  "Its actions on Social have nothing to act on: turn on what it reads.": "Ses actions sur Social n'ont rien sur quoi agir : activez ce qu'il lit."
+  "Its actions on Social have nothing to act on: turn on what it reads.": "Ses actions sur Social n'ont rien sur quoi agir : activez ce qu'il lit.",
+  "Agent: reports": "Agent : signale",
+  "Check the keywords yourself.": "Vérifiez vous-même les mots-clés.",
+  "{{name}} already reports in the validation": "{{name}} signale déjà dans la validation",
+  "Its actions spend no iDNA: no budget to set.": "Ses actions ne dépensent pas d'iDNA : pas de budget à fixer.",
+  "For {{actions}}": "Pour {{actions}}"
 }

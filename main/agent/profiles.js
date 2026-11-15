@@ -85,8 +85,11 @@ function readsBefore(value) {
 const normalizeEvents = (value) =>
   Array.isArray(value) ? EVENTS.filter((one) => value.includes(one)) : []
 
-/** The actions only one agent may hold: the validation has one agent answering it. */
-const SINGLE_HOLDER_ACTIONS = ['answerFlip']
+/**
+ * The actions only one agent may hold: the validation has one agent answering it and one reporting (the same agent,
+ * or two: B-257).
+ */
+const SINGLE_HOLDER_ACTIONS = ['answerFlip', 'report']
 
 const newAgentId = () => crypto.randomBytes(8).toString('hex')
 /** The id of the agent read from the single agent's setup. */
@@ -260,6 +263,10 @@ function agentSettings(file, agent) {
 const validationAgent = (file) =>
   file.agents.find((agent) => agent.actions.answerFlip) || null
 
+/** The agent that reports flips in the validation (the one holding "Report flips"), or null. */
+const reportAgent = (file) =>
+  file.agents.find((agent) => agent.actions.report) || null
+
 /**
  * The file of agents (`file`), read with its defaults; with none yet, the single agent's setup (`singleFile`) read
  * as one agent, written to `file` only at the first change.
@@ -304,12 +311,30 @@ function createAgentProfiles({file, singleFile, logger}) {
  * and the shared pause; its other actions stay. With no such agent yet, a write adds a "Validation agent" first.
  */
 function validationAgentSettings(profiles) {
+  // The agent answering and the one reporting (B-257), seen as one: the connection of the answering agent (else the
+  // reporting one), each action's level from the agent holding it while that agent is on.
   const read = () => {
     const file = profiles.read()
-    const agent = validationAgent(file)
-    return agent
-      ? agentSettings(file, agent)
-      : {...defaultSettings(), paused: file.paused}
+    const answering = validationAgent(file)
+    const reporting = reportAgent(file)
+    const base = answering || reporting
+    if (!base) return {...defaultSettings(), paused: file.paused}
+    const settings = agentSettings(file, base)
+    const levelOf = (agent, name) =>
+      agent && agent.enabled
+        ? agent.actions[name]
+        : {...settings.permissions[name], level: 'off'}
+    return {
+      ...settings,
+      enabled: Boolean(
+        (answering && answering.enabled) || (reporting && reporting.enabled)
+      ),
+      permissions: {
+        ...settings.permissions,
+        answerFlip: levelOf(answering, 'answerFlip'),
+        report: levelOf(reporting, 'report'),
+      },
+    }
   }
   return {
     read,
@@ -329,10 +354,14 @@ function validationAgentSettings(profiles) {
         model: value.model,
         reportThresholds: value.reportThresholds,
       }
+      // Another agent's report stays its own (B-257).
+      const reporting = reportAgent(file)
+      const reportsElsewhere =
+        reporting && (!current || reporting.id !== current.id)
       updated.actions = {
         ...updated.actions,
         answerFlip: value.permissions.answerFlip,
-        report: value.permissions.report,
+        ...(reportsElsewhere ? {} : {report: value.permissions.report}),
       }
       const agents = current
         ? file.agents.map((agent) =>
@@ -357,6 +386,7 @@ module.exports = {
   fromSingleAgent,
   normalizeAgent,
   normalizeAgents,
+  reportAgent,
   validationAgent,
   validationAgentSettings,
 }

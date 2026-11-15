@@ -82,13 +82,7 @@ export function ActionsSection({agent, agents, catalog, onChange}) {
                           key={id}
                           variant="outline"
                           isDisabled={Boolean(holder)}
-                          title={
-                            holder
-                              ? t('{{name}} already answers the validation', {
-                                  name: holder,
-                                })
-                              : undefined
-                          }
+                          title={holder ? heldText(id, holder, t) : undefined}
                           onClick={() =>
                             setActions((actions) => ({
                               ...actions,
@@ -138,6 +132,13 @@ export function ActionsSection({agent, agents, catalog, onChange}) {
       </Stack>
     </SettingsSection>
   )
+}
+
+/** Who already holds an action only one agent may hold. */
+function heldText(id, name, t) {
+  return id === 'report'
+    ? t('{{name}} already reports in the validation', {name})
+    : t('{{name}} already answers the validation', {name})
 }
 
 function ActionRow({id, label, info, perDay, row, catalog, setActions}) {

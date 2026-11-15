@@ -10,7 +10,7 @@ import {
   Textarea,
 } from '../../shared/components/components'
 import {SettingsSection} from '../settings/components'
-import {areaNames, readsList} from './catalog'
+import {areaNames, readsList, spendingActions} from './catalog'
 import {readNumber} from './limit-fields'
 
 // The agent page's sections (B-255): its Instructions, what it reads, when it runs and what it spends. Each says
@@ -229,13 +229,15 @@ function eventNames(t) {
 }
 
 /** "When and how much": when it runs (schedule, events) and the most it may spend a day. */
-export function ScheduleSection({agent, onChange}) {
+export function ScheduleSection({agent, catalog, onChange}) {
   const {t} = useTranslation()
   const [budget, setBudget] = useDraft(
     agent.budgetPerDay === null ? '' : String(agent.budgetPerDay)
   )
   const [time, setTime] = useDraft(agent.schedule.time)
   const events = eventNames(t)
+  // The budget only for actions that spend iDNA (B-257): answering, reporting, writing a story spend nothing.
+  const spending = spendingActions(agent, catalog)
   return (
     <SettingsSection
       title={t('When and how much')}
@@ -320,35 +322,53 @@ export function ScheduleSection({agent, onChange}) {
             ))}
           </Wrap>
         </Stack>
-        <FormControlWithLabel
-          label={t('Budget a day, in iDNA', {nsSeparator: '!!'})}
-        >
-          <Input
-            type="number"
-            min={0}
-            step="0.01"
-            placeholder={t('None', {nsSeparator: '!!'})}
-            value={budget}
-            onChange={(e) => setBudget(e.target.value)}
-            onBlur={(e) => {
-              const text = e.currentTarget.value.trim()
-              const next = text === '' ? null : Number(text)
-              // A number the field cannot read (a comma in some languages) reads as '': not "no budget".
-              const unreadable = e.currentTarget.validity.badInput
-              if (
-                unreadable ||
-                (next !== null && !(Number.isFinite(next) && next >= 0))
-              ) {
-                setBudget(
-                  agent.budgetPerDay === null ? '' : String(agent.budgetPerDay)
-                )
-                return
-              }
-              if (next !== agent.budgetPerDay)
-                onChange((a) => ({...a, budgetPerDay: next}))
-            }}
-          />
-        </FormControlWithLabel>
+        {spending.length === 0 ? (
+          <Text color="muted">
+            {t('Its actions spend no iDNA: no budget to set.', {
+              nsSeparator: '!!',
+            })}
+          </Text>
+        ) : (
+          <Stack spacing={1}>
+            <FormControlWithLabel
+              label={t('Budget a day, in iDNA', {nsSeparator: '!!'})}
+            >
+              <Input
+                type="number"
+                min={0}
+                step="0.01"
+                placeholder={t('None', {nsSeparator: '!!'})}
+                value={budget}
+                onChange={(e) => setBudget(e.target.value)}
+                onBlur={(e) => {
+                  const text = e.currentTarget.value.trim()
+                  const next = text === '' ? null : Number(text)
+                  // A number the field cannot read (a comma in some languages) reads as '': not "no budget".
+                  const unreadable = e.currentTarget.validity.badInput
+                  if (
+                    unreadable ||
+                    (next !== null && !(Number.isFinite(next) && next >= 0))
+                  ) {
+                    setBudget(
+                      agent.budgetPerDay === null
+                        ? ''
+                        : String(agent.budgetPerDay)
+                    )
+                    return
+                  }
+                  if (next !== agent.budgetPerDay)
+                    onChange((a) => ({...a, budgetPerDay: next}))
+                }}
+              />
+            </FormControlWithLabel>
+            <Text color="muted">
+              {t('For {{actions}}', {
+                actions: spending.map(({label}) => label).join(', '),
+                nsSeparator: '!!',
+              })}
+            </Text>
+          </Stack>
+        )}
       </Stack>
     </SettingsSection>
   )

@@ -5,7 +5,7 @@ import {
   onAgentChange,
   solveAgentFlip,
   stopAgentSolve,
-  updateAgentSettings,
+  setAgentsPaused,
 } from '../../settings/agent/api'
 import {
   END_MARGIN_MS,
@@ -60,10 +60,18 @@ async function agentFlip(flip, {isShort}) {
   }
 }
 
-/** 'autopilot' | 'suggest' from the settings, or null when the agent does not answer; a pause is apart. */
+/**
+ * 'autopilot' | 'suggest' from the answering agent's level, 'report' when an agent only reports (B-257: it never
+ * answers nor submits), or null when no agent acts in the validation; a pause is apart.
+ */
 export function agentMode(settings) {
+  if (!settings.enabled) return null
   const {level} = settings.permissions.answerFlip
-  if (!settings.enabled || level === 'off') return null
+  if (level === 'off')
+    return settings.permissions.report?.level &&
+      settings.permissions.report.level !== 'off'
+      ? 'report'
+      : null
   return level === 'alone' ? 'autopilot' : 'suggest'
 }
 
@@ -178,9 +186,11 @@ export function useAgentValidation({
       .map(({hash}) => hash)
   )
 
-  // One flip at a time, the next one as soon as the last is answered.
+  // One flip at a time, the next one as soon as the last is answered. An agent that only reports reads the flips once
+  // they have their keywords: the long session.
   React.useEffect(() => {
     if (!active || !phase || asking) return
+    if (mode === 'report' && isShort) return
     const flip = nextFlipToAsk(flips, asked.current, {isShort, withoutWords})
     if (!flip) return
     const timeoutMs = flipDeadlineMs({
@@ -223,6 +233,7 @@ export function useAgentValidation({
     // withoutWords changes with the clock; its size says when a flip joined it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
+    mode,
     active,
     phase,
     asking,
@@ -236,9 +247,9 @@ export function useAgentValidation({
     longSessionDuration,
   ])
 
-  // Autopilot: what its permissions let it do alone, once per flip.
+  // Autopilot, or an agent that only reports: what its permissions let it do alone, once per flip.
   React.useEffect(() => {
-    if (mode !== 'autopilot' || !active || !phase) return
+    if ((mode !== 'autopilot' && mode !== 'report') || !active || !phase) return
     autopilotEvents({
       flips,
       picks,
@@ -330,14 +341,12 @@ export function useAgentValidation({
         ? Math.max(0, Math.ceil((countdownEnd - now) / 1000))
         : null,
     // The pause is the agent's everywhere (the menu card shows it too); here it stops the agent at once.
+    // The pause of every agent (the Agents page has it too), not a write of one agent's settings.
     pause: () => {
       setPausing(true)
-      updateAgentSettings((s) => ({...s, paused: true})).catch(() =>
-        setPausing(false)
-      )
+      setAgentsPaused(true).catch(() => setPausing(false))
     },
-    resume: () =>
-      updateAgentSettings((s) => ({...s, paused: false})).catch(() => {}),
+    resume: () => setAgentsPaused(false).catch(() => {}),
     takeRest: () => toTake.forEach(send),
     canTakeRest:
       mode === 'suggest' &&

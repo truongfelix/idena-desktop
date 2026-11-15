@@ -78,7 +78,11 @@ function createAgentCommands({profiles, key, log, onChange = () => {}}) {
               )
             : null
           if (holder)
-            throw new Error(`${holder.name} already answers the validation`)
+            throw new Error(
+              name === 'report'
+                ? `${holder.name} already reports in the validation`
+                : `${holder.name} already answers the validation`
+            )
         })
         const agents = current
           ? file.agents.map((other) => (other.id === agent.id ? agent : other))

@@ -115,8 +115,10 @@ export function ValidationScreen({
     const show = isKeywords
       ? Boolean(pick.report) &&
         !currentFlip.relevance &&
-        !(agent.mode === 'autopilot' && pick.reportDecision === 'alone')
-      : agent.mode === 'suggest' && !currentFlip.option
+        !(agent.mode !== 'suggest' && pick.reportDecision === 'alone')
+      : agent.mode === 'suggest' &&
+        pick.answers !== false &&
+        !currentFlip.option
     return show
       ? {
           percent: Math.round((pick.confidence || 0) * 100),
@@ -422,11 +424,7 @@ export function ValidationScreen({
                   })}
                 </Text>
               )}
-              <Text fontWeight={500}>
-                {agent.mode === 'autopilot'
-                  ? t('A flip without an answer gets a random one.')
-                  : t('Answer the flips yourself.')}
-              </Text>
+              <Text fontWeight={500}>{agentHelpText(agent, t)}</Text>
             </Stack>
           )}
           {agent?.canTakeRest && isSolving(state) && !isSubmitting(state) && (
@@ -626,9 +624,18 @@ const AUTOPILOT_STEPS = [
 function agentBadgeText(agent, t) {
   if (agent.paused) return t('Agent: paused', {nsSeparator: '!!'})
   if (agent.noAnswer) return t('Agent: no answer', {nsSeparator: '!!'})
+  if (agent.mode === 'report') return t('Agent: reports', {nsSeparator: '!!'})
   return agent.mode === 'autopilot'
     ? t('Agent: Autopilot', {nsSeparator: '!!'})
     : t('Agent: Suggest', {nsSeparator: '!!'})
+}
+
+/** What the person does when the agent gives no answer: by its mode. */
+function agentHelpText(agent, t) {
+  if (agent.mode === 'report') return t('Check the keywords yourself.')
+  return agent.mode === 'autopilot'
+    ? t('A flip without an answer gets a random one.')
+    : t('Answer the flips yourself.')
 }
 
 /** The validation's step for Autopilot (agent/autopilot.js autopilotPlan), or null where it does nothing. */

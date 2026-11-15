@@ -95,7 +95,12 @@ export function pickedSide(pick) {
 /** "Take the agent's picks for the rest": an ANSWER for each flip still without an answer that has a pick. */
 export function answersToTake(flips, picks) {
   return flips
-    .filter((flip) => !flip.option && pickedSide(picks[flip.hash]))
+    .filter(
+      (flip) =>
+        !flip.option &&
+        picks[flip.hash]?.answers !== false &&
+        pickedSide(picks[flip.hash])
+    )
     .map((flip) => ({
       type: 'ANSWER',
       hash: flip.hash,
@@ -123,18 +128,27 @@ export function autopilotEvents({
   let left = reportsLeft
   flips.forEach((flip) => {
     const pick = picks[flip.hash]
-    if (!pick || pick.decision !== 'alone') return
+    if (!pick) return
+    // An answer only from the agent answering (B-257: a reporting agent alone gives none).
     const side = pickedSide(pick)
-    if (side && !flip.option && !applied.has(`answer:${flip.hash}`))
+    if (
+      pick.answers !== false &&
+      pick.decision === 'alone' &&
+      side &&
+      !flip.option &&
+      !applied.has(`answer:${flip.hash}`)
+    )
       events.push({type: 'ANSWER', hash: flip.hash, option: side})
     if (!isKeywords || applied.has(`mark:${flip.hash}`) || !unmarked(flip))
       return
+    // The keywords' marks: the reporting agent's level, or the answering agent's when one agent does both.
+    if ((pick.markDecision ?? pick.decision) !== 'alone') return
     if (pick.report) {
       if (pick.reportDecision === 'alone' && left > 0) {
         left -= 1
         events.push({type: 'REPORT_WORDS', hash: flip.hash})
       }
-    } else if (!pick.report && pick.relevance === 'relevant')
+    } else if (pick.relevance === 'relevant')
       events.push({type: 'APPROVE_WORDS', hash: flip.hash})
   })
   return events

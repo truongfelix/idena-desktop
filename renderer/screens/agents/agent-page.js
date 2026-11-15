@@ -148,7 +148,7 @@ export function AgentPage({id}) {
     hasKey: agent.hasKey,
     keyElsewhere: false,
   }
-  const isValidation = Boolean(agent.actions.answerFlip)
+  const isValidation = Boolean(agent.actions.answerFlip || agent.actions.report)
 
   return (
     <Stack spacing={8} w="full" maxW="4xl" pb={8}>
@@ -218,7 +218,7 @@ export function AgentPage({id}) {
         onChange={save}
       />
       <ReadsSection agent={agent} catalog={catalog} onChange={save} />
-      <ScheduleSection agent={agent} onChange={save} />
+      <ScheduleSection agent={agent} catalog={catalog} onChange={save} />
       {agent.actions.report && (
         <ReportRulesSection settings={agent} onChange={save} />
       )}

@@ -85,9 +85,6 @@ function readAgentFile(text, agents = []) {
   const dropped = SINGLE_HOLDER_ACTIONS.filter(
     (name) => read.actions[name] && agents.some((one) => one.actions[name])
   )
-  // The reports go with the answers: they are made while answering the validation.
-  if (dropped.includes('answerFlip') && read.actions.report)
-    dropped.push('report')
   const asked = Object.fromEntries(
     Object.entries(read.actions).filter(([name]) => !dropped.includes(name))
   )

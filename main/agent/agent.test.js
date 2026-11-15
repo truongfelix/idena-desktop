@@ -68,8 +68,10 @@ describe('the agent channel', () => {
     })
   })
 
-  test('the model is not asked when the action is off', async () => {
-    const {agent, ask} = setup({permissions: {answerFlip: {level: 'off'}}})
+  test('the model is not asked when the actions are off', async () => {
+    const {agent, ask} = setup({
+      permissions: {answerFlip: {level: 'off'}, report: {level: 'off'}},
+    })
     await expect(agent.handle('solveFlip', {flip})).resolves.toMatchObject({
       decision: 'off',
     })
