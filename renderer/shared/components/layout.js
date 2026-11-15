@@ -378,7 +378,7 @@ const syncingPeersMachine = createPeersMachine(() => callRpc('net_peers'))
 function SyncingApp() {
   const {t} = useTranslation()
 
-  const {highestBlock, wrongTime, message} = useChainState()
+  const {highestBlock, wrongTime, message, compacting} = useChainState()
   const {step, speed} = useSyncStep()
 
   const {address} = useIdentityState()
@@ -407,7 +407,12 @@ function SyncingApp() {
         left={0}
         w="full"
       >
-        {converting ? t('Converting the IPFS data...') : t('Synchronizing...')}
+        {/* eslint-disable-next-line no-nested-ternary */}
+        {compacting
+          ? t('Compacting the database...')
+          : converting
+          ? t('Converting the IPFS data...')
+          : t('Synchronizing...')}
       </Flex>
       <Stack spacing={10} w="full" maxW="md">
         {Boolean(address) && (
@@ -467,7 +472,15 @@ function SyncingApp() {
           </Text>
         )}
 
-        {message && (
+        {/* The node compacts its chain database at start (B-245): minutes on a hard disk, nothing wrong. */}
+        {compacting && (
+          <Alert status="warning" bg="orange.500" borderRadius="lg">
+            {t(
+              'The node is tidying its database, this can take several minutes; do not close it'
+            )}
+          </Alert>
+        )}
+        {message && !compacting && (
           <Alert status="error" bg="red.500" borderRadius="lg">
             {message}
           </Alert>

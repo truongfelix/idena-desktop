@@ -1817,5 +1817,10 @@
   "The recording stopped at its limit: the {{size}} KB a voice note can hold.": "The recording stopped at its limit: the {{size}} KB a voice note can hold.",
   "The recording stopped at its limit: {{minutes}} minutes.": "The recording stopped at its limit: {{minutes}} minutes.",
   "Play the video": "Play the video",
-  "🎞 This computer cannot play this video.": "🎞 This computer cannot play this video."
+  "🎞 This computer cannot play this video.": "🎞 This computer cannot play this video.",
+  "Compacting": "Compacting",
+  "Compacting the database...": "Compacting the database...",
+  "The node is tidying its database, this can take several minutes; do not close it": "The node is tidying its database, this can take several minutes; do not close it",
+  "Peers: {{peersCount}} (in {{inbound}}, out {{outbound}}, direct {{direct}})": "Peers: {{peersCount}} (in {{inbound}}, out {{outbound}}, direct {{direct}})",
+  "Your node has no connection: what it sends cannot reach the network": "Your node has no connection: what it sends cannot reach the network"
 }

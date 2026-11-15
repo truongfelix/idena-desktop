@@ -1817,5 +1817,10 @@
   "The recording stopped at its limit: the {{size}} KB a voice note can hold.": "L'enregistrement s'est arrêté à sa limite : les {{size}} Ko qu'une note vocale peut contenir.",
   "The recording stopped at its limit: {{minutes}} minutes.": "L'enregistrement s'est arrêté à sa limite : {{minutes}} minutes.",
   "Play the video": "Lire la vidéo",
-  "🎞 This computer cannot play this video.": "🎞 Cet ordinateur ne peut pas lire cette vidéo."
+  "🎞 This computer cannot play this video.": "🎞 Cet ordinateur ne peut pas lire cette vidéo.",
+  "Compacting": "Compactage",
+  "Compacting the database...": "Compactage de la base de données...",
+  "The node is tidying its database, this can take several minutes; do not close it": "Le nœud range sa base de données, cela peut prendre plusieurs minutes ; ne le fermez pas",
+  "Peers: {{peersCount}} (in {{inbound}}, out {{outbound}}, direct {{direct}})": "Connexions : {{peersCount}} (entrantes {{inbound}}, sortantes {{outbound}}, directes {{direct}})",
+  "Your node has no connection: what it sends cannot reach the network": "Votre nœud n'a aucune connexion : ce qu'il envoie ne peut pas atteindre le réseau"
 }
