@@ -192,7 +192,16 @@ export function ModelSection({
   const isLocal = settings.provider === 'local'
 
   return (
-    <SettingsSection title={title || t('Model')}>
+    <SettingsSection
+      title={title || t('Model')}
+      foldId="agent.connection"
+      summary={[
+        (providers.find(({id}) => id === settings.provider) || {}).label,
+        settings.model,
+      ]
+        .filter(Boolean)
+        .join(' · ')}
+    >
       <Stack spacing={5}>
         <SimpleGrid columns={[1, 3]} spacing={2} role="radiogroup">
           {providers.map(({id, label, hint}) => (

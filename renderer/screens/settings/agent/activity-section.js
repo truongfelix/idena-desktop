@@ -1,16 +1,23 @@
 /* eslint-disable react/prop-types */
 import * as React from 'react'
-import {Flex, Stack, Text} from '@chakra-ui/react'
+import {Button, Flex, Stack, Text} from '@chakra-ui/react'
 import {useTranslation} from 'react-i18next'
 import {HDivider} from '../../../shared/components/components'
 import {SettingsSection} from '../components'
 import {pendingActivityText} from '../../agents/catalog'
 
-function formatTime(ms) {
-  return new Date(ms).toLocaleString([], {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  })
+/** The time of a line: the hour alone today, the date too before (B-252). */
+export function formatTime(ms, now = Date.now()) {
+  const at = new Date(ms)
+  const today = new Date(now)
+  const sameDay =
+    at.getFullYear() === today.getFullYear() &&
+    at.getMonth() === today.getMonth() &&
+    at.getDate() === today.getDate()
+  return at.toLocaleString(
+    [],
+    sameDay ? {timeStyle: 'short'} : {dateStyle: 'short', timeStyle: 'short'}
+  )
 }
 
 /** One line of the log (main/agent/agent.js) in words. */
@@ -56,40 +63,80 @@ function how(decision, t) {
   return ''
 }
 
-export function ActivitySection({activity}) {
+/**
+ * The log as shown (B-252): the lines that say the same thing in a row (five "Settings saved") as one, with their
+ * count and the newest time; newest first, as the log comes.
+ */
+export function groupActivity(activity, t) {
+  const rows = []
+  activity.forEach((entry) => {
+    const text = activityText(entry, t)
+    const who = how(entry.decision, t)
+    const last = rows[rows.length - 1]
+    if (last && last.text === text && last.how === who) last.count += 1
+    else rows.push({at: entry.at, text, how: who, count: 1})
+  })
+  return rows
+}
+
+export function ActivitySection({activity, onClear}) {
   const {t} = useTranslation()
+  const rows = groupActivity(activity, t).slice(0, 50)
   return (
-    <SettingsSection title={t('Activity')}>
-      {activity.length === 0 ? (
+    <SettingsSection
+      title={t('Activity')}
+      foldId="agent.activity"
+      summary={activity.length ? formatTime(activity[0].at) : t('Nothing yet.')}
+    >
+      {rows.length === 0 ? (
         <Text color="muted">{t('Nothing yet.')}</Text>
       ) : (
         <Stack spacing={0}>
-          {activity.slice(0, 50).map((entry, i) => (
+          {rows.map((row, i) => (
             // eslint-disable-next-line react/no-array-index-key
-            <React.Fragment key={`${entry.at}-${i}`}>
-              <HDivider />
-              <Flex py={2} gap={4} wrap="wrap">
+            <React.Fragment key={`${row.at}-${i}`}>
+              {i > 0 && <HDivider />}
+              <Flex py={1.5} gap={4} align="baseline" minW={0}>
                 <Text
-                  w={32}
+                  flexShrink={0}
+                  whiteSpace="nowrap"
                   color="muted"
+                  fontSize="sm"
                   sx={{fontVariantNumeric: 'tabular-nums'}}
                 >
-                  {formatTime(entry.at)}
+                  {formatTime(row.at)}
                 </Text>
-                <Text flex="1 1 320px" minW={0}>
-                  {activityText(entry, t)}
+                <Text flex={1} minW={0} isTruncated title={row.text}>
+                  {row.text}
+                  {row.count > 1 && (
+                    <Text as="span" color="muted">{` ×${row.count}`}</Text>
+                  )}
                 </Text>
-                <Text fontSize="sm" fontWeight={500} color="muted">
-                  {how(entry.decision, t)}
-                </Text>
+                {row.how && (
+                  <Text
+                    flexShrink={0}
+                    fontSize="xs"
+                    fontWeight={500}
+                    color="muted"
+                  >
+                    {row.how}
+                  </Text>
+                )}
               </Flex>
             </React.Fragment>
           ))}
         </Stack>
       )}
-      <Text color="muted" fontSize="sm" mt={3}>
-        {t('The log is kept until the app closes.')}
-      </Text>
+      <Flex mt={3} gap={4} align="center" justify="space-between">
+        <Text color="muted" fontSize="sm">
+          {t('The log is kept until the app closes.')}
+        </Text>
+        {onClear && rows.length > 0 && (
+          <Button size="sm" variant="link" colorScheme="blue" onClick={onClear}>
+            {t('Clear')}
+          </Button>
+        )}
+      </Flex>
     </SettingsSection>
   )
 }

@@ -47,6 +47,9 @@ function createAgent({
   // validation agent.
   const writing = new Set()
   const activity = []
+  // When each agent's log was last cleared (B-252): the lines of all agents (pause, resume) older than it are hidden
+  // on that agent's page too.
+  const clearedAt = new Map()
 
   const log = (entry) => {
     activity.push({at: now(), ...entry})
@@ -116,10 +119,21 @@ function createAgent({
     }
   }
 
+  // The Instructions of the agent `agentId` (the validation agent's without one), sent with each of its flips too.
+  const instructionsOf = (agentId) => {
+    if (!profiles) return ''
+    const file = profiles.read()
+    const agent =
+      agentId !== undefined
+        ? file.agents.find((one) => one.id === agentId)
+        : validationAgent(file)
+    return agent ? agent.instructions : ''
+  }
+
   /** One flip to the model, the answer read. Throws the provider's error. */
-  const askFlip = async (config, flip, timeoutMs, running) => {
+  const askFlip = async (config, flip, timeoutMs, running, instructions) => {
     const checked = checkFlip(flip)
-    const {system, parts} = flipQuestion(checked)
+    const {system, parts} = flipQuestion(checked, instructions)
     const controller = new AbortController()
     running.add(controller)
     try {
@@ -158,7 +172,13 @@ function createAgent({
     }
     let answer
     try {
-      answer = await askFlip(config, flip, timeoutMs, solving)
+      answer = await askFlip(
+        config,
+        flip,
+        timeoutMs,
+        solving,
+        instructionsOf(undefined)
+      )
     } catch (error) {
       log({
         agentId,
@@ -296,7 +316,13 @@ function createAgent({
           : settings.read()
       const logged = agentId !== undefined ? agentId : validationId()
       try {
-        const answer = await askFlip(config, flip, timeoutMs, testing)
+        const answer = await askFlip(
+          config,
+          flip,
+          timeoutMs,
+          testing,
+          instructionsOf(agentId)
+        )
         log({
           agentId: logged,
           action: 'test',
@@ -329,14 +355,24 @@ function createAgent({
       // No agent named (no data, or none in it): every line.
       const agentId = data ? data.agentId : undefined
       const lines = activity.slice().reverse()
-      return agentId === undefined || agentId === null
-        ? lines
-        : lines.filter(
-            (entry) =>
-              entry.agentId === agentId ||
-              (entry.action === 'settings' &&
-                ['paused', 'resumed'].includes(entry.decision))
-          )
+      if (agentId === undefined || agentId === null) return lines
+      const since = clearedAt.get(agentId)
+      return lines.filter(
+        (entry) =>
+          entry.agentId === agentId ||
+          (entry.action === 'settings' &&
+            ['paused', 'resumed'].includes(entry.decision) &&
+            (since === undefined || entry.at > since))
+      )
+    },
+    /** Clear: the agent's lines go (B-252); the other agents' stay. */
+    clearActivity: (data) => {
+      const agentId = data ? data.agentId : undefined
+      if (typeof agentId !== 'string') throw new Error('no agent named')
+      for (let i = activity.length - 1; i >= 0; i -= 1)
+        if (activity[i].agentId === agentId) activity.splice(i, 1)
+      clearedAt.set(agentId, now())
+      return null
     },
   }
 

@@ -117,6 +117,7 @@ export const importAgentFile = (text) =>
   writeAgents(() => agent('importAgent', {text}))
 export const agentActivity = (agentId) =>
   agent('activity', agentId === undefined ? undefined : {agentId})
+export const clearAgentActivity = (agentId) => agent('clearActivity', {agentId})
 export const stopAgentTest = () => agent('stopTest')
 export const stopAgentSolve = () => agent('stopSolve')
 export const testAgentFlip = (flip, timeoutMs, agentId) =>

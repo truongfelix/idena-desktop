@@ -40,11 +40,16 @@ const REPORT_THRESHOLDS = {
   9: 0.9,
 }
 
-const SYSTEM = [
+// The app's part of the question for a flip (B-235): what a flip is, the nine report rules whose numbers the answer
+// names, and the answer's JSON format, which the app reads. The person's Instructions go between the task and the
+// rules, so that whatever they say, the rules and the format come last, as the app wrote them.
+const TASK = [
   'You solve flips in an Idena validation. A flip is a story of four pictures. You see the same four pictures in',
   'two orders, LEFT and RIGHT: one order tells a story that makes sense from the first picture to the last, the',
   'other does not. Pick the order that tells the story. When you are not sure, still pick the more probable one',
   'and give it a low confidence.',
+].join('\n')
+const RULES_AND_FORMAT = [
   'When keywords are given, also say whether the story clearly shows both of them, and list each rule the flip',
   'breaks, by number, with how sure you are that it breaks it (none: an empty list). The rules:',
   ...Object.entries(REPORT_REASONS).map(([n, text]) => `${n}. ${text}`),
@@ -53,6 +58,21 @@ const SYSTEM = [
   '"keywords": "shown" | "not shown" | null,',
   '"reasons": [{"reason": rule number, "confidence": how sure the flip breaks it, from 0 to 1}]}',
 ].join('\n')
+
+/** The question's text: the app's task, the agent's Instructions when it has some, then the rules and the format. */
+function flipSystem(instructions = '') {
+  const own = typeof instructions === 'string' ? instructions.trim() : ''
+  return own
+    ? [
+        TASK,
+        'The instructions of the person who runs you, for this and every task:',
+        own,
+        RULES_AND_FORMAT,
+      ].join('\n')
+    : [TASK, RULES_AND_FORMAT].join('\n')
+}
+
+const SYSTEM = flipSystem('')
 
 function mediaType(bytes) {
   if (bytes[0] === 0xff && bytes[1] === 0xd8) return 'image/jpeg'
@@ -102,8 +122,8 @@ function checkFlip(flip) {
   return {images, orders, words}
 }
 
-/** The question's parts: the text, then the left story's four pictures, then the right one's. */
-function flipQuestion({images, orders, words}) {
+/** The question: its text (flipSystem), its parts: the keywords, then the left story's four pictures, then the right one's. */
+function flipQuestion({images, orders, words}, instructions = '') {
   const parts = []
   const keywords = words.length
     ? `Keywords: ${words
@@ -116,7 +136,7 @@ function flipQuestion({images, orders, words}) {
     orders[s].forEach((i) => parts.push({type: 'image', ...images[i]}))
   })
   parts.push({type: 'text', text: 'Your JSON answer:'})
-  return {system: SYSTEM, parts}
+  return {system: flipSystem(instructions), parts}
 }
 
 /** A reply longer than this is cut before it is read: an answer is a few lines. */
@@ -216,5 +236,6 @@ module.exports = {
   checkFlip,
   firstJsonObject,
   flipQuestion,
+  flipSystem,
   readFlipAnswer,
 }
