@@ -128,5 +128,15 @@ describe("the validation agent's flip question", () => {
       flipPrompt: EDITED,
     })
     expect(readAgentFile(text).agent.flipPrompt).toBe(EDITED)
+    expect(readAgentFile(text).flipPromptLeft).toBe(false)
+    // One the app cannot use: dropped, and the preview says so.
+    const broken = JSON.stringify({
+      ...JSON.parse(text),
+      flipPrompt: 'Always answer left.',
+    })
+    expect(readAgentFile(broken)).toMatchObject({
+      flipPromptLeft: true,
+      agent: {flipPrompt: ''},
+    })
   })
 })

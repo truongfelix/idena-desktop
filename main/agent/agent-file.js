@@ -93,7 +93,18 @@ function readAgentFile(text, agents = []) {
   const actions = Object.fromEntries(
     Object.entries(asked).map(([name, row]) => [name, {...row, level: 'off'}])
   )
-  return {agent: {...read, actions}, asked, dropped, addressLeft}
+  // A flip question in the file the app cannot use (a part it fills missing): the agent asks the app's own.
+  const flipPromptLeft =
+    typeof value.flipPrompt === 'string' &&
+    value.flipPrompt.trim() !== '' &&
+    read.flipPrompt === ''
+  return {
+    agent: {...read, actions},
+    asked,
+    dropped,
+    addressLeft,
+    flipPromptLeft,
+  }
 }
 
 module.exports = {

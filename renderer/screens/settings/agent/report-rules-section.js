@@ -12,7 +12,7 @@ import {REPORT_REASONS} from '../../validation/practice'
 
 const STEPS = [50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100]
 
-/** The number of reasons a summary names one by one at most: past this, "Custom thresholds". */
+/** The runs of equal thresholds a summary names at most: past this, "Custom thresholds". */
 const MAX_GROUPS = 3
 
 /**

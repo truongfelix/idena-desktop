@@ -23,14 +23,27 @@ export function FlipQuestionSection({agent, onSave}) {
   const [draft, setDraft] = React.useState(null)
   const [error, setError] = React.useState(null)
   const [isSaving, setIsSaving] = React.useState(false)
+  const [loadError, setLoadError] = React.useState(null)
 
   React.useEffect(() => {
-    flipPromptDefault().then(setFallback, () => {})
+    flipPromptDefault().then(setFallback, (e) =>
+      setLoadError(agentErrorText(e))
+    )
   }, [])
   const saved = agent.flipPrompt || fallback
   React.useEffect(() => {
     setDraft(saved)
   }, [saved])
+  if (loadError && !agent.flipPrompt)
+    return (
+      <SettingsSection title={t('The flip question')}>
+        <ErrorAlert>
+          {t('The app could not read its flip question ({{message}}).', {
+            message: loadError,
+          })}
+        </ErrorAlert>
+      </SettingsSection>
+    )
   if (saved === null || draft === null) return null
 
   const save = async (text) => {
@@ -85,10 +98,12 @@ export function FlipQuestionSection({agent, onSave}) {
           </PrimaryButton>
           {(agent.flipPrompt || draft !== fallback) && (
             <SecondaryButton
-              isDisabled={isSaving}
+              isDisabled={isSaving || fallback === null}
               onClick={() => {
                 setDraft(fallback)
-                save(fallback)
+                setError(null)
+                // Only a saved question of its own is saved back; an unsaved edit is just undone.
+                if (agent.flipPrompt) save(fallback)
               }}
             >
               {t('Back to default')}

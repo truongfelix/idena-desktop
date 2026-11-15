@@ -2033,5 +2033,12 @@
   "{{reason}} at {{percent}}": "{{reason}} at {{percent}}",
   "{{from}}-{{to}} at {{percent}}": "{{from}}-{{to}} at {{percent}}",
   "Fold": "Fold",
-  "Change": "Change"
+  "Change": "Change",
+  "Flip question": "Flip question",
+  "Its own": "Its own",
+  "Hide it": "Hide it",
+  "Read it": "Read it",
+  "It brings its own flip question, which decides the validation answers and reports: read it before turning Answer the flips on.": "It brings its own flip question, which decides the validation answers and reports: read it before turning Answer the flips on.",
+  "The file's flip question cannot be used (a part the app fills is missing): the agent asks the app's own.": "The file's flip question cannot be used (a part the app fills is missing): the agent asks the app's own.",
+  "The app could not read its flip question ({{message}}).": "The app could not read its flip question ({{message}})."
 }
