@@ -2,7 +2,7 @@ const {checkAction} = require('./permissions')
 const {createAgentCommands} = require('./agent-commands')
 const {createPending} = require('./pending')
 const {agentSettings, validationAgent} = require('./profiles')
-const {checkFlip, flipQuestion, readFlipAnswer} = require('./flips')
+const {checkFlip, flipQuestion, mediaType, readFlipAnswer} = require('./flips')
 const {readStory, storySystem} = require('./stories')
 const providers = require('./providers')
 
@@ -40,6 +40,7 @@ function createAgent({
   logger,
   notify = () => {},
   ask = providers.ask,
+  draw = providers.drawImage,
   now = Date.now,
 }) {
   // The questions in flight: the validation's (stopped when the agent is paused or turned off) and the practice
@@ -359,6 +360,63 @@ function createAgent({
         log({
           agentId,
           action: 'flipStory',
+          decision: 'failed',
+          detail: error.message,
+        })
+        throw error
+      } finally {
+        writing.delete(controller)
+      }
+    },
+    /**
+     * One picture of a flip's story (B-236 Make the images), drawn by the image model of the agent `agentId`, which
+     * must hold "Write flip stories" (not Off): {mediaType, data}. It goes into the flip editor for the person to check.
+     */
+    async drawStoryPicture({agentId, prompt, timeoutMs} = {}) {
+      if (!profiles) throw new Error('no agents')
+      const file = profiles.read()
+      const agent = file.agents.find((one) => one.id === agentId)
+      if (!agent) throw new Error('no such agent')
+      const check = checkAction(agentSettings(file, agent), 'flipStory')
+      if (check.decision === 'off') {
+        log({
+          agentId,
+          action: 'flipImage',
+          decision: 'off',
+          detail: check.reason,
+        })
+        throw new Error(`the agent may not do it (${check.reason})`)
+      }
+      if (typeof prompt !== 'string' || !prompt.trim())
+        throw new Error('no prompt')
+      const controller = new AbortController()
+      writing.add(controller)
+      try {
+        const picture = await draw(
+          {
+            provider: agent.provider,
+            address: agent.address,
+            imageModel: agent.imageModel,
+            key: key.read(destination(agent)),
+          },
+          prompt,
+          {
+            timeoutMs: clampTimeout(timeoutMs),
+            signal: controller.signal,
+            mediaTypeOf: mediaType,
+          }
+        )
+        log({
+          agentId,
+          action: 'flipImage',
+          decision: check.decision,
+          detail: '',
+        })
+        return picture
+      } catch (error) {
+        log({
+          agentId,
+          action: 'flipImage',
           decision: 'failed',
           detail: error.message,
         })

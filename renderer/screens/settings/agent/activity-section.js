@@ -59,6 +59,13 @@ export function activityText({action, decision, detail}, t) {
           nsSeparator: '!!',
         })
       return t('Wrote a flip story: {{detail}}', {detail, nsSeparator: '!!'})
+    case 'flipImage':
+      return decision === 'failed'
+        ? t('A story picture failed: {{detail}}', {
+            detail,
+            nsSeparator: '!!',
+          })
+        : t('Drew a story picture')
     case 'key':
       return decision === 'removed' ? t('Key removed') : t('Key saved')
     default:

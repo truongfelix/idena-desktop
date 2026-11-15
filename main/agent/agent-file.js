@@ -25,6 +25,7 @@ function exportAgent(agent) {
       provider,
       ...(address === DEFAULT_ADDRESSES[provider] ? {address} : {}),
       model: agent.model,
+      ...(agent.imageModel ? {imageModel: agent.imageModel} : {}),
       actions: agent.actions,
       schedule: agent.schedule,
       budgetPerDay: agent.budgetPerDay,

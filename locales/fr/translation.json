@@ -2046,5 +2046,13 @@
   "The story": "L'histoire",
   "A flip story failed: {{detail}}": "Une histoire de flip a échoué : {{detail}}",
   "A flip story was not written: the agent may not": "Une histoire de flip n'a pas été écrite : l'agent n'en a pas le droit",
-  "Wrote a flip story: {{detail}}": "A écrit une histoire de flip : {{detail}}"
+  "Wrote a flip story: {{detail}}": "A écrit une histoire de flip : {{detail}}",
+  "Image model, for Make the images in the flip editor": "Modèle d'images, pour Créer les images dans l'éditeur de flips",
+  "None: the prompts are copied by hand": "Aucun : les consignes se copient à la main",
+  "Picture {{n}} of {{count}}": "Image {{n}} sur {{count}}",
+  "Make the images": "Créer les images",
+  "The story has 4 pictures: unlock the nonsense picture first, or write one with 3.": "L'histoire a 4 images : déverrouillez d'abord l'image absurde, ou écrivez-en une avec 3.",
+  "Make the images replaces the pictures already in those slots.": "Créer les images remplace les images déjà dans ces cases.",
+  "A story picture failed: {{detail}}": "Une image d'histoire a échoué : {{detail}}",
+  "Drew a story picture": "A dessiné une image d'histoire"
 }

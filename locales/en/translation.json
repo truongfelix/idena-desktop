@@ -2046,5 +2046,13 @@
   "The story": "The story",
   "A flip story failed: {{detail}}": "A flip story failed: {{detail}}",
   "A flip story was not written: the agent may not": "A flip story was not written: the agent may not",
-  "Wrote a flip story: {{detail}}": "Wrote a flip story: {{detail}}"
+  "Wrote a flip story: {{detail}}": "Wrote a flip story: {{detail}}",
+  "Image model, for Make the images in the flip editor": "Image model, for Make the images in the flip editor",
+  "None: the prompts are copied by hand": "None: the prompts are copied by hand",
+  "Picture {{n}} of {{count}}": "Picture {{n}} of {{count}}",
+  "Make the images": "Make the images",
+  "The story has 4 pictures: unlock the nonsense picture first, or write one with 3.": "The story has 4 pictures: unlock the nonsense picture first, or write one with 3.",
+  "Make the images replaces the pictures already in those slots.": "Make the images replaces the pictures already in those slots.",
+  "A story picture failed: {{detail}}": "A story picture failed: {{detail}}",
+  "Drew a story picture": "Drew a story picture"
 }

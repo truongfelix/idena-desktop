@@ -247,6 +247,21 @@ export function ModelSection({
             />
           </FormControlWithLabel>
         </SimpleGrid>
+        {settings.provider !== 'anthropic' &&
+          settings.actions &&
+          settings.actions.flipStory && (
+            <FormControlWithLabel
+              label={t('Image model, for Make the images in the flip editor')}
+            >
+              <SavedOnBlurInput
+                value={settings.imageModel || ''}
+                placeholder={t('None: the prompts are copied by hand', {
+                  nsSeparator: '!!',
+                })}
+                onSave={(imageModel) => onChange((s) => ({...s, imageModel}))}
+              />
+            </FormControlWithLabel>
+          )}
         {!isLocal && (
           <KeyField
             status={status}

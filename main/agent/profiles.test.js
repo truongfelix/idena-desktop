@@ -43,6 +43,7 @@ describe('agent profiles', () => {
       provider: 'local',
       address: DEFAULT_ADDRESSES.local,
       model: '',
+      imageModel: '',
       instructions: '',
       actions: {},
       schedule: {kind: 'manual', time: '09:00'},

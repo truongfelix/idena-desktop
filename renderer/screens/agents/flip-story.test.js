@@ -1,4 +1,4 @@
-import {storyAgentOf, storyWords} from './flip-story'
+import {fitContain, storyAgentOf, storySlots, storyWords} from './flip-story'
 
 // B-236: the flip editor shows the story panel only for an agent that is on and holds "Write flip stories".
 
@@ -71,5 +71,35 @@ describe("the flip's keywords as the agent gets them", () => {
     expect(storyWords({words: []})).toBeNull()
     expect(storyWords({words: [{name: 'ladder'}]})).toBeNull()
     expect(storyWords(undefined)).toBeNull()
+  })
+})
+
+describe('Make the images: which slots, and the picture in the frame', () => {
+  test("every slot but the nonsense picture's, in the editor's order", () => {
+    expect(storySlots([2, 0, 3, 1], 3, 3)).toEqual([2, 0, 1])
+    // Unlocked (no nonsense picture): four slots for four pictures.
+    expect(storySlots([2, 0, 3, 1], -1, 4)).toEqual([2, 0, 3, 1])
+    // Three pictures with the slot unlocked: the first three, the fourth left to the person.
+    expect(storySlots([0, 1, 2, 3], -1, 3)).toEqual([0, 1, 2])
+  })
+
+  test('four pictures while the nonsense slot is locked: none', () => {
+    expect(storySlots([0, 1, 2, 3], 3, 4)).toBeNull()
+    expect(storySlots(undefined, 3, 3)).toBeNull()
+  })
+
+  test('a square picture whole and centred in the 440 x 330 frame', () => {
+    expect(fitContain(1024, 1024, 440, 330)).toEqual({
+      x: 55,
+      y: 0,
+      width: 330,
+      height: 330,
+    })
+    expect(fitContain(1536, 1024, 440, 330)).toEqual({
+      x: 0,
+      y: 18,
+      width: 440,
+      height: 293,
+    })
   })
 })

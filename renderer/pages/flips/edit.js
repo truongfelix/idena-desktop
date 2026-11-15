@@ -378,7 +378,21 @@ export default function EditFlipPage() {
                   }}
                 />
               )}
-              {is('images') && <FlipStoryPrompts keywords={keywords} />}
+              {is('images') && (
+                <FlipStoryPrompts
+                  keywords={keywords}
+                  images={images}
+                  originalOrder={originalOrder}
+                  adversarialImageId={adversarialImageId}
+                  onImage={(slot, image) =>
+                    send('CHANGE_IMAGES', {
+                      image,
+                      currentIndex: slot,
+                      scene: null,
+                    })
+                  }
+                />
+              )}
               {is('protect') && (
                 <FlipProtectStep
                   keywords={keywords}

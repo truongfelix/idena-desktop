@@ -11,7 +11,11 @@ import {
 } from '@chakra-ui/react'
 import {useTranslation} from 'react-i18next'
 import {SecondaryButton} from '../../shared/components/button'
-import {agentErrorText, writeFlipStory} from '../settings/agent/api'
+import {
+  agentErrorText,
+  drawStoryPicture,
+  writeFlipStory,
+} from '../settings/agent/api'
 import {useAgents} from './use-agents'
 
 // "Write flip stories" in the flip editor (B-236, owner 2026-11-15): shown only when an agent that is on holds the
@@ -191,19 +195,137 @@ export function FlipStoryHelper({keywords}) {
   )
 }
 
-/** The images step: the prompts of the story written for these keywords, to copy into an image model. */
-export function FlipStoryPrompts({keywords}) {
+/**
+ * The slots a story's pictures go into (B-236 Make the images), in the order the editor shows them: every slot but the
+ * nonsense picture's. Null when the story has more pictures than such slots (4 pictures while the 4th slot is still
+ * the nonsense picture).
+ */
+export function storySlots(originalOrder, adversarialImageId, count) {
+  const free = (originalOrder || []).filter((n) => n !== adversarialImageId)
+  return free.length >= count ? free.slice(0, count) : null
+}
+
+/** Where a w x h picture goes in a W x H frame, whole and centred: {x, y, width, height}. */
+export function fitContain(w, h, W, H) {
+  const scale = Math.min(W / w, H / h)
+  const width = Math.round(w * scale)
+  const height = Math.round(h * scale)
+  return {
+    x: Math.floor((W - width) / 2),
+    y: Math.floor((H - height) / 2),
+    width,
+    height,
+  }
+}
+
+const FRAME_WIDTH = 440
+const FRAME_HEIGHT = 330
+
+/** A drawn picture as a flip frame: 440 x 330, the picture whole on white, a PNG data URL. */
+async function asFrame({mediaType, data}) {
+  const img = new Image()
+  img.src = `data:${mediaType};base64,${data}`
+  await img.decode()
+  const canvas = document.createElement('canvas')
+  canvas.width = FRAME_WIDTH
+  canvas.height = FRAME_HEIGHT
+  const ctx = canvas.getContext('2d')
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, FRAME_WIDTH, FRAME_HEIGHT)
+  const {x, y, width, height} = fitContain(
+    img.naturalWidth,
+    img.naturalHeight,
+    FRAME_WIDTH,
+    FRAME_HEIGHT
+  )
+  ctx.drawImage(img, x, y, width, height)
+  return canvas.toDataURL('image/png')
+}
+
+/**
+ * The images step: the prompts of the story written for these keywords, to copy into an image model; with an agent
+ * whose service draws pictures (an image model set), Make the images puts them in the story's slots for the person
+ * to check (`onImage(slot, url)`).
+ */
+export function FlipStoryPrompts({
+  keywords,
+  images = [],
+  originalOrder,
+  adversarialImageId,
+  onImage,
+}) {
   const {t} = useTranslation()
   const {list} = useAgents()
+  const [progress, setProgress] = React.useState(null)
+  const [error, setError] = React.useState(null)
+  const agent = storyAgentOf(list)
   const words = storyWords(keywords)
-  if (!storyAgentOf(list) || !words) return null
+  if (!agent || !words) return null
   const story = latest.get(wordsKey(words))
   if (!story) return null
+  const count = story.prompts.length
+  const slots = storySlots(originalOrder, adversarialImageId, count)
+  const canDraw =
+    agent.provider !== 'anthropic' && Boolean(agent.imageModel) && onImage
+  const replaces = slots && slots.some((n) => images[n])
+
+  const drawAll = async () => {
+    setError(null)
+    try {
+      for (let i = 0; i < count; i += 1) {
+        setProgress(i + 1)
+        // One after the other: each lands in its slot as soon as it is drawn.
+        // eslint-disable-next-line no-await-in-loop
+        const picture = await drawStoryPicture(agent.id, story.prompts[i])
+        // eslint-disable-next-line no-await-in-loop
+        onImage(slots[i], await asFrame(picture))
+      }
+    } catch (e) {
+      setError(agentErrorText(e))
+    } finally {
+      setProgress(null)
+    }
+  }
+
   return (
     <Box borderWidth={1} borderRadius="md" p={4} mt={6}>
-      <Text fontWeight={500}>
-        {story.title || t('The story', {nsSeparator: '!!'})}
-      </Text>
+      <Flex justify="space-between" align="center" gap={3} wrap="wrap">
+        <Text fontWeight={500}>
+          {story.title || t('The story', {nsSeparator: '!!'})}
+        </Text>
+        {canDraw && (
+          <SecondaryButton
+            size="sm"
+            isLoading={progress !== null}
+            loadingText={t('Picture {{n}} of {{count}}', {
+              n: progress,
+              count,
+            })}
+            isDisabled={!slots}
+            onClick={drawAll}
+          >
+            {t('Make the images')}
+          </SecondaryButton>
+        )}
+      </Flex>
+      {canDraw && !slots && (
+        <Text fontSize="sm" color="muted" mt={2}>
+          {t(
+            'The story has 4 pictures: unlock the nonsense picture first, or write one with 3.',
+            {nsSeparator: '!!'}
+          )}
+        </Text>
+      )}
+      {canDraw && replaces && progress === null && (
+        <Text fontSize="sm" color="muted" mt={2}>
+          {t('Make the images replaces the pictures already in those slots.')}
+        </Text>
+      )}
+      {error && (
+        <Text color="red.500" fontSize="sm" mt={2}>
+          {error}
+        </Text>
+      )}
       <StoryView story={story} withSummary={false} />
     </Box>
   )

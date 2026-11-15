@@ -8,6 +8,9 @@ const axios = require('axios')
 const ANTHROPIC_VERSION = '2023-06-01'
 const ANTHROPIC_MAX_TOKENS = 1024
 const MAX_REPLY_BYTES = 1024 * 1024
+// A picture comes back in base64 in the JSON: a 1024x1024 PNG is a few MB.
+const MAX_IMAGE_REPLY_BYTES = 25 * 1024 * 1024
+const MAX_IMAGE_PROMPT = 4000
 const MAX_ERROR_TEXT = 200
 
 const LOOPBACK_HOSTS = new Set(['localhost', '[::1]'])
@@ -189,4 +192,80 @@ async function ask(
   }
 }
 
-module.exports = {ask, buildRequest, checkAddress, replyText, providerError}
+/**
+ * The request for one picture (B-236): an OpenAI-compatible images endpoint, on the agent's own service and key, with
+ * its image model. The Anthropic API draws no pictures.
+ */
+function buildImageRequest({provider, address, imageModel, key}, prompt) {
+  if (provider === 'anthropic')
+    throw new Error('this service draws no pictures')
+  const base = checkAddress(provider, address)
+  if (!imageModel) throw new Error('no image model chosen')
+  if (provider !== 'local' && !key) throw new Error('no key kept')
+  const headers = {'content-type': 'application/json'}
+  if (key) headers.authorization = `Bearer ${key}`
+  return {
+    url: `${base}/images/generations`,
+    headers,
+    body: {
+      model: imageModel,
+      prompt: String(prompt || '').slice(0, MAX_IMAGE_PROMPT),
+      n: 1,
+      size: '1024x1024',
+    },
+  }
+}
+
+/**
+ * One picture from the prompt: {mediaType, data} (base64 PNG, JPEG or WebP). Only a picture sent in the answer is
+ * taken (`b64_json`): a link would be a second request to an address the service chose.
+ */
+async function drawImage(
+  config,
+  prompt,
+  {timeoutMs, signal, request = axios.request, mediaTypeOf} = {}
+) {
+  const {url, headers, body} = buildImageRequest(config, prompt)
+  let response
+  try {
+    response = await request({
+      method: 'post',
+      url,
+      headers,
+      data: body,
+      timeout: timeoutMs,
+      signal,
+      maxRedirects: 0,
+      maxContentLength: MAX_IMAGE_REPLY_BYTES,
+      maxBodyLength: MAX_IMAGE_REPLY_BYTES,
+      responseType: 'json',
+    })
+  } catch (error) {
+    if (signal && signal.aborted) throw new Error('stopped')
+    throw providerError(error)
+  }
+  const first = Array.isArray(response.data?.data)
+    ? response.data.data[0]
+    : null
+  if (!first || typeof first.b64_json !== 'string') {
+    throw new Error(
+      first && first.url
+        ? 'the service sent a link, not a picture'
+        : 'the service sent no picture'
+    )
+  }
+  const bytes = Buffer.from(first.b64_json, 'base64')
+  const type = mediaTypeOf ? mediaTypeOf(bytes) : null
+  if (!type) throw new Error('the service sent no picture')
+  return {mediaType: type, data: bytes.toString('base64')}
+}
+
+module.exports = {
+  ask,
+  buildImageRequest,
+  buildRequest,
+  checkAddress,
+  drawImage,
+  replyText,
+  providerError,
+}
