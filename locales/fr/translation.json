@@ -2029,5 +2029,22 @@
   "Sent to the model with each of its actions: solving a flip, writing a post": "Envoyées au modèle avec chacune de ses actions : résoudre un flip, écrire une publication",
   "The app adds what each action needs, and that part stays as it is: for a flip, its pictures and keywords, the report rules and the format of the answer it reads.": "L'application ajoute ce dont chaque action a besoin, et cette partie reste telle quelle : pour un flip, ses images et ses mots-clés, les règles de signalement et le format de la réponse qu'elle lit.",
   "Delete {{name}}?": "Supprimer {{name}} ?",
-  "Delete the agent": "Supprimer l'agent"
+  "Delete the agent": "Supprimer l'agent",
+  "Write flip stories": "Écrire des histoires de flips",
+  "In the flip editor, from the two keywords: a story and one image prompt per picture. Ask me: when you click Write a story. Alone: as soon as the keywords show. Nothing goes to the chain.": "Dans l'éditeur de flips, à partir des deux mots-clés : une histoire et une consigne d'image par image. Me demander : quand vous cliquez sur Écrire une histoire. Seul : dès que les mots-clés s'affichent. Rien ne va sur la chaîne.",
+  "The two keywords of the flip you make": "Les deux mots-clés du flip que vous créez",
+  "Picture {{n}}": "Image {{n}}",
+  "Copied!": "Copié !",
+  "Character: {{text}}": "Personnage : {{text}}",
+  "Goal: {{text}}": "But : {{text}}",
+  "A story by {{name}}": "Une histoire de {{name}}",
+  "Pictures in the story": "Images de l'histoire",
+  "3 pictures, the 4th yours": "3 images, la 4e de vous",
+  "4 pictures": "4 images",
+  "Write another": "En écrire une autre",
+  "Write a story": "Écrire une histoire",
+  "The story": "L'histoire",
+  "A flip story failed: {{detail}}": "Une histoire de flip a échoué : {{detail}}",
+  "A flip story was not written: the agent may not": "Une histoire de flip n'a pas été écrite : l'agent n'en a pas le droit",
+  "Wrote a flip story: {{detail}}": "A écrit une histoire de flip : {{detail}}"
 }

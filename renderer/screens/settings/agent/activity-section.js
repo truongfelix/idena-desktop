@@ -48,6 +48,17 @@ export function activityText({action, decision, detail}, t) {
       if (decision === 'exported') return t('Agent exported to a file')
       if (decision === 'imported') return t('Agent imported from a file')
       return t('Settings saved')
+    case 'flipStory':
+      if (decision === 'failed')
+        return t('A flip story failed: {{detail}}', {
+          detail,
+          nsSeparator: '!!',
+        })
+      if (decision === 'off')
+        return t('A flip story was not written: the agent may not', {
+          nsSeparator: '!!',
+        })
+      return t('Wrote a flip story: {{detail}}', {detail, nsSeparator: '!!'})
     case 'key':
       return decision === 'removed' ? t('Key removed') : t('Key saved')
     default:

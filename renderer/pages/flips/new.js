@@ -45,6 +45,10 @@ import {
 } from '../../screens/flips/utils'
 import {Step} from '../../screens/flips/types'
 import {
+  FlipStoryHelper,
+  FlipStoryPrompts,
+} from '../../screens/agents/flip-story'
+import {
   ImageSearchConsentDialog,
   useAdversarialSearch,
 } from '../../screens/flips/components/image-search'
@@ -333,6 +337,9 @@ export default function NewFlipPage() {
                         )}
                       </FlipKeywordPanel>
                       {isOffline && <CommunityTranslationUnavailable />}
+                      {is('keywords.loaded') && (
+                        <FlipStoryHelper keywords={keywords} />
+                      )}
                     </Box>
                     <FlipStoryAside>
                       <IconButton2
@@ -378,6 +385,7 @@ export default function NewFlipPage() {
                   }}
                 />
               )}
+              {is('images') && <FlipStoryPrompts keywords={keywords} />}
               {is('protect') && (
                 <FlipProtectStep
                   keywords={keywords}

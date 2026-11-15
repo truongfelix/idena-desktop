@@ -62,10 +62,10 @@ function openAiBody(model, system, parts) {
   }
 }
 
-function anthropicBody(model, system, parts) {
+function anthropicBody(model, system, parts, maxTokens = ANTHROPIC_MAX_TOKENS) {
   return {
     model,
-    max_tokens: ANTHROPIC_MAX_TOKENS,
+    max_tokens: maxTokens,
     system,
     messages: [
       {
@@ -106,7 +106,13 @@ function replyText(provider, data) {
 }
 
 /** The request for one question: url, headers and body, before it is sent. */
-function buildRequest({provider, address, model, key}, system, parts) {
+/** `maxTokens`: the longest reply asked of an Anthropic model (a story's four prompts need more than a flip's JSON). */
+function buildRequest(
+  {provider, address, model, key},
+  system,
+  parts,
+  {maxTokens} = {}
+) {
   const base = checkAddress(provider, address)
   if (!model) throw new Error('no model chosen')
   if (provider !== 'local' && !key) throw new Error('no key kept')
@@ -118,7 +124,7 @@ function buildRequest({provider, address, model, key}, system, parts) {
         'anthropic-version': ANTHROPIC_VERSION,
         'x-api-key': key,
       },
-      body: anthropicBody(model, system, parts),
+      body: anthropicBody(model, system, parts, maxTokens),
     }
   }
   const headers = {'content-type': 'application/json'}
@@ -158,9 +164,11 @@ async function ask(
   config,
   system,
   parts,
-  {timeoutMs, signal, request = axios.request} = {}
+  {timeoutMs, signal, maxTokens, request = axios.request} = {}
 ) {
-  const {url, headers, body} = buildRequest(config, system, parts)
+  const {url, headers, body} = buildRequest(config, system, parts, {
+    maxTokens,
+  })
   try {
     const response = await request({
       method: 'post',

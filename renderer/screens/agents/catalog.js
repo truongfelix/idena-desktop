@@ -33,6 +33,15 @@ export function actionCatalog(t) {
       ],
       defaults: {level: 'off', limit: 1},
     },
+    {
+      id: 'flipStory',
+      label: t('Write flip stories'),
+      limit: t(
+        'In the flip editor, from the two keywords: a story and one image prompt per picture. Ask me: when you click Write a story. Alone: as soon as the keywords show. Nothing goes to the chain.',
+        {nsSeparator: '!!'}
+      ),
+      reads: [t('The two keywords of the flip you make')],
+    },
   ]
 }
 
@@ -79,6 +88,8 @@ export function actionName(action, t) {
       return t('Vote in oracle votings')
     case 'invite':
       return t('Invite')
+    case 'flipStory':
+      return t('Write flip stories')
     default:
       return action
   }

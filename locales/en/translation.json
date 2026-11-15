@@ -2029,5 +2029,22 @@
   "Sent to the model with each of its actions: solving a flip, writing a post": "Sent to the model with each of its actions: solving a flip, writing a post",
   "The app adds what each action needs, and that part stays as it is: for a flip, its pictures and keywords, the report rules and the format of the answer it reads.": "The app adds what each action needs, and that part stays as it is: for a flip, its pictures and keywords, the report rules and the format of the answer it reads.",
   "Delete {{name}}?": "Delete {{name}}?",
-  "Delete the agent": "Delete the agent"
+  "Delete the agent": "Delete the agent",
+  "Write flip stories": "Write flip stories",
+  "In the flip editor, from the two keywords: a story and one image prompt per picture. Ask me: when you click Write a story. Alone: as soon as the keywords show. Nothing goes to the chain.": "In the flip editor, from the two keywords: a story and one image prompt per picture. Ask me: when you click Write a story. Alone: as soon as the keywords show. Nothing goes to the chain.",
+  "The two keywords of the flip you make": "The two keywords of the flip you make",
+  "Picture {{n}}": "Picture {{n}}",
+  "Copied!": "Copied!",
+  "Character: {{text}}": "Character: {{text}}",
+  "Goal: {{text}}": "Goal: {{text}}",
+  "A story by {{name}}": "A story by {{name}}",
+  "Pictures in the story": "Pictures in the story",
+  "3 pictures, the 4th yours": "3 pictures, the 4th yours",
+  "4 pictures": "4 pictures",
+  "Write another": "Write another",
+  "Write a story": "Write a story",
+  "The story": "The story",
+  "A flip story failed: {{detail}}": "A flip story failed: {{detail}}",
+  "A flip story was not written: the agent may not": "A flip story was not written: the agent may not",
+  "Wrote a flip story: {{detail}}": "Wrote a flip story: {{detail}}"
 }
