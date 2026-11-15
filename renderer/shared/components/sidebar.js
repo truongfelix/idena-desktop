@@ -123,14 +123,19 @@ export default function Sidebar({
 }
 
 // The node's peers from net_peers, polled every 5 s: null while unknown (no answer yet, or an error: the node
-// serves only bcn_syncing while it opens its database).
+// serves only bcn_syncing while it opens its database), and how long (ms) the list has been empty.
 function useNodePeers() {
   const [{result, error}] = usePoll(useRpc('net_peers'), 5000)
-  return error || !Array.isArray(result) ? null : result
+  const peers = error || !Array.isArray(result) ? null : result
+  const emptySince = React.useRef(null)
+  const empty = Array.isArray(peers) && peers.length === 0
+  if (!empty) emptySince.current = null
+  else if (emptySince.current === null) emptySince.current = Date.now()
+  return {peers, emptyForMs: empty ? Date.now() - emptySince.current : 0}
 }
 
 // The status's step from the chain state, the IPFS conversion and the peers (B-245).
-function useNodeStatus(peers) {
+function useNodeStatus({peers, emptyForMs}) {
   const {syncing, compacting} = useChainState()
   const {isBehind} = useSyncStep()
   // The node's one-time IPFS conversion (main/ipfs-conversion.js): it does not sync meanwhile. Only the built-in
@@ -139,7 +144,14 @@ function useNodeStatus(peers) {
   const {runInternalNode, useExternalNode} = useSettingsState()
   const converting =
     Boolean(ipfsConversion) && runInternalNode && !useExternalNode
-  return nodeStatus({syncing, compacting, converting, isBehind, peers})
+  return nodeStatus({
+    syncing,
+    compacting,
+    converting,
+    isBehind,
+    peers,
+    emptyForMs,
+  })
 }
 
 export function Status() {
@@ -149,8 +161,9 @@ export function Status() {
 
   const {wrongClientTime} = useTimingState()
 
-  const peers = useNodePeers()
-  const status = useNodeStatus(peers)
+  const nodePeers = useNodePeers()
+  const {peers} = nodePeers
+  const status = useNodeStatus(nodePeers)
 
   switch (true) {
     case loading:
@@ -172,7 +185,8 @@ export function Status() {
         </StatusContent>
       )
 
-    case status === NodeStatus.NoPeers:
+    // A wrong clock keeps the node from its peers: its own status says why (below).
+    case status === NodeStatus.NoPeers && !wrongClientTime:
       return (
         <StatusContent bg="red.020">
           <ConnectionBandwidth peers={peers} status={status} />

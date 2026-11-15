@@ -423,9 +423,10 @@ function SyncingApp() {
             </Heading>
           </Stack>
         )}
+        {/* eslint-disable-next-line no-nested-ternary */}
         {converting ? (
           <IpfsConversionStep conversion={ipfsConversion} />
-        ) : (
+        ) : compacting ? null : (
           <Stack spacing={3}>
             <Flex justify="space-between">
               <Box>

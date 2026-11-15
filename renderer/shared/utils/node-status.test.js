@@ -1,4 +1,4 @@
-import {NodeStatus, nodeStatus, peerCounts} from './node-status'
+import {NO_PEERS_MS, NodeStatus, nodeStatus, peerCounts} from './node-status'
 
 describe('nodeStatus', () => {
   const base = {
@@ -25,9 +25,20 @@ describe('nodeStatus', () => {
       {},
       {syncing: true, converting: true},
     ])
-      expect(nodeStatus({...base, ...state, peers: []})).toBe(
-        NodeStatus.NoPeers
-      )
+      expect(
+        nodeStatus({...base, ...state, peers: [], emptyForMs: NO_PEERS_MS})
+      ).toBe(NodeStatus.NoPeers)
+  })
+
+  it('waits before calling an empty list no peers', () => {
+    // A node starting, or between two peers, dials for some seconds.
+    expect(nodeStatus({...base, peers: []})).toBe(NodeStatus.Synchronized)
+    expect(nodeStatus({...base, peers: [], emptyForMs: NO_PEERS_MS - 1})).toBe(
+      NodeStatus.Synchronized
+    )
+    expect(
+      nodeStatus({...base, syncing: true, peers: [], emptyForMs: 5000})
+    ).toBe(NodeStatus.Synchronizing)
   })
 
   it('reads unknown peers as no claim', () => {
@@ -80,8 +91,9 @@ describe('peerCounts', () => {
       inbound: 0,
       outbound: 0,
       direct: 0,
-      directions: true,
+      directions: false,
     })
     expect(peerCounts([]).known).toBe(true)
+    expect(peerCounts([]).directions).toBe(true)
   })
 })
