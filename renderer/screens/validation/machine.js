@@ -634,6 +634,17 @@ export const createValidationMachine = ({
                         log('Re-fetch long flips after rebooting the app'),
                       ],
                     },
+                    // The agent's best flip (B-260): set, never toggled, and only while none is marked.
+                    MARK_BEST: {
+                      cond: ({bestFlipHashes}) =>
+                        Object.keys(bestFlipHashes).length === 0,
+                      actions: [
+                        assign({
+                          bestFlipHashes: (_, {hash}) => ({[hash]: true}),
+                        }),
+                        log(),
+                      ],
+                    },
                     FAVORITE: {
                       actions: [
                         assign({

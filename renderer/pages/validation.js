@@ -9,6 +9,7 @@ import {
   persistValidationState,
   loadValidationState,
   availableReportsNumber,
+  hasBestFlip,
 } from '../screens/validation/utils'
 import {
   ValidationFailedDialog,
@@ -109,6 +110,7 @@ function ValidationSession({
     reportsUsed: state.context.reports.size,
     // The machine's own limit: every long flip counts, ready or not.
     reportsAllowed: availableReportsNumber(state.context.longFlips),
+    hasBest: hasBestFlip(state.context),
     step: autopilotStep(state),
     send,
     validationStart,

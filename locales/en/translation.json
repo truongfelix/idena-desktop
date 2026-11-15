@@ -2126,5 +2126,6 @@
   "{{name}} already reports in the validation": "{{name}} already reports in the validation",
   "Its actions spend no iDNA: no budget to set.": "Its actions spend no iDNA: no budget to set.",
   "For {{actions}}": "For {{actions}}",
-  "Not added: {{actions}}. Another agent of yours already holds it.": "Not added: {{actions}}. Another agent of yours already holds it."
+  "Not added: {{actions}}. Another agent of yours already holds it.": "Not added: {{actions}}. Another agent of yours already holds it.",
+  "Agent's pick · it would mark this flip best": "Agent's pick · it would mark this flip best"
 }

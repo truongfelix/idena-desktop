@@ -13,6 +13,7 @@ import {
   answersToTake,
   appliedKey,
   autopilotEvents,
+  bestSuggestionOf,
   flipDeadlineMs,
   flipsLeftToAsk,
   nextFlipToAsk,
@@ -88,6 +89,8 @@ export function useAgentValidation({
   phase,
   reportsUsed,
   reportsAllowed,
+  // Whether a best flip is marked (B-260): the agent marks one only when none is.
+  hasBest = false,
   step = null,
   send,
   validationStart,
@@ -302,6 +305,8 @@ export function useAgentValidation({
               markDecision: late.markDecision,
               relevance: late.relevance,
               reportSide: late.reportSide,
+              reportConfidence: late.reportConfidence,
+              quality: late.quality,
               reportLater: false,
             },
           }))
@@ -328,11 +333,12 @@ export function useAgentValidation({
       applied: applied.current,
       isKeywords: phase === 'keywords',
       reportsLeft: reportsAllowed - reportsUsed,
+      hasBest,
     }).forEach((event) => {
       applied.current.add(appliedKey(event))
       send(event)
     })
-  }, [active, phase, flips, picks, reportsUsed, reportsAllowed, send])
+  }, [active, phase, flips, picks, reportsUsed, reportsAllowed, hasBest, send])
 
   const end = sessionEnd({
     isShort,
@@ -430,6 +436,12 @@ export function useAgentValidation({
     },
     resume: () => setAgentsPaused(false).catch(() => {}),
     takeRest: () => toTake.forEach(send),
+    // The flip it would mark best, for the person's click (its marks asked first: Ask me); null when it marks alone,
+    // or a best flip is marked.
+    bestSuggestion:
+      active && phase === 'keywords' && !hasBest
+        ? bestSuggestionOf(flips, picks)
+        : null,
     canTakeRest:
       mode === 'suggest' &&
       !paused &&

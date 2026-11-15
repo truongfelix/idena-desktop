@@ -37,7 +37,10 @@ import {
   useAutoStartLottery,
   useAutoStartValidation,
 } from '../../screens/validation/hooks/use-start-validation'
-import {availableReportsNumber} from '../../screens/validation/utils'
+import {
+  availableReportsNumber,
+  hasBestFlip,
+} from '../../screens/validation/utils'
 import {
   PRACTICE_LONG_SESSION_DURATION_PER_FLIP,
   PRACTICE_SHORT_SESSION_DURATION,
@@ -230,6 +233,7 @@ function PracticeSession({practice, onDone, onLeave}) {
     reportsUsed: state.context.reports.size,
     // The machine's own limit: every long flip counts, ready or not.
     reportsAllowed: availableReportsNumber(state.context.longFlips),
+    hasBest: hasBestFlip(state.context),
     step: autopilotStep(state),
     send,
     validationStart,
