@@ -40,6 +40,14 @@ const validationNodeCalls = {
   fetchKeywords,
 }
 
+// Whether a submit failed because the node already holds the same transaction (a retried submit): the answers
+// are with the node. The node calls throw an Error with the node's message.
+export function isDuplicateTx(error) {
+  return String(error?.message ?? error).includes(
+    'tx with same hash already exists'
+  )
+}
+
 export const createValidationMachine = ({
   epoch,
   validationStart,
@@ -67,6 +75,11 @@ export const createValidationMachine = ({
         translations: {},
         reports: new Set(),
         submitLongAnswersHash: null,
+        // When the answers went to the node (ms), and the short answers' hash transaction: the screens follow
+        // both until a block holds them.
+        submitLongAnswersAt: null,
+        submitShortAnswersHash: null,
+        submitShortAnswersAt: null,
       },
       states: {
         shortSession: {
@@ -435,13 +448,18 @@ export const createValidationMachine = ({
                               ),
                             onDone: {
                               target: '#validation.longSession',
-                              actions: [log()],
+                              actions: [
+                                assign({
+                                  submitShortAnswersHash: (_, {data}) => data,
+                                  submitShortAnswersAt: () => Date.now(),
+                                }),
+                                log(),
+                              ],
                             },
                             onError: [
                               {
                                 target: '#validation.longSession',
-                                cond: (_, {data}) =>
-                                  data === 'tx with same hash already exists',
+                                cond: (_, {data}) => isDuplicateTx(data),
                               },
                               {
                                 target: 'fail',
@@ -951,6 +969,7 @@ export const createValidationMachine = ({
                               actions: [
                                 assign({
                                   submitLongAnswersHash: (_, {data}) => data,
+                                  submitLongAnswersAt: () => Date.now(),
                                 }),
                               ],
                               target: '#validation.validationSucceeded',
@@ -958,8 +977,7 @@ export const createValidationMachine = ({
                             onError: [
                               {
                                 target: '#validation.validationSucceeded',
-                                cond: (_, {data}) =>
-                                  data === 'tx with same hash already exists',
+                                cond: (_, {data}) => isDuplicateTx(data),
                               },
                               {
                                 target: 'fail',

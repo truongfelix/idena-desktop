@@ -1817,5 +1817,9 @@
   "The recording stopped at its limit: the {{size}} KB a voice note can hold.": "L'enregistrement s'est arrêté à sa limite : les {{size}} Ko qu'une note vocale peut contenir.",
   "The recording stopped at its limit: {{minutes}} minutes.": "L'enregistrement s'est arrêté à sa limite : {{minutes}} minutes.",
   "Play the video": "Lire la vidéo",
-  "🎞 This computer cannot play this video.": "🎞 Cet ordinateur ne peut pas lire cette vidéo."
+  "🎞 This computer cannot play this video.": "🎞 Cet ordinateur ne peut pas lire cette vidéo.",
+  "Your node has no connection: your answers cannot reach the network": "Votre nœud n'a aucune connexion : vos réponses ne peuvent pas atteindre le réseau",
+  "Your short answers are not in a block yet: keep the app open and connected": "Vos réponses courtes ne sont pas encore dans un bloc : gardez l'application ouverte et connectée",
+  "Your answers are not in a block yet: keep the app open and connected": "Vos réponses ne sont pas encore dans un bloc : gardez l'application ouverte et connectée",
+  "Your answers were sent to your node": "Vos réponses ont été transmises à votre nœud"
 }
