@@ -12,6 +12,7 @@ import {
   MIN_FLIP_MS,
   answersToTake,
   appliedKey,
+  askAgain,
   autopilotEvents,
   bestSuggestionOf,
   flipDeadlineMs,
@@ -107,6 +108,8 @@ export function useAgentValidation({
   const [noAnswer, setNoAnswer] = React.useState(null)
   const [asking, setAsking] = React.useState(null)
   const asked = React.useRef(new Set())
+  // Each flip's questions so far, by hash (B-263: a failed one is asked again a few times).
+  const triesOf = React.useRef(new Map())
   const applied = React.useRef(new Set())
   const seen = React.useRef(new Map())
   const drawn = React.useRef(new Map())
@@ -155,6 +158,7 @@ export function useAgentValidation({
     if (!phase || sessionRef.current === session) return
     sessionRef.current = session
     asked.current = new Set()
+    triesOf.current = new Map()
     applied.current = new Set()
     seen.current = new Map()
     drawn.current = new Map()
@@ -229,6 +233,34 @@ export function useAgentValidation({
       .then((answer) => {
         // Gone, or a question of the session before: dropped.
         if (!live.current || sessionRef.current !== session) return
+        // A model error (B-263): asked again, at most twice more, while the session gives the flip time; the error
+        // shows meanwhile.
+        if (answer?.failed) {
+          const tries = (triesOf.current.get(flip.hash) || 0) + 1
+          triesOf.current.set(flip.hash, tries)
+          const left = new Set(asked.current)
+          left.delete(flip.hash)
+          const again = askAgain(
+            tries,
+            flipDeadlineMs({
+              end: sessionEnd({
+                isShort,
+                validationStart,
+                shortSessionDuration,
+                longSessionDuration,
+              }),
+              now: Date.now(),
+              flipsLeft: flipsLeftToAsk(flips, left),
+              isShort,
+            })
+          )
+          if (again) {
+            asked.current.delete(flip.hash)
+            setNoAnswer({reason: answer.reason})
+            setAsking((current) => (current === token ? null : current))
+            return
+          }
+        }
         // Refused for the pause (the main process saw it first): asked again after the resume.
         const pick = answer?.decision === 'off' ? null : answer
         if (pick) {

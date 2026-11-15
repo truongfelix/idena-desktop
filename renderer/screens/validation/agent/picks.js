@@ -30,6 +30,16 @@ export const NO_ANSWER_MAX_CHARS = 160
  * Why the agent gave no answer (the model's error, or the app's before the call), as the validation screen shows it: the error's text, cut to NO_ANSWER_MAX_CHARS;
  * null for a question stopped by a pause (asked again after the resume, not a failure).
  */
+/** A flip's questions at most: the first and two more after a model error (B-263). */
+export const MAX_FLIP_TRIES = 3
+
+/**
+ * Whether a flip whose question failed (`tries` made so far) is asked again: fewer than MAX_FLIP_TRIES, and the
+ * session still gives it a share of its time (`timeoutMs`, flipDeadlineMs of the flips left with it; null: none).
+ */
+export const askAgain = (tries, timeoutMs) =>
+  tries < MAX_FLIP_TRIES && Boolean(timeoutMs)
+
 export function noAnswerReason(text) {
   const reason = String(text || '').trim()
   if (reason === 'stopped') return null

@@ -2,6 +2,8 @@ import {AnswerType, RelevanceType} from '../../../shared/types'
 import {
   answersToTake,
   appliedKey,
+  askAgain,
+  MAX_FLIP_TRIES,
   autopilotEvents,
   bestFlipOf,
   flipDeadlineMs,
@@ -393,6 +395,15 @@ describe("Autopilot's marks in the keywords check (B-259, B-260)", () => {
     ).toBe('a')
     // None approved: none.
     expect(bestFlipOf(flips, picks)).toBeNull()
+  })
+})
+
+describe('a flip whose question failed (B-263)', () => {
+  test('asked again twice at most, and only while the session gives it time', () => {
+    expect(askAgain(1, 20000)).toBe(true)
+    expect(askAgain(2, 20000)).toBe(true)
+    expect(askAgain(MAX_FLIP_TRIES, 20000)).toBe(false)
+    expect(askAgain(1, null)).toBe(false)
   })
 })
 
