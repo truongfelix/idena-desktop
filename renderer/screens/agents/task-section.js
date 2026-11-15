@@ -56,6 +56,15 @@ function runLine({result, detail}, t) {
   }
 }
 
+/** When it runs, in words, before a run: waiting for the Social scan, or its schedule. */
+function whenLine(agent, isReady, t) {
+  if (!isReady) return t('Waits for Social to read the chain up to now.')
+  if (agent.schedule.kind === 'hourly')
+    return t('Runs every hour while the app is open.')
+  if (agent.schedule.kind !== 'daily') return t('Runs when you click Run now.')
+  return t('Runs once a day at its time, while the app is open.')
+}
+
 /** "Task": what the agent does when it runs (the daily joke of 3615 IDENA), and a run now. */
 export function TaskSection({agent, onChange}) {
   const {t} = useTranslation()
@@ -133,15 +142,7 @@ export function TaskSection({agent, onChange}) {
                 {t('Run now')}
               </SecondaryButton>
               <Text color="muted" fontSize="sm">
-                {line ||
-                  // eslint-disable-next-line no-nested-ternary
-                  (!socialReadyForJokes(social)
-                    ? t('Waits for Social to read the chain up to now.')
-                    : agent.schedule.kind === 'hourly'
-                    ? t('Runs every hour while the app is open.')
-                    : agent.schedule.kind !== 'daily'
-                    ? t('Runs when you click Run now.')
-                    : t('Runs once a day at its time, while the app is open.'))}
+                {line || whenLine(agent, socialReadyForJokes(social), t)}
               </Text>
             </Flex>
           </>
