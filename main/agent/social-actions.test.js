@@ -205,8 +205,12 @@ describe('Social actions', () => {
     const agent = start([social({reply: {level: 'ask'}})])
     await expect(agent.handle('lastRun', {agentId: ID})).resolves.toBe(null)
     await agent.handle('setReadPoint', {agentId: ID, height: 500})
+    // A start after now (the clock set back during the run): kept as now.
     await expect(
-      agent.handle('setLastRun', {agentId: ID, at: at + 1})
+      agent.handle('setLastRun', {agentId: ID, at: at + 60000})
+    ).resolves.toBe(at)
+    await expect(
+      agent.handle('setLastRun', {agentId: ID, at: 0})
     ).rejects.toThrow('not a time')
     await expect(
       agent.handle('setLastRun', {agentId: ID, at: at - 60000})

@@ -3,8 +3,8 @@ const fs = require('fs-extra')
 // How far each agent read Idena Social (B-239): the block its last run read up to, kept by the main process in one
 // JSON file of the user data folder (agent-read.json), so that a restart does not show it the same posts and
 // messages again. A run reads what came after its point, then moves it to the block it read up to.
-// The same file keeps when each daily agent's last run that ended without failing started (B-274), so a daily agent runs once a day,
-// not again at each start of the app; a build before it reads `points` alone and drops `runs` when it saves.
+// The same file keeps, for each daily agent, when its last run that did not fail began (B-274): it runs once a day,
+// not again at each start of the app. A build before it reads `points` alone and drops `runs` when it saves.
 
 const ID_PATTERN = /^[0-9a-f]{16}$/u
 
@@ -77,18 +77,17 @@ function createReadPoints({file = null, logger = null, now = Date.now} = {}) {
         }
         return points[agentId]
       },
-      /** When the agent `agentId`'s last run that ended without failing started (ms), or null. */
+      /** When the agent `agentId`'s last run that did not fail began (ms), or null. */
       lastRun(data) {
         const id = data && data.agentId
         return Object.prototype.hasOwnProperty.call(runs, id) ? runs[id] : null
       },
-      /** The agent `agentId`'s run that started `at` (ms, not after now) ended without failing. */
+      /** The agent `agentId`'s run that began `at` (ms; after now, a clock set back meanwhile: now) did not fail. */
       setLastRun(data) {
         const {agentId, at} = data || {}
         if (!ID_PATTERN.test(agentId)) throw new Error('no agent named')
-        if (!Number.isSafeInteger(at) || at <= 0 || at > now())
-          throw new Error('not a time')
-        runs = {...runs, [agentId]: at}
+        if (!Number.isSafeInteger(at) || at <= 0) throw new Error('not a time')
+        runs = {...runs, [agentId]: Math.min(at, now())}
         save()
         return runs[agentId]
       },
