@@ -16,6 +16,15 @@ export function tagName(name) {
   return match ? match[1] : null
 }
 
+/**
+ * The posts that tag it an agent may still read today (B-264): `perDay` a day (null: no limit), `today` read so far;
+ * none when the day's count is unknown (each one read is a question billed).
+ */
+export function tagsLeftOf(perDay, today) {
+  if (typeof today !== 'number') return 0
+  return typeof perDay === 'number' ? Math.max(0, perDay - today) : Infinity
+}
+
 /** Whether `message` tags the profile name `name` (tagName's). A text on IPFS is not read: no tag. */
 export function tags(message, name) {
   if (!name || typeof message !== 'string' || message === LIKE) return false

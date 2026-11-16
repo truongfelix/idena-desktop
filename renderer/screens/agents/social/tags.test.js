@@ -2,11 +2,11 @@
 import os from 'os'
 import path from 'path'
 import fs from 'fs-extra'
-import {tagName, tags} from './tags'
+import {tagName, tags, tagsLeftOf} from './tags'
 import {socialDigest} from './digest'
 import {eventPending} from './events'
 import {runSocialAgent} from './run'
-import {eventsRead, questionsLeft} from '../runner'
+import {eventsRead} from '../runner'
 
 // The posts that tag an agent (B-264): its questions, at most a number a day for the whole agent (a day in UTC), only
 // from the identities its criteria let it read; past them, and for an untagged post, no reply and no model call.
@@ -152,10 +152,10 @@ describe('what a run reads of the posts that tag it', () => {
     ])
     expect(eventsRead({reads: {tags: null}, events: ['tag']})).toEqual([])
     // Past its questions of the day, or with the day's count unknown, a tag starts no run.
-    expect(questionsLeft(5, 4)).toBe(true)
-    expect(questionsLeft(5, 5)).toBe(false)
-    expect(questionsLeft(null, 50)).toBe(true)
-    expect(questionsLeft(5, null)).toBe(false)
+    expect(tagsLeftOf(5, 4)).toBe(1)
+    expect(tagsLeftOf(5, 7)).toBe(0)
+    expect(tagsLeftOf(null, 50)).toBe(Infinity)
+    expect(tagsLeftOf(5, null)).toBe(0)
   })
 })
 

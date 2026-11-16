@@ -2,6 +2,7 @@ import {socialDigest} from './digest'
 import {criteriaNeeds, passes} from '../criteria'
 import {doneOnFeed, readPlan} from './plan'
 import {mostCost} from './execute'
+import {tagsLeftOf} from './tags'
 import {shortAddress} from '../../social/people'
 
 // One run of an agent on Idena Social (B-239, B-240): the app reads what came since its read point (digest.js), the
@@ -93,6 +94,16 @@ export async function runSocialAgent(agent, social, deps) {
   if (typeof scanned !== 'number')
     return {result: 'failed', detail: t('Social has not read the chain yet')}
   const point = await call('readPoint', {agentId: agent.id})
+  // Its questions left today (B-264): the posts that tag it it may still read, a day in UTC, asked before anything
+  // else is read. Unknown, the run fails before reading (passed over, they would be lost), as for its read point: a
+  // later run reads them.
+  let tagsLeft = 0
+  if (agent.reads?.tags) {
+    const today = await call('tagsToday', {agentId: agent.id})
+    if (typeof today !== 'number')
+      return {result: 'failed', detail: t('its questions of the day unknown')}
+    tagsLeft = tagsLeftOf(agent.reads.tags.perDay, today)
+  }
   // Whose it reads and whom it acts on (B-266): the authors of what is new read first, when a criterion needs it.
   const who = {
     posts: agent.actions.readPosts?.who || null,
@@ -115,17 +126,6 @@ export async function runSocialAgent(agent, social, deps) {
     // Without a reader, nothing is known of anyone: no criterion that needs it passes.
     facts = deps.readAuthors ? await deps.readAuthors([...authors], needs) : {}
   }
-  // Its questions left today (B-264): the posts that tag it it may still read, a day in UTC. Unknown, the run fails
-  // before reading (each one read is a question billed; passed over, it would be lost): a later run reads them.
-  let tagsLeft = 0
-  if (agent.reads?.tags) {
-    const {perDay} = agent.reads.tags
-    const today = await call('tagsToday', {agentId: agent.id})
-    if (typeof today !== 'number')
-      return {result: 'failed', detail: t('its questions of the day unknown')}
-    tagsLeft =
-      typeof perDay === 'number' ? Math.max(0, perDay - today) : Infinity
-  }
   const digest = socialDigest(
     social,
     {reads: agent.reads, who, facts, tagsLeft},
@@ -143,7 +143,9 @@ export async function runSocialAgent(agent, social, deps) {
             count: digest.tagsPassed,
             nsSeparator: '!!',
           }),
-        }).catch(() => {})
+        }).catch((error) =>
+          global.logger?.warn('agent activity line not written', error?.message)
+        )
       : null
   // Nothing to read, and no post of its own to write: the model is not asked (its service bills each question).
   if (digest.empty && !held.includes('post')) {

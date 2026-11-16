@@ -15,6 +15,7 @@ import {
   scannedHeight,
 } from './social/run'
 import {EVENT_MIN_MS, eventPending, eventReadBy} from './social/events'
+import {tagsLeftOf} from './social/tags'
 import {
   prepareSocialAction,
   sendSocialAction,
@@ -45,10 +46,6 @@ export function eventsRead(agent) {
   const {reads = {}, events = []} = agent
   return events.filter((one) => eventReadBy(one, reads))
 }
-
-/** Whether an agent reading `perDay` posts that tag it a day, `today` read, has questions left (unknown: none). */
-export const questionsLeft = (perDay, today) =>
-  typeof today === 'number' && (typeof perDay !== 'number' || today < perDay)
 
 /** Whether an event may still run the agent today: not after MAX_TRIES failed event runs that day. */
 export const eventsAllowed = (fails, day) =>
@@ -257,16 +254,6 @@ export function AgentRunner() {
         // eslint-disable-next-line no-restricted-syntax
         for (const agent of active) {
           let events = eventsRead(agent)
-          // A tag starts a run only while it has questions left today (B-264): past them, a run would read none.
-          if (events.includes('tag')) {
-            const {perDay} = agent.reads.tags
-            // eslint-disable-next-line no-await-in-loop
-            const today = await agentCall('tagsToday', {
-              agentId: agent.id,
-            }).catch(() => null)
-            if (!questionsLeft(perDay, today))
-              events = events.filter((one) => one !== 'tag')
-          }
           if (
             due.includes(agent) ||
             !events.length ||
@@ -275,6 +262,17 @@ export function AgentRunner() {
           )
             // eslint-disable-next-line no-continue
             continue
+          // A tag starts a run only while it has questions left today (B-264): past them, a run would read none.
+          if (events.includes('tag')) {
+            // eslint-disable-next-line no-await-in-loop
+            const today = await agentCall('tagsToday', {
+              agentId: agent.id,
+            }).catch(() => null)
+            if (tagsLeftOf(agent.reads.tags.perDay, today) === 0)
+              events = events.filter((one) => one !== 'tag')
+            // eslint-disable-next-line no-continue
+            if (!events.length) continue
+          }
           // eslint-disable-next-line no-await-in-loop
           const point = await agentCall('readPoint', {agentId: agent.id}).catch(
             () => null
