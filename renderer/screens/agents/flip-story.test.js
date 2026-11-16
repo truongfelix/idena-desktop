@@ -147,6 +147,24 @@ describe("the draft's stories for these keywords (B-236, B-268)", () => {
     expect(storyForKeywords({...saved, stories: []}, words)).toBeNull()
   })
 
+  test('a story without a prompts list, or with odd values, is read without crashing', () => {
+    const odd = {
+      words: ['ladder', 'kite'],
+      stories: [
+        {title: 'Words only', story: 'S'},
+        null,
+        {prompts: [' ', 3, 'p']},
+      ],
+    }
+    expect(storyForKeywords(odd, words).stories).toEqual([
+      {title: 'Words only', story: 'S', prompts: []},
+      {title: '', story: '', prompts: ['p']},
+    ])
+    expect(promptsOf(storyForKeywords(odd, words))).toEqual([
+      {story: 1, index: 0, prompt: 'p'},
+    ])
+  })
+
   test('a draft of a build before B-268 is read as one story', () => {
     const old = {
       words: ['ladder', 'kite'],
