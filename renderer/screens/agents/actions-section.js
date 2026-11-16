@@ -19,15 +19,8 @@ import {drawsPictures} from './flip-story'
 import {READ_COLS, ReadRow} from './read-row'
 import {DO_COLS, DoRow} from './do-row'
 import {nothingToActOn} from './page-sections'
-import {
-  areaCount,
-  firstArea,
-  flipStarts,
-  isOn,
-  rowOf,
-  withLevels,
-  withRow,
-} from './rights'
+import {FlipStarts} from './flip-starts'
+import {areaCount, firstArea, isOn, rowOf, withLevels, withRow} from './rights'
 
 /**
  * "What it may do": the agent's rights as one table per area of the app (Q-64, B-280). Every right of an area is a
@@ -101,21 +94,12 @@ export function ActionsSection({agent, agents, catalog, onChange}) {
           })}
         </Flex>
         {area === 'flips' && (
-          <Flex gap={2} align="center" wrap="wrap">
-            <Text color="muted">{t('Start from')}</Text>
-            {flipStarts(t).map(({id, label, levels}) => (
-              <Button
-                key={id}
-                size="sm"
-                variant="outline"
-                onClick={() =>
-                  setActions((actions) => withLevels(actions, catalog, levels))
-                }
-              >
-                {label}
-              </Button>
-            ))}
-          </Flex>
+          <FlipStarts
+            catalog={catalog}
+            onPick={(levels) =>
+              setActions((actions) => withLevels(actions, catalog, levels))
+            }
+          />
         )}
         {nothingToActOn(agent) && (
           <Text color="orange.500">

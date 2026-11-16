@@ -2239,5 +2239,8 @@
   "Ask me at every step": "Ask me at every step",
   "It prepares the drafts, I send": "It prepares the drafts, I send",
   "It makes and sends alone": "It makes and sends alone",
-  "Nothing, while its actions here are Off.": "Nothing, while its actions here are Off."
+  "Nothing, while its actions here are Off.": "Nothing, while its actions here are Off.",
+  "Set every step of Flips?": "Set every step of Flips?",
+  "Each step takes the level below, in place of the one it has now. Their limits a day stay.": "Each step takes the level below, in place of the one it has now. Their limits a day stay.",
+  "Set the steps": "Set the steps"
 }

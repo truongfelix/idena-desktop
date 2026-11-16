@@ -2239,5 +2239,8 @@
   "Ask me at every step": "Me demander à chaque étape",
   "It prepares the drafts, I send": "Il prépare les brouillons, j'envoie",
   "It makes and sends alone": "Il fait et envoie seul",
-  "Nothing, while its actions here are Off.": "Rien, tant que ses actions ici sont désactivées."
+  "Nothing, while its actions here are Off.": "Rien, tant que ses actions ici sont désactivées.",
+  "Set every step of Flips?": "Régler toutes les étapes de Flips ?",
+  "Each step takes the level below, in place of the one it has now. Their limits a day stay.": "Chaque étape prend le niveau ci-dessous, à la place de celui qu'elle a maintenant. Leurs limites par jour restent.",
+  "Set the steps": "Régler les étapes"
 }
