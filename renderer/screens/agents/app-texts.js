@@ -39,13 +39,38 @@ export function useAppTexts(held) {
   return texts
 }
 
-/** An action's ⓘ: what it is for, then what the app sends with the Instructions for it, when it sends something. */
-export function ActionInfo({info, sent}) {
+/**
+ * An action's ⓘ: what it is for, then what the app sends with the Instructions for it, when it sends something;
+ * `changed`: the agent holds its own text for the action's area.
+ */
+
+/** The area whose part an action is asked with (main/agent/app-parts.js PARTS), or undefined. */
+export const partOf = (action) =>
+  ({
+    flipStory: 'flipStory',
+    answerFlip: 'validation',
+    report: 'validation',
+    flipJudge: 'validation',
+    post: 'social',
+    reply: 'social',
+    like: 'social',
+    message: 'social',
+    tip: 'social',
+  }[action])
+export function ActionInfo({info, sent, changed = false}) {
   const {t} = useTranslation()
   return (
     <>
       {info}
-      {sent && (
+      {changed && (
+        // The agent's own text is sent for this area (B-282): the app's is not shown as if it were.
+        <Text mt={3}>
+          {t(
+            'You changed the app’s part for this area. What is sent is in What the app adds.'
+          )}
+        </Text>
+      )}
+      {sent && !changed && (
         <>
           <Text mt={3} fontWeight={500}>
             {t('What the app sends with your Instructions')}

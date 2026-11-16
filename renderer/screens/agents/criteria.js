@@ -21,7 +21,7 @@ const known = new Map()
 
 /** What the criteria in `list` need read of each author: {identity, vouched, trust}. */
 export function criteriaNeeds(list) {
-  const needs = {identity: false, vouched: false, trust: false}
+  const needs = {identity: false, vouched: false, trust: false, named: false}
   list.filter(Boolean).forEach((one) => {
     if (one.minAge !== null || one.minStake !== null) needs.identity = true
     if (one.states.some((state) => state !== 'Vouched')) needs.identity = true
@@ -31,6 +31,8 @@ export function criteriaNeeds(list) {
       needs.identity = true
     }
     if (one.trustAbove !== null) needs.trust = true
+    // A claimed profile name (B-281): read from the profiles contract, as the other facts.
+    if (one.named === true) needs.named = true
   })
   return needs
 }
@@ -110,6 +112,20 @@ export async function readAuthors(
       })
     } catch {
       // Left out.
+    }
+  }
+  if (needs.named && missing('named').length) {
+    const asked = missing('named')
+    try {
+      const names = await readEntries(
+        settled,
+        asked.map((a) => ['a:', a])
+      )
+      asked.forEach((a, i) => {
+        facts[a].named = Boolean(names[i])
+      })
+    } catch {
+      // Left out: the criterion does not pass.
     }
   }
   if (needs.trust) {

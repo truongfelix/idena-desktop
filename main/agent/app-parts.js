@@ -12,15 +12,27 @@ const INSTRUCTIONS_SLOT = '{{instructions}}'
 const ACTIONS_SLOT = '{{actions}}'
 
 /**
- * An unlocked part as sent: each slot filled. A text without the Instructions' slot gets them at its end, so they
- * are never dropped.
+ * An unlocked part as sent: each slot filled. A text without a slot gets what the slot holds at its end (the
+ * actions, then the Instructions), so neither is ever dropped. An agent without Instructions: the slot's line goes,
+ * with the line that announces it (one ending with ":"), so what follows is not read as the person's words.
  */
 function fillPart(template, {instructions = '', actions = ''} = {}) {
   const own = typeof instructions === 'string' ? instructions.trim() : ''
-  const text = String(template).split(ACTIONS_SLOT).join(actions)
-  if (text.includes(INSTRUCTIONS_SLOT))
-    return text.split(INSTRUCTIONS_SLOT).join(own)
-  return own ? `${text}\n\n${own}` : text
+  let text = String(template)
+  const listsActions = text.includes(ACTIONS_SLOT)
+  text = text.split(ACTIONS_SLOT).join(actions)
+  if (!listsActions && actions) text = `${text}\n\n${actions}`
+  if (!text.includes(INSTRUCTIONS_SLOT)) return own ? `${text}\n\n${own}` : text
+  if (own) return text.split(INSTRUCTIONS_SLOT).join(own)
+  const kept = []
+  text.split('\n').forEach((line) => {
+    if (line.trim() !== INSTRUCTIONS_SLOT) {
+      kept.push(line.split(INSTRUCTIONS_SLOT).join(''))
+      return
+    }
+    if (kept.length && kept[kept.length - 1].trim().endsWith(':')) kept.pop()
+  })
+  return kept.join('\n').replace(/^\n+/u, '')
 }
 
 /**

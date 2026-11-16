@@ -67,12 +67,47 @@ describe("the authors' facts", () => {
       identity: true,
       vouched: true,
       trust: false,
+      named: false,
     })
     expect(criteriaNeeds([{...none, trustAbove: 1}])).toEqual({
       identity: false,
       vouched: false,
       trust: true,
+      named: false,
     })
+    // A claimed profile name (B-281) is read from the profiles contract, for the authors asked only.
+    const named = criteriaNeeds([{...none, named: true}])
+    expect(named).toEqual({
+      identity: false,
+      vouched: false,
+      trust: false,
+      named: true,
+    })
+    const names = jest.fn(async (method, list) =>
+      list.map((_, i) =>
+        i === 0 ? {result: 'ann'} : {error: {message: 'data is nil'}}
+      )
+    )
+    const read = await readAuthors([A, B], named, {
+      settled: names,
+      call: jest.fn(),
+      now: 1,
+    })
+    expect(names).toHaveBeenCalledTimes(1)
+    expect(names.mock.calls[0][0]).toBe('contract_readMap')
+    expect(read[A].named).toBe(true)
+    expect(read[B.toLowerCase()].named).toBe(false)
+    expect(passes({...none, named: true}, A, read[A])).toBe(true)
+    expect(passes({...none, named: true}, B, read[B.toLowerCase()])).toBe(false)
+    // A read that failed leaves the fact out: the criterion does not pass.
+    forgetAuthors()
+    const failed = await readAuthors([A], named, {
+      settled: jest.fn().mockRejectedValue(new Error('down')),
+      call: jest.fn(),
+      now: 1,
+    })
+    expect(passes({...none, named: true}, A, failed[A])).toBe(false)
+    forgetAuthors()
     const settled = jest.fn(async (method, list) =>
       list.map(([address]) => ({
         result: {

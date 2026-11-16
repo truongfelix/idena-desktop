@@ -310,7 +310,8 @@ function normalizeAgent(input, {id = newAgentId} = {}) {
     reportThresholds,
     // Its actions read with the Flips area's steps (B-258): see withFlipPictures.
     flipSteps: true,
-    // The app's parts it changed (B-282), only when it changed one: an older build reads the app's own.
+    // The app's parts it changed (B-282), only when it changed one. An older build sends the app's own, and drops
+    // this field when it saves the agents.
     ...(Object.keys(appParts).length ? {appParts} : {}),
   }
 }

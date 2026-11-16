@@ -5,7 +5,8 @@ const {SINGLE_HOLDER_ACTIONS, normalizeAgent} = require('./profiles')
 // their levels and limits, when it runs, its model and its budget, the report thresholds. Never the key, nor the
 // Activity. The service's address goes in only when it is the service's public default: another may hold a secret
 // (a token in the address) or a private server. An imported agent starts off, each action Off, until the person
-// turns each one on.
+// turns each one on. Nor its own parts of the app's text (B-282): a file cannot bring a text in place of the app's
+// (its safeguard, its format) that the import does not show; a part is unlocked by the person, on their computer.
 
 const FORMAT = 'idena-agent'
 const VERSION = 1
@@ -72,6 +73,7 @@ function readAgentFile(text, agents = []) {
     ...value,
     id: undefined,
     enabled: false,
+    appParts: undefined,
     // Only the service's public default address comes from a file, as only it goes into one: another (a server
     // that would get the key and what the agent reads) is set by the person on the agent's page.
     address:

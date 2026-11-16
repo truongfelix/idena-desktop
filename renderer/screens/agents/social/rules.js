@@ -50,14 +50,25 @@ export function lastActs({feed = [], conversations = [], me}) {
   return acts
 }
 
-/** The addresses that wrote a private message to the account `me`, one to one (lowercase). */
+/**
+ * The addresses that wrote to the account `me` first, one to one (lowercase): the conversation's earliest message is
+ * theirs. One the account opened does not count, whatever was answered since.
+ */
 export function wroteFirst({conversations = [], me}) {
   const out = new Set()
   conversations.forEach((conversation) => {
     if (conversation.isGroup || conversation.group) return
     const others = conversation.others || []
     if (others.length !== 1) return
-    if ((conversation.messages || []).some((m) => m.from === others[0]))
+    const first = (conversation.messages || []).reduce(
+      (found, message) =>
+        typeof message.height === 'number' &&
+        (!found || message.height < found.height)
+          ? message
+          : found,
+      null
+    )
+    if (first && first.from === others[0])
       out.add(String(others[0]).toLowerCase())
   })
   out.delete(String(me || '').toLowerCase())
@@ -68,31 +79,38 @@ export function wroteFirst({conversations = [], me}) {
  * The checks of one run: `allows(action, whom)` says why an action on the people `whom` is refused ('once per
  * author', 'did not write first') or null; `did(action, whom)` counts one this run asked for (done alone or waiting
  * in To approve), so a second one for the same author in the run is refused too. `rows`: the agent's actions,
- * `scanned` the last block read.
+ * `scanned` the last block read, `waiting` what earlier runs left in To approve ([{action, whom}]): each counts as
+ * done for its author until the person decides. The chain is read only when a row has a rule.
  */
-export function actionRules(rows, social, scanned) {
-  const acts = lastActs(social)
-  const wrote = wroteFirst(social)
-  const inRun = new Set()
+export function actionRules(rows, social, scanned, waiting = []) {
+  let acts = null
+  let wrote = null
   const key = (action, one) => `${action}:${String(one).toLowerCase()}`
+  const asked = new Set()
+  waiting.forEach(({action, whom}) =>
+    (whom || []).forEach((one) => asked.add(key(action, one)))
+  )
   return {
     allows(action, whom) {
       const row = rows[action] || {}
-      if (action === 'message' && row.onlyAnswers === true)
+      if (action === 'message' && row.onlyAnswers === true) {
+        wrote = wrote || wroteFirst(social)
         if (!whom.every((one) => wrote.has(String(one).toLowerCase())))
           return 'did not write first'
+      }
       const blocks = PERIOD_BLOCKS[row.perAuthor]
       if (!blocks) return null
+      acts = acts || lastActs(social)
       const recent = (one) => {
         const last = acts[action]?.get(String(one).toLowerCase())
         return typeof last === 'number' && last > scanned - blocks
       }
-      return whom.some((one) => inRun.has(key(action, one)) || recent(one))
+      return whom.some((one) => asked.has(key(action, one)) || recent(one))
         ? 'once per author'
         : null
     },
     did(action, whom) {
-      whom.forEach((one) => inRun.add(key(action, one)))
+      whom.forEach((one) => asked.add(key(action, one)))
     },
   }
 }

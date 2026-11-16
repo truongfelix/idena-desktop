@@ -59,6 +59,26 @@ describe('an unlocked part', () => {
       'No slot.\n\nMine.'
     )
     expect(fillPart('No slot.', {instructions: ''})).toBe('No slot.')
+    // The actions too: a Social text without their slot still lists them, before the Instructions.
+    expect(fillPart('Frame.', {instructions: 'Mine.', actions: '- x'})).toBe(
+      'Frame.\n\n- x\n\nMine.'
+    )
+  })
+
+  test('without Instructions, the slot goes with the line that announces it', () => {
+    const parts = defaultParts()
+    const flips = fillPart(parts.validation, {instructions: ''})
+    expect(flips).not.toContain('The instructions of the person who runs you')
+    expect(flips).not.toContain(INSTRUCTIONS_SLOT)
+    expect(flips).toBe(flipSystem(''))
+    const social = fillPart(parts.social, {instructions: '', actions: '- x'})
+    expect(social).not.toContain('Instructions from the person you act for')
+    expect(social).toContain('- x')
+    expect(fillPart(parts.flipStory, {instructions: ''})).toBe(storySystem(''))
+    // A slot inside a line only loses its name.
+    expect(fillPart(`Do this: ${INSTRUCTIONS_SLOT} now.`, {})).toBe(
+      'Do this:  now.'
+    )
   })
 
   test('kept only for a known area, when it is a text that differs from the default', () => {

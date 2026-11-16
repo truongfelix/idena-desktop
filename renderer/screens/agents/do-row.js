@@ -30,7 +30,16 @@ export const DO_COLS =
  * own or the catalog's defaults set to Off (rights.js), `change(patch)` changes it. `holder`: the other agent that
  * holds it, for an action only one agent may hold. `onFree`: takes the row out, for one kept Off by an older file.
  */
-export function DoRow({entry, row, sent, note, holder, change, onFree}) {
+export function DoRow({
+  entry,
+  row,
+  sent,
+  changed,
+  note,
+  holder,
+  change,
+  onFree,
+}) {
   const {t} = useTranslation()
   const [open, setOpen] = React.useState(false)
   const {id, label, info, perDay, scope} = entry
@@ -43,7 +52,7 @@ export function DoRow({entry, row, sent, note, holder, change, onFree}) {
         <Flex align="center" gap={2}>
           <Text fontWeight={500}>{label}</Text>
           <InfoTip label={label}>
-            <ActionInfo info={info} sent={sent} />
+            <ActionInfo info={info} sent={sent} changed={changed} />
           </InfoTip>
         </Flex>
         {(holder || note) && (

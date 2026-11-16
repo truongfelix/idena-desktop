@@ -4,7 +4,7 @@ import {Box, Button, Flex, Grid, Heading, Stack, Text} from '@chakra-ui/react'
 import {useTranslation} from 'react-i18next'
 import {HDivider} from '../../shared/components/components'
 import {InfoTip} from '../../shared/components/info-tip'
-import {useAppTexts} from './app-texts'
+import {partOf, useAppTexts} from './app-texts'
 import {SettingsSection} from '../settings/components'
 import {
   AREAS,
@@ -170,6 +170,9 @@ export function ActionsSection({agent, agents, catalog, onChange}) {
                       entry={entry}
                       row={rowOf(agent, entry)}
                       sent={texts && texts.sent[entry.id]}
+                      changed={Boolean(
+                        agent.appParts && agent.appParts[partOf(entry.id)]
+                      )}
                       holder={holder ? heldText(entry.id, holder, t) : null}
                       // Make the pictures needs a service that draws (B-258): the row says so.
                       note={

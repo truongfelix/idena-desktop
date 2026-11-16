@@ -65,8 +65,17 @@ export function plannedLine(planned, {names = {}, amount, fee}, t) {
 }
 
 /** Whether the agent reads private messages, or runs on them: its reading then waits for their decryption. */
-export const readsMessages = (agent) =>
-  Boolean(agent.reads?.messages || agent.events?.includes('message'))
+export const readsMessages = (agent) => {
+  // A rule on its private messages (B-281: once per author, who wrote first) reads the conversations too.
+  const message = agent.actions?.message
+  const ruled =
+    message &&
+    message.level !== 'off' &&
+    (Boolean(message.perAuthor) || message.onlyAnswers === true)
+  return Boolean(
+    agent.reads?.messages || agent.events?.includes('message') || ruled
+  )
+}
 
 /** The last block the Social scan read: the feed and the messages hold nothing after it (the chain's head at most). */
 export function scannedHeight(social, withMessages = false) {
@@ -125,7 +134,7 @@ export async function runSocialAgent(agent, social, deps) {
   )
   const needs = criteriaNeeds([...Object.values(who), ...Object.values(onlyTo)])
   let facts = {}
-  if (needs.identity || needs.vouched || needs.trust) {
+  if (needs.identity || needs.vouched || needs.trust || needs.named) {
     const authors = new Set()
     socialDigest(
       social,
@@ -142,6 +151,21 @@ export async function runSocialAgent(agent, social, deps) {
   )
   // The posts that tag it past its questions of the day: never read, named in Activity once the point passed them.
   // A line that could not be written stops nothing.
+  // The new posts past its posts of the day (B-281): named the same way.
+  const tellPostsPassed = () =>
+    digest.postsPassed
+      ? call('didAction', {
+          agentId: agent.id,
+          action: 'readPosts',
+          skipped: true,
+          detail: t('{{count}} past its posts of the day, not read', {
+            count: digest.postsPassed,
+            nsSeparator: '!!',
+          }),
+        }).catch((error) =>
+          global.logger?.warn('agent activity line not written', error?.message)
+        )
+      : null
   const tellPassed = () =>
     digest.tagsPassed
       ? call('didAction', {
@@ -160,6 +184,7 @@ export async function runSocialAgent(agent, social, deps) {
   if (digest.empty && !held.includes('post')) {
     await call('setReadPoint', {agentId: agent.id, height: digest.readTo})
     await tellPassed()
+    await tellPostsPassed()
     return {result: 'nothing new', detail: ''}
   }
   const {answer} = await call('planSocial', {
@@ -186,6 +211,7 @@ export async function runSocialAgent(agent, social, deps) {
     await call('countPosts', {agentId: agent.id, n: digest.postsShown})
   await call('setReadPoint', {agentId: agent.id, height: digest.readTo})
   await tellPassed()
+  await tellPostsPassed()
   // eslint-disable-next-line no-restricted-syntax
   // eslint-disable-next-line no-await-in-loop
   for (const {action, reason} of plan.dropped.slice(0, DROPPED_LINES))
@@ -196,7 +222,15 @@ export async function runSocialAgent(agent, social, deps) {
 
   const count = {alone: 0, ask: 0, skipped: 0, failed: 0}
   // Once per author, and a message only to who wrote first (B-281).
-  const rules = actionRules(agent.actions, social, scanned)
+  // What earlier runs left in To approve counts for its author too.
+  const waiting = ((await call('pending')) || [])
+    .filter((item) => item.agentId === agent.id)
+    .map(({action, target}) => {
+      if (target && Array.isArray(target.others))
+        return {action, whom: target.others}
+      return {action, whom: target && target.author ? [target.author] : []}
+    })
+  const rules = actionRules(agent.actions, social, scanned, waiting)
   const names = social.names || {}
   // eslint-disable-next-line no-restricted-syntax
   for (const planned of plan.actions) {
@@ -217,7 +251,9 @@ export async function runSocialAgent(agent, social, deps) {
         !whom.every((one) =>
           passes(onlyTo[action], one, {
             ...facts[String(one).toLowerCase()],
-            named: Boolean(names[one]),
+            named:
+              facts[String(one).toLowerCase()]?.named === true ||
+              Boolean(names[one]),
           })
         ))
     ) {
