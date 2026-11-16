@@ -124,8 +124,12 @@ export const clearAgentActivity = (agentId) => agent('clearActivity', {agentId})
  */
 export const writeFlipStory = (agentId, {words, idea, parts, notThese}) =>
   agent('writeStory', {agentId, words, idea, parts, notThese})
-/** What the app adds to the Instructions per action (`sent`), and the suggested Instructions (B-268). */
-export const agentAppTexts = () => agent('appTexts')
+/**
+ * What the app adds to the Instructions per action (`sent`; Social with the actions `held`), and the suggested
+ * Instructions (B-268).
+ */
+export const agentAppTexts = (held) =>
+  agent('appTexts', held ? {held} : undefined)
 /** One picture of a story's prompt by the agent's image model: {mediaType, data} (base64). */
 export const drawStoryPicture = (agentId, prompt) =>
   agent('drawStoryPicture', {agentId, prompt})

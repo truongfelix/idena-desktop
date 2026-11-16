@@ -7,21 +7,35 @@ import {agentAppTexts} from '../settings/agent/api'
 // What the app sends with the Instructions, per action (B-268, owner 2026-11-16): nothing hidden. The main process
 // builds these texts with the same functions that send them (main/agent/app-texts.js).
 
-let cached = null
+// By the Social actions held: the texts never change in a running app.
+const cached = new Map()
 
-/** {sent: {action: text}, suggestions: {flipStory, answerFlip, social}}, or null until read. */
-export function useAppTexts() {
-  const [texts, setTexts] = React.useState(cached)
+/**
+ * {sent: {action: text}, suggestions: {flipStory, answerFlip, social}}, or null until read; `held` the Social actions
+ * the agent holds (its run lists only those).
+ */
+export function useAppTexts(held) {
+  const key = held ? held.join(',') : '*'
+  const [texts, setTexts] = React.useState(() => cached.get(key) || null)
   React.useEffect(() => {
-    if (cached) return
-    agentAppTexts().then(
+    if (cached.has(key)) {
+      setTexts(cached.get(key))
+      return undefined
+    }
+    let live = true
+    agentAppTexts(held).then(
       (value) => {
-        cached = value
-        setTexts(value)
+        cached.set(key, value)
+        if (live) setTexts(value)
       },
       () => {}
     )
-  }, [])
+    return () => {
+      live = false
+    }
+    // The key names the list.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key])
   return texts
 }
 

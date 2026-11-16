@@ -27,7 +27,11 @@ import {nothingToActOn} from './page-sections'
  */
 export function ActionsSection({agent, agents, catalog, onChange}) {
   const {t} = useTranslation()
-  const texts = useAppTexts()
+  const texts = useAppTexts(
+    ['post', 'reply', 'like', 'message', 'tip'].filter(
+      (id) => agent.actions[id] && agent.actions[id].level !== 'off'
+    )
+  )
   const [isAdding, setIsAdding] = React.useState(false)
   const names = areaNames(t)
   const rows = catalog.filter(({id}) => agent.actions[id])

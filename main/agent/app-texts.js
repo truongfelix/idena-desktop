@@ -1,9 +1,14 @@
 // What the app adds to the Instructions for each action (B-268, owner 2026-11-16), as the agent's page shows it in the
 // action's ⓘ, and the suggested Instructions it offers: the texts are built by the same functions that send them.
 
-const {storySystem} = require('./stories')
-const {FLIP_SUGGESTION, flipSystem} = require('./flips')
-const {SOCIAL_ACTIONS, SOCIAL_SUGGESTION, socialSystem} = require('./social')
+const {storyQuestion, storySystem} = require('./stories')
+const {FLIP_SUGGESTION, flipQuestion, flipSystem} = require('./flips')
+const {
+  SOCIAL_ACTIONS,
+  SOCIAL_SUGGESTION,
+  socialHeld,
+  socialSystem,
+} = require('./social')
 
 /**
  * The owner's story template of 2026-11-13 and 2026-11-15 (four panels), as a suggestion for the Instructions: its
@@ -51,13 +56,47 @@ const STORY_SUGGESTION = [
   '- Each image prompt should be 60–120 words, concrete and visual, with no storytelling commentary.',
 ].join('\n')
 
-/** Each action's app part (without Instructions) and suggestion: the ⓘ and the Instructions' "Add the suggestion". */
-function appTexts() {
-  const flips = flipSystem('')
-  const social = socialSystem(SOCIAL_ACTIONS, '')
+const QUESTION = '--- The question ---'
+
+/** A story run's question as the app writes it, with stand-ins for the person's data. */
+const storyExample = () =>
+  storyQuestion({
+    words: [{name: '(keyword 1)'}, {name: '(keyword 2)'}],
+    idea: '(your idea, when you write one)',
+    parts: ['story', 'prompts'],
+    notThese: ['(the titles given before, for Try another story)'],
+  })
+
+/** A flip's question as the app writes it, its pictures named. */
+function flipExample() {
+  const picture = {mediaType: 'image/png', data: ''}
+  const {parts} = flipQuestion({
+    images: [picture, picture, picture, picture],
+    orders: [
+      [0, 1, 2, 3],
+      [0, 1, 2, 3],
+    ],
+    words: [{name: '(keyword 1)'}, {name: '(keyword 2)'}],
+  })
+  return parts
+    .map((part) => (part.type === 'image' ? '(a picture)' : part.text))
+    .join('\n')
+}
+
+/**
+ * Each action's app part as sent without Instructions (the system text, then the question with stand-ins for the
+ * data), and the suggestions: the ⓘ and the Instructions' "Add the suggestion". `held`: the Social actions the agent
+ * holds, as its run lists them.
+ */
+function appTexts({held = SOCIAL_ACTIONS} = {}) {
+  const flips = `${flipSystem('')}\n\n${QUESTION}\n${flipExample()}`
+  const social = `${socialSystem(
+    socialHeld(held),
+    ''
+  )}\n\n${QUESTION}\n(what the app read on Social since the last run, labelled p1, c1, u1)`
   return {
     sent: {
-      flipStory: storySystem(''),
+      flipStory: `${storySystem('')}\n\n${QUESTION}\n${storyExample()}`,
       answerFlip: flips,
       report: flips,
       ...Object.fromEntries(SOCIAL_ACTIONS.map((name) => [name, social])),

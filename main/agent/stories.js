@@ -4,6 +4,8 @@
 // the parts asked, the stories given before) and the answer's format, which the app reads. The format comes last, so
 // whatever the Instructions say, it is the one the app reads.
 
+const {firstJsonObject} = require('./flips')
+
 const MAX_KEYWORD_LENGTH = 200
 const MAX_IDEA_LENGTH = 2000
 /** The prompts of one answer at most, all its stories together: "3 stories of 4 pictures" fits. */
@@ -94,22 +96,6 @@ function storyQuestion({words, idea = '', parts, notThese = []} = {}) {
 const cut = (value, max) =>
   typeof value === 'string' ? value.trim().slice(0, max) : ''
 
-/** The JSON object of a reply: as it came, or inside a code block or other words around it. */
-function jsonOf(reply) {
-  try {
-    return JSON.parse(reply)
-  } catch {
-    const start = reply.indexOf('{')
-    const end = reply.lastIndexOf('}')
-    if (start < 0 || end <= start) return null
-    try {
-      return JSON.parse(reply.slice(start, end + 1))
-    } catch {
-      return null
-    }
-  }
-}
-
 /**
  * The model's answer read: its stories, each with its title, its story in words (when asked) and its prompts (when
  * asked), MAX_PROMPTS prompts at most in all (the ones after are dropped). Throws when the parts asked are not there:
@@ -117,11 +103,7 @@ function jsonOf(reply) {
  */
 function readStories(text, parts) {
   const asked = checkParts(parts)
-  const answer = jsonOf(
-    String(text || '')
-      .slice(0, 64 * 1024)
-      .trim()
-  )
+  const answer = firstJsonObject(String(text || '').slice(0, 64 * 1024))
   if (!answer || !Array.isArray(answer.stories))
     throw new Error('the answer is not in the format asked')
   let left = asked.includes('prompts') ? MAX_PROMPTS : 0

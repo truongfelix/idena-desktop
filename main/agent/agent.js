@@ -22,8 +22,8 @@ const MAX_ANSWER_TEXT = 4000
 // A run's plan on Idena Social: several actions, each with a text of a post's length.
 const MAX_PLAN_TEXT = 12000
 const PLAN_MAX_TOKENS = 4096
-// A story and four prompts of up to 120 words: about 1,500 tokens; room for a longer one.
-const STORY_MAX_TOKENS = 4096
+// Stories with 12 prompts of up to 120 words and each story in words (B-268): about 4,000 tokens; room for more.
+const STORY_MAX_TOKENS = 8192
 
 function clampTimeout(value) {
   // null, '' and booleans are numbers to Number(): 0, a 1 s deadline. Only a real number counts.
@@ -673,9 +673,9 @@ function createAgent({
       stop(testing)
       return null
     },
-    /** The log, newest first; with `agentId`, that agent's lines and the pause and resume of all agents. */
     // What the app adds to the Instructions per action, and the suggestions (B-268): the agent page's ⓘ.
-    appTexts: () => appTexts(),
+    appTexts: (data) => appTexts(data),
+    /** The log, newest first; with `agentId`, that agent's lines and the pause and resume of all agents. */
     activity: (data) => {
       // No agent named (no data, or none in it): every line.
       const agentId = data ? data.agentId : undefined

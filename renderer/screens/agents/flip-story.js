@@ -58,10 +58,25 @@ export function storyForKeywords(saved, words) {
   if (!saved || !words || !Array.isArray(saved.words)) return null
   if (saved.words.join('|') !== names(words).join('|')) return null
   if (Array.isArray(saved.stories)) {
-    const stories = saved.stories.filter(
-      (one) => one && (one.story || (one.prompts && one.prompts.length))
-    )
-    return stories.length ? {...saved, stories} : null
+    const stories = saved.stories
+      .filter((one) => one && typeof one === 'object')
+      .map((one) => ({
+        title: typeof one.title === 'string' ? one.title : '',
+        story: typeof one.story === 'string' ? one.story : '',
+        prompts: (Array.isArray(one.prompts) ? one.prompts : []).filter(
+          (prompt) => typeof prompt === 'string' && prompt.trim()
+        ),
+      }))
+      .filter((one) => one.story || one.prompts.length)
+    return stories.length
+      ? {
+          ...saved,
+          idea: typeof saved.idea === 'string' ? saved.idea : '',
+          parts: Array.isArray(saved.parts) ? saved.parts : DEFAULT_PARTS,
+          titles: Array.isArray(saved.titles) ? saved.titles : [],
+          stories,
+        }
+      : null
   }
   if (!Array.isArray(saved.prompts) || !saved.prompts.length) return null
   return {
@@ -214,11 +229,19 @@ export function FlipStoryHelper({keywords, story: saved, onStory}) {
   current.current = key
   const run = React.useRef(0)
   const canDraw = drawsPictures(agent)
+  // The titles given so far for these keywords, read when a run starts.
+  const titles = React.useRef([])
+  titles.current = kept ? kept.titles : []
 
+  // Other keywords: their own draft's idea and ticks, or none.
   React.useEffect(() => {
     run.current += 1
     setIsWriting(false)
     setError(null)
+    setIdea(kept ? kept.idea : '')
+    setParts(kept ? kept.parts : DEFAULT_PARTS)
+    // kept is read again at each render: the key says when the keywords changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
 
   const write = React.useCallback(async () => {
@@ -236,14 +259,14 @@ export function FlipStoryHelper({keywords, story: saved, onStory}) {
         words: forWords,
         idea,
         parts: asks,
-        notThese: kept ? kept.titles : [],
+        notThese: titles.current,
       })
       if (current.current === forKey)
         onStory(
           draftStory(written, forWords, {
             idea,
             parts,
-            titles: kept ? kept.titles : [],
+            titles: titles.current,
           })
         )
     } catch (e) {
@@ -253,13 +276,14 @@ export function FlipStoryHelper({keywords, story: saved, onStory}) {
     }
     // words is rebuilt at each render: the key says when it changed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agent && agent.id, key, idea, parts, kept, onStory])
+  }, [agent && agent.id, key, idea, parts, onStory])
 
   // Alone: as soon as the keywords show, once per keywords, with what the person last asked.
   const isAlone = agent && agent.actions.flipStory.level === 'alone'
+  const hasStory = Boolean(kept)
   React.useEffect(() => {
-    if (isAlone && key && !kept && !asked.has(key)) write()
-  }, [isAlone, key, kept, write])
+    if (isAlone && key && !hasStory && !asked.has(key)) write()
+  }, [isAlone, key, hasStory, write])
 
   if (!agent || !words) return null
   const choices = [
@@ -452,14 +476,18 @@ export function FlipStoryPrompts({
     [agent && agent.id]
   )
 
-  // Alone, the pictures asked: each prompt drawn once, one after the other, as the step opens.
+  // Alone, the pictures asked: the agent's prompts drawn once each, one after the other, as the step opens (one loop:
+  // a prompt the person edits afterwards is drawn by their click, never on its own).
   const isAlone = agent && agent.actions.flipStory.level === 'alone'
   const wantsPictures = Boolean(kept && kept.parts.includes('images'))
-  const prompts = all.map(({prompt}) => prompt).join('\n')
+  const opening = React.useRef(all)
+  if (!opening.current.length) opening.current = all
+  const started = React.useRef(false)
   React.useEffect(() => {
-    if (!canDraw || !isAlone || !wantsPictures) return
+    if (!canDraw || !isAlone || !wantsPictures || started.current) return
+    started.current = true
     ;(async () => {
-      for (const {prompt} of all) {
+      for (const {prompt} of opening.current) {
         if (!alive.current) break
         if (!drawn.has(prompt) && !drawnAlone.has(prompt)) {
           drawnAlone.add(prompt)
@@ -469,9 +497,9 @@ export function FlipStoryPrompts({
         }
       }
     })()
-    // prompts says when the list changed.
+    // Once, when the agent list has come: the prompts are the ones the step opened with.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canDraw, isAlone, wantsPictures, prompts, draw])
+  }, [canDraw, isAlone, wantsPictures])
 
   if (!agent || !kept || !all.length) return null
   return (
