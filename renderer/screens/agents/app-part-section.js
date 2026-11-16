@@ -130,16 +130,19 @@ export function AppPartSection({agent, onChange}) {
               value={parts[area] || texts.parts[area]}
               onSave={save}
             />
+            {/* The slots are named outside the texts: a "{{...}}" inside one would be read as a value to fill. */}
             <Text fontSize="sm" color="muted">
+              <Text as="code">{'{{instructions}}'}</Text>{' '}
               {t(
-                '{{slot}} is where your Instructions go; without it, they go at the end.',
-                {slot: '{{instructions}}'}
+                'is where your Instructions go; without it, they go at the end.'
               )}
-              {area === 'social' &&
-                ` ${t(
-                  '{{slot}} is where the app lists the actions it may do.',
-                  {slot: '{{actions}}'}
-                )}`}
+              {area === 'social' && (
+                <>
+                  {' '}
+                  <Text as="code">{'{{actions}}'}</Text>{' '}
+                  {t('is where the app lists the actions it may do.')}
+                </>
+              )}
             </Text>
             <Flex>
               <SecondaryButton

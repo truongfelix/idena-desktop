@@ -2267,8 +2267,6 @@
   "The app’s part for {{area}}": "The app’s part for {{area}}",
   "This text is yours. The app no longer updates it, and if the model’s answer loses its format, its runs do nothing.": "This text is yours. The app no longer updates it, and if the model’s answer loses its format, its runs do nothing.",
   "Unlocked. Nothing changes until you change the text below.": "Unlocked. Nothing changes until you change the text below.",
-  "{{slot}} is where your Instructions go; without it, they go at the end.": "{{slot}} is where your Instructions go; without it, they go at the end.",
-  "{{slot}} is where the app lists the actions it may do.": "{{slot}} is where the app lists the actions it may do.",
   "Back to the default": "Back to the default",
   "Unlock to edit": "Unlock to edit",
   "Unlock the app’s part for {{area}}?": "Unlock the app’s part for {{area}}?",
@@ -2278,5 +2276,7 @@
   "Whatever the text says, the app still checks its rights, its limits a day and its budget. Once changed, the text no longer follows the app’s updates. You can go back to the default at any time.": "Whatever the text says, the app still checks its rights, its limits a day and its budget. Once changed, the text no longer follows the app’s updates. You can go back to the default at any time.",
   "Unlock": "Unlock",
   "Keep it locked": "Keep it locked",
-  "Flip stories": "Flip stories"
+  "Flip stories": "Flip stories",
+  "is where your Instructions go; without it, they go at the end.": "is where your Instructions go; without it, they go at the end.",
+  "is where the app lists the actions it may do.": "is where the app lists the actions it may do."
 }

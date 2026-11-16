@@ -2267,8 +2267,6 @@
   "The app’s part for {{area}}": "La partie de l'app pour {{area}}",
   "This text is yours. The app no longer updates it, and if the model’s answer loses its format, its runs do nothing.": "Ce texte est le vôtre. L'app ne le met plus à jour, et si la réponse du modèle perd son format, ses passages ne font rien.",
   "Unlocked. Nothing changes until you change the text below.": "Déverrouillé. Rien ne change tant que vous ne modifiez pas le texte ci-dessous.",
-  "{{slot}} is where your Instructions go; without it, they go at the end.": "{{slot}} est la place de vos Instructions ; sans lui, elles vont à la fin.",
-  "{{slot}} is where the app lists the actions it may do.": "{{slot}} est la place où l'app liste les actions qu'il peut faire.",
   "Back to the default": "Revenir au texte par défaut",
   "Unlock to edit": "Déverrouiller pour modifier",
   "Unlock the app’s part for {{area}}?": "Déverrouiller la partie de l'app pour {{area}} ?",
@@ -2278,5 +2276,7 @@
   "Whatever the text says, the app still checks its rights, its limits a day and its budget. Once changed, the text no longer follows the app’s updates. You can go back to the default at any time.": "Quoi que dise le texte, l'app vérifie toujours ses droits, ses limites par jour et son budget. Une fois modifié, le texte ne suit plus les mises à jour de l'app. Vous pouvez revenir au texte par défaut à tout moment.",
   "Unlock": "Déverrouiller",
   "Keep it locked": "Garder verrouillé",
-  "Flip stories": "Histoires de flips"
+  "Flip stories": "Histoires de flips",
+  "is where your Instructions go; without it, they go at the end.": "est la place de vos Instructions ; sans lui, elles vont à la fin.",
+  "is where the app lists the actions it may do.": "est la place où l'app liste les actions qu'il peut faire."
 }
