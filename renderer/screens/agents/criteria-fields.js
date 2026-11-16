@@ -64,8 +64,20 @@ export function criteriaLine(criteria, t, stateName) {
     parts.push(t('with “{{words}}”', {words: criteria.mustWords.join(', ')}))
   if (criteria.notWords && criteria.notWords.length)
     parts.push(t('without “{{words}}”', {words: criteria.notWords.join(', ')}))
+  // B-281: a claimed profile name, the posts' topics.
+  if (criteria.named === true) parts.push(t('with a profile name'))
+  if (criteria.topics && criteria.topics.length)
+    parts.push(
+      t('in {{topics}}', {
+        topics: criteria.topics.map((one) => `r/${one}`).join(', '),
+      })
+    )
   return parts.join(' · ') || t('Everyone')
 }
+
+/** The topics of a text, separated by commas: lower case, without the "r/" a person may type. */
+export const topicList = (text) =>
+  wordList(text).map((one) => one.toLowerCase().replace(/^r\//u, ''))
 
 /** Whether a token is an address (0x and 40 hex digits). */
 const isAddress = (one) => /^0x[0-9a-fA-F]{40}$/u.test(one)
@@ -144,10 +156,12 @@ function useStateName() {
 /**
  * The criteria in one line, a button that opens their editor: `value` the saved criteria (null: none), `open` and
  * `onToggle` the editor's state, kept by the row (B-280: the line sits in a cell, the editor under the row).
+ * `extra`: the row's other rules in words (B-281: once per author, who wrote first), said after the criteria.
  */
-export function CriteriaSummary({label, value, open, onToggle}) {
+export function CriteriaSummary({label, value, extra = [], open, onToggle}) {
   const {t} = useTranslation()
   const stateName = useStateName()
+  const line = [criteriaLine(value, t, stateName), ...extra].join(' · ')
   return (
     <Button
       size="sm"
@@ -155,20 +169,25 @@ export function CriteriaSummary({label, value, open, onToggle}) {
       colorScheme="blue"
       whiteSpace="normal"
       textAlign="left"
-      aria-label={`${label}: ${criteriaLine(value, t, stateName)}`}
+      aria-label={`${label}: ${line}`}
       aria-expanded={open}
       onClick={onToggle}
     >
-      {criteriaLine(value, t, stateName)}
+      {line}
     </Button>
   )
 }
 
 /**
  * The criteria editor: `value` the saved criteria (null: none), `withWords` for a read (the words its text must or
- * must not hold), `onChange(criteria)` with the whole new criteria.
+ * must not hold), `withTopics` for the posts (their topics, B-281), `onChange(criteria)` with the whole new criteria.
  */
-export function CriteriaEditor({value, withWords = false, onChange}) {
+export function CriteriaEditor({
+  value,
+  withWords = false,
+  withTopics = false,
+  onChange,
+}) {
   const {t} = useTranslation()
   const stateName = useStateName()
   const criteria = {...EMPTY, ...(value || {})}
@@ -224,6 +243,12 @@ export function CriteriaEditor({value, withWords = false, onChange}) {
           onSave={(minStake) => save({minStake})}
         />
       </Flex>
+      <Checkbox
+        isChecked={criteria.named === true}
+        onChange={(e) => save({named: e.target.checked})}
+      >
+        {t('Only authors with a profile name')}
+      </Checkbox>
       <ListField
         label={t('Only these identities (addresses; none: everyone)', {
           nsSeparator: '!!',
@@ -244,6 +269,16 @@ export function CriteriaEditor({value, withWords = false, onChange}) {
         addresses
         onSave={(except) => save({except})}
       />
+      {withTopics && (
+        <ListField
+          label={t('Only posts in these topics (commas)')}
+          value={criteria.topics || []}
+          parse={topicList}
+          join={joinWords}
+          placeholder="flips, validation"
+          onSave={(topics) => save({topics})}
+        />
+      )}
       {withWords && (
         <>
           <ListField

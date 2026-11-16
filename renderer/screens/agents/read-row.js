@@ -1,6 +1,6 @@
 /* eslint-disable react/prop-types */
 import * as React from 'react'
-import {Box, Flex, Switch, Text} from '@chakra-ui/react'
+import {Box, Flex, Stack, Switch, Text} from '@chakra-ui/react'
 import {useTranslation} from 'react-i18next'
 import {HDivider, Input, Select} from '../../shared/components/components'
 import {InfoTip} from '../../shared/components/info-tip'
@@ -44,39 +44,67 @@ export function NoCell() {
   )
 }
 
-/** Read all Social posts: the last 24 hours, or the last N posts. */
+/**
+ * Read all Social posts: those of the last 24 hours (B-281: at most a number a run) or those since its last run (at
+ * most N), and at most a number a day.
+ */
 function PostsWindow({row, onChange}) {
   const {t} = useTranslation()
   const [count, setCount] = useDraft(String(row.count))
   return (
-    <Flex align="center" gap={3} wrap="wrap">
+    <Stack spacing={2}>
       <Select
-        w="auto"
         aria-label={t('Which posts')}
         value={row.window}
         onChange={(e) => onChange({window: e.target.value})}
       >
         <option value="day">{t('The last 24 hours')}</option>
-        <option value="count">{t('The last posts')}</option>
+        <option value="count">{t('Those since its last run')}</option>
       </Select>
       {row.window === 'count' && (
-        <Input
-          type="number"
-          w="80px"
+        <Flex align="center" gap={2}>
+          <Input
+            type="number"
+            size="sm"
+            w="80px"
+            min={1}
+            max={MAX_POSTS_READ}
+            aria-label={t('How many posts')}
+            value={count}
+            onChange={(e) => setCount(e.target.value)}
+            onBlur={(e) => {
+              const next = readNumber(e.currentTarget.value, {min: 1})
+              if (next === null || next > MAX_POSTS_READ)
+                setCount(String(row.count))
+              else if (next !== row.count) onChange({count: next})
+            }}
+          />
+          <Text color="muted">{t('posts at most a run')}</Text>
+        </Flex>
+      )}
+      {row.window === 'day' && (
+        <NumberField
+          label={t('posts at most a run')}
+          value={typeof row.perRun === 'number' ? row.perRun : null}
           min={1}
-          max={MAX_POSTS_READ}
-          aria-label={t('How many posts')}
-          value={count}
-          onChange={(e) => setCount(e.target.value)}
-          onBlur={(e) => {
-            const next = readNumber(e.currentTarget.value, {min: 1})
-            if (next === null || next > MAX_POSTS_READ)
-              setCount(String(row.count))
-            else if (next !== row.count) onChange({count: next})
-          }}
+          optional
+          placeholder={String(MAX_POSTS_READ)}
+          onSave={(perRun) =>
+            onChange({
+              perRun: perRun > MAX_POSTS_READ ? MAX_POSTS_READ : perRun,
+            })
+          }
         />
       )}
-    </Flex>
+      <NumberField
+        label={t('posts at most a day (a day in UTC)')}
+        value={typeof row.perDay === 'number' ? row.perDay : null}
+        min={0}
+        optional
+        placeholder={t('None', {nsSeparator: '!!'})}
+        onSave={(perDay) => onChange({perDay})}
+      />
+    </Stack>
   )
 }
 
@@ -135,6 +163,7 @@ export function ReadRow({entry, row, change}) {
           <CriteriaEditor
             value={row.who || null}
             withWords
+            withTopics={id === 'readPosts'}
             onChange={(who) => change({who})}
           />
         </Box>

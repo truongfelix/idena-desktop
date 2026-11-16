@@ -1,7 +1,16 @@
 /* eslint-disable react/prop-types */
 import * as React from 'react'
-import {Box, Button, ButtonGroup, Flex, Stack, Text} from '@chakra-ui/react'
+import {
+  Box,
+  Button,
+  ButtonGroup,
+  Checkbox,
+  Flex,
+  Stack,
+  Text,
+} from '@chakra-ui/react'
 import {useTranslation} from 'react-i18next'
+import {Select} from '../../shared/components/components'
 import {InfoTip} from '../../shared/components/info-tip'
 import {ActionInfo} from './app-texts'
 import {LEVELS, levelLabel} from './catalog'
@@ -93,6 +102,11 @@ export function DoRow({entry, row, sent, note, holder, change, onFree}) {
           <CriteriaSummary
             label={t('Only to')}
             value={row.onlyTo || null}
+            extra={[
+              row.perAuthor === 'day' && t('once per author a day'),
+              row.perAuthor === 'week' && t('once per author a week'),
+              row.onlyAnswers === true && t('only who wrote to it first'),
+            ].filter(Boolean)}
             open={open}
             onToggle={() => setOpen((now) => !now)}
           />
@@ -100,12 +114,33 @@ export function DoRow({entry, row, sent, note, holder, change, onFree}) {
         {!scope && !hasOnlyTo && <NoCell />}
       </Stack>
       {hasOnlyTo && open && (
-        <Box gridColumn="1 / -1" pb={4} maxW="xl">
+        <Stack gridColumn="1 / -1" pb={4} maxW="xl" spacing={3}>
           <CriteriaEditor
             value={row.onlyTo || null}
             onChange={(onlyTo) => change({onlyTo})}
           />
-        </Box>
+          {/* Once per author, and who wrote first (B-281): the row's own rules, beside its criteria. */}
+          <Stack spacing={3} pl={3} borderLeftWidth={2} borderColor="gray.100">
+            <Select
+              w="auto"
+              aria-label={t('How often for one author')}
+              value={row.perAuthor || ''}
+              onChange={(e) => change({perAuthor: e.target.value || null})}
+            >
+              <option value="">{t('No limit for one author')}</option>
+              <option value="day">{t('Once per author a day')}</option>
+              <option value="week">{t('Once per author a week')}</option>
+            </Select>
+            {id === 'message' && (
+              <Checkbox
+                isChecked={row.onlyAnswers === true}
+                onChange={(e) => change({onlyAnswers: e.target.checked})}
+              >
+                {t('Only to who wrote to it first')}
+              </Checkbox>
+            )}
+          </Stack>
+        </Stack>
       )}
     </>
   )
