@@ -254,7 +254,7 @@ export function ModelSection({
           settings.actions &&
           settings.actions.flipStory && (
             <FormControlWithLabel
-              label={t('Image model, for Make the images in the flip editor')}
+              label={t('Image model, for the pictures of flip stories')}
             >
               <SavedOnBlurInput
                 value={settings.imageModel || ''}

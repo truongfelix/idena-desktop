@@ -16,7 +16,7 @@ export function actionCatalog(t) {
       area: 'flips',
       label: t('Write flip stories'),
       info: t(
-        "Writes a flip's story and one picture prompt per frame, from the flip's two keywords, in the flip editor."
+        "Writes flip stories and their picture prompts in the flip editor, as your Instructions ask, from the flip's two keywords and your idea."
       ),
       reads: [t('The two keywords of the flip you make')],
     },

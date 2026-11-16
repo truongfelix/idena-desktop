@@ -4,7 +4,8 @@ const {createPending} = require('./pending')
 const {createReadPoints} = require('./read-points')
 const {agentSettings, reportAgent, validationAgent} = require('./profiles')
 const {checkFlip, flipQuestion, mediaType, readFlipAnswer} = require('./flips')
-const {readStory, storySystem} = require('./stories')
+const {readStories, storyQuestion, storySystem} = require('./stories')
+const {appTexts} = require('./app-texts')
 const {socialHeld, socialSystem} = require('./social')
 const providers = require('./providers')
 
@@ -21,8 +22,8 @@ const MAX_ANSWER_TEXT = 4000
 // A run's plan on Idena Social: several actions, each with a text of a post's length.
 const MAX_PLAN_TEXT = 12000
 const PLAN_MAX_TOKENS = 4096
-// A story and four prompts of up to 120 words: about 1,500 tokens; room for a longer one.
-const STORY_MAX_TOKENS = 4096
+// Stories with 12 prompts of up to 120 words and each story in words (B-268): about 4,000 tokens; room for more.
+const STORY_MAX_TOKENS = 8192
 
 function clampTimeout(value) {
   // null, '' and booleans are numbers to Number(): 0, a 1 s deadline. Only a real number counts.
@@ -507,11 +508,12 @@ function createAgent({
       }
     },
     /**
-     * A flip's story (B-236): for the agent `agentId` holding "Write flip stories" (not Off), one story of `panels`
-     * (3 or 4) panels for the flip's two keywords `words`, and one image prompt per panel, read from its answer. Nothing
-     * goes to the chain: the person copies the prompts, or the images come into the flip editor for them to check.
+     * A flip's stories (B-236, B-268): for the agent `agentId` holding "Write flip stories" (not Off), the stories and
+     * image prompts its Instructions ask for, for the flip's two keywords `words`, the person's `idea`, the `parts`
+     * asked ('story', 'prompts') and the titles given before (`notThese`). Nothing goes to the chain: the person reads
+     * the stories, edits the prompts, and the pictures come into the flip editor for them to choose.
      */
-    async writeStory({agentId, panels, words, timeoutMs} = {}) {
+    async writeStory({agentId, words, idea, parts, notThese, timeoutMs} = {}) {
       if (!profiles) throw new Error('no agents')
       const file = profiles.read()
       const agent = file.agents.find((one) => one.id === agentId)
@@ -526,7 +528,8 @@ function createAgent({
         })
         throw new Error(`the agent may not do it (${check.reason})`)
       }
-      const system = storySystem(panels, words, agent.instructions)
+      const question = storyQuestion({words, idea, parts, notThese})
+      const system = storySystem(agent.instructions)
       const controller = new AbortController()
       writing.add(controller)
       try {
@@ -538,21 +541,24 @@ function createAgent({
             key: key.read(destination(agent)),
           },
           system,
-          [{type: 'text', text: 'Write the story and its prompts now.'}],
+          [{type: 'text', text: question}],
           {
             timeoutMs: clampTimeout(timeoutMs),
             signal: controller.signal,
             maxTokens: STORY_MAX_TOKENS,
           }
         )
-        const story = readStory(answer, panels)
+        const written = readStories(answer, parts)
         log({
           agentId,
           action: 'flipStory',
           decision: check.decision,
-          detail: story.title,
+          detail: written.stories
+            .map((one) => one.title)
+            .filter(Boolean)
+            .join(' · '),
         })
-        return story
+        return written
       } catch (error) {
         log({
           agentId,
@@ -667,6 +673,8 @@ function createAgent({
       stop(testing)
       return null
     },
+    // What the app adds to the Instructions per action, and the suggestions (B-268): the agent page's ⓘ.
+    appTexts: (data) => appTexts(data),
     /** The log, newest first; with `agentId`, that agent's lines and the pause and resume of all agents. */
     activity: (data) => {
       // No agent named (no data, or none in it): every line.

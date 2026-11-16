@@ -395,6 +395,7 @@ export default function EditFlipPage() {
                 <FlipStoryPrompts
                   keywords={keywords}
                   story={story}
+                  onStory={onStory}
                   images={images}
                   originalOrder={originalOrder}
                   adversarialImageId={adversarialImageId}
