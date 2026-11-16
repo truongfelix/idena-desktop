@@ -91,18 +91,18 @@ export function socialDigest(
   // reads them first).
   const isBlocked = (address) => Boolean(blocked && blocked.has(address))
   // `topic`: a new post's topic (null for none), for the posts' topics (B-281); a claimed name is a fact too.
+  // An author's facts with its claimed name: the one read for the criteria, or a name the Social screen holds.
+  const factsOf = (address) => {
+    const read = facts[String(address).toLowerCase()] || {}
+    return {...read, named: read.named === true || Boolean(names[address])}
+  }
+  let postsPassed = 0
   const readsFrom = (kind, address, text = null, topic = undefined) => {
     if (collect) {
       collect.add(String(address).toLowerCase())
       return true
     }
-    return passes(
-      who[kind] || null,
-      address,
-      {...facts[String(address).toLowerCase()], named: Boolean(names[address])},
-      text,
-      topic
-    )
+    return passes(who[kind] || null, address, factsOf(address), text, topic)
   }
   const from =
     point === null || point === undefined ? scanned - FIRST_RUN_BLOCKS : point
@@ -193,7 +193,11 @@ export function socialDigest(
             )
         : fresh.slice(0, reads.posts.count)
     // Its posts left today (B-281): the newest stay, the others are passed over for good, as those past the window.
-    if (!collect) fresh = fresh.slice(0, Math.max(0, postsLeft))
+    if (!collect) {
+      const left = Math.max(0, postsLeft)
+      postsPassed = Math.max(0, fresh.length - left)
+      fresh = fresh.slice(0, left)
+    }
     fresh.forEach((node) =>
       candidates.push({kind: 'post', height: node.call.height, node})
     )
@@ -290,7 +294,10 @@ export function socialDigest(
   const own = reads?.own
     ? feed
         .filter(({call}) => call.author === me && call.height <= scanned)
-        .slice(0, OWN_POSTS_SHOWN)
+        .slice(
+          0,
+          typeof reads.ownCount === 'number' ? reads.ownCount : OWN_POSTS_SHOWN
+        )
         .reverse()
         .map(({call}) => `- "${shownText(call.message, call.hasMedia)}"`)
     : []
@@ -410,6 +417,7 @@ export function socialDigest(
     labels,
     empty,
     readTo: readUpTo(leftOut, lastHeight, from, scanned),
+    postsPassed,
     tagsShown: counts.tag,
     postsShown: counts.post,
     tagsPassed,

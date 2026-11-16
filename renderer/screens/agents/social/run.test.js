@@ -684,6 +684,99 @@ describe('a Social run', () => {
     expect(again.sent).toEqual([])
   })
 
+  test('once per author: what waits in To approve from an earlier run counts for its author', async () => {
+    const two = state({feed: [node(31, ANN, 'A second post', 9995), ...feed()]})
+    const label = (social, id, more = {}) =>
+      [
+        ...socialDigest(
+          social,
+          {reads: {posts: {window: 'count', count: 50}}},
+          {point: null, scanned: HEAD, ...more}
+        ).labels,
+      ].find(([, item]) => item.node?.id === id)[0]
+    const asking = start({
+      readPosts: {level: 'alone', window: 'count', count: 50},
+      like: {level: 'ask', limit: 5, perAuthor: 'day'},
+    })
+    answer = JSON.stringify({actions: [{do: 'like', to: label(two, 30)}]})
+    await expect(runSocialAgent(asking, two, deps())).resolves.toMatchObject({
+      count: {ask: 1},
+    })
+    const next = state({
+      head: HEAD + 100,
+      feed: [node(32, ANN, 'A third post', HEAD + 50), ...two.feed],
+    })
+    answer = JSON.stringify({
+      actions: [
+        {do: 'like', to: label(next, 32, {point: HEAD, scanned: HEAD + 100})},
+      ],
+    })
+    await expect(runSocialAgent(asking, next, deps())).resolves.toMatchObject({
+      count: {ask: 0, skipped: 1},
+    })
+  })
+
+  test('once per author: a like sent counts at the next run, before the chain shows it', async () => {
+    const agent = start({
+      readPosts: {level: 'alone', window: 'count', count: 50},
+      like: {level: 'alone', limit: 5, perAuthor: 'day'},
+    })
+    const label = (social, id, more = {}) =>
+      [
+        ...socialDigest(
+          social,
+          {reads: agent.reads},
+          {point: null, scanned: HEAD, ...more}
+        ).labels,
+      ].find(([, item]) => item.node?.id === id)[0]
+    answer = JSON.stringify({actions: [{do: 'like', to: label(state(), 30)}]})
+    await expect(runSocialAgent(agent, state(), deps())).resolves.toMatchObject(
+      {count: {alone: 1}}
+    )
+    await expect(main.handle('actsDone', {agentId: ID})).resolves.toEqual([
+      {action: 'like', who: ANN, height: HEAD},
+    ])
+    // The next run: the feed does not show the like yet, a new post of Ann is not liked.
+    const next = state({
+      head: HEAD + 3,
+      feed: [node(32, ANN, 'A new post', HEAD + 2), ...feed()],
+    })
+    answer = JSON.stringify({
+      actions: [
+        {do: 'like', to: label(next, 32, {point: HEAD, scanned: HEAD + 3})},
+      ],
+    })
+    const again = deps()
+    await expect(runSocialAgent(agent, next, again)).resolves.toMatchObject({
+      count: {alone: 0, skipped: 1},
+    })
+    expect(again.sent).toEqual([])
+  })
+
+  test('its own posts: as many as its row says, ten without a number', () => {
+    const mine = Array.from({length: 12}, (_, i) =>
+      node(100 + i, ME, `Mine ${i}`, 9000 + i)
+    ).reverse()
+    const own = (reads) =>
+      socialDigest(
+        state({feed: mine}),
+        {reads: {posts: {window: 'off', count: 10}, ...reads}},
+        {point: 9900, scanned: HEAD}
+      ).text.match(/Mine \d+/gu) || []
+    expect(own({own: true})).toHaveLength(10)
+    expect(own({own: true, ownCount: 3})).toEqual([
+      'Mine 9',
+      'Mine 10',
+      'Mine 11',
+    ])
+    expect(own({own: false, ownCount: 3})).toEqual([])
+    const agent = start({readOwnPosts: {level: 'alone', limit: 3}})
+    expect(agent.reads).toMatchObject({own: true, ownCount: 3})
+    expect('ownCount' in start({readOwnPosts: {level: 'alone'}}).reads).toBe(
+      false
+    )
+  })
+
   test('a private message only to who wrote to it first (B-281)', async () => {
     const agent = start({
       readPosts: {level: 'alone', window: 'count', count: 50},
@@ -691,15 +784,43 @@ describe('a Social run', () => {
       message: {level: 'alone', limit: 3, onlyAnswers: true},
     })
     expect(agent.actions.message.onlyAnswers).toBe(true)
+    // Bob opened his conversation; the agent opened the one with Ann, who answered since.
+    const social = () =>
+      state({
+        conversations: [
+          {
+            ...chat,
+            messages: [
+              {from: BOB, text: 'Hello agent', height: 9970, index: 0},
+              {from: ME, text: 'Hello Bob', height: 9975, index: 0},
+              {from: BOB, text: 'Hi, how are you?', height: 9980, index: 0},
+            ],
+          },
+          {
+            key: `${ME}-${ANN}`,
+            others: [ANN],
+            isGroup: false,
+            isRequest: false,
+            messages: [
+              {from: ME, text: 'Hello Ann', height: 9960, index: 0},
+              {from: ANN, text: 'Who are you?', height: 9985, index: 0},
+            ],
+          },
+        ],
+      })
     const labels = [
       ...socialDigest(
-        state(),
+        social(),
         {reads: agent.reads},
         {point: null, scanned: HEAD}
       ).labels,
     ]
-    const ann = labels.find(([, item]) => item.node?.id === 30)[0]
-    const bob = labels.find(([, item]) => item.kind === 'chat')[0]
+    const chatWith = (other) =>
+      labels.find(
+        ([, item]) => item.kind === 'chat' && item.others[0] === other
+      )[0]
+    const ann = chatWith(ANN)
+    const bob = chatWith(BOB)
     answer = JSON.stringify({
       actions: [
         {do: 'message', to: ann, text: 'Hello Ann'},
@@ -707,7 +828,7 @@ describe('a Social run', () => {
       ],
     })
     const d = deps()
-    const result = await runSocialAgent(agent, state(), d)
+    const result = await runSocialAgent(agent, social(), d)
     expect(result.count).toMatchObject({alone: 1, skipped: 1})
     expect(d.sent.map(({target}) => target.others)).toEqual([[BOB]])
     const lines = await main.handle('activity', {agentId: ID})
@@ -735,6 +856,11 @@ describe('a Social run', () => {
     await expect(runSocialAgent(agent, later, deps())).resolves.toMatchObject({
       result: 'nothing new',
     })
+    // The posts passed over are named in Activity.
+    const lines = await main.handle('activity', {agentId: ID})
+    expect(lines.map(({detail}) => detail)).toEqual(
+      expect.arrayContaining(['1 past its posts of the day, not read'])
+    )
     await expect(main.handle('postsToday', {agentId: ID})).resolves.toBe(1)
   })
 

@@ -2278,9 +2278,13 @@
   "Keep it locked": "Garder verrouillé",
   "Flip stories": "Histoires de flips",
   "is where your Instructions go; without it, they go at the end.": "est la place de vos Instructions ; sans lui, elles vont à la fin.",
-  "is where the app lists the actions it may do.": "est la place où l'app liste les actions qu'il peut faire.",
   "Delete a sent flip": "Effacer un flip envoyé",
   "Deletes a sent flip the judge failed, yours or an agent's. A deletion costs a fee: set the iDNA it may spend a day; past it, or without a limit, it waits for you.": "Efface un flip envoyé que le juge a refusé, le vôtre ou celui d'un agent. Effacer coûte des frais : réglez les iDNA qu'il peut dépenser par jour ; au-delà, ou sans limite, il attend votre accord.",
   "wants to delete a sent flip": "veut effacer un flip envoyé",
-  "Sent flips the judge failed, yours too": "Les flips envoyés que le juge a refusés, les vôtres aussi"
+  "Sent flips the judge failed, yours too": "Les flips envoyés que le juge a refusés, les vôtres aussi",
+  "is where the app lists the actions it may do; without it, the list goes at the end.": "est la place où l'app liste les actions qu'il peut faire ; sans lui, la liste va à la fin.",
+  "You changed the app’s part for this area. What is sent is in What the app adds.": "Vous avez modifié la partie de l'app pour ce domaine. Ce qui est envoyé est dans Ce que l'app ajoute.",
+  "Not a topic name, nothing saved: {{list}}": "Pas un nom de sujet, rien enregistré : {{list}}",
+  "{{count}} past its posts of the day, not read": "{{count}} au-delà de ses publications du jour, non lues",
+  "of its last posts at most": "de ses dernières publications au plus"
 }

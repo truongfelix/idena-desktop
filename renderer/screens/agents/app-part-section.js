@@ -140,7 +140,9 @@ export function AppPartSection({agent, onChange}) {
                 <>
                   {' '}
                   <Text as="code">{'{{actions}}'}</Text>{' '}
-                  {t('is where the app lists the actions it may do.')}
+                  {t(
+                    'is where the app lists the actions it may do; without it, the list goes at the end.'
+                  )}
                 </>
               )}
             </Text>
@@ -148,7 +150,8 @@ export function AppPartSection({agent, onChange}) {
               <SecondaryButton
                 onClick={() => {
                   setUnlocked((now) => ({...now, [area]: false}))
-                  if (isChanged) save(null)
+                  // Always: a change typed just before the click is still being saved, and must not come back.
+                  save(null)
                 }}
               >
                 {t('Back to the default')}

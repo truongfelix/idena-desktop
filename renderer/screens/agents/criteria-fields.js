@@ -4,6 +4,7 @@ import {Box, Button, Checkbox, Flex, Stack, Text, Wrap} from '@chakra-ui/react'
 import {useTranslation} from 'react-i18next'
 import {Textarea} from '../../shared/components/components'
 import {NumberField} from './limit-fields'
+import {TOPIC_NAME} from '../social/contract'
 
 // The criteria of a read of others (`who`) or of an action on others (`onlyTo`), B-266: folded under a line that says
 // them, unfolded to change them. Saved whole at each change; the main process checks each field (criteria.js).
@@ -18,6 +19,9 @@ export const CRITERIA_STATES = [
   'Suspended',
   'Zombie',
 ]
+
+// One list for a read without topics: a new one at each render would reset the field while it is typed in.
+const NO_TOPICS = []
 
 const EMPTY = {
   only: [],
@@ -90,6 +94,7 @@ function ListField({
   join,
   placeholder,
   addresses = false,
+  topics = false,
 }) {
   const {t} = useTranslation()
   const [draft, setDraft] = React.useState(join(value))
@@ -117,7 +122,10 @@ function ListField({
           const next = parse(e.currentTarget.value)
           // A list with a line that is not an address is not saved: the text stays, said wrong, until fixed (a
           // mistyped address must never empty "only these" into everyone).
-          const bad = addresses ? next.filter((one) => !isAddress(one)) : []
+          // A topic's name the same way (B-281): one Social would not take is refused, never dropped unsaid.
+          let bad = []
+          if (addresses) bad = next.filter((one) => !isAddress(one))
+          if (topics) bad = next.filter((one) => !TOPIC_NAME.test(one))
           setWrong(bad)
           if (bad.length) return
           if (join(next) !== join(value)) onSave(next)
@@ -125,10 +133,15 @@ function ListField({
       />
       {wrong.length > 0 && (
         <Text fontSize="sm" color="red.500" mt={1}>
-          {t('Not an address, nothing saved: {{list}}', {
-            list: wrong.join(', '),
-            nsSeparator: '!!',
-          })}
+          {topics
+            ? t('Not a topic name, nothing saved: {{list}}', {
+                list: wrong.join(', '),
+                nsSeparator: '!!',
+              })
+            : t('Not an address, nothing saved: {{list}}', {
+                list: wrong.join(', '),
+                nsSeparator: '!!',
+              })}
         </Text>
       )}
     </Box>
@@ -272,10 +285,11 @@ export function CriteriaEditor({
       {withTopics && (
         <ListField
           label={t('Only posts in these topics (commas)')}
-          value={criteria.topics || []}
+          value={criteria.topics || NO_TOPICS}
           parse={topicList}
           join={joinWords}
           placeholder="flips, validation"
+          topics
           onSave={(topics) => save({topics})}
         />
       )}

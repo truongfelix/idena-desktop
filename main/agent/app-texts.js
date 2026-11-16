@@ -89,11 +89,12 @@ function flipExample() {
  * The app's part of each area with its slots (B-282, app-parts.js): what the agent's page shows locked, and what an
  * unlocked text starts from.
  */
-const defaultParts = () => ({
+const DEFAULT_PARTS = Object.freeze({
   flipStory: storySystem(INSTRUCTIONS_SLOT),
   validation: flipSystem(INSTRUCTIONS_SLOT),
   social: socialTemplate(),
 })
+const defaultParts = () => DEFAULT_PARTS
 
 /**
  * Each action's app part as sent without Instructions (the system text, then the question with stand-ins for the
@@ -122,7 +123,7 @@ function appTexts({held = SOCIAL_ACTIONS} = {}) {
       answerFlip: FLIP_SUGGESTION,
       social: SOCIAL_SUGGESTION,
     },
-    parts: defaultParts(),
+    parts: {...DEFAULT_PARTS},
   }
 }
 

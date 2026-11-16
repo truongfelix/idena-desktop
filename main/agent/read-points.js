@@ -55,12 +55,42 @@ function readCounts(value, field) {
   )
 }
 
+const ADDRESS = /^0x[0-9a-f]{40}$/u
+/** A week of blocks (20 s each), and the most acts kept for one agent. */
+const ACTS_KEPT_BLOCKS = 7 * 4320
+const MAX_ACTS = 500
+
+/** The acts saved, each one checked: {agentId: [{action, who, height}]}. */
+function readActs(value) {
+  const saved = value && typeof value === 'object' ? value.acts : null
+  if (!saved || typeof saved !== 'object') return {}
+  return Object.fromEntries(
+    Object.entries(saved)
+      .filter(([id, list]) => ID_PATTERN.test(id) && Array.isArray(list))
+      .map(([id, list]) => [
+        id,
+        list
+          .filter(
+            (one) =>
+              one &&
+              typeof one.action === 'string' &&
+              ADDRESS.test(one.who) &&
+              isHeight(one.height)
+          )
+          .slice(-MAX_ACTS),
+      ])
+  )
+}
+
 /** The points over `file` (none: kept until the app closes). */
 function createReadPoints({file = null, logger = null, now = Date.now} = {}) {
   let points = {}
   let runs = {}
   let tags = {}
   let posts = {}
+  // What each agent did for whom (B-281, once per author): {agentId: [{action, who, height}]}, kept a week of
+  // blocks, so an action sent and not yet in a block the Social scan read still counts for its author.
+  let acts = {}
   if (file)
     try {
       const saved = fs.readJsonSync(file())
@@ -68,6 +98,7 @@ function createReadPoints({file = null, logger = null, now = Date.now} = {}) {
       runs = readRuns(saved)
       tags = readCounts(saved, 'tags')
       posts = readCounts(saved, 'posts')
+      acts = readActs(saved)
     } catch (error) {
       if (error.code !== 'ENOENT' && logger)
         logger.warn('agent read points unreadable', error.toString())
@@ -77,7 +108,11 @@ function createReadPoints({file = null, logger = null, now = Date.now} = {}) {
     if (!file) return
     try {
       const temp = `${file()}.tmp`
-      fs.outputJsonSync(temp, {v: 1, points, runs, tags, posts}, {spaces: 2})
+      fs.outputJsonSync(
+        temp,
+        {v: 1, points, runs, tags, posts, acts},
+        {spaces: 2}
+      )
       fs.renameSync(temp, file())
     } catch (error) {
       if (logger) logger.warn('agent read points not written', error.toString())
@@ -137,6 +172,30 @@ function createReadPoints({file = null, logger = null, now = Date.now} = {}) {
         }
         return before + n
       },
+      /** What the agent `agentId` did for whom, as noted: [{action, who, height}]. */
+      actsDone(data) {
+        return acts[data && data.agentId] || []
+      },
+      /** The agent `agentId` did `action` for the people `whom` at the block `height`; older than a week go. */
+      noteActs(data) {
+        const {agentId, action, whom, height} = data || {}
+        if (!ID_PATTERN.test(agentId)) throw new Error('no agent named')
+        if (typeof action !== 'string' || !isHeight(height))
+          throw new Error('not an action done')
+        const added = (Array.isArray(whom) ? whom : [])
+          .map((who) => String(who || '').toLowerCase())
+          .filter((who) => ADDRESS.test(who))
+          .map((who) => ({action: action.slice(0, 20), who, height}))
+        if (!added.length) return acts[agentId] || []
+        acts = {
+          ...acts,
+          [agentId]: [...(acts[agentId] || []), ...added]
+            .filter((one) => one.height > height - ACTS_KEPT_BLOCKS)
+            .slice(-MAX_ACTS),
+        }
+        save()
+        return acts[agentId]
+      },
       /** How many new posts the agent `agentId` read today (a day in UTC, B-281). */
       postsToday(data) {
         const one = posts[data && data.agentId]
@@ -171,16 +230,21 @@ function createReadPoints({file = null, logger = null, now = Date.now} = {}) {
       const keptPosts = Object.fromEntries(
         Object.entries(posts).filter(([id]) => liveIds.includes(id))
       )
+      const keptActs = Object.fromEntries(
+        Object.entries(acts).filter(([id]) => liveIds.includes(id))
+      )
       if (
         Object.keys(kept).length !== Object.keys(points).length ||
         Object.keys(keptRuns).length !== Object.keys(runs).length ||
         Object.keys(keptTags).length !== Object.keys(tags).length ||
-        Object.keys(keptPosts).length !== Object.keys(posts).length
+        Object.keys(keptPosts).length !== Object.keys(posts).length ||
+        Object.keys(keptActs).length !== Object.keys(acts).length
       ) {
         points = kept
         runs = keptRuns
         tags = keptTags
         posts = keptPosts
+        acts = keptActs
         save()
       }
     },

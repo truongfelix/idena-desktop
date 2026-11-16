@@ -59,6 +59,26 @@ describe('an unlocked part', () => {
       'No slot.\n\nMine.'
     )
     expect(fillPart('No slot.', {instructions: ''})).toBe('No slot.')
+    // The actions too: a Social text without their slot still lists them, before the Instructions.
+    expect(fillPart('Frame.', {instructions: 'Mine.', actions: '- x'})).toBe(
+      'Frame.\n\n- x\n\nMine.'
+    )
+  })
+
+  test('without Instructions, the slot goes with the line that announces it', () => {
+    const parts = defaultParts()
+    const flips = fillPart(parts.validation, {instructions: ''})
+    expect(flips).not.toContain('The instructions of the person who runs you')
+    expect(flips).not.toContain(INSTRUCTIONS_SLOT)
+    expect(flips).toBe(flipSystem(''))
+    const social = fillPart(parts.social, {instructions: '', actions: '- x'})
+    expect(social).not.toContain('Instructions from the person you act for')
+    expect(social).toContain('- x')
+    expect(fillPart(parts.flipStory, {instructions: ''})).toBe(storySystem(''))
+    // A slot inside a line only loses its name.
+    expect(fillPart(`Do this: ${INSTRUCTIONS_SLOT} now.`, {})).toBe(
+      'Do this:  now.'
+    )
   })
 
   test('kept only for a known area, when it is a text that differs from the default', () => {
@@ -74,9 +94,10 @@ describe('an unlocked part', () => {
         defaults
       )
     ).toEqual({social: 'My own frame'})
+    // A text past the longest (a file edited by hand) is cut there, never replaced by the app's.
     expect(
-      normalizeParts({social: 'x'.repeat(MAX_PART_LENGTH + 1)}, defaults)
-    ).toEqual({})
+      normalizeParts({social: 'x'.repeat(MAX_PART_LENGTH + 5)}, defaults).social
+    ).toHaveLength(MAX_PART_LENGTH)
     expect(normalizeParts(null, defaults)).toEqual({})
   })
 })
@@ -160,6 +181,35 @@ describe('what is sent', () => {
     ask.mockResolvedValue('{"actions": []}')
     await agent.handle('planSocial', {agentId: ID, input: 'x'})
     expect(ask.mock.calls[1][1]).toBe(socialSystem(['reply'], 'Be kind.'))
+  })
+
+  test('the parts live in a file of their own: a build before them cannot drop them', () => {
+    const file = path.join(dir, 'agents.json')
+    const partsFile = path.join(dir, 'agent-parts.json')
+    const profiles = createAgentProfiles({
+      file: () => file,
+      partsFile: () => partsFile,
+    })
+    const one = {id: ID, name: 'Agent', appParts: {social: 'My frame'}}
+    profiles.write({agents: [one, {id: 'ffffffffffffffff', name: 'Other'}]})
+    // The file of agents holds no part; the other file holds this agent's.
+    expect(fs.readJsonSync(file).agents.some((a) => 'appParts' in a)).toBe(
+      false
+    )
+    expect(fs.readJsonSync(partsFile)).toEqual({
+      v: 1,
+      parts: {[ID]: {social: 'My frame'}},
+    })
+    expect(profiles.read().agents[0].appParts).toEqual({social: 'My frame'})
+    expect('appParts' in profiles.read().agents[1]).toBe(false)
+    // An older build saves the agents as it knows them: the part is still there afterwards.
+    const old = fs.readJsonSync(file)
+    fs.writeJsonSync(file, {...old, agents: old.agents.map((a) => ({...a}))})
+    expect(profiles.read().agents[0].appParts).toEqual({social: 'My frame'})
+    // Back to the default, and an agent removed: its part goes.
+    profiles.write({agents: [{...profiles.read().agents[0], appParts: {}}]})
+    expect(fs.readJsonSync(partsFile)).toEqual({v: 1, parts: {}})
+    expect('appParts' in profiles.read().agents[0]).toBe(false)
   })
 
   test('back to the default: an agent saved without its part holds none', () => {
