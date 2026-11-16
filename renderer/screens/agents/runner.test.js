@@ -112,6 +112,8 @@ describe("the agents' runs in the window", () => {
     expect(dailyDue(daily, noon, nine + 3600 * 1000)).toBe(false)
     // Before its time: never.
     expect(dailyDue(daily, nine - 60 * 1000, null)).toBe(false)
+    // A saved time after now (a clock set ahead once) is not a run.
+    expect(dailyDue(daily, noon, noon + 24 * 3600 * 1000)).toBe(true)
   })
 })
 
@@ -139,26 +141,38 @@ describe('one run (B-274, B-273)', () => {
     delete global.ipcRenderer
   })
 
-  test('Activity names what started it; a run that read counts as its run, a failed one does not', async () => {
-    runSocialAgent.mockResolvedValueOnce({result: 'done', detail: ''})
+  test("the run is told what started it; a daily agent's run that read counts from its start, a failed one not", async () => {
+    let started
+    runSocialAgent.mockImplementationOnce(async (_, __, deps) => {
+      started = deps.why
+      return {result: 'done', detail: ''}
+    })
+    const before = Date.now()
     await runAgentNow(agent, social, t)
+    expect(started).toBe('now')
     expect(calls).toEqual([
-      ['runStarted', {agentId: agent.id, why: 'now'}],
-      ['setLastRun', {agentId: agent.id}],
+      ['setLastRun', {agentId: agent.id, at: expect.any(Number)}],
     ])
+    expect(calls[0][1].at).toBeGreaterThanOrEqual(before)
     calls = []
     runSocialAgent.mockResolvedValueOnce({result: 'nothing new', detail: ''})
     await runAgentNow(agent, social, t, 'daily')
-    expect(calls).toEqual([
-      ['runStarted', {agentId: agent.id, why: 'daily'}],
-      ['setLastRun', {agentId: agent.id}],
-    ])
+    expect(calls.map(([command]) => command)).toEqual(['setLastRun'])
     calls = []
     runSocialAgent.mockRejectedValueOnce(new Error('the answer was cut short'))
     await expect(runAgentNow(agent, social, t, 'event')).rejects.toThrow(
       'cut short'
     )
-    expect(calls).toEqual([['runStarted', {agentId: agent.id, why: 'event'}]])
+    expect(calls).toEqual([])
+    // An hourly agent never reads it: nothing written.
+    runSocialAgent.mockResolvedValueOnce({result: 'done', detail: ''})
+    await runAgentNow(
+      {...agent, schedule: {kind: 'hourly'}},
+      social,
+      t,
+      'hourly'
+    )
+    expect(calls).toEqual([])
   })
 
   test("the message after a failed Run now holds the reason alone, without Electron's wrapping", () => {

@@ -109,12 +109,17 @@ export function todayAt(schedule, now) {
 }
 
 /**
- * Whether a daily agent still runs today (B-274): its time has come, and no run of it ended without failing since
- * then (Run now and event runs included, in this app session or before a restart: the main process keeps the time).
+ * Whether a daily agent still runs today (B-274): its time has come, and no run of it that started since then ended
+ * without failing (Run now and event runs included, in this app session or before a restart: the main process keeps
+ * the time). A time after now (a clock set wrong once) is not taken as a run.
  */
-export const dailyDue = (schedule, now, lastRun) =>
-  dueToday(schedule, now) &&
-  !(typeof lastRun === 'number' && lastRun >= todayAt(schedule, now))
+export function dailyDue(schedule, now, lastRun) {
+  const at = todayAt(schedule, now)
+  return (
+    now >= at &&
+    !(typeof lastRun === 'number' && lastRun >= at && lastRun <= now)
+  )
+}
 
 /** Whether a run that gave `result` counts as the agent's run (B-274): it read, asked or found nothing new. */
 export const ranFully = (result) =>
@@ -130,9 +135,10 @@ export async function runAgentNow(agent, social, t, why = 'now') {
   try {
     if (!isSocialAgent(agent)) return {result: 'off', detail: ''}
     const state = socialState(social)
-    await agentCall('runStarted', {agentId: agent.id, why})
+    const startedAt = Date.now()
     const outcome = await runSocialAgent(agent, state, {
       t,
+      why,
       agent: agentCall,
       prepare: (item) => prepareSocialAction(item, state),
       send: (pending) => sendSocialAction(pending),
@@ -142,8 +148,11 @@ export async function runAgentNow(agent, social, t, why = 'now') {
           call: socialRpc,
         }),
     })
-    if (ranFully(outcome.result))
-      await agentCall('setLastRun', {agentId: agent.id}).catch(() => {})
+    // Only a daily agent reads it: the time the run started, so a run begun before its time is not its daily run.
+    if (agent.schedule?.kind === 'daily' && ranFully(outcome.result))
+      await agentCall('setLastRun', {agentId: agent.id, at: startedAt}).catch(
+        () => {}
+      )
     return outcome
   } finally {
     running.delete(agent.id)
@@ -232,6 +241,9 @@ export function AgentRunner() {
             }).catch(() => undefined)
             if (last !== undefined && dailyDue(agent.schedule, now, last))
               due.push(agent)
+            // Ran today already (before a restart, Run now): done for the day in this window too.
+            else if (last !== undefined)
+              runs.set(agent.id, afterRun(inWindow, day, now, 'done'))
           }
         }
         // An event (a like, an answer, a tip, a message to it) after its read point runs it too, at most every

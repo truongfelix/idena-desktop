@@ -205,7 +205,15 @@ describe('Social actions', () => {
     const agent = start([social({reply: {level: 'ask'}})])
     await expect(agent.handle('lastRun', {agentId: ID})).resolves.toBe(null)
     await agent.handle('setReadPoint', {agentId: ID, height: 500})
-    await expect(agent.handle('setLastRun', {agentId: ID})).resolves.toBe(at)
+    await expect(
+      agent.handle('setLastRun', {agentId: ID, at: at + 1})
+    ).rejects.toThrow('not a time')
+    await expect(
+      agent.handle('setLastRun', {agentId: ID, at: at - 60000})
+    ).resolves.toBe(at - 60000)
+    await expect(agent.handle('setLastRun', {agentId: ID, at})).resolves.toBe(
+      at
+    )
     const file = path.join(dir, 'agent-read.json')
     expect(fs.readJsonSync(file)).toEqual({
       v: 1,
@@ -214,33 +222,30 @@ describe('Social actions', () => {
     })
     await expect(start().handle('lastRun', {agentId: ID})).resolves.toBe(at)
     await expect(start().handle('readPoint', {agentId: ID})).resolves.toBe(500)
-    await expect(agent.handle('setLastRun', {agentId: 'x'})).rejects.toThrow(
-      'no agent named'
-    )
+    await expect(
+      agent.handle('setLastRun', {agentId: 'x', at})
+    ).rejects.toThrow('no agent named')
     // A file of a build before it (points alone), or a damaged time: read, the time unknown.
     fs.writeJsonSync(file, {v: 1, points: {[ID]: 7}, runs: {[ID]: 'noon'}})
     await expect(start().handle('lastRun', {agentId: ID})).resolves.toBe(null)
     await expect(start().handle('readPoint', {agentId: ID})).resolves.toBe(7)
-    await start().handle('setLastRun', {agentId: ID})
+    await start().handle('setLastRun', {agentId: ID, at})
     const again = start()
     await again.handle('removeAgent', {agentId: ID})
     await expect(again.handle('lastRun', {agentId: ID})).resolves.toBe(null)
     expect(fs.readJsonSync(file).runs).toEqual({})
   })
 
-  test('a run names what started it in Activity, one of four kinds (B-274)', async () => {
+  test('each question of a run names what started it in Activity, one of four kinds (B-274)', async () => {
     const agent = start([social({reply: {level: 'ask'}})])
-    await agent.handle('runStarted', {agentId: ID, why: 'daily'})
-    await expect(
-      agent.handle('runStarted', {agentId: ID, why: 'weekly'})
-    ).rejects.toThrow('no such run')
-    await expect(
-      agent.handle('runStarted', {agentId: 'bbbbbbbbbbbbbbbb', why: 'now'})
-    ).rejects.toThrow('no such agent')
+    await agent.handle('planSocial', {agentId: ID, input: 'x', why: 'daily'})
+    await agent.handle('planSocial', {agentId: ID, input: 'x', why: 'weekly'})
+    await agent.handle('planSocial', {agentId: ID, input: 'x'})
     const lines = await agent.handle('activity', {agentId: ID})
     expect(lines.filter((line) => line.action === 'run')).toEqual([
       expect.objectContaining({agentId: ID, action: 'run', decision: 'daily'}),
     ])
+    expect(ask).toHaveBeenCalledTimes(3)
   })
 
   test('the run is asked with the frame, the Instructions before the format, only the actions not Off', async () => {

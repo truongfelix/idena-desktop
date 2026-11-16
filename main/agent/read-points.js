@@ -3,7 +3,7 @@ const fs = require('fs-extra')
 // How far each agent read Idena Social (B-239): the block its last run read up to, kept by the main process in one
 // JSON file of the user data folder (agent-read.json), so that a restart does not show it the same posts and
 // messages again. A run reads what came after its point, then moves it to the block it read up to.
-// The same file keeps when each agent's last run ended without failing (B-274), so a daily agent runs once a day,
+// The same file keeps when each daily agent's last run that ended without failing started (B-274), so a daily agent runs once a day,
 // not again at each start of the app; a build before it reads `points` alone and drops `runs` when it saves.
 
 const ID_PATTERN = /^[0-9a-f]{16}$/u
@@ -77,16 +77,18 @@ function createReadPoints({file = null, logger = null, now = Date.now} = {}) {
         }
         return points[agentId]
       },
-      /** When the agent `agentId`'s last run ended without failing (ms), or null. */
+      /** When the agent `agentId`'s last run that ended without failing started (ms), or null. */
       lastRun(data) {
         const id = data && data.agentId
         return Object.prototype.hasOwnProperty.call(runs, id) ? runs[id] : null
       },
-      /** The agent `agentId`'s run ended now without failing. */
+      /** The agent `agentId`'s run that started `at` (ms, not after now) ended without failing. */
       setLastRun(data) {
-        const agentId = data && data.agentId
+        const {agentId, at} = data || {}
         if (!ID_PATTERN.test(agentId)) throw new Error('no agent named')
-        runs = {...runs, [agentId]: now()}
+        if (!Number.isSafeInteger(at) || at <= 0 || at > now())
+          throw new Error('not a time')
+        runs = {...runs, [agentId]: at}
         save()
         return runs[agentId]
       },

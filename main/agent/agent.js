@@ -377,15 +377,6 @@ function createAgent({
     ...(readPoints ? readPoints.commands : {}),
     /** An action an agent prepared (pending.js propose): refused, to do alone, or waiting in To approve. */
     ...(pending ? {propose: (data) => pending.propose(data)} : {}),
-    /** A Social run of the agent `agentId` starts (B-274): Activity names what started it. */
-    runStarted({agentId, why} = {}) {
-      if (!profiles) throw new Error('no agents')
-      if (!profiles.read().agents.some((one) => one.id === agentId))
-        throw new Error('no such agent')
-      if (!RUN_KINDS.includes(why)) throw new Error('no such run')
-      log({agentId, action: 'run', decision: why})
-      return null
-    },
     status,
     saveSettings(data) {
       const saved = settings.write(data)
@@ -472,7 +463,7 @@ function createAgent({
      * Social actions it holds (not Off). Returns the model's answer, a plan the app reads and checks action by action
      * (each one then goes through propose).
      */
-    async planSocial({agentId, input, timeoutMs} = {}) {
+    async planSocial({agentId, input, why, timeoutMs} = {}) {
       if (!profiles) throw new Error('no agents')
       const file = profiles.read()
       const agent = file.agents.find((one) => one.id === agentId)
@@ -488,6 +479,8 @@ function createAgent({
         log({agentId, action: 'social', decision: 'off', detail: reason})
         throw new Error(`the agent may not do it (${reason})`)
       }
+      // What started the run, before its question (B-274): every question billed is named in Activity.
+      if (RUN_KINDS.includes(why)) log({agentId, action: 'run', decision: why})
       const controller = new AbortController()
       writing.add(controller)
       try {

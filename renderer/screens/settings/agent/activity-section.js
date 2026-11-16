@@ -75,6 +75,7 @@ export function activityText({action, decision, detail}, t) {
       if (decision === 'daily')
         return t('Daily run: its time of the day came', {nsSeparator: '!!'})
       if (decision === 'hourly') return t('Hourly run')
+      if (decision !== 'event') return `${action} ${decision}`
       return t('Run on an event: a like, an answer, a tip or a message', {
         nsSeparator: '!!',
       })

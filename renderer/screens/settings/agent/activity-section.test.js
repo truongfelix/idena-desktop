@@ -61,6 +61,9 @@ describe('what started a Social run (B-274)', () => {
     expect(activityText({action: 'run', decision: 'event'}, t)).toBe(
       'Run on an event: a like, an answer, a tip or a message'
     )
+    expect(activityText({action: 'run', decision: 'weekly'}, t)).toBe(
+      'run weekly'
+    )
     const failed = {action: 'social', decision: 'failed', detail: 'cut short'}
     const rows = groupActivity(
       [
