@@ -1,4 +1,13 @@
-import {addressList, criteriaLine, wordList} from './criteria-fields'
+import {
+  CRITERIA_STATES,
+  addressList,
+  criteriaLine,
+  wordList,
+} from './criteria-fields'
+import {ONLY_TO} from './actions-section'
+import {WHO_READS} from './read-row'
+
+const main = require('../../../main/agent/criteria')
 
 // B-266: the criteria editor's folded line and its lists.
 const t = (text, values = {}) =>
@@ -35,5 +44,13 @@ describe('the criteria in words', () => {
       '0xD',
     ])
     expect(wordList('idena, flip ,, ')).toEqual(['idena', 'flip'])
+  })
+})
+
+describe('the page and the main process name the same', () => {
+  test('actions with criteria and identity states', () => {
+    expect(ONLY_TO).toEqual(main.ONLY_TO_ACTIONS)
+    expect(WHO_READS).toEqual(main.WHO_ACTIONS)
+    expect([...CRITERIA_STATES].sort()).toEqual([...main.STATES].sort())
   })
 })

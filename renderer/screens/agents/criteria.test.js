@@ -34,6 +34,10 @@ describe('an author and the criteria', () => {
     expect(passes(words, A, human, 'A new FLIP today')).toBe(true)
     expect(passes(words, A, human, 'Hello')).toBe(false)
     expect(passes(words, A, human, 'Idena scam')).toBe(false)
+    // Whole words: not "flip" in "flipper", nor "scam" in "scamper"; a like or a tip has no text: no words checked.
+    expect(passes(words, A, human, 'A flipper')).toBe(false)
+    expect(passes(words, A, human, 'Idena, scampering')).toBe(true)
+    expect(passes(words, A, human, null)).toBe(true)
     expect(
       passes(
         {...none, states: ['Human'], trustAbove: 50, minStake: 1000},
@@ -78,6 +82,49 @@ describe("the authors' facts", () => {
     expect(facts[B].state).toBe('Newbie')
     await readAuthors([A], needs, {settled, call: jest.fn(), now: 2000})
     expect(settled).toHaveBeenCalledTimes(1)
+    // Seen at each run, it is still read again once past its time.
+    await readAuthors([A], needs, {
+      settled,
+      call: jest.fn(),
+      now: 1000 + 29 * 60 * 1000,
+    })
+    expect(settled).toHaveBeenCalledTimes(1)
+    await readAuthors([A], needs, {
+      settled,
+      call: jest.fn(),
+      now: 1000 + 31 * 60 * 1000,
+    })
+    expect(settled).toHaveBeenCalledTimes(2)
+  })
+
+  test('Vouched: a vouched member in standing (no identity of its own, its voucher validated)', async () => {
+    const C = `0x${'c'.repeat(40)}`
+    const V = `0x${'d'.repeat(40)}`
+    const states = {
+      [A]: 'Undefined',
+      [B]: 'Human',
+      [C]: 'Undefined',
+      [V]: 'Human',
+    }
+    const settled = jest.fn(async (method, list) => {
+      if (method === 'contract_readMap')
+        // A and B vouched for by V; C has no voucher.
+        return list.map(([, , key]) =>
+          key === `0x${Buffer.from(C).toString('hex')}`
+            ? {error: new Error('data is nil')}
+            : {result: V}
+        )
+      return list.map(([address]) => ({result: {state: states[address]}}))
+    })
+    const facts = await readAuthors(
+      [A, B, C],
+      criteriaNeeds([{...none, states: ['Vouched']}]),
+      {settled, call: jest.fn()}
+    )
+    expect(facts[A].vouched).toBe(true)
+    // B has an identity of its own: not a vouched member; C has no voucher.
+    expect(facts[B].vouched).toBe(false)
+    expect(facts[C].vouched).toBe(false)
   })
 
   test('a read that fails leaves the facts out', async () => {

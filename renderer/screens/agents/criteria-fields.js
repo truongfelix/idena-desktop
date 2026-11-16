@@ -67,9 +67,23 @@ export function criteriaLine(criteria, t, stateName) {
   return parts.join(' · ') || t('Everyone')
 }
 
-function ListField({label, value, onSave, parse, join, placeholder}) {
+/** Whether a token is an address (0x and 40 hex digits). */
+const isAddress = (one) => /^0x[0-9a-fA-F]{40}$/u.test(one)
+
+function ListField({
+  label,
+  value,
+  onSave,
+  parse,
+  join,
+  placeholder,
+  addresses = false,
+}) {
+  const {t} = useTranslation()
   const [draft, setDraft] = React.useState(join(value))
   React.useEffect(() => setDraft(join(value)), [value, join])
+  // What is not an address is not kept: said here, never dropped unseen.
+  const wrong = addresses ? parse(draft).filter((one) => !isAddress(one)) : []
   return (
     <Box>
       <Text fontSize="sm" color="muted" mb={1}>
@@ -83,10 +97,20 @@ function ListField({label, value, onSave, parse, join, placeholder}) {
         placeholder={placeholder}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={(e) => {
-          const next = parse(e.currentTarget.value)
+          const next = parse(e.currentTarget.value).filter(
+            (one) => !addresses || isAddress(one)
+          )
           if (join(next) !== join(value)) onSave(next)
         }}
       />
+      {wrong.length > 0 && (
+        <Text fontSize="sm" color="red.500" mt={1}>
+          {t('Not an address, not kept: {{list}}', {
+            list: wrong.join(', '),
+            nsSeparator: '!!',
+          })}
+        </Text>
+      )}
     </Box>
   )
 }
@@ -194,6 +218,7 @@ export function CriteriaFields({title, value, withWords = false, onChange}) {
             parse={addressList}
             join={joinLines}
             placeholder="0x…"
+            addresses
             onSave={(only) => save({only})}
           />
           <ListField
@@ -202,6 +227,7 @@ export function CriteriaFields({title, value, withWords = false, onChange}) {
             parse={addressList}
             join={joinLines}
             placeholder="0x…"
+            addresses
             onSave={(except) => save({except})}
           />
           {withWords && (

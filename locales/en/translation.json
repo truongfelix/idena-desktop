@@ -2163,5 +2163,6 @@
   "All but these identities (addresses)": "All but these identities (addresses)",
   "Its text holds one of these words (commas)": "Its text holds one of these words (commas)",
   "Its text holds none of these words (commas)": "Its text holds none of these words (commas)",
-  "Whose": "Whose"
+  "Whose": "Whose",
+  "Not an address, not kept: {{list}}": "Not an address, not kept: {{list}}"
 }

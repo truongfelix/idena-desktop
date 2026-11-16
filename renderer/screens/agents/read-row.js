@@ -9,7 +9,7 @@ import {useDraft} from './page-sections'
 import {CriteriaFields} from './criteria-fields'
 
 // The reads of what others wrote: whose, by criteria (B-266).
-const WHO_READS = ['readPosts', 'readNotifications', 'readMessages']
+export const WHO_READS = ['readPosts', 'readNotifications', 'readMessages']
 
 /** The most posts "the last N" reads (main/agent/profiles.js MAX_POSTS_READ). */
 const MAX_POSTS_READ = 50

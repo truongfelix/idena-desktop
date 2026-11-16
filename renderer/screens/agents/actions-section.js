@@ -30,7 +30,7 @@ import {ReadRow} from './read-row'
 import {nothingToActOn} from './page-sections'
 
 // The actions on others: only to whom the person's criteria pick (B-266).
-const ONLY_TO = ['reply', 'like', 'message', 'tip']
+export const ONLY_TO = ['reply', 'like', 'message', 'tip']
 
 /**
  * "What it may do": the agent's actions by area (Q-64), each Off, Ask me or Alone with its limit a day, and the

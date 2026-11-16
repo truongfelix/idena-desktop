@@ -1,4 +1,10 @@
-import {readEntries, readTrust} from '../social/profiles'
+import {
+  identityStates,
+  isValidated,
+  isVouchable,
+  readEntries,
+  readTrust,
+} from '../social/profiles'
 
 // Whose posts, answers and messages an agent reads, and whom it acts on (B-266): the criteria the person sets on a
 // read action (`who`) or an action on others (`onlyTo`), checked as saved in main/agent/criteria.js. Each author is
@@ -36,6 +42,10 @@ export async function readAuthors(
   {settled, call, now = Date.now()}
 ) {
   const list = [...new Set(addresses.map((a) => String(a).toLowerCase()))]
+  // The expired ones go: the cache holds only what is still fresh.
+  known.forEach((kept, address) => {
+    if (now - kept.at >= AUTHOR_TTL_MS) known.delete(address)
+  })
   const fresh = (address) => {
     const kept = known.get(address)
     return kept && now - kept.at < AUTHOR_TTL_MS ? kept.facts : null
@@ -67,8 +77,17 @@ export async function readAuthors(
         settled,
         asked.map((a) => ['v:', a])
       )
+      const states = await identityStates(settled, [
+        ...asked,
+        ...vouchers.filter(Boolean),
+      ])
+      // A vouched member in standing, as the profiles count it: no identity of its own, its voucher validated.
       asked.forEach((a, i) => {
-        facts[a].vouched = Boolean(vouchers[i])
+        const voucher = vouchers[i] ? String(vouchers[i]).toLowerCase() : null
+        facts[a].vouched =
+          voucher !== null &&
+          isVouchable(states[a]) &&
+          isValidated(states[voucher])
       })
     } catch {
       // Left out.
@@ -86,19 +105,31 @@ export async function readAuthors(
       }
     }
   }
-  list.forEach((a) => known.set(a, {at: now, facts: facts[a]}))
+  // Stamped when read: a cached author's facts keep their first time, and are read again once it is past.
+  list.forEach((a) => {
+    const kept = known.get(a)
+    known.set(a, {at: kept ? kept.at : now, facts: facts[a]})
+  })
   return facts
 }
+
+const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')
+
+/** Whether `word` is in `text` as a whole word (not "art" in "party"): letters and digits around it end it. */
+const hasWord = (text, word) =>
+  new RegExp(`(^|[^\\p{L}\\p{N}])${escape(word)}($|[^\\p{L}\\p{N}])`, 'u').test(
+    text
+  )
 
 /** Forgets the authors read (a test, or the node changed). */
 export const forgetAuthors = () => known.clear()
 
 /**
  * Whether `address` (with its `facts`, readAuthors) and its `text` pass `criteria`; no criteria pass everyone. A state
- * picked passes when the author is in one of them (Vouched: a vouched member); the words: one of `mustWords` in the
- * text, none of `notWords`.
+ * picked passes when the author is in one of them (Vouched: a vouched member in standing); the words, whole words: one
+ * of `mustWords` in the text, none of `notWords`, for an item with a text (`text` null: a like or a tip, no words).
  */
-export function passes(criteria, address, facts = {}, text = '') {
+export function passes(criteria, address, facts = {}, text = null) {
   if (!criteria) return true
   const who = String(address || '').toLowerCase()
   if (criteria.only.length && !criteria.only.includes(who)) return false
@@ -125,16 +156,17 @@ export function passes(criteria, address, facts = {}, text = '') {
     !(typeof facts.stake === 'number' && facts.stake >= criteria.minStake)
   )
     return false
-  const lower = String(text || '').toLowerCase()
+  if (text === null) return true
+  const lower = String(text).toLowerCase()
   if (
     criteria.mustWords &&
     criteria.mustWords.length &&
-    !criteria.mustWords.some((word) => lower.includes(word))
+    !criteria.mustWords.some((word) => hasWord(lower, word))
   )
     return false
   if (
     criteria.notWords &&
-    criteria.notWords.some((word) => lower.includes(word))
+    criteria.notWords.some((word) => hasWord(lower, word))
   )
     return false
   return true

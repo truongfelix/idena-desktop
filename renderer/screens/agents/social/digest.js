@@ -78,7 +78,7 @@ export function socialDigest(
   // (criteria.js readAuthors). `collect` (a Set): the authors of what is new go in it, nothing is left out (the run
   // reads them first).
   const isBlocked = (address) => Boolean(blocked && blocked.has(address))
-  const readsFrom = (kind, address, text = '') => {
+  const readsFrom = (kind, address, text = null) => {
     if (collect) {
       collect.add(String(address).toLowerCase())
       return true
