@@ -113,8 +113,8 @@ describe('agent provider requests', () => {
       parts,
       {maxTokens: 8000}
     ).body
-    // The task's own room stays (a story, a plan); a smaller task gets the agent's limit.
-    expect(set.max_tokens).toBe(8000)
+    // The person's setting is the limit, for a story or a plan too: the task's own room is for an agent without one.
+    expect(set.max_tokens).toBe(1500)
     expect(set.output_config).toEqual({effort: 'low'})
     expect(
       buildRequest({...anthropic, maxTokens: 1500}, 's', parts).body.max_tokens

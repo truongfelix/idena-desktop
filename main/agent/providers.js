@@ -136,7 +136,8 @@ function replyText(provider, data) {
 /**
  * The request for one question: url, headers and body, before it is sent. The config's `maxTokens` and `effort` are
  * the agent's (B-265: null and '' when the person set none); the option `maxTokens` is the task's own longest answer
- * for an Anthropic model (a story's four prompts need more than a flip's JSON): the larger of the two is sent.
+ * for an Anthropic model (a story's four prompts need more than a flip's JSON), sent only when the agent has none:
+ * the person's setting is the limit for every task, as on the other services.
  */
 function buildRequest(
   {provider, address, model, key, maxTokens: agentMaxTokens, effort},
@@ -159,10 +160,7 @@ function buildRequest(
         model,
         system,
         parts,
-        // A task that needs room (a story, a Social plan) keeps it under a smaller limit set for the agent.
-        agentMaxTokens && maxTokens
-          ? Math.max(agentMaxTokens, maxTokens)
-          : agentMaxTokens || maxTokens,
+        agentMaxTokens || maxTokens,
         effort
       ),
     }
