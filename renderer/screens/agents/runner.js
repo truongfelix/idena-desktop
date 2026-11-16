@@ -6,6 +6,8 @@ import {blockedAddresses} from '../social/people'
 import {historyDone} from '../social/scan'
 import {agentsList, lastAgentsList, onAgentsChange} from '../settings/agent/api'
 import {executors} from './pending-api'
+import {readAuthors} from './criteria'
+import {socialRpc, socialRpcSettled} from '../social/node'
 import {
   heldSocial,
   readsMessages,
@@ -113,6 +115,11 @@ export async function runAgentNow(agent, social, t) {
       agent: agentCall,
       prepare: (item) => prepareSocialAction(item, state),
       send: (pending) => sendSocialAction(pending),
+      readAuthors: (addresses, needs) =>
+        readAuthors(addresses, needs, {
+          settled: socialRpcSettled,
+          call: socialRpc,
+        }),
     })
   } finally {
     running.delete(agent.id)

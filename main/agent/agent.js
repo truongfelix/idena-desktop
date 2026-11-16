@@ -4,7 +4,8 @@ const {createPending} = require('./pending')
 const {createReadPoints} = require('./read-points')
 const {agentSettings, reportAgent, validationAgent} = require('./profiles')
 const {checkFlip, flipQuestion, mediaType, readFlipAnswer} = require('./flips')
-const {readStory, storySystem} = require('./stories')
+const {readStories, storyQuestion, storySystem} = require('./stories')
+const {appTexts} = require('./app-texts')
 const {socialHeld, socialSystem} = require('./social')
 const providers = require('./providers')
 
@@ -21,8 +22,12 @@ const MAX_ANSWER_TEXT = 4000
 // A run's plan on Idena Social: several actions, each with a text of a post's length.
 const MAX_PLAN_TEXT = 12000
 const PLAN_MAX_TOKENS = 4096
-// A story and four prompts of up to 120 words: about 1,500 tokens; room for a longer one.
-const STORY_MAX_TOKENS = 4096
+// Stories with 12 prompts of up to 120 words and each story in words (B-268): about 4,000 tokens; room for more.
+const STORY_MAX_TOKENS = 8192
+// A picture that failed before the service could draw it (B-269): the key refused, the service not reached, the
+// request stopped or never built. A deadline may come after the service drew and billed it: it counts.
+const NOT_BILLED =
+  /HTTP 40[13]\b|cannot be reached|^stopped$|no key|no image model|draws no pictures/u
 
 function clampTimeout(value) {
   // null, '' and booleans are numbers to Number(): 0, a 1 s deadline. Only a real number counts.
@@ -338,6 +343,7 @@ function createAgent({
       reportConfidence: report ? reading.reportConfidence : 0,
       // How good a flip it is, from the agent that marks the keywords (B-260: the best flip).
       quality: (reading || (separate ? null : answer) || {}).quality ?? null,
+      doubted: Boolean((reading || (separate ? null : answer) || {}).doubted),
       markDecision,
       reportLater: separate && !hasWords,
       ...(answered.status === 'rejected'
@@ -503,11 +509,12 @@ function createAgent({
       }
     },
     /**
-     * A flip's story (B-236): for the agent `agentId` holding "Write flip stories" (not Off), one story of `panels`
-     * (3 or 4) panels for the flip's two keywords `words`, and one image prompt per panel, read from its answer. Nothing
-     * goes to the chain: the person copies the prompts, or the images come into the flip editor for them to check.
+     * A flip's stories (B-236, B-268): for the agent `agentId` holding "Write flip stories" (not Off), the stories and
+     * image prompts its Instructions ask for, for the flip's two keywords `words`, the person's `idea`, the `parts`
+     * asked ('story', 'prompts') and the titles given before (`notThese`). Nothing goes to the chain: the person reads
+     * the stories, edits the prompts, and the pictures come into the flip editor for them to choose.
      */
-    async writeStory({agentId, panels, words, timeoutMs} = {}) {
+    async writeStory({agentId, words, idea, parts, notThese, timeoutMs} = {}) {
       if (!profiles) throw new Error('no agents')
       const file = profiles.read()
       const agent = file.agents.find((one) => one.id === agentId)
@@ -522,28 +529,32 @@ function createAgent({
         })
         throw new Error(`the agent may not do it (${check.reason})`)
       }
-      const system = storySystem(panels, words, agent.instructions)
+      const question = storyQuestion({words, idea, parts, notThese})
+      const system = storySystem(agent.instructions)
       const controller = new AbortController()
       writing.add(controller)
       try {
         const answer = await ask(
           connection(agent),
           system,
-          [{type: 'text', text: 'Write the story and its prompts now.'}],
+          [{type: 'text', text: question}],
           {
             timeoutMs: clampTimeout(timeoutMs),
             signal: controller.signal,
             maxTokens: STORY_MAX_TOKENS,
           }
         )
-        const story = readStory(answer, panels)
+        const written = readStories(answer, parts)
         log({
           agentId,
           action: 'flipStory',
           decision: check.decision,
-          detail: story.title,
+          detail: written.stories
+            .map((one) => one.title)
+            .filter(Boolean)
+            .join(' · '),
         })
-        return story
+        return written
       } catch (error) {
         log({
           agentId,
@@ -577,6 +588,20 @@ function createAgent({
       }
       if (typeof prompt !== 'string' || !prompt.trim())
         throw new Error('no prompt')
+      // Its pictures a day (B-269): each one is billed by its service. Counted when asked, and kept with the day's
+      // tally (pending.js): a restart keeps the count. A failure the service cannot have billed is given back.
+      const limit = agent.actions.flipStory.picturesPerDay
+      const drawnToday = pending.picturesToday(agentId)
+      if (typeof limit === 'number' && drawnToday + 1 > limit) {
+        log({
+          agentId,
+          action: 'flipImage',
+          decision: 'off',
+          detail: 'pictures a day reached',
+        })
+        throw new Error(`its ${limit} pictures a day are reached`)
+      }
+      pending.addPicture(agentId)
       const controller = new AbortController()
       writing.add(controller)
       try {
@@ -602,6 +627,7 @@ function createAgent({
         })
         return picture
       } catch (error) {
+        if (NOT_BILLED.test(error.message)) pending.addPicture(agentId, -1)
         log({
           agentId,
           action: 'flipImage',
@@ -658,6 +684,8 @@ function createAgent({
       stop(testing)
       return null
     },
+    // What the app adds to the Instructions per action, and the suggestions (B-268): the agent page's ⓘ.
+    appTexts: (data) => appTexts(data),
     /** The log, newest first; with `agentId`, that agent's lines and the pause and resume of all agents. */
     activity: (data) => {
       // No agent named (no data, or none in it): every line.

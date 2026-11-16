@@ -37,12 +37,7 @@ import {saveAgentFile} from './agent-file'
 import {AgentBadge} from './agents-list'
 import {actionCatalog} from './catalog'
 import {useAgents} from './use-agents'
-import {
-  InstructionsSection,
-  ReadsSection,
-  ScheduleSection,
-  useDraft,
-} from './page-sections'
+import {InstructionsSection, ScheduleSection, useDraft} from './page-sections'
 import {RunNow} from './run-now'
 
 function NameField({value, onSave}) {
@@ -217,8 +212,7 @@ export function AgentPage({id}) {
         catalog={catalog}
         onChange={save}
       />
-      <ReadsSection agent={agent} catalog={catalog} onChange={save} />
-      <ScheduleSection agent={agent} catalog={catalog} onChange={save} />
+      <ScheduleSection agent={agent} onChange={save} />
       {agent.actions.report && (
         <ReportRulesSection settings={agent} onChange={save} />
       )}

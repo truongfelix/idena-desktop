@@ -16,7 +16,7 @@ export function actionCatalog(t) {
       area: 'flips',
       label: t('Write flip stories'),
       info: t(
-        "Writes a flip's story and one picture prompt per frame, from the flip's two keywords, in the flip editor."
+        "Writes flip stories and their picture prompts in the flip editor, as your Instructions ask, from the flip's two keywords and your idea."
       ),
       reads: [t('The two keywords of the flip you make')],
     },
@@ -43,8 +43,8 @@ export function actionCatalog(t) {
       id: 'post',
       area: 'social',
       label: t('Post on Social'),
-      info: t('Writes posts of its own. It reads its own last posts.'),
-      reads: [t('Its own last posts')],
+      info: t('Writes posts of its own.'),
+      reads: [],
       defaults: {level: 'off', limit: 1},
       perDay: 'count',
       // It spends iDNA (fees, a tip's amount): the budget counts it.
@@ -99,6 +99,51 @@ export function actionCatalog(t) {
       // It spends iDNA (fees, a tip's amount): the budget counts it.
       spends: true,
     },
+    // What it reads on Social (B-262): given like any action, on or off; reading spends nothing.
+    {
+      id: 'readPosts',
+      area: 'social',
+      kind: 'read',
+      label: t('Read all Social posts'),
+      info: t(
+        'The new posts of everyone on Social: those of the last 24 hours, or the last N. It acts only on what it read.',
+        {nsSeparator: '!!'}
+      ),
+      reads: [],
+      defaults: {level: 'alone', window: 'day', count: 10},
+    },
+    {
+      id: 'readOwnPosts',
+      area: 'social',
+      kind: 'read',
+      label: t('Read its own posts'),
+      info: t(
+        'Its own last posts, to go on from them (a series, what it already said).'
+      ),
+      reads: [],
+      defaults: {level: 'alone'},
+    },
+    {
+      id: 'readNotifications',
+      area: 'social',
+      kind: 'read',
+      label: t('Read its notifications'),
+      info: t(
+        'Only its own: the likes, answers and tips to its posts, replies and comments.',
+        {nsSeparator: '!!'}
+      ),
+      reads: [],
+      defaults: {level: 'alone'},
+    },
+    {
+      id: 'readMessages',
+      area: 'social',
+      kind: 'read',
+      label: t('Read its private messages'),
+      info: t('Its one-to-one conversations with a new message.'),
+      reads: [],
+      defaults: {level: 'alone'},
+    },
   ]
 }
 
@@ -109,6 +154,7 @@ export function socialReadsList({reads}, t) {
     out.push(t('The posts of the last 24 hours'))
   if (reads.posts.window === 'count')
     out.push(t('The last {{count}} posts', {count: reads.posts.count}))
+  if (reads.own) out.push(t('Its own last posts'))
   if (reads.notifications)
     out.push(t('Its notifications: likes, answers, tips', {nsSeparator: '!!'}))
   if (reads.messages) out.push(t('Its private messages'))
@@ -242,9 +288,13 @@ export function actionsLine(agent, catalog, t) {
   const rows = catalog.filter(({id}) => agent.actions[id])
   if (!rows.length) return t('None yet')
   return rows
-    .map(
-      ({id, label}) => `${label} (${levelLabel(agent.actions[id].level, t)})`
-    )
+    .map(({id, label, kind}) => {
+      const {level} = agent.actions[id]
+      // A read is on or off (B-262).
+      if (kind === 'read')
+        return `${label} (${level === 'off' ? t('Off') : t('On')})`
+      return `${label} (${levelLabel(level, t)})`
+    })
     .join(', ')
 }
 
@@ -278,13 +328,40 @@ export function readsList(agent, catalog, t) {
 export const spendingActions = (agent, catalog) =>
   catalog.filter(({id, spends}) => spends && agent.actions[id])
 
-/** Its budget, in words; none for an agent whose actions spend nothing (`catalog` given), whatever was set before. */
+/**
+ * The most it may spend alone a day, in words (B-269): its overall limit when set, else what its Alone actions' own
+ * limits add up to (each one's iDNA a day, fees included); none for an agent whose actions spend nothing (`catalog`
+ * given), whatever was set before.
+ */
 export function budgetLine(agent, t, catalog = null) {
-  const {budgetPerDay} = agent
   if (catalog && spendingActions(agent, catalog).length === 0)
     return t('Spends no iDNA')
-  if (budgetPerDay === null || budgetPerDay === 0) return t('Spends no iDNA')
-  return t('Up to {{amount}} iDNA a day', {amount: budgetPerDay})
+  // What spends alone: the actions set to Alone among those that spend iDNA (Ask me spends only on a click).
+  const spending = (catalog || actionCatalog((text) => text))
+    .filter(({spends}) => spends)
+    .map(({id}) => id)
+  const limits = Object.entries(agent.actions || {})
+    .filter(
+      ([id, row]) => spending.includes(id) && row && row.level === 'alone'
+    )
+    .map(([, row]) =>
+      typeof row.spendPerDay === 'number' ? row.spendPerDay : null
+    )
+  const own = limits.reduce((sum, limit) => sum + (limit || 0), 0)
+  const overall =
+    typeof agent.budgetPerDay === 'number' ? agent.budgetPerDay : null
+  // Nothing spends alone (no Alone action that spends): no overall limit changes that.
+  if (!limits.length) return t('Spends no iDNA')
+  // An action without its own limit spends within the overall one, up to all of it.
+  let most = own
+  if (overall !== null)
+    most = limits.every((limit) => limit !== null)
+      ? Math.min(overall, own)
+      : overall
+  if (!most) return t('Spends no iDNA')
+  return t('Up to {{amount}} iDNA a day', {
+    amount: Math.round(most * 100) / 100,
+  })
 }
 
 /** Where the model runs, as the cards show it. */

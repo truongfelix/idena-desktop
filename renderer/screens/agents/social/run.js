@@ -1,4 +1,5 @@
 import {socialDigest} from './digest'
+import {criteriaNeeds, passes} from '../criteria'
 import {doneOnFeed, readPlan} from './plan'
 import {mostCost} from './execute'
 import {shortAddress} from '../../social/people'
@@ -8,7 +9,8 @@ import {shortAddress} from '../../social/people'
 // the app keeps only those it may do on what it was shown (plan.js), and asks the main process about each one
 // (propose): refused, waiting in To approve (Ask me), or done alone within its daily limit and budget. A tip's
 // amount is the person's. Then the read point moves to the block read. Every dependency is passed in (`deps`):
-// the agent channel (`agent(command, data)`), the action's preparation and sending (`prepare`, `send`), the words.
+// the agent channel (`agent(command, data)`), the action's preparation and sending (`prepare`, `send`), the words,
+// the authors' facts for its criteria (`readAuthors(addresses, needs)`, B-266).
 
 /** The Social actions an agent can hold (main/agent/social.js SOCIAL_ACTIONS). */
 export const SOCIAL_ACTIONS = ['post', 'reply', 'like', 'message', 'tip']
@@ -91,9 +93,30 @@ export async function runSocialAgent(agent, social, deps) {
   if (typeof scanned !== 'number')
     return {result: 'failed', detail: t('Social has not read the chain yet')}
   const point = await call('readPoint', {agentId: agent.id})
+  // Whose it reads and whom it acts on (B-266): the authors of what is new read first, when a criterion needs it.
+  const who = {
+    posts: agent.actions.readPosts?.who || null,
+    notifications: agent.actions.readNotifications?.who || null,
+    messages: agent.actions.readMessages?.who || null,
+  }
+  const onlyTo = Object.fromEntries(
+    held.map((action) => [action, agent.actions[action]?.onlyTo || null])
+  )
+  const needs = criteriaNeeds([...Object.values(who), ...Object.values(onlyTo)])
+  let facts = {}
+  if (needs.identity || needs.vouched || needs.trust) {
+    const authors = new Set()
+    socialDigest(
+      social,
+      {reads: agent.reads, collect: authors},
+      {point, scanned}
+    )
+    // Without a reader, nothing is known of anyone: no criterion that needs it passes.
+    facts = deps.readAuthors ? await deps.readAuthors([...authors], needs) : {}
+  }
   const digest = socialDigest(
     social,
-    {reads: agent.reads, held},
+    {reads: agent.reads, who, facts},
     {point, scanned}
   )
   // Nothing to read, and no post of its own to write: the model is not asked (its service bills each question).
@@ -129,6 +152,32 @@ export async function runSocialAgent(agent, social, deps) {
   // eslint-disable-next-line no-restricted-syntax
   for (const planned of plan.actions) {
     const {action} = planned
+    // Whom it acts on (B-266): a target outside the action's criteria is refused, whatever the model asked.
+    // Every one it acts on: a post's author, or each person of a message. A target it cannot know is refused too:
+    // the check never fails open.
+    // A message goes to the people the plan picked (plan.js `others`), the other actions to the item's author.
+    let whom = []
+    if (action === 'message') whom = planned.others || []
+    else if (planned.item)
+      whom = planned.item.author
+        ? [planned.item.author]
+        : planned.item.others || []
+    if (
+      onlyTo[action] &&
+      (!whom.length ||
+        !whom.every((one) =>
+          passes(onlyTo[action], one, facts[String(one).toLowerCase()])
+        ))
+    ) {
+      count.skipped += 1
+      // eslint-disable-next-line no-await-in-loop
+      await log(action, {
+        skipped: true,
+        detail: t('not done: outside its criteria', {nsSeparator: '!!'}),
+      })
+      // eslint-disable-next-line no-continue
+      continue
+    }
     const amount = action === 'tip' ? agent.actions.tip.amount : undefined
     const item = {action, body: planned.text, target: targetOf(planned), amount}
     let pending

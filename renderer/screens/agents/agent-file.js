@@ -94,7 +94,22 @@ function ImportDialog({preview, onCancel, onAdd, isAdding, error}) {
               </Box>
             )}
             {fact(t('Runs'), runsLine(agent, t))}
-            {fact(t('Budget'), budgetLine(agent, t))}
+            {fact(
+              t('Budget'),
+              // The file's own levels: the agent comes in with each action Off.
+              budgetLine(
+                {
+                  ...agent,
+                  actions: Object.fromEntries(
+                    Object.entries(agent.actions).map(([name, row]) => [
+                      name,
+                      {...row, level: (asked[name] || row).level},
+                    ])
+                  ),
+                },
+                t
+              )
+            )}
             {fact(t('Model'), connectionLine(agent, t))}
           </Stack>
           {addressLeft && (

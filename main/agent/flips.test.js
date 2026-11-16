@@ -1,5 +1,8 @@
 const {
   REPORT_REASONS,
+  FLIP_FORMAT,
+  FLIP_MEANING,
+  FLIP_SUGGESTION,
   REPORT_THRESHOLDS,
   checkFlip,
   firstJsonObject,
@@ -108,6 +111,7 @@ describe('agent flips: the model answer', () => {
       report: false,
       reportConfidence: 0,
       quality: null,
+      doubted: false,
     })
     expect(
       readFlipAnswer('{"answer": "both", "confidence": 3}', {hasWords: false})
@@ -135,6 +139,7 @@ describe('agent flips: the model answer', () => {
       report: true,
       reportConfidence: REPORT_THRESHOLDS[4],
       quality: null,
+      doubted: true,
     })
     expect(readFlipAnswer(sure, {hasWords: false})).toMatchObject({
       reasons: [],
@@ -222,6 +227,13 @@ describe('agent flips: the model answer', () => {
       expect(system).toContain(`${n}. ${text}`)
     )
     expect(Object.keys(REPORT_THRESHOLDS)).toEqual(Object.keys(REPORT_REASONS))
+  })
+
+  test('no hidden advice (B-268): the meaning and the format only, the advice is the suggested Instructions', () => {
+    const {system} = flipQuestion(checkFlip(flip()))
+    expect(system).toBe(`${FLIP_MEANING}\n${FLIP_FORMAT}`)
+    expect(system).not.toMatch(/not sure|more probable|good flip/iu)
+    expect(FLIP_SUGGESTION).toMatch(/more probable/u)
   })
 
   test('keywords shown: the flip approved', () => {

@@ -15,7 +15,8 @@ const MAX_PENDING_PER_AGENT = 20
 const MAX_TEXT_LENGTH = 10000
 /**
  * The actions whose limit counts them per day (posts, replies, likes, private messages); a tip's limit counts the
- * iDNA tipped per day (DAILY_AMOUNT_ACTIONS); the others count iDNA sent, or per validation.
+ * iDNA tipped per day (DAILY_AMOUNT_ACTIONS), never its fees: it lets no tip go alone (B-269: the action's own iDNA a
+ * day, fees included, or the overall limit does); the others count iDNA sent, or per validation.
  */
 const DAILY_COUNT_ACTIONS = new Set(['post', 'reply', 'like', 'message'])
 const DAILY_AMOUNT_ACTIONS = new Set(['tip'])
@@ -26,6 +27,7 @@ const MAX_DETAIL_LENGTH = 500
  */
 const OVER_LIMIT = [
   'above the limit',
+  'above its daily iDNA',
   'above the budget',
   'no budget',
   'cost unknown',
@@ -92,7 +94,11 @@ function readItem(value) {
   }
 }
 
-/** The day's tally saved with the list ({day, spent, done}), or an empty one; another day's starts again. */
+/**
+ * The day's tally saved with the list, or an empty one; another day's starts again: {day, spent (by agent), done (by
+ * agent and action; 'flipImage' counts the pictures drawn), spentBy (by agent and action, B-269), before (a tally a
+ * build before B-269 began: each action counts all the agent spent)}.
+ */
 function readTally(saved, day) {
   const tally = saved && saved.tally
   const numbers = (value) =>
@@ -102,8 +108,20 @@ function readTally(saved, day) {
       )
     )
   return tally && tally.day === day
-    ? {day, spent: numbers(tally.spent), done: numbers(tally.done)}
-    : {day, spent: {}, done: {}}
+    ? {
+        day,
+        spent: numbers(tally.spent),
+        done: numbers(tally.done),
+        // By agent and action (B-269): each action's own iDNA a day. A tally saved before has none: each action
+        // counts as having spent all the agent spent today.
+        spentBy: numbers(tally.spentBy),
+        // Kept in the file until the day ends: a restart still counts what the build before spent.
+        ...(tally.before === true ||
+        !(tally.spentBy && typeof tally.spentBy === 'object')
+          ? {before: true}
+          : {}),
+      }
+    : {day, spent: {}, done: {}, spentBy: {}}
 }
 
 function readSaved(file, logger) {
@@ -155,17 +173,26 @@ function createPending({
   // counts from the moment it goes alone (two runs at once cannot both post), until it is known never sent.
   let tally = readTally(saved, today())
   const current = () => {
-    if (tally.day !== today()) tally = {day: today(), spent: {}, done: {}}
+    if (tally.day !== today())
+      tally = {day: today(), spent: {}, done: {}, spentBy: {}}
     return tally
   }
   const spentToday = (agentId) => current().spent[agentId] || 0
+  const spentByToday = (agentId, action) =>
+    Math.max(
+      current().spentBy[`${agentId}:${action}`] || 0,
+      current().before ? spentToday(agentId) : 0
+    )
   const doneToday = (agentId, action) =>
     current().done[`${agentId}:${action}`] || 0
   const addTally = (agentId, action, {n = 0, cost = 0} = {}) => {
     const day = current()
     const key = `${agentId}:${action}`
     if (n) day.done[key] = Math.max(0, (day.done[key] || 0) + n)
-    if (cost) day.spent[agentId] = Math.max(0, (day.spent[agentId] || 0) + cost)
+    if (cost) {
+      day.spent[agentId] = Math.max(0, (day.spent[agentId] || 0) + cost)
+      day.spentBy[key] = Math.max(0, (day.spentBy[key] || 0) + cost)
+    }
   }
 
   /** The amount of the agent's row for an action counted in iDNA (a tip), else undefined. */
@@ -176,20 +203,28 @@ function createPending({
   }
 
   /**
-   * An action the agent may do alone, within its daily budget: `cost` in iDNA, fees included. No budget: it may
-   * spend nothing alone, the action waits for the person.
+   * An action the agent may do alone, within what it may spend a day: `cost` in iDNA, fees included (B-269). A limit
+   * must cover it, the action's own iDNA a day or the agent's overall one (budgetPerDay), and each one set must have
+   * room. No limit at all: it may spend nothing alone, the action waits for the person, as before B-269.
    */
-  const withinBudget = (agentId, cost) => {
+  const withinBudget = (agentId, action, cost) => {
     // A cost the caller did not give, or not a number, is unknown: the person decides.
     if (!(typeof cost === 'number' && Number.isFinite(cost) && cost >= 0))
       return {decision: 'ask', reason: 'cost unknown'}
     if (cost === 0) return {decision: 'alone', reason: 'within the limit'}
     const agent = profiles.read().agents.find((one) => one.id === agentId)
-    const budget = agent ? agent.budgetPerDay : null
-    if (budget === null) return {decision: 'ask', reason: 'no budget'}
-    return spentToday(agentId) + cost > budget
-      ? {decision: 'ask', reason: 'above the budget'}
-      : {decision: 'alone', reason: 'within the limit'}
+    const row = agent && agent.actions[action]
+    const own =
+      row && typeof row.spendPerDay === 'number' ? row.spendPerDay : null
+    const overall = agent ? agent.budgetPerDay : null
+    // A tip's daily amount counts the iDNA tipped, never its fees: it covers nothing alone.
+    if (own === null && overall === null)
+      return {decision: 'ask', reason: 'no budget'}
+    if (own !== null && spentByToday(agentId, action) + cost > own)
+      return {decision: 'ask', reason: 'above its daily iDNA'}
+    if (overall !== null && spentToday(agentId) + cost > overall)
+      return {decision: 'ask', reason: 'above the budget'}
+    return {decision: 'alone', reason: 'within the limit'}
   }
 
   // Written beside, then renamed over the file: a power cut leaves the old list or the new one, never half. A
@@ -299,7 +334,8 @@ function createPending({
         ...counts,
         ...(amount !== undefined ? {amount} : {}),
       })
-      if (check.decision === 'alone') check = withinBudget(agentId, cost)
+      if (check.decision === 'alone')
+        check = withinBudget(agentId, action, cost)
       if (check.decision === 'alone') {
         // Counted now, not once done: a second run meanwhile finds the day's post taken and the budget spent.
         addTally(agentId, action, {n: dailyCount(action, amount), cost})
@@ -472,6 +508,13 @@ function createPending({
         )
       )
       if (gone.length) changed()
+    },
+    /** The pictures the agent's service drew today (B-269), kept with the day's tally: a restart keeps them. */
+    picturesToday: (agentId) => doneToday(agentId, 'flipImage'),
+    /** One more picture asked of its service today (`n` -1: one given back, never billed). */
+    addPicture(agentId, n = 1) {
+      addTally(agentId, 'flipImage', {n})
+      save()
     },
     /**
      * The window was loaded again (a reload, a crash): an action it was doing never said how it went. It waits again,

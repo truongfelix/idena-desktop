@@ -1,19 +1,18 @@
 /* eslint-disable react/prop-types */
 import * as React from 'react'
-import {Box, Checkbox, Flex, Stack, Switch, Text, Wrap} from '@chakra-ui/react'
+import {Box, Button, Checkbox, Flex, Stack, Text, Wrap} from '@chakra-ui/react'
 import {useTranslation} from 'react-i18next'
 import {
   FormControlWithLabel,
-  HDivider,
   Input,
   Select,
   Textarea,
 } from '../../shared/components/components'
 import {SettingsSection} from '../settings/components'
-import {areaNames, readsList, spendingActions} from './catalog'
-import {readNumber} from './limit-fields'
+import {useAppTexts} from './app-texts'
 
-// The agent page's sections (B-255): its Instructions, what it reads, when it runs and what it spends. Each says
+// The agent page's sections (B-255): its Instructions, when it runs and what it spends (what it reads is among its
+// actions since B-262). Each says
 // what it is for in the ⓘ beside its title, written for any agent; no small print under the fields.
 
 /** A text field saved when it loses the focus, not at each key. */
@@ -71,7 +70,7 @@ export function InstructionsSection({agent, onChange}) {
       title={t('Instructions')}
       foldId="agent.instructions"
       info={t(
-        "Your words to the agent: who it is, what it should do and how. They go to the model with each of its actions; the app adds what each action needs, the data it reads and the form of the answer, and that part stays the app's.",
+        "Your words to the agent: who it is, what it should do and how. They go to the model with each of its actions; the app adds only the data each action reads and the form of the answer, shown in each action's ⓘ.",
         {nsSeparator: '!!'}
       )}
       summary={
@@ -95,62 +94,62 @@ export function InstructionsSection({agent, onChange}) {
         }}
       />
       <Grip target={box} />
+      <Suggestions agent={agent} onChange={onChange} />
     </SettingsSection>
   )
 }
 
-/** The posts' window: none, the last 24 hours, or the last N posts. */
-function PostsRead({reads, onChange}) {
-  const {t} = useTranslation()
-  const [count, setCount] = useDraft(String(reads.posts.count))
-  const setPosts = (change) =>
-    onChange((a) => ({
-      ...a,
-      reads: {...a.reads, posts: {...a.reads.posts, ...change}},
-    }))
-  return (
-    <Flex align="center" gap={3} wrap="wrap">
-      <Text flex="1 1 160px">{t('Posts')}</Text>
-      <Select
-        w="auto"
-        aria-label={t('Posts')}
-        value={reads.posts.window}
-        onChange={(e) => setPosts({window: e.target.value})}
-      >
-        <option value="off">{t('None')}</option>
-        <option value="day">{t('The last 24 hours')}</option>
-        <option value="count">{t('The last posts')}</option>
-      </Select>
-      {reads.posts.window === 'count' && (
-        <Input
-          type="number"
-          w="80px"
-          min={1}
-          max={50}
-          aria-label={t('How many posts')}
-          value={count}
-          onChange={(e) => setCount(e.target.value)}
-          onBlur={(e) => {
-            const next = readNumber(e.currentTarget.value, {min: 1})
-            if (next === null || next > 50) setCount(String(reads.posts.count))
-            else if (next !== reads.posts.count) setPosts({count: next})
-          }}
-        />
-      )}
-    </Flex>
-  )
-}
+const isHeld = (agent, ids) =>
+  ids.some((id) => agent.actions[id] && agent.actions[id].level !== 'off')
 
-function SwitchRow({label, isChecked, onToggle}) {
+/**
+ * The suggested Instructions of the actions the agent holds (B-268): the app's former texts, added at the end of the
+ * Instructions for the person to keep, edit or delete. One already there is not offered again.
+ */
+function Suggestions({agent, onChange}) {
+  const {t} = useTranslation()
+  const texts = useAppTexts()
+  if (!texts) return null
+  const offers = [
+    [['flipStory'], 'flipStory', t('Add the suggestion for flip stories')],
+    [
+      ['answerFlip', 'report'],
+      'answerFlip',
+      t('Add the suggestion for the validation'),
+    ],
+    [
+      ['post', 'reply', 'like', 'message', 'tip'],
+      'social',
+      t('Add the suggestion for Social'),
+    ],
+  ].filter(
+    ([ids, key]) =>
+      isHeld(agent, ids) &&
+      texts.suggestions[key] &&
+      !agent.instructions.includes(texts.suggestions[key].split('\n')[0])
+  )
+  if (!offers.length) return null
   return (
-    <Flex align="center" justify="space-between" gap={3}>
-      <Text>{label}</Text>
-      <Switch
-        aria-label={label}
-        isChecked={isChecked}
-        onChange={(e) => onToggle(e.target.checked)}
-      />
-    </Flex>
+    <Wrap spacing={4} mt={2}>
+      {offers.map(([, key, label]) => (
+        <Button
+          key={key}
+          size="sm"
+          variant="link"
+          colorScheme="blue"
+          onClick={() =>
+            onChange((a) => ({
+              ...a,
+              instructions: [a.instructions.trim(), texts.suggestions[key]]
+                .filter(Boolean)
+                .join('\n\n'),
+            }))
+          }
+        >
+          {label}
+        </Button>
+      ))}
+    </Wrap>
   )
 }
 
@@ -167,57 +166,6 @@ export function nothingToActOn({actions, reads}) {
   )
 }
 
-/** "What it reads": on Social, the posts' window, its notifications, its messages; and what its actions read. */
-export function ReadsSection({agent, catalog, onChange}) {
-  const {t} = useTranslation()
-  const names = areaNames(t)
-  const setRead = (name, value) =>
-    onChange((a) => ({...a, reads: {...a.reads, [name]: value}}))
-  return (
-    <SettingsSection
-      title={t('What it reads')}
-      foldId="agent.reads"
-      info={t(
-        'What the model is sent, and nothing else: what you turn on here, and what its actions need. It acts only on what it read. Reading spends nothing.',
-        {nsSeparator: '!!'}
-      )}
-      summary={readsList(agent, catalog, t).join(', ')}
-    >
-      <Stack spacing={3}>
-        <Text fontWeight={500}>{names.social}</Text>
-        <PostsRead reads={agent.reads} onChange={onChange} />
-        <SwitchRow
-          label={t('Notifications: likes, answers and tips to it', {
-            nsSeparator: '!!',
-          })}
-          isChecked={agent.reads.notifications}
-          onToggle={(on) => setRead('notifications', on)}
-        />
-        <SwitchRow
-          label={t('Private messages')}
-          isChecked={agent.reads.messages}
-          onToggle={(on) => setRead('messages', on)}
-        />
-        {nothingToActOn(agent) && (
-          <Text color="orange.500">
-            {t(
-              'Its actions on Social have nothing to act on: turn on what it reads.',
-              {nsSeparator: '!!'}
-            )}
-          </Text>
-        )}
-        <HDivider />
-        <Text color="muted">
-          {t('Everything it reads: {{list}}', {
-            list: readsList(agent, catalog, t).join(', '),
-            nsSeparator: '!!',
-          })}
-        </Text>
-      </Stack>
-    </SettingsSection>
-  )
-}
-
 /** The events that run it besides its schedule (profiles.js EVENTS), in words. */
 function eventNames(t) {
   return {
@@ -228,22 +176,17 @@ function eventNames(t) {
   }
 }
 
-/** "When and how much": when it runs (schedule, events) and the most it may spend a day. */
-export function ScheduleSection({agent, catalog, onChange}) {
+/** "When it runs": its schedule and the events that start a run (what it spends is on its actions, B-269). */
+export function ScheduleSection({agent, onChange}) {
   const {t} = useTranslation()
-  const [budget, setBudget] = useDraft(
-    agent.budgetPerDay === null ? '' : String(agent.budgetPerDay)
-  )
   const [time, setTime] = useDraft(agent.schedule.time)
   const events = eventNames(t)
-  // The budget only for actions that spend iDNA (B-257): answering, reporting, writing a story spend nothing.
-  const spending = spendingActions(agent, catalog)
   return (
     <SettingsSection
-      title={t('When and how much')}
+      title={t('When it runs')}
       foldId="agent.schedule"
       info={t(
-        "When it runs: on its schedule, and when something comes to it. The budget is the most it may spend a day in iDNA, fees included, on what it does alone; with none, it spends nothing alone. The model's own service bills apart.",
+        'On its schedule, and when something comes to it. What it may spend is set on each action that costs money.',
         {nsSeparator: '!!'}
       )}
       summary={
@@ -322,53 +265,6 @@ export function ScheduleSection({agent, catalog, onChange}) {
             ))}
           </Wrap>
         </Stack>
-        {spending.length === 0 ? (
-          <Text color="muted">
-            {t('Its actions spend no iDNA: no budget to set.', {
-              nsSeparator: '!!',
-            })}
-          </Text>
-        ) : (
-          <Stack spacing={1}>
-            <FormControlWithLabel
-              label={t('Budget a day, in iDNA', {nsSeparator: '!!'})}
-            >
-              <Input
-                type="number"
-                min={0}
-                step="0.01"
-                placeholder={t('None', {nsSeparator: '!!'})}
-                value={budget}
-                onChange={(e) => setBudget(e.target.value)}
-                onBlur={(e) => {
-                  const text = e.currentTarget.value.trim()
-                  const next = text === '' ? null : Number(text)
-                  // A number the field cannot read (a comma in some languages) reads as '': not "no budget".
-                  const unreadable = e.currentTarget.validity.badInput
-                  if (
-                    unreadable ||
-                    (next !== null && !(Number.isFinite(next) && next >= 0))
-                  ) {
-                    setBudget(
-                      agent.budgetPerDay === null
-                        ? ''
-                        : String(agent.budgetPerDay)
-                    )
-                    return
-                  }
-                  if (next !== agent.budgetPerDay)
-                    onChange((a) => ({...a, budgetPerDay: next}))
-                }}
-              />
-            </FormControlWithLabel>
-            <Text color="muted">
-              {t('For {{actions}}', {
-                actions: spending.map(({label}) => label).join(', '),
-                nsSeparator: '!!',
-              })}
-            </Text>
-          </Stack>
-        )}
       </Stack>
     </SettingsSection>
   )

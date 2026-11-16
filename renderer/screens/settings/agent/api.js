@@ -118,9 +118,18 @@ export const importAgentFile = (text) =>
 export const agentActivity = (agentId) =>
   agent('activity', agentId === undefined ? undefined : {agentId})
 export const clearAgentActivity = (agentId) => agent('clearActivity', {agentId})
-/** A flip's story by the agent `agentId` (B-236): {title, character, goal, panels, keywords, prompts}. */
-export const writeFlipStory = (agentId, panels, words) =>
-  agent('writeStory', {agentId, panels, words})
+/**
+ * A flip's stories by the agent `agentId` (B-236, B-268): `parts` asked ('story', 'prompts'), the person's `idea`,
+ * the titles given before (`notThese`): {stories: [{title, story, prompts}]}.
+ */
+export const writeFlipStory = (agentId, {words, idea, parts, notThese}) =>
+  agent('writeStory', {agentId, words, idea, parts, notThese})
+/**
+ * What the app adds to the Instructions per action (`sent`; Social with the actions `held`), and the suggested
+ * Instructions (B-268).
+ */
+export const agentAppTexts = (held) =>
+  agent('appTexts', held ? {held} : undefined)
 /** One picture of a story's prompt by the agent's image model: {mediaType, data} (base64). */
 export const drawStoryPicture = (agentId, prompt) =>
   agent('drawStoryPicture', {agentId, prompt})
