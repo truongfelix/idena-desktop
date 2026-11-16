@@ -35,7 +35,7 @@ const ACTIONS = {
   reply: {level: 'off', limit: 5, spendPerDay: null},
   like: {level: 'off', limit: 10, spendPerDay: null},
   message: {level: 'off', limit: 3, spendPerDay: null},
-  tip: {level: 'off', limit: 0, amount: 1},
+  tip: {level: 'off', limit: 0, amount: 1, spendPerDay: null},
   // What it reads on Social, given like any action (B-262): on ('alone') or off. Reading spends nothing.
   readPosts: {level: 'off', limit: null},
   readOwnPosts: {level: 'off', limit: null},

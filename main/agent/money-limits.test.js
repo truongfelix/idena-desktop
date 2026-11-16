@@ -105,10 +105,43 @@ describe('the money limits of the actions', () => {
     })
   })
 
-  test("a tip's daily amount is its own limit: alone without an overall one", async () => {
-    const act = start({actions: {tip: {level: 'alone', limit: 5, amount: 2}}})
+  test("a tip's daily amount counts the iDNA tipped, never its fees: alone only within an iDNA a day", async () => {
+    // As before B-269: a daily amount and no budget, the tip waits for the person.
+    let act = start({actions: {tip: {level: 'alone', limit: 5, amount: 2}}})
+    await expect(act('tip', 2.01, {amount: 2})).resolves.toMatchObject({
+      decision: 'skipped',
+      reason: 'no budget',
+    })
+    act = start({
+      actions: {tip: {level: 'alone', limit: 5, amount: 2, spendPerDay: 4.1}},
+    })
     await expect(act('tip', 2.01, {amount: 2})).resolves.toMatchObject({
       decision: 'alone',
+    })
+    // The second tip's fees would pass the 4.1 a day, fees included.
+    await expect(act('tip', 2.1, {amount: 2})).resolves.toMatchObject({
+      decision: 'skipped',
+      reason: 'above its daily iDNA',
+    })
+  })
+
+  test("a day's tally of a build before: each action as if it spent all the agent spent today", async () => {
+    fs.writeJsonSync(path.join(dir, 'pending.json'), {
+      v: 1,
+      items: [],
+      tally: {
+        day: new Date(2026, 10, 16, 12).toDateString(),
+        spent: {[ID]: 4},
+        done: {},
+      },
+    })
+    const act = start({
+      actions: {post: {level: 'alone', limit: null, spendPerDay: 5}},
+    })
+    await expect(act('post', 0.5)).resolves.toMatchObject({decision: 'alone'})
+    await expect(act('post', 0.6)).resolves.toMatchObject({
+      decision: 'skipped',
+      reason: 'above its daily iDNA',
     })
   })
 

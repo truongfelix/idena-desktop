@@ -324,28 +324,29 @@ export function readsList(agent, catalog, t) {
   return reads.length ? reads : [t('Nothing')]
 }
 
-// The actions that spend iDNA (B-269: each with its own limit a day).
-const SPENDING = ['post', 'reply', 'like', 'message', 'tip']
-
 /** The agent's actions that spend iDNA (the budget counts them), by label. */
 export const spendingActions = (agent, catalog) =>
   catalog.filter(({id, spends}) => spends && agent.actions[id])
 
 /**
- * The most it may spend alone a day, in words (B-269): its overall limit when set, else what its actions' own limits
- * add up to (an action's iDNA a day, a tip's daily amount); none for an agent whose actions spend nothing (`catalog`
+ * The most it may spend alone a day, in words (B-269): its overall limit when set, else what its Alone actions' own
+ * limits add up to (each one's iDNA a day, fees included); none for an agent whose actions spend nothing (`catalog`
  * given), whatever was set before.
  */
 export function budgetLine(agent, t, catalog = null) {
   if (catalog && spendingActions(agent, catalog).length === 0)
     return t('Spends no iDNA')
+  // What spends alone: the actions set to Alone among those that spend iDNA (Ask me spends only on a click).
+  const spending = (catalog || actionCatalog((text) => text))
+    .filter(({spends}) => spends)
+    .map(({id}) => id)
   const limits = Object.entries(agent.actions || {})
-    .filter(([id, row]) => SPENDING.includes(id) && row && row.level !== 'off')
-    .map(([id, row]) => {
-      if (typeof row.spendPerDay === 'number') return row.spendPerDay
-      if (id === 'tip' && typeof row.limit === 'number') return row.limit
-      return null
-    })
+    .filter(
+      ([id, row]) => spending.includes(id) && row && row.level === 'alone'
+    )
+    .map(([, row]) =>
+      typeof row.spendPerDay === 'number' ? row.spendPerDay : null
+    )
   const own = limits.reduce((sum, limit) => sum + (limit || 0), 0)
   const overall =
     typeof agent.budgetPerDay === 'number' ? agent.budgetPerDay : null

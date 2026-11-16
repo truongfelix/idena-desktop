@@ -212,7 +212,7 @@ export function AgentPage({id}) {
         catalog={catalog}
         onChange={save}
       />
-      <ScheduleSection agent={agent} catalog={catalog} onChange={save} />
+      <ScheduleSection agent={agent} onChange={save} />
       {agent.actions.report && (
         <ReportRulesSection settings={agent} onChange={save} />
       )}

@@ -2055,7 +2055,6 @@
   "wants to like a post": "veut aimer une publication",
   "wants to send a private message": "veut envoyer un message privé",
   "iDNA a tip": "iDNA par pourboire",
-  "iDNA at most a day": "iDNA au plus par jour",
   "at most a day": "au plus par jour",
   "a post": "une publication",
   "a reply to {{name}}": "une réponse à {{name}}",
@@ -2142,5 +2141,6 @@
   "iDNA at most a day, fees included": "iDNA au plus par jour, frais compris",
   "pictures at most a day": "images au plus par jour",
   "When it runs": "Quand il agit",
-  "On its schedule, and when something comes to it. What it may spend is set on each action that costs money.": "Selon son horaire, et quand quelque chose lui arrive. Ce qu’il peut dépenser se règle sur chaque action qui coûte de l’argent."
+  "On its schedule, and when something comes to it. What it may spend is set on each action that costs money.": "Selon son horaire, et quand quelque chose lui arrive. Ce qu’il peut dépenser se règle sur chaque action qui coûte de l’argent.",
+  "iDNA tipped at most a day": "iDNA donnés au plus par jour"
 }

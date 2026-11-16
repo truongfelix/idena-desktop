@@ -14,7 +14,7 @@ export function readNumber(text, {whole = true, min = 0} = {}) {
   const number = Number(value)
   if (!Number.isFinite(number) || number < min) return null
   if (whole && !Number.isInteger(number)) return null
-  return number
+  return whole ? number : Math.round(number * 100) / 100
 }
 
 /**
@@ -107,11 +107,12 @@ export function LimitFields({kind, row, onChange}) {
           onSave={(amount) => onChange({amount})}
         />
         <NumberField
-          label={t('iDNA at most a day')}
+          label={t('iDNA tipped at most a day')}
           value={row.limit}
           min={0}
           onSave={(limit) => onChange({limit})}
         />
+        <SpendField row={row} onChange={onChange} />
       </Flex>
     )
   return (

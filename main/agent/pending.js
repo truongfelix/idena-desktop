@@ -107,8 +107,12 @@ function readTally(saved, day) {
         day,
         spent: numbers(tally.spent),
         done: numbers(tally.done),
-        // By agent and action (B-269): each action's own iDNA a day.
+        // By agent and action (B-269): each action's own iDNA a day. A tally saved before has none: each action
+        // counts as having spent all the agent spent today.
         spentBy: numbers(tally.spentBy),
+        ...(tally.spentBy && typeof tally.spentBy === 'object'
+          ? {}
+          : {before: true}),
       }
     : {day, spent: {}, done: {}, spentBy: {}}
 }
@@ -168,7 +172,10 @@ function createPending({
   }
   const spentToday = (agentId) => current().spent[agentId] || 0
   const spentByToday = (agentId, action) =>
-    current().spentBy[`${agentId}:${action}`] || 0
+    Math.max(
+      current().spentBy[`${agentId}:${action}`] || 0,
+      current().before ? spentToday(agentId) : 0
+    )
   const doneToday = (agentId, action) =>
     current().done[`${agentId}:${action}`] || 0
   const addTally = (agentId, action, {n = 0, cost = 0} = {}) => {
@@ -190,8 +197,8 @@ function createPending({
 
   /**
    * An action the agent may do alone, within what it may spend a day: `cost` in iDNA, fees included (B-269). A limit
-   * must cover it, the action's own (its iDNA a day; a tip's daily amount) or the agent's overall one (budgetPerDay),
-   * and each one set must have room. No limit at all: it may spend nothing alone, the action waits for the person.
+   * must cover it, the action's own iDNA a day or the agent's overall one (budgetPerDay), and each one set must have
+   * room. No limit at all: it may spend nothing alone, the action waits for the person, as before B-269.
    */
   const withinBudget = (agentId, action, cost) => {
     // A cost the caller did not give, or not a number, is unknown: the person decides.
@@ -202,11 +209,9 @@ function createPending({
     const row = agent && agent.actions[action]
     const own =
       row && typeof row.spendPerDay === 'number' ? row.spendPerDay : null
-    // A tip's limit is its iDNA tipped a day, checked with its level (permissions.js).
-    const tipLimit =
-      DAILY_AMOUNT_ACTIONS.has(action) && row && typeof row.limit === 'number'
     const overall = agent ? agent.budgetPerDay : null
-    if (own === null && !tipLimit && overall === null)
+    // A tip's daily amount counts the iDNA tipped, never its fees: it covers nothing alone.
+    if (own === null && overall === null)
       return {decision: 'ask', reason: 'no budget'}
     if (own !== null && spentByToday(agentId, action) + cost > own)
       return {decision: 'ask', reason: 'above its daily iDNA'}
@@ -501,6 +506,13 @@ function createPending({
      * The window was loaded again (a reload, a crash): an action it was doing never said how it went. It waits again,
      * with a warning: it may have been done.
      */
+    /** The pictures the agent's service drew today (B-269), kept with the day's tally: a restart keeps them. */
+    picturesToday: (agentId) => doneToday(agentId, 'flipImage'),
+    /** One more picture asked of its service today. */
+    addPicture(agentId) {
+      addTally(agentId, 'flipImage', {n: 1})
+      save()
+    },
     interrupted() {
       const running = items.filter((item) => item.state === 'running')
       running.forEach((item) => {

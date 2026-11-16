@@ -2056,7 +2056,6 @@
   "wants to send a private message": "wants to send a private message",
   "Idena Social": "Idena Social",
   "iDNA a tip": "iDNA a tip",
-  "iDNA at most a day": "iDNA at most a day",
   "at most a day": "at most a day",
   "a post": "a post",
   "a reply to {{name}}": "a reply to {{name}}",
@@ -2142,5 +2141,6 @@
   "iDNA at most a day, fees included": "iDNA at most a day, fees included",
   "pictures at most a day": "pictures at most a day",
   "When it runs": "When it runs",
-  "On its schedule, and when something comes to it. What it may spend is set on each action that costs money.": "On its schedule, and when something comes to it. What it may spend is set on each action that costs money."
+  "On its schedule, and when something comes to it. What it may spend is set on each action that costs money.": "On its schedule, and when something comes to it. What it may spend is set on each action that costs money.",
+  "iDNA tipped at most a day": "iDNA tipped at most a day"
 }

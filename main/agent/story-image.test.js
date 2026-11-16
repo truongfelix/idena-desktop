@@ -124,6 +124,7 @@ describe("the agent's picture command", () => {
       },
       ask: jest.fn(),
       draw,
+      pendingFile: () => path.join(dir, 'pending.json'),
       now: () => 1,
     })
   }
@@ -175,7 +176,7 @@ describe("the agent's picture command", () => {
     expect(draw).not.toHaveBeenCalled()
   })
 
-  test('its pictures a day (B-269): past them, refused and logged; a failed one is given back', async () => {
+  test('its pictures a day (B-269): past them, refused and logged; a failed one counts too', async () => {
     const agent = start({flipStory: {level: 'ask', picturesPerDay: 2}})
     const picture = () =>
       agent.handle('drawStoryPicture', {
@@ -183,12 +184,20 @@ describe("the agent's picture command", () => {
         prompt: 'A kite.',
       })
     await expect(picture()).resolves.toMatchObject({mediaType: 'image/png'})
+    // The service may have drawn and billed it before it failed.
     draw.mockRejectedValueOnce(new Error('service busy'))
     await expect(picture()).rejects.toThrow('service busy')
-    // The failed one did not count: one more is drawn, then the day's two are reached.
-    await expect(picture()).resolves.toMatchObject({mediaType: 'image/png'})
     await expect(picture()).rejects.toThrow('its 2 pictures a day are reached')
-    expect(draw).toHaveBeenCalledTimes(3)
+    expect(draw).toHaveBeenCalledTimes(2)
+    // A restart keeps the day's count.
+    const again = start({flipStory: {level: 'ask', picturesPerDay: 2}})
+    await expect(
+      again.handle('drawStoryPicture', {
+        agentId: 'aaaaaaaaaaaaaaaa',
+        prompt: 'A kite.',
+      })
+    ).rejects.toThrow('its 2 pictures a day are reached')
+    expect(draw).toHaveBeenCalledTimes(2)
     const [line] = await agent.handle('activity', {
       agentId: 'aaaaaaaaaaaaaaaa',
     })
