@@ -1,0 +1,98 @@
+import {criteriaNeeds, forgetAuthors, passes, readAuthors} from './criteria'
+
+// B-266: whose an agent reads and whom it acts on, by the person's criteria on each author.
+
+const A = `0x${'a'.repeat(40)}`
+const B = `0x${'b'.repeat(40)}`
+const none = {
+  only: [],
+  except: [],
+  states: [],
+  trustAbove: null,
+  minAge: null,
+  minStake: null,
+}
+
+describe('an author and the criteria', () => {
+  test('each criterion, and all of them together', () => {
+    const human = {state: 'Human', age: 10, stake: 5000, trust: 60}
+    expect(passes(null, A, {})).toBe(true)
+    expect(passes({...none, only: [B]}, A, human)).toBe(false)
+    expect(passes({...none, except: [A]}, A, human)).toBe(false)
+    expect(passes({...none, states: ['Verified', 'Human']}, A, human)).toBe(
+      true
+    )
+    expect(passes({...none, states: ['Newbie']}, A, human)).toBe(false)
+    expect(passes({...none, states: ['Vouched']}, A, {vouched: true})).toBe(
+      true
+    )
+    expect(passes({...none, trustAbove: 50}, A, human)).toBe(true)
+    expect(passes({...none, trustAbove: 60}, A, human)).toBe(false)
+    expect(passes({...none, minAge: 10, minStake: 5000}, A, human)).toBe(true)
+    expect(passes({...none, minStake: 5001}, A, human)).toBe(false)
+    const words = {...none, mustWords: ['idena', 'flip'], notWords: ['scam']}
+    expect(passes(words, A, human, 'A new FLIP today')).toBe(true)
+    expect(passes(words, A, human, 'Hello')).toBe(false)
+    expect(passes(words, A, human, 'Idena scam')).toBe(false)
+    expect(
+      passes(
+        {...none, states: ['Human'], trustAbove: 50, minStake: 1000},
+        A,
+        human
+      )
+    ).toBe(true)
+  })
+
+  test('a fact not read passes no criterion that needs it', () => {
+    expect(passes({...none, states: ['Human']}, A, {})).toBe(false)
+    expect(passes({...none, trustAbove: 0}, A, {})).toBe(false)
+    expect(passes({...none, minAge: 0}, A, undefined)).toBe(false)
+  })
+})
+
+describe("the authors' facts", () => {
+  beforeEach(forgetAuthors)
+
+  test('only what the criteria need is read, once, and kept a while', async () => {
+    expect(criteriaNeeds([null, {...none, states: ['Vouched']}])).toEqual({
+      identity: false,
+      vouched: true,
+      trust: false,
+    })
+    const settled = jest.fn(async (method, list) =>
+      list.map(([address]) => ({
+        result: {
+          state: address === A ? 'Human' : 'Newbie',
+          age: 3,
+          stake: '12.5',
+        },
+      }))
+    )
+    const needs = criteriaNeeds([{...none, minStake: 1}])
+    const facts = await readAuthors([A, B.toUpperCase()], needs, {
+      settled,
+      call: jest.fn(),
+      now: 1000,
+    })
+    expect(facts[A]).toEqual({state: 'Human', age: 3, stake: 12.5})
+    expect(facts[B].state).toBe('Newbie')
+    await readAuthors([A], needs, {settled, call: jest.fn(), now: 2000})
+    expect(settled).toHaveBeenCalledTimes(1)
+  })
+
+  test('a read that fails leaves the facts out', async () => {
+    const settled = jest.fn(async () => {
+      throw new Error('node down')
+    })
+    const facts = await readAuthors(
+      [A],
+      criteriaNeeds([{...none, minAge: 1}]),
+      {
+        settled,
+        call: jest.fn(),
+      }
+    )
+    expect(facts[A]).toEqual({})
+    expect(passes({...none, minAge: 1}, A, facts[A])).toBe(false)
+  })
+})
