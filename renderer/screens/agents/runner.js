@@ -30,8 +30,9 @@ import {
 
 // The agents' runs in the window (B-243, B-239): every minute, each agent on, not paused, holding a Social action,
 // runs when its time comes (every hour, or once a day after its time), when the Social scan is up to date. An agent
-// holding a Flips step (B-258) runs on its schedule too, its Social part only once the scan is up to date. An approved
-// action (To approve) is done with the same code.
+// holding only Flips steps (B-258) runs on its schedule without waiting for the scan; one holding Social actions too
+// waits for it, so that its run of the day is never taken by a run without its Social part. An approved action (To
+// approve) is done with the same code.
 
 const CHECK_MS = 60 * 1000
 const HOUR_MS = 60 * 60 * 1000

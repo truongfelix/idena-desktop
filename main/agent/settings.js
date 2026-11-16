@@ -50,7 +50,9 @@ const ACTIONS = {
   // from one step to the next through the drafts (renderer/screens/agents/flips/). `limit` counts the step's actions
   // a day in a run (null: none). Write the story: a flip's story and image prompts (the flip editor, B-236), and in a
   // run a new draft for a keyword pair without a flip.
-  flipStory: {level: 'off', limit: null},
+  // `picturesPerDay`: Make the pictures' own, copied here for a build before B-258, whose stories draw within it
+  // (profiles.js); this build never reads it.
+  flipStory: {level: 'off', limit: null, picturesPerDay: null},
   // Make the pictures (B-236's Make the images, its own right since B-258): `picturesPerDay` (B-269) the most pictures
   // its service draws a day (each one is billed); null: no limit.
   flipPictures: {level: 'off', limit: null, picturesPerDay: null},

@@ -401,7 +401,16 @@ function createPending({
         if (!Object.prototype.hasOwnProperty.call(ACTIONS, action))
           return {decision: 'off', reason: 'unknown action'}
         const counted = isDaily(action) ? doneToday(agentId, action) : 0
-        return decide(agentId, action, {usage: counted})
+        const check = decide(agentId, action, {usage: counted})
+        // Asking, but To approve has no room left for it: propose would refuse it after the work was paid for.
+        if (
+          check.decision === 'ask' &&
+          (items.length >= MAX_PENDING ||
+            items.filter((one) => one.agentId === agentId).length >=
+              MAX_PENDING_PER_AGENT)
+        )
+          return {decision: 'off', reason: 'too many actions waiting'}
+        return check
       },
       /**
        * How an action the agent did alone went (after a propose that said so, which counted it): logged. `release`:

@@ -533,7 +533,12 @@ describe('agent profiles', () => {
         limit: null,
         picturesPerDay: 6,
       })
-      expect(agent.actions.flipStory).toEqual({level: 'alone', limit: null})
+      // A build before B-258 reads its pictures a day on Write flip stories: kept there.
+      expect(agent.actions.flipStory).toEqual({
+        level: 'alone',
+        limit: null,
+        picturesPerDay: 6,
+      })
       // A build before B-269 kept no pictures a day: none.
       const older = normalizeAgent({
         ...before,
@@ -551,6 +556,16 @@ describe('agent profiles', () => {
       // Saved since: a Make the pictures the person removed stays removed.
       const removed = {...agent, actions: {flipStory: agent.actions.flipStory}}
       expect(normalizeAgent(removed).actions.flipPictures).toBeUndefined()
+      // ... and a build before B-258 then draws no picture with its stories (Off the same).
+      expect(normalizeAgent(removed).actions.flipStory.picturesPerDay).toBe(0)
+      const off = {
+        ...agent,
+        actions: {
+          ...agent.actions,
+          flipPictures: {...agent.actions.flipPictures, level: 'off'},
+        },
+      }
+      expect(normalizeAgent(off).actions.flipStory.picturesPerDay).toBe(0)
     })
 
     test('the file is written whole: nothing left beside it', () => {

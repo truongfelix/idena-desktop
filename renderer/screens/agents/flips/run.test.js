@@ -42,9 +42,17 @@ const identity = {
 const epoch = {currentPeriod: 'None'}
 
 /** The agent holding `levels` ({step: level}), and the run's fakes. */
-function setup({levels, limits = {}, flips = [], answer, pending = []}) {
+function setup({
+  levels,
+  limits = {},
+  flips = [],
+  answer,
+  pending = [],
+  // Each test its own agent: the failures of the day are kept by agent, in the module.
+  agentId = 'a1',
+}) {
   const agent = {
-    id: 'a1',
+    id: agentId,
     actions: Object.fromEntries(
       Object.entries(levels).map(([id, level]) => [
         id,
@@ -284,8 +292,11 @@ describe('a Flips run', () => {
     expect(settled).toEqual([['w', 'flipStory']])
   })
 
-  test('a failed answer of the model is not written twice in Activity', async () => {
-    const {agent, deps, lines} = setup({levels: {flipStory: 'alone'}})
+  test('a failed answer of the model is not written twice in Activity, nor asked again that day', async () => {
+    const {agent, deps, lines} = setup({
+      levels: {flipStory: 'alone'},
+      agentId: 'failing',
+    })
     deps.ipc.mockImplementation(async () => {
       const error = new Error('the service did not answer')
       error.logged = true
@@ -294,5 +305,72 @@ describe('a Flips run', () => {
     const outcome = await runFlipsAgent(agent, {identity, epoch}, deps)
     expect(lines).toEqual([])
     expect(outcome.count).toMatchObject({failed: 1})
+    // The same pair is not asked again today.
+    deps.ipc.mockClear()
+    await runFlipsAgent(agent, {identity, epoch}, deps)
+    expect(deps.ipc).not.toHaveBeenCalled()
+  })
+
+  const ready = (fields = {}) => ({
+    id: 'agents',
+    type: FlipType.Draft,
+    createdAt: '2026-11-16T09:00:00.000Z',
+    keywordPairId: 8,
+    keywords: {words: [{name: 'cat'}, {name: 'tree'}]},
+    originalOrder: [0, 3, 1, 2],
+    order: [2, 1, 3, 0],
+    adversarialImageId: 3,
+    protectedImages: ['data:a,AA', 'data:a,BB', 'data:a,CC', 'data:a,DD'],
+    agentFlip: {by: 'a2', stage: 'drafted', waiting: null, declined: {}},
+    ...fields,
+  })
+
+  test('an answer of the judge it cannot read is no verdict: the draft is not deleted', async () => {
+    const {agent, deps, store} = setup({
+      levels: {flipJudge: 'alone', flipDelete: 'alone'},
+      flips: [ready()],
+      answer: () => ({answer: null, relevance: null, report: false}),
+      agentId: 'unreadable',
+    })
+    const outcome = await runFlipsAgent(agent, {identity, epoch}, deps)
+    expect(store.getFlip('agents').agentVerdict).toBeUndefined()
+    expect(store.getFlip('agents').type).toBe(FlipType.Draft)
+    expect(outcome.count).toMatchObject({failed: 1})
+  })
+
+  test('a draft changed while the step worked is not written over', async () => {
+    const story = {
+      id: 'drawn',
+      type: FlipType.Draft,
+      createdAt: '2026-11-16T09:00:00.000Z',
+      keywordPairId: 9,
+      originalOrder: [0, 3, 1, 2],
+      adversarialImageId: 3,
+      images: [null, null, null, null],
+      story: {stories: [{title: 'T', prompts: ['p1', 'p2', 'p3']}]},
+      agentFlip: {by: 'a1', stage: 'story', waiting: null, declined: {}},
+    }
+    const {agent, deps, store, lines} = setup({
+      levels: {flipPictures: 'alone'},
+      flips: [story],
+      agentId: 'overwrite',
+    })
+    // The person puts a picture of their own in while the agent draws.
+    deps.draw.mockImplementation(async (_, prompt) => {
+      if (prompt === 'p3')
+        store.updateDraft({id: 'drawn', images: ['mine', null, null, null]})
+      return `data:image/png;base64,${prompt}`
+    })
+    await runFlipsAgent(agent, {identity, epoch}, deps)
+    expect(store.getFlip('drawn').images).toEqual(['mine', null, null, null])
+    expect(store.getFlip('drawn').agentFlip.stage).toBe('story')
+    expect(lines).toEqual([
+      [
+        'flipPictures',
+        undefined,
+        true,
+        'the draft changed meanwhile: not written over',
+      ],
+    ])
   })
 })

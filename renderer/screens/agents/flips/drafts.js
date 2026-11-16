@@ -69,6 +69,21 @@ export function contentsKey(flip) {
   )
 }
 
+/**
+ * Whether the draft is still as it was when a step read it (`before`): a draft, the same pictures, order, stage and
+ * wait. A step's slow work (a story, pictures, a judgement) is never written over a change made meanwhile.
+ */
+export function sameDraft(now, before) {
+  const key = (flip) =>
+    JSON.stringify([
+      flip.type,
+      contentsKey(flip),
+      (flip.images || []).map((src) => (src ? hash(String(src)) : '')),
+      flip.agentFlip ? [flip.agentFlip.stage, flip.agentFlip.waiting] : null,
+    ])
+  return Boolean(now) && now.type === FlipType.Draft && key(now) === key(before)
+}
+
 /** Whether the flip is protected and shuffled: four protected pictures and an order that is not the story's. */
 export function isShuffled(flip) {
   const {protectedImages, originalOrder, order} = flip || {}
@@ -194,13 +209,18 @@ export function freePairs(identity, flips) {
       .filter((flip) => HOLDING.includes(flip.type))
       .map((flip) => flip.keywordPairId)
   )
-  const sent = Array.isArray(identity && identity.flips)
-    ? identity.flips.length
-    : 0
+  const mined = Array.isArray(identity && identity.flips) ? identity.flips : []
+  // On the way: every draft holding one of the identity's pairs (the person's too, which may be sent), and every flip
+  // being sent that is not counted as made yet.
+  const own = new Set(pairs.map((pair) => pair && pair.id))
   const onTheWay = all.filter(
-    (flip) => isAgentDraft(flip) && flip.agentFlip.stage !== 'submitted'
+    (flip) =>
+      own.has(flip.keywordPairId) &&
+      (flip.type === FlipType.Draft ||
+        (flip.type === FlipType.Publishing && !mined.includes(flip.hash)))
   ).length
-  const room = Number(identity && identity.availableFlips) - sent - onTheWay
+  const room =
+    Number(identity && identity.availableFlips) - mined.length - onTheWay
   if (!(room > 0)) return []
   return pairs
     .filter(

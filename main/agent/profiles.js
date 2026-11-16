@@ -236,6 +236,19 @@ function normalizeAgent(input, {id = newAgentId} = {}) {
   // stories" drew the pictures (an image model set) holds Make the pictures at the same level, with its pictures a
   // day. Once: a later save carries the mark, and a removed Make the pictures stays removed.
   if (value.flipSteps !== true) actions = withFlipPictures(value, actions)
+  // What a build before B-258 reads: its stories draw within flipStory's pictures a day. Without Make the pictures
+  // (or Off), none (0): a downgrade does not draw more than this build.
+  if (actions.flipStory)
+    actions = {
+      ...actions,
+      flipStory: {
+        ...actions.flipStory,
+        picturesPerDay:
+          actions.flipPictures && actions.flipPictures.level !== 'off'
+            ? actions.flipPictures.picturesPerDay
+            : 0,
+      },
+    }
   const schedule =
     value.schedule && typeof value.schedule === 'object' ? value.schedule : {}
   // A number, or a number written as text; anything else (an empty field included) is no budget.

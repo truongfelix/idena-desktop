@@ -10,6 +10,7 @@ import {
   judgeQuestion,
   orphans,
   permutationsOf,
+  sameDraft,
   shuffledOrder,
   storyForPictures,
   verdictOf,
@@ -51,12 +52,27 @@ async function settleOrphans(deps) {
   )
 }
 
+// The flips (or keyword pairs) whose step failed today, in this window: not tried again before tomorrow, so that a
+// model that keeps failing is not billed at every run (a failure is not counted against the step's limit).
+const failedToday = new Map()
+
 /**
  * One action of a step on one flip: may it (mayDo), its work (`work()`, the model's part; null: nothing to propose),
- * then propose; `apply(result, waiting)` writes it into the draft (waiting: the item of To approve, or null alone).
- * Returns 'stop' when the step can do no more in this run (Off, past its limit), else 'next'.
+ * then, the draft still as it was (`fresh()`: nothing written over a change made meanwhile), propose; `apply(result,
+ * waiting)` writes it into the draft (waiting: the item of To approve, or null alone). `key` names the flip (or pair)
+ * for the failures of the day. Returns 'stop' when the step can do no more in this run (Off, past its limit, To
+ * approve full), else 'next'.
  */
-async function act(agent, step, deps, count, {work, propose, apply}) {
+async function act(
+  agent,
+  step,
+  deps,
+  count,
+  {key, work, fresh, propose, apply}
+) {
+  const day = new Date(deps.now()).toDateString()
+  const failure = `${agent.id}:${step}:${key}`
+  if (failedToday.get(failure) === day) return 'next'
   const may = await deps.call('mayDo', {agentId: agent.id, action: step})
   if (may.decision === 'off') return 'stop'
   if (may.decision === 'ask' && OVER_LIMIT.includes(may.reason)) {
@@ -69,11 +85,9 @@ async function act(agent, step, deps, count, {work, propose, apply}) {
     })
     return 'stop'
   }
-  let result
-  try {
-    result = work ? await work() : {}
-  } catch (error) {
+  const fail = async (error) => {
     count.failed += 1
+    failedToday.set(failure, day)
     if (!logged(error))
       await deps.call('didAction', {
         agentId: agent.id,
@@ -81,9 +95,25 @@ async function act(agent, step, deps, count, {work, propose, apply}) {
         ok: false,
         detail: String(error?.message || error),
       })
+  }
+  let result
+  try {
+    result = work ? await work() : {}
+  } catch (error) {
+    await fail(error)
     return 'next'
   }
   if (!result) return 'next'
+  if (fresh && !fresh()) {
+    count.skipped += 1
+    await deps.call('didAction', {
+      agentId: agent.id,
+      action: step,
+      skipped: true,
+      detail: 'the draft changed meanwhile: not written over',
+    })
+    return 'next'
+  }
   const {body = '', detail = '', target} = propose(result)
   const decision = await deps.call('propose', {
     agentId: agent.id,
@@ -96,13 +126,26 @@ async function act(agent, step, deps, count, {work, propose, apply}) {
     skipOverLimit: true,
   })
   if (decision.decision === 'ask' && decision.item) {
-    apply(result, {step, id: decision.item.id})
-    count.ask += 1
+    try {
+      await apply(result, {step, id: decision.item.id})
+      count.ask += 1
+    } catch (error) {
+      // No draft waits on the item: it leaves To approve.
+      await deps
+        .call('withdraw', {
+          id: decision.item.id,
+          agentId: agent.id,
+          reason: String(error?.message || error),
+        })
+        .catch(() => {})
+      await fail(error)
+    }
     return 'next'
   }
+  // Refused (Off, past its limit, To approve full): the step does no more in this run.
   if (decision.decision !== 'alone') {
     count.skipped += 1
-    return OVER_LIMIT.includes(decision.reason) ? 'stop' : 'next'
+    return 'stop'
   }
   try {
     const done = await apply(result, null)
@@ -115,6 +158,7 @@ async function act(agent, step, deps, count, {work, propose, apply}) {
     })
   } catch (error) {
     count.failed += 1
+    failedToday.set(failure, day)
     // Never done (refused before it reached the chain): its count is given back to the day.
     await deps.call('didAction', {
       agentId: agent.id,
@@ -161,6 +205,12 @@ const STEPS = {
       let words
       // eslint-disable-next-line no-await-in-loop
       const next = await act(agent, 'flipStory', deps, count, {
+        key: `pair ${pair.id}`,
+        // The pair still free: no draft took it meanwhile (the person's in the editor).
+        fresh: () =>
+          freePairs(ctx.identity, deps.store.getFlips()).some(
+            ({id}) => id === pair.id
+          ),
         work: async () => {
           words = await deps.loadWords(pair)
           const sent = storyWords({words})
@@ -216,6 +266,8 @@ const STEPS = {
     for (const flip of draftsAt('flipPictures', deps.store.getFlips())) {
       // eslint-disable-next-line no-await-in-loop
       const next = await act(agent, 'flipPictures', deps, count, {
+        key: flip.id,
+        fresh: () => sameDraft(deps.store.getFlip(flip.id), flip),
         work: async () => {
           const one = storyForPictures(flip.story)
           if (!one) throw new Error('the draft has no story to draw')
@@ -250,6 +302,8 @@ const STEPS = {
     for (const flip of draftsAt('flipDraft', deps.store.getFlips())) {
       // eslint-disable-next-line no-await-in-loop
       const next = await act(agent, 'flipDraft', deps, count, {
+        key: flip.id,
+        fresh: () => sameDraft(deps.store.getFlip(flip.id), flip),
         work: async () => {
           const shield = await deps.protect(flip)
           if (!shield.protectedImages.every(Boolean))
@@ -288,12 +342,17 @@ const STEPS = {
     for (const flip of draftsAt('flipJudge', deps.store.getFlips())) {
       // eslint-disable-next-line no-await-in-loop
       const next = await act(agent, 'flipJudge', deps, count, {
+        key: flip.id,
+        fresh: () => sameDraft(deps.store.getFlip(flip.id), flip),
         work: async () => {
           const {flip: question, storySide} = judgeQuestion(flip, deps.random)
           const answer = await deps.ipc('judgeFlip', {
             agentId: agent.id,
             flip: question,
           })
+          // An answer it could not read (cut short, in prose) is no verdict: a failed flip would be deleted.
+          if (!answer || !answer.answer)
+            throw new Error('the answer could not be read')
           return verdictOf(answer, {
             storySide,
             flip,
@@ -325,6 +384,7 @@ const STEPS = {
     for (const flip of draftsAt('flipSubmit', deps.store.getFlips())) {
       // eslint-disable-next-line no-await-in-loop
       const next = await act(agent, 'flipSubmit', deps, count, {
+        key: flip.id,
         propose: () => ({
           detail: keywordsLine(flip),
           target: {flipId: flip.id},
@@ -350,6 +410,7 @@ const STEPS = {
     for (const flip of draftsAt('flipDelete', deps.store.getFlips())) {
       // eslint-disable-next-line no-await-in-loop
       const next = await act(agent, 'flipDelete', deps, count, {
+        key: flip.id,
         propose: () => ({
           body: deps.verdictText(flip.agentVerdict),
           detail: keywordsLine(flip),

@@ -124,14 +124,21 @@ describe('the keyword pairs for new drafts', () => {
     ],
   }
   test('pairs not used and held by no flip, as many as flips are left to make', () => {
-    // 3 to make, 1 sent: room for 2; pair 1 holds the person's draft.
+    // 3 to make, 1 sent: room for 2.
+    expect(freePairs(identity, []).map(({id}) => id)).toEqual([1, 2])
+    // The person's draft holds pair 1 and may be sent: room for 1.
     const person = {type: FlipType.Draft, keywordPairId: 1}
-    expect(freePairs(identity, [person]).map(({id}) => id)).toEqual([2, 3])
-    // An agent draft on its way takes a place: room for 1.
-    const onItsWay = draft('story', {keywordPairId: 2})
-    expect(freePairs(identity, [person, onItsWay]).map(({id}) => id)).toEqual([
-      3,
-    ])
+    expect(freePairs(identity, [person]).map(({id}) => id)).toEqual([2])
+    // A flip being sent, not counted as made yet, takes a place too; once made (its hash in the identity's flips)
+    // it is counted once.
+    const sending = {type: FlipType.Publishing, keywordPairId: 2, hash: '0xnew'}
+    expect(freePairs(identity, [sending]).map(({id}) => id)).toEqual([1])
+    expect(
+      freePairs({...identity, flips: ['0xsent', '0xnew']}, [sending]).map(
+        ({id}) => id
+      )
+    ).toEqual([1])
+    expect(freePairs(identity, [person, sending])).toEqual([])
     // An archived flip of an earlier epoch holds nothing.
     const archived = {type: FlipType.Archived, keywordPairId: 2}
     expect(freePairs(identity, [archived]).map(({id}) => id)).toEqual([1, 2])

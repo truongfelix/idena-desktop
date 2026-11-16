@@ -10,7 +10,7 @@ import {
 } from '../../flips/utils'
 import {IMAGE_SOURCES} from '../../flips/image-search-machine'
 import {asFrame} from '../flip-story'
-import {declinedChange, judgedPass, waitingItem} from './drafts'
+import {declinedChange, judgedFail, judgedPass, waitingItem} from './drafts'
 
 // The app's side of a Flips run (B-258): the flip store, the drawing, the editor's own protect and publish code,
 // and what To approve's Approve and Decline do to a draft waiting on them. Each acts on the draft as it is when
@@ -190,6 +190,9 @@ export function flipsExecutors(t) {
     // Sent as it is (submitDraft clears the wait); a failure leaves it waiting, with its error.
     flipSubmit: approved('flipSubmit', (flip) => submitDraft(flip.id)),
     flipDelete: approved('flipDelete', (flip) => {
+      // Reworked since the judge failed it: not deleted.
+      if (!judgedFail(flip))
+        throw new Error('the draft changed since the judge failed it')
       store().deleteDraft(flip.id)
       return keywordsOf(flip)
     }),

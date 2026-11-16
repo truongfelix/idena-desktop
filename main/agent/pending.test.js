@@ -256,6 +256,38 @@ describe('To approve', () => {
     expect(list).toEqual([])
   })
 
+  // B-258: a Flips step asks before its billed work whether it may, nothing counted.
+  test('mayDo says what an action may do now, To approve full included, and counts nothing', async () => {
+    const story = (level, limit = null) => ({
+      ...joke(),
+      actions: {post: {level: 'ask'}, flipStory: {level, limit}},
+    })
+    let agent = start([story('alone', 1)])
+    const may = (action = 'flipStory') =>
+      agent.handle('mayDo', {agentId: JOKE, action})
+    await expect(may()).resolves.toMatchObject({decision: 'alone'})
+    // Asked twice, still alone: mayDo counted nothing.
+    await expect(may()).resolves.toMatchObject({decision: 'alone'})
+    // As a Flips run proposes: no iDNA spent.
+    await expect(
+      agent.handle('propose', {...proposal(), action: 'flipStory', cost: 0})
+    ).resolves.toMatchObject({decision: 'alone'})
+    await expect(may()).resolves.toMatchObject({
+      decision: 'ask',
+      reason: 'above the limit',
+    })
+    agent = start([story('ask')])
+    await expect(may()).resolves.toMatchObject({decision: 'ask'})
+    for (let i = 0; i < MAX_PENDING_PER_AGENT; i += 1)
+      // eslint-disable-next-line no-await-in-loop
+      await agent.handle('propose', proposal())
+    await expect(may()).resolves.toMatchObject({
+      decision: 'off',
+      reason: 'too many actions waiting',
+    })
+    await expect(may('send')).resolves.toMatchObject({decision: 'off'})
+  })
+
   test(`at most ${MAX_PENDING_PER_AGENT} actions of one agent wait: the others still can`, async () => {
     const agent = start([joke(), {...joke(), id: OTHER, name: 'Second'}])
     for (let i = 0; i < MAX_PENDING_PER_AGENT; i += 1)
