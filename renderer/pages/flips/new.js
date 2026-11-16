@@ -402,6 +402,7 @@ export default function NewFlipPage() {
                 <FlipStoryPrompts
                   keywords={keywords}
                   story={story}
+                  onStory={onStory}
                   images={images}
                   originalOrder={originalOrder}
                   adversarialImageId={adversarialImageId}

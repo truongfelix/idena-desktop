@@ -1,10 +1,12 @@
 import {
   draftStory,
   fitContain,
+  freeSlots,
+  promptsOf,
   storyAgentOf,
   storyForKeywords,
-  storySlots,
   storyWords,
+  withPrompt,
 } from './flip-story'
 
 // B-236: the flip editor shows the story panel only for an agent that is on and holds "Write flip stories".
@@ -82,17 +84,17 @@ describe("the flip's keywords as the agent gets them", () => {
 })
 
 describe('Make the images: which slots, and the picture in the frame', () => {
-  test("every slot but the nonsense picture's, in the editor's order", () => {
-    expect(storySlots([2, 0, 3, 1], 3, 3)).toEqual([2, 0, 1])
-    // Unlocked (no nonsense picture): four slots for four pictures.
-    expect(storySlots([2, 0, 3, 1], -1, 4)).toEqual([2, 0, 3, 1])
-    // Three pictures with the slot unlocked: the first three, the fourth left to the person.
-    expect(storySlots([0, 1, 2, 3], -1, 3)).toEqual([0, 1, 2])
-  })
-
-  test('four pictures while the nonsense slot is locked: none', () => {
-    expect(storySlots([0, 1, 2, 3], 3, 4)).toBeNull()
-    expect(storySlots(undefined, 3, 3)).toBeNull()
+  test("every slot but the nonsense picture's, with its place in the editor's order", () => {
+    expect(freeSlots([2, 0, 3, 1], 3)).toEqual([
+      {slot: 2, place: 0},
+      {slot: 0, place: 1},
+      {slot: 1, place: 3},
+    ])
+    // Unlocked (no nonsense picture): all four.
+    expect(freeSlots([2, 0, 3, 1], -1).map(({slot}) => slot)).toEqual([
+      2, 0, 3, 1,
+    ])
+    expect(freeSlots(undefined, 3)).toEqual([])
   })
 
   test('a square picture whole and centred in the 440 x 330 frame', () => {
@@ -111,24 +113,70 @@ describe('Make the images: which slots, and the picture in the frame', () => {
   })
 })
 
-describe("the draft's story for these keywords (B-236)", () => {
+describe("the draft's stories for these keywords (B-236, B-268)", () => {
   const words = [{name: 'ladder'}, {name: 'kite'}]
-  const saved = draftStory({title: 'T', prompts: ['a', 'b', 'c']}, words)
-
-  test('kept with its keywords, shown again for them', () => {
-    expect(saved.words).toEqual(['ladder', 'kite'])
-    expect(storyForKeywords(saved, words)).toBe(saved)
+  const run = {
+    stories: [
+      {title: 'A', story: 'Story A', prompts: ['a1', 'a2']},
+      {title: 'B', story: '', prompts: ['b1']},
+    ],
+  }
+  const saved = draftStory(run, words, {
+    idea: 'windy',
+    parts: ['story', 'prompts'],
+    titles: ['Before'],
   })
 
-  test('none for other keywords, without one, or for a draft that has none', () => {
+  test('kept with its keywords, the idea, the parts and every title so far', () => {
+    expect(saved).toEqual({
+      words: ['ladder', 'kite'],
+      idea: 'windy',
+      parts: ['story', 'prompts'],
+      titles: ['Before', 'A', 'B'],
+      stories: run.stories,
+    })
+    expect(storyForKeywords(saved, words)).toEqual(saved)
+  })
+
+  test('none for other keywords, without one, or for a draft without stories', () => {
     expect(
       storyForKeywords(saved, [{name: 'ladder'}, {name: 'boat'}])
     ).toBeNull()
     expect(storyForKeywords(null, words)).toBeNull()
-    expect(storyForKeywords({title: 'T', prompts: ['a']}, words)).toBeNull()
-    expect(
-      storyForKeywords({words: ['ladder', 'kite'], prompts: []}, words)
-    ).toBeNull()
+    expect(storyForKeywords({...saved, words: undefined}, words)).toBeNull()
+    expect(storyForKeywords({...saved, stories: []}, words)).toBeNull()
+  })
+
+  test('a draft of a build before B-268 is read as one story', () => {
+    const old = {
+      words: ['ladder', 'kite'],
+      title: 'T',
+      character: 'a boy',
+      panels: ['one', 'two', 'three'],
+      prompts: ['p1', 'p2', 'p3'],
+    }
+    expect(storyForKeywords(old, words)).toEqual({
+      words: ['ladder', 'kite'],
+      idea: '',
+      parts: ['story', 'prompts'],
+      titles: ['T'],
+      stories: [
+        {title: 'T', story: 'one\ntwo\nthree', prompts: ['p1', 'p2', 'p3']},
+      ],
+    })
+    expect(storyForKeywords({...old, prompts: []}, words)).toBeNull()
+  })
+
+  test('a prompt edited changes that prompt only; the prompts listed in order', () => {
+    const edited = withPrompt(saved, 0, 1, 'a2, at night')
+    expect(edited.stories[0].prompts).toEqual(['a1', 'a2, at night'])
+    expect(edited.stories[1]).toBe(saved.stories[1])
+    expect(promptsOf(edited)).toEqual([
+      {story: 0, index: 0, prompt: 'a1'},
+      {story: 0, index: 1, prompt: 'a2, at night'},
+      {story: 1, index: 0, prompt: 'b1'},
+    ])
+    expect(promptsOf(null)).toEqual([])
   })
 
   test('a long description is cut for the agent, not refused', () => {
