@@ -10,6 +10,7 @@ import {
 } from '../../shared/components/components'
 import {SettingsSection} from '../settings/components'
 import {useAppTexts} from './app-texts'
+import {eventReadBy} from './social/events'
 
 // The agent page's sections (B-255): its Instructions, when it runs and what it spends (what it reads is among its
 // actions since B-262). Each says
@@ -176,13 +177,6 @@ function eventNames(t) {
     message: t('a private message'),
     tag: t('a post that tags it'),
   }
-}
-
-/** Whether the agent reads what the event `id` is about (B-255): an event it does not read starts an empty run. */
-function eventReadBy(id, reads) {
-  if (id === 'message') return reads.messages
-  if (id === 'tag') return Boolean(reads.tags)
-  return reads.notifications
 }
 
 /** "When it runs": its schedule and the events that start a run (what it spends is on its actions, B-269). */

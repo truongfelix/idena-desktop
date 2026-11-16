@@ -2139,6 +2139,7 @@
   "posts at most a day (a day in UTC)": "posts at most a day (a day in UTC)",
   "a post that tags it": "a post that tags it",
   "{{count}} past its questions of the day, not read": "{{count}} past its questions of the day, not read",
+  "its questions of the day unknown": "its questions of the day unknown",
   "Only its own: the likes, answers and tips to its posts, replies and comments.": "Only its own: the likes, answers and tips to its posts, replies and comments.",
   "Read its private messages": "Read its private messages",
   "Its one-to-one conversations with a new message.": "Its one-to-one conversations with a new message.",

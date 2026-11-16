@@ -6,7 +6,7 @@ import {tagName, tags} from './tags'
 import {socialDigest} from './digest'
 import {eventPending} from './events'
 import {runSocialAgent} from './run'
-import {eventsRead} from '../runner'
+import {eventsRead, questionsLeft} from '../runner'
 
 // The posts that tag an agent (B-264): its questions, at most a number a day for the whole agent (a day in UTC), only
 // from the identities its criteria let it read; past them, and for an untagged post, no reply and no model call.
@@ -151,6 +151,11 @@ describe('what a run reads of the posts that tag it', () => {
       'tag',
     ])
     expect(eventsRead({reads: {tags: null}, events: ['tag']})).toEqual([])
+    // Past its questions of the day, or with the day's count unknown, a tag starts no run.
+    expect(questionsLeft(5, 4)).toBe(true)
+    expect(questionsLeft(5, 5)).toBe(false)
+    expect(questionsLeft(null, 50)).toBe(true)
+    expect(questionsLeft(5, null)).toBe(false)
   })
 })
 
@@ -338,7 +343,7 @@ describe('an answering agent on Social (B-264)', () => {
     await expect(main.handle('tagsToday', {agentId: ID})).resolves.toBe(2)
   })
 
-  test('the count of the day unread: no post that tags it is read', async () => {
+  test('the count of the day unread: the run fails before reading, and the questions wait for the next run', async () => {
     const agent = start()
     const d = deps()
     const agentCall = d.agent
@@ -346,9 +351,27 @@ describe('an answering agent on Social (B-264)', () => {
       command === 'tagsToday'
         ? Promise.reject(new Error('unreadable'))
         : agentCall(command, data)
+    await expect(runSocialAgent(agent, social(questions()), d)).rejects.toThrow(
+      'unreadable'
+    )
+    expect(ask).not.toHaveBeenCalled()
+    await expect(main.handle('readPoint', {agentId: ID})).resolves.toBe(null)
+    const lines = (await main.handle('activity', {agentId: ID})).map(
+      (line) => line.detail
+    )
+    expect(lines.join('\n')).not.toContain('past its questions')
+  })
+
+  test('a line of Activity that cannot be written stops no answer', async () => {
+    const agent = start()
+    const d = deps()
+    const agentCall = d.agent
+    d.agent = (command, data) =>
+      command === 'didAction' && data.action === 'readTags'
+        ? Promise.reject(new Error('no such agent'))
+        : agentCall(command, data)
     await expect(
       runSocialAgent(agent, social(questions()), d)
-    ).resolves.toMatchObject({result: 'nothing new'})
-    expect(ask).not.toHaveBeenCalled()
+    ).resolves.toMatchObject({result: 'done', count: {alone: 5}})
   })
 })

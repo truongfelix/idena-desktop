@@ -136,6 +136,11 @@ describe('agent profiles', () => {
     expect(
       normalizeAgent({actions: {readTags: {level: 'off', limit: 3}}}).reads.tags
     ).toBe(null)
+    // A part of a question is none.
+    expect(
+      normalizeAgent({actions: {readTags: {level: 'alone', limit: 2.5}}}).reads
+        .tags
+    ).toEqual({perDay: 2})
     // Once they are actions, a read turned off stays off (no migration again).
     const off = normalizeAgent({
       ...migrated,

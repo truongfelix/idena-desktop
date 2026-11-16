@@ -14,7 +14,7 @@ import {
   runSocialAgent,
   scannedHeight,
 } from './social/run'
-import {EVENT_MIN_MS, eventPending} from './social/events'
+import {EVENT_MIN_MS, eventPending, eventReadBy} from './social/events'
 import {
   prepareSocialAction,
   sendSocialAction,
@@ -43,12 +43,12 @@ const eventFails = new Map()
  */
 export function eventsRead(agent) {
   const {reads = {}, events = []} = agent
-  return events.filter((one) => {
-    if (one === 'message') return reads.messages
-    if (one === 'tag') return Boolean(reads.tags)
-    return reads.notifications
-  })
+  return events.filter((one) => eventReadBy(one, reads))
 }
+
+/** Whether an agent reading `perDay` posts that tag it a day, `today` read, has questions left (unknown: none). */
+export const questionsLeft = (perDay, today) =>
+  typeof today === 'number' && (typeof perDay !== 'number' || today < perDay)
 
 /** Whether an event may still run the agent today: not after MAX_TRIES failed event runs that day. */
 export const eventsAllowed = (fails, day) =>
@@ -256,7 +256,17 @@ export function AgentRunner() {
         const state = socialState(socialRef.current)
         // eslint-disable-next-line no-restricted-syntax
         for (const agent of active) {
-          const events = eventsRead(agent)
+          let events = eventsRead(agent)
+          // A tag starts a run only while it has questions left today (B-264): past them, a run would read none.
+          if (events.includes('tag')) {
+            const {perDay} = agent.reads.tags
+            // eslint-disable-next-line no-await-in-loop
+            const today = await agentCall('tagsToday', {
+              agentId: agent.id,
+            }).catch(() => null)
+            if (!questionsLeft(perDay, today))
+              events = events.filter((one) => one !== 'tag')
+          }
           if (
             due.includes(agent) ||
             !events.length ||

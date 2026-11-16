@@ -115,15 +115,16 @@ export async function runSocialAgent(agent, social, deps) {
     // Without a reader, nothing is known of anyone: no criterion that needs it passes.
     facts = deps.readAuthors ? await deps.readAuthors([...authors], needs) : {}
   }
-  // Its questions left today (B-264): the posts that tag it it may still read, a day in UTC. Unknown, it reads none:
-  // each one read is a question billed.
+  // Its questions left today (B-264): the posts that tag it it may still read, a day in UTC. Unknown, the run fails
+  // before reading (each one read is a question billed; passed over, it would be lost): a later run reads them.
   let tagsLeft = 0
   if (agent.reads?.tags) {
     const {perDay} = agent.reads.tags
-    const today = await call('tagsToday', {agentId: agent.id}).catch(() => null)
-    if (typeof today === 'number')
-      tagsLeft =
-        typeof perDay === 'number' ? Math.max(0, perDay - today) : Infinity
+    const today = await call('tagsToday', {agentId: agent.id})
+    if (typeof today !== 'number')
+      return {result: 'failed', detail: t('its questions of the day unknown')}
+    tagsLeft =
+      typeof perDay === 'number' ? Math.max(0, perDay - today) : Infinity
   }
   const digest = socialDigest(
     social,
@@ -131,6 +132,7 @@ export async function runSocialAgent(agent, social, deps) {
     {point, scanned}
   )
   // The posts that tag it past its questions of the day: never read, named in Activity once the point passed them.
+  // A line that could not be written stops nothing.
   const tellPassed = () =>
     digest.tagsPassed
       ? call('didAction', {
@@ -141,7 +143,7 @@ export async function runSocialAgent(agent, social, deps) {
             count: digest.tagsPassed,
             nsSeparator: '!!',
           }),
-        })
+        }).catch(() => {})
       : null
   // Nothing to read, and no post of its own to write: the model is not asked (its service bills each question).
   if (digest.empty && !held.includes('post')) {

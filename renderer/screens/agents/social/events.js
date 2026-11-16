@@ -5,6 +5,13 @@ import {tagName, tags} from './tags'
 // The events that start an agent's run besides its schedule (B-255): a like, an answer, a tip or a private message
 // to it after its read point, as the Social scan holds them; a post that tags it (B-264).
 
+/** Whether an agent that reads `reads` reads what the event `id` is about: an event it does not read starts an empty run. */
+export function eventReadBy(id, reads = {}) {
+  if (id === 'message') return Boolean(reads.messages)
+  if (id === 'tag') return Boolean(reads.tags)
+  return Boolean(reads.notifications)
+}
+
 /** How soon after an event's run another event may start one: the model's service bills each run. */
 export const EVENT_MIN_MS = 5 * 60 * 1000
 

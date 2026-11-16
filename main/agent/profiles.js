@@ -81,7 +81,7 @@ function readsOf(actions) {
       ? {
           perDay:
             typeof actions.readTags.limit === 'number'
-              ? actions.readTags.limit
+              ? Math.floor(actions.readTags.limit)
               : null,
         }
       : null,

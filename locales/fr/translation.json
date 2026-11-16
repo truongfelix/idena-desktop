@@ -2139,6 +2139,7 @@
   "posts at most a day (a day in UTC)": "publications au plus par jour (un jour en UTC)",
   "a post that tags it": "une publication qui le mentionne",
   "{{count}} past its questions of the day, not read": "{{count}} au-delà de ses questions du jour, non lues",
+  "its questions of the day unknown": "ses questions du jour inconnues",
   "Only its own: the likes, answers and tips to its posts, replies and comments.": "Seulement les siennes : les j'aime, réponses et pourboires sur ses publications, réponses et commentaires.",
   "Read its private messages": "Lire ses messages privés",
   "Its one-to-one conversations with a new message.": "Ses conversations à deux avec un nouveau message.",
