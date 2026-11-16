@@ -358,6 +358,9 @@ function createAgent({
     return result
   }
 
+  // The pictures drawn today, by agent (B-269), while the app runs.
+  const pictures = {day: null, count: new Map()}
+
   const handlers = {
     ...(agents ? agents.commands : {}),
     ...(pending ? pending.commands : {}),
@@ -592,6 +595,24 @@ function createAgent({
       }
       if (typeof prompt !== 'string' || !prompt.trim())
         throw new Error('no prompt')
+      // Its pictures a day (B-269): each one is billed by its service. Counted when asked, given back when it failed.
+      const day = new Date(now()).toDateString()
+      if (pictures.day !== day) {
+        pictures.day = day
+        pictures.count = new Map()
+      }
+      const limit = agent.actions.flipStory.picturesPerDay
+      const drawnToday = pictures.count.get(agentId) || 0
+      if (typeof limit === 'number' && drawnToday + 1 > limit) {
+        log({
+          agentId,
+          action: 'flipImage',
+          decision: 'off',
+          detail: 'pictures a day reached',
+        })
+        throw new Error(`its ${limit} pictures a day are reached`)
+      }
+      pictures.count.set(agentId, drawnToday + 1)
       const controller = new AbortController()
       writing.add(controller)
       try {
@@ -617,6 +638,11 @@ function createAgent({
         })
         return picture
       } catch (error) {
+        if (pictures.day === day)
+          pictures.count.set(
+            agentId,
+            Math.max(0, (pictures.count.get(agentId) || 0) - 1)
+          )
         log({
           agentId,
           action: 'flipImage',

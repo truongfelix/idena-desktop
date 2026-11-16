@@ -175,6 +175,30 @@ describe("the agent's picture command", () => {
     expect(draw).not.toHaveBeenCalled()
   })
 
+  test('its pictures a day (B-269): past them, refused and logged; a failed one is given back', async () => {
+    const agent = start({flipStory: {level: 'ask', picturesPerDay: 2}})
+    const picture = () =>
+      agent.handle('drawStoryPicture', {
+        agentId: 'aaaaaaaaaaaaaaaa',
+        prompt: 'A kite.',
+      })
+    await expect(picture()).resolves.toMatchObject({mediaType: 'image/png'})
+    draw.mockRejectedValueOnce(new Error('service busy'))
+    await expect(picture()).rejects.toThrow('service busy')
+    // The failed one did not count: one more is drawn, then the day's two are reached.
+    await expect(picture()).resolves.toMatchObject({mediaType: 'image/png'})
+    await expect(picture()).rejects.toThrow('its 2 pictures a day are reached')
+    expect(draw).toHaveBeenCalledTimes(3)
+    const [line] = await agent.handle('activity', {
+      agentId: 'aaaaaaaaaaaaaaaa',
+    })
+    expect(line).toMatchObject({
+      action: 'flipImage',
+      decision: 'off',
+      detail: 'pictures a day reached',
+    })
+  })
+
   test('the image model is kept with the agent and travels in its file', async () => {
     const agent = start({flipStory: {level: 'ask'}})
     const {agents} = await agent.handle('agents')

@@ -89,8 +89,8 @@ describe('agent profiles', () => {
       },
     })
     expect(migrated.actions).toEqual({
-      post: {level: 'alone', limit: null},
-      reply: {level: 'ask', limit: 5},
+      post: {level: 'alone', limit: null, spendPerDay: null},
+      reply: {level: 'ask', limit: 5, spendPerDay: null},
       readPosts: {level: 'alone', limit: null, window: 'count', count: 7},
       readOwnPosts: {level: 'alone', limit: null},
       readNotifications: {level: 'alone', limit: null},
@@ -185,7 +185,7 @@ describe('agent profiles', () => {
     expect(agent.actions).toEqual(
       // Plus the read actions an old file's Social actions bring (B-262), tested apart.
       expect.objectContaining({
-        post: {level: 'alone', limit: 1},
+        post: {level: 'alone', limit: 1, spendPerDay: null},
         tip: {level: 'off', limit: 0, amount: 1},
       })
     )
