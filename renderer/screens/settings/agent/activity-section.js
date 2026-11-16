@@ -68,6 +68,19 @@ export function activityText({action, decision, detail}, t) {
         : t('Drew a story picture')
     case 'key':
       return decision === 'removed' ? t('Key removed') : t('Key saved')
+    // What started a Social run (B-274).
+    case 'run':
+      if (decision === 'now')
+        return t('Run now: a run started by you', {nsSeparator: '!!'})
+      if (decision === 'daily')
+        return t('Daily run: its time of the day came', {nsSeparator: '!!'})
+      if (decision === 'hourly') return t('Hourly run')
+      if (decision === 'event')
+        return t('Run on an event: a like, an answer, a tip or a message', {
+          nsSeparator: '!!',
+        })
+    // Another kind: as it is (the default).
+    // falls through
     default:
       return `${action} ${decision}`
   }

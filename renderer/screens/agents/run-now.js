@@ -4,6 +4,7 @@ import {useTranslation} from 'react-i18next'
 import {SecondaryButton} from '../../shared/components/button'
 import {useSuccessToast} from '../../shared/hooks/use-toast'
 import {useSocial} from '../social/provider'
+import {agentErrorText} from '../settings/agent/api'
 import {isSocialAgent, runAgentNow, socialReady} from './runner'
 
 /** What a run says, in words. */
@@ -23,6 +24,13 @@ export function runLine({result, detail}, t) {
       return t('It failed: {{detail}}', {detail, nsSeparator: '!!'})
   }
 }
+
+/**
+ * The message after a run that threw: the reason alone, as Activity shows it (B-273), not Electron's "Error invoking
+ * remote method" before it.
+ */
+export const failedLine = (error, t) =>
+  runLine({result: 'failed', detail: agentErrorText(error)}, t)
 
 /** Why Run now is off, or nothing. */
 function buttonTitle({enabled, paused, ready}, t) {
@@ -57,7 +65,7 @@ export function RunNow({agent, paused, onDone}) {
         try {
           line = runLine(await runAgentNow(agent, social, t), t)
         } catch (error) {
-          line = runLine({result: 'failed', detail: error?.message || ''}, t)
+          line = failedLine(error, t)
         } finally {
           setIsRunning(false)
         }

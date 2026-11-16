@@ -16,6 +16,8 @@ const providers = require('./providers')
 const MIN_TIMEOUT_MS = 1000
 const MAX_TIMEOUT_MS = 120 * 1000
 const MAX_ACTIVITY = 200
+// What starts a Social run (B-274): its time of the day, its hour, an event it reads, or Run now.
+const RUN_KINDS = ['daily', 'hourly', 'event', 'now']
 /** What an agent is given to read for a text (the joke agent: its recent jokes), and what its answer may be. */
 const MAX_INPUT_TEXT = 20000
 const MAX_ANSWER_TEXT = 4000
@@ -97,7 +99,7 @@ function createAgent({
 
   // How far each agent read Idena Social (read-points.js).
   const readPoints = profiles
-    ? createReadPoints({file: readPointsFile, logger})
+    ? createReadPoints({file: readPointsFile, logger, now})
     : null
 
   // The agents of the validation that are on (answering, reporting), by id: one that stops being so ends its question.
@@ -461,7 +463,7 @@ function createAgent({
      * Social actions it holds (not Off). Returns the model's answer, a plan the app reads and checks action by action
      * (each one then goes through propose).
      */
-    async planSocial({agentId, input, timeoutMs} = {}) {
+    async planSocial({agentId, input, why, timeoutMs} = {}) {
       if (!profiles) throw new Error('no agents')
       const file = profiles.read()
       const agent = file.agents.find((one) => one.id === agentId)
@@ -477,6 +479,8 @@ function createAgent({
         log({agentId, action: 'social', decision: 'off', detail: reason})
         throw new Error(`the agent may not do it (${reason})`)
       }
+      // What started the run, before its question (B-274): every question billed is named in Activity.
+      if (RUN_KINDS.includes(why)) log({agentId, action: 'run', decision: why})
       const controller = new AbortController()
       writing.add(controller)
       try {

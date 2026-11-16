@@ -97,21 +97,48 @@ export function socialReady(social) {
 /** Whether the agent's time of the day has come (a daily agent). */
 export function dueToday(schedule, now) {
   if (schedule.kind !== 'daily') return false
+  return now >= todayAt(schedule, now)
+}
+
+/** When a daily agent's time of the day is, on the day of `now` (ms). */
+export function todayAt(schedule, now) {
   const [hours, minutes] = schedule.time.split(':').map(Number)
   const at = new Date(now)
   at.setHours(hours, minutes, 0, 0)
-  return now >= at.getTime()
+  return at.getTime()
 }
 
-/** One run of an agent now, whatever its schedule (the agent page's Run now, or its time come). */
-export async function runAgentNow(agent, social, t) {
+/**
+ * Whether a daily agent still runs today (B-274): its time has come, and no run of it that started since then ended
+ * without failing (Run now and event runs included, in this app session or before a restart: the main process keeps
+ * the time). A time after now (a clock set wrong once) is not taken as a run.
+ */
+export function dailyDue(schedule, now, lastRun) {
+  const at = todayAt(schedule, now)
+  return (
+    now >= at &&
+    !(typeof lastRun === 'number' && lastRun >= at && lastRun <= now)
+  )
+}
+
+/** Whether a run that gave `result` counts as the agent's run (B-274): it read, asked or found nothing new. */
+export const ranFully = (result) =>
+  result === 'done' || result === 'nothing new'
+
+/**
+ * One run of an agent now, whatever its schedule: `why` is what started it, named in Activity (B-274): 'now' (the
+ * agent page's Run now), 'daily', 'hourly' (its time come), 'event'.
+ */
+export async function runAgentNow(agent, social, t, why = 'now') {
   if (running.has(agent.id)) return {result: 'running', detail: ''}
   running.add(agent.id)
   try {
     if (!isSocialAgent(agent)) return {result: 'off', detail: ''}
     const state = socialState(social)
-    return await runSocialAgent(agent, state, {
+    const startedAt = Date.now()
+    const outcome = await runSocialAgent(agent, state, {
       t,
+      why,
       agent: agentCall,
       prepare: (item) => prepareSocialAction(item, state),
       send: (pending) => sendSocialAction(pending),
@@ -121,6 +148,12 @@ export async function runAgentNow(agent, social, t) {
           call: socialRpc,
         }),
     })
+    // Only a daily agent reads it: the time the run started, so a run begun before its time is not its daily run.
+    if (agent.schedule?.kind === 'daily' && ranFully(outcome.result))
+      await agentCall('setLastRun', {agentId: agent.id, at: startedAt}).catch(
+        () => {}
+      )
+    return outcome
   } finally {
     running.delete(agent.id)
   }
@@ -189,13 +222,30 @@ export function AgentRunner() {
       const active = list.agents.filter(
         (agent) => agent.enabled && isSocialAgent(agent)
       )
-      const due = active.filter((agent) => {
-        const state = runs.get(agent.id)
-        if (agent.schedule.kind === 'hourly') return hourlyDue(state, now)
-        return runDue(state, day, now) && dueToday(agent.schedule, now)
-      })
       busy.current = true
       try {
+        const due = []
+        // eslint-disable-next-line no-restricted-syntax
+        for (const agent of active) {
+          const inWindow = runs.get(agent.id)
+          if (agent.schedule.kind === 'hourly') {
+            if (hourlyDue(inWindow, now)) due.push(agent)
+          } else if (
+            runDue(inWindow, day, now) &&
+            dueToday(agent.schedule, now)
+          ) {
+            // Its last run, kept across restarts: unknown, it is not run (a question is billed).
+            // eslint-disable-next-line no-await-in-loop
+            const last = await agentCall('lastRun', {
+              agentId: agent.id,
+            }).catch(() => undefined)
+            if (last !== undefined && dailyDue(agent.schedule, now, last))
+              due.push(agent)
+            // Ran today already (before a restart, Run now): done for the day in this window too.
+            else if (last !== undefined)
+              runs.set(agent.id, afterRun(inWindow, day, now, 'done'))
+          }
+        }
         // An event (a like, an answer, a tip, a message to it) after its read point runs it too, at most every
         // EVENT_MIN_MS.
         const state = socialState(socialRef.current)
@@ -221,14 +271,20 @@ export function AgentRunner() {
             due.push(agent)
           }
         }
+        // eslint-disable-next-line no-restricted-syntax
         for (const agent of due) {
+          let why = agent.schedule.kind === 'hourly' ? 'hourly' : 'daily'
+          if (lastEvent.get(agent.id) === now) why = 'event'
           // eslint-disable-next-line no-await-in-loop
-          const {result} = await runAgentNow(agent, socialRef.current, t).catch(
-            (error) => {
-              global.logger?.error('agent run failed', error?.message)
-              return {result: 'failed'}
-            }
-          )
+          const {result} = await runAgentNow(
+            agent,
+            socialRef.current,
+            t,
+            why
+          ).catch((error) => {
+            global.logger?.error('agent run failed', error?.message)
+            return {result: 'failed'}
+          })
           if (lastEvent.get(agent.id) === now)
             eventFails.set(
               agent.id,
