@@ -2,9 +2,10 @@ import {
   CRITERIA_STATES,
   addressList,
   criteriaLine,
+  topicList,
   wordList,
 } from './criteria-fields'
-import {ONLY_TO} from './actions-section'
+import {ONLY_TO} from './do-row'
 import {WHO_READS} from './read-row'
 
 const main = require('../../../main/agent/criteria')
@@ -52,5 +53,34 @@ describe('the page and the main process name the same', () => {
     expect(ONLY_TO).toEqual(main.ONLY_TO_ACTIONS)
     expect(WHO_READS).toEqual(main.WHO_ACTIONS)
     expect([...CRITERIA_STATES].sort()).toEqual([...main.STATES].sort())
+  })
+})
+
+describe('a profile name and topics (B-281)', () => {
+  test('said in the line after the other criteria; topics typed with or without r/', () => {
+    expect(
+      criteriaLine(
+        {
+          only: [],
+          except: [],
+          states: ['Human'],
+          trustAbove: null,
+          minAge: null,
+          minStake: null,
+          named: true,
+          topics: ['flips', 'validation'],
+        },
+        t,
+        (s) => s
+      )
+    ).toBe('Human · with a profile name · in r/flips, r/validation')
+    expect(topicList('r/Flips, validation ,')).toEqual(['flips', 'validation'])
+    // What the editor saves is what the main process keeps.
+    expect(
+      main.normalizeCriteria(
+        {named: true, topics: topicList('r/Flips')},
+        {withWords: true}
+      )
+    ).toMatchObject({named: true, topics: ['flips']})
   })
 })

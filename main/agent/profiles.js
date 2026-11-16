@@ -1,6 +1,8 @@
 const crypto = require('crypto')
 const fs = require('fs-extra')
 const {criteriaField} = require('./criteria')
+const {normalizeParts} = require('./app-parts')
+const {defaultParts} = require('./app-texts')
 const {
   ACTIONS,
   LEVELS,
@@ -55,7 +57,24 @@ const READ_ACTIONS = [
 /** The posts' window of Read all Social posts: the last 24 hours, or the last N posts. */
 function postsWindow(row) {
   const count = Number(row.count)
+  // B-281: the most posts of one run with the window of a day (1 to MAX_POSTS_READ), and the most a day (from 0);
+  // each kept only when set, so a row saved before reads the same.
+  const perRun = Number(row.perRun)
+  const perDay = Number(row.perDay)
   return {
+    ...(row.perRun !== null &&
+    row.perRun !== '' &&
+    Number.isInteger(perRun) &&
+    perRun >= 1 &&
+    perRun <= MAX_POSTS_READ
+      ? {perRun}
+      : {}),
+    ...(row.perDay !== null &&
+    row.perDay !== '' &&
+    Number.isInteger(perDay) &&
+    perDay >= 0
+      ? {perDay}
+      : {}),
     window: row.window === 'count' ? 'count' : 'day',
     count:
       Number.isInteger(count) && count >= 1 && count <= MAX_POSTS_READ
@@ -71,7 +90,12 @@ function readsOf(actions) {
   const posts = actions.readPosts
   return {
     posts: isOn(posts)
-      ? {window: posts.window, count: posts.count}
+      ? {
+          window: posts.window,
+          count: posts.count,
+          ...(typeof posts.perRun === 'number' ? {perRun: posts.perRun} : {}),
+          ...(typeof posts.perDay === 'number' ? {perDay: posts.perDay} : {}),
+        }
       : {window: 'off', count: (posts && posts.count) || DEFAULT_POSTS_READ},
     own: isOn(actions.readOwnPosts),
     notifications: isOn(actions.readNotifications),
@@ -252,6 +276,7 @@ function normalizeAgent(input, {id = newAgentId} = {}) {
   const schedule =
     value.schedule && typeof value.schedule === 'object' ? value.schedule : {}
   // A number, or a number written as text; anything else (an empty field included) is no budget.
+  const appParts = normalizeParts(value.appParts, defaultParts())
   const budget =
     typeof value.budgetPerDay === 'number' ||
     (typeof value.budgetPerDay === 'string' && value.budgetPerDay.trim())
@@ -285,6 +310,8 @@ function normalizeAgent(input, {id = newAgentId} = {}) {
     reportThresholds,
     // Its actions read with the Flips area's steps (B-258): see withFlipPictures.
     flipSteps: true,
+    // The app's parts it changed (B-282), only when it changed one: an older build reads the app's own.
+    ...(Object.keys(appParts).length ? {appParts} : {}),
   }
 }
 

@@ -64,8 +64,20 @@ export function criteriaLine(criteria, t, stateName) {
     parts.push(t('with “{{words}}”', {words: criteria.mustWords.join(', ')}))
   if (criteria.notWords && criteria.notWords.length)
     parts.push(t('without “{{words}}”', {words: criteria.notWords.join(', ')}))
+  // B-281: a claimed profile name, the posts' topics.
+  if (criteria.named === true) parts.push(t('with a profile name'))
+  if (criteria.topics && criteria.topics.length)
+    parts.push(
+      t('in {{topics}}', {
+        topics: criteria.topics.map((one) => `r/${one}`).join(', '),
+      })
+    )
   return parts.join(' · ') || t('Everyone')
 }
+
+/** The topics of a text, separated by commas: lower case, without the "r/" a person may type. */
+export const topicList = (text) =>
+  wordList(text).map((one) => one.toLowerCase().replace(/^r\//u, ''))
 
 /** Whether a token is an address (0x and 40 hex digits). */
 const isAddress = (one) => /^0x[0-9a-fA-F]{40}$/u.test(one)
@@ -126,15 +138,10 @@ function ListField({
 const joinLines = (list) => list.join('\n')
 const joinWords = (list) => list.join(', ')
 
-/**
- * The criteria editor: `value` the saved criteria (null: none), `withWords` for a read (the words its text must or
- * must not hold), `onChange(criteria)` with the whole new criteria. `title` says what it picks ("Whose", "Only to").
- */
-export function CriteriaFields({title, value, withWords = false, onChange}) {
+/** An identity state as the app says it (Verified is "Validated"). */
+function useStateName() {
   const {t} = useTranslation()
-  const [open, setOpen] = React.useState(false)
-  const criteria = {...EMPTY, ...(value || {})}
-  const stateName = (state) =>
+  return (state) =>
     ({
       Human: t('Human'),
       Verified: t('Validated'),
@@ -144,119 +151,151 @@ export function CriteriaFields({title, value, withWords = false, onChange}) {
       Suspended: t('Suspended'),
       Zombie: t('Zombie'),
     }[state] || state)
+}
+
+/**
+ * The criteria in one line, a button that opens their editor: `value` the saved criteria (null: none), `open` and
+ * `onToggle` the editor's state, kept by the row (B-280: the line sits in a cell, the editor under the row).
+ * `extra`: the row's other rules in words (B-281: once per author, who wrote first), said after the criteria.
+ */
+export function CriteriaSummary({label, value, extra = [], open, onToggle}) {
+  const {t} = useTranslation()
+  const stateName = useStateName()
+  const line = [criteriaLine(value, t, stateName), ...extra].join(' · ')
+  return (
+    <Button
+      size="sm"
+      variant="link"
+      colorScheme="blue"
+      whiteSpace="normal"
+      textAlign="left"
+      aria-label={`${label}: ${line}`}
+      aria-expanded={open}
+      onClick={onToggle}
+    >
+      {line}
+    </Button>
+  )
+}
+
+/**
+ * The criteria editor: `value` the saved criteria (null: none), `withWords` for a read (the words its text must or
+ * must not hold), `withTopics` for the posts (their topics, B-281), `onChange(criteria)` with the whole new criteria.
+ */
+export function CriteriaEditor({
+  value,
+  withWords = false,
+  withTopics = false,
+  onChange,
+}) {
+  const {t} = useTranslation()
+  const stateName = useStateName()
+  const criteria = {...EMPTY, ...(value || {})}
   const save = (patch) => onChange({...criteria, ...patch})
   return (
-    <Stack spacing={2}>
-      <Flex gap={2} align="baseline" wrap="wrap">
-        <Text fontSize="sm" color="muted">
-          {title}
+    <Stack spacing={3} pl={3} borderLeftWidth={2} borderColor="gray.100">
+      <Box>
+        <Text fontSize="sm" color="muted" mb={1}>
+          {t('Identity states (none picked: any)', {nsSeparator: '!!'})}
         </Text>
-        <Button
-          size="sm"
-          variant="link"
-          colorScheme="blue"
-          aria-expanded={open}
-          onClick={() => setOpen((now) => !now)}
-        >
-          {criteriaLine(value, t, stateName)}
-        </Button>
+        <Wrap spacing={4}>
+          {CRITERIA_STATES.map((state) => (
+            <Checkbox
+              key={state}
+              isChecked={criteria.states.includes(state)}
+              onChange={(e) =>
+                save({
+                  states: e.target.checked
+                    ? [...criteria.states, state]
+                    : criteria.states.filter((one) => one !== state),
+                })
+              }
+            >
+              {stateName(state)}
+            </Checkbox>
+          ))}
+        </Wrap>
+      </Box>
+      <Flex gap={4} wrap="wrap">
+        <NumberField
+          label={t('Trust above')}
+          value={criteria.trustAbove}
+          min={0}
+          optional
+          placeholder={t('Any', {nsSeparator: '!!'})}
+          onSave={(trustAbove) => save({trustAbove})}
+        />
+        <NumberField
+          label={t('epochs of age at least')}
+          value={criteria.minAge}
+          min={0}
+          optional
+          placeholder={t('Any', {nsSeparator: '!!'})}
+          onSave={(minAge) => save({minAge})}
+        />
+        <NumberField
+          label={t('iDNA of stake at least')}
+          value={criteria.minStake}
+          min={0}
+          whole={false}
+          optional
+          placeholder={t('Any', {nsSeparator: '!!'})}
+          onSave={(minStake) => save({minStake})}
+        />
       </Flex>
-      {open && (
-        <Stack
-          spacing={3}
-          pl={3}
-          borderLeftWidth={2}
-          borderColor="gray.100"
-          maxW="xl"
-        >
-          <Box>
-            <Text fontSize="sm" color="muted" mb={1}>
-              {t('Identity states (none picked: any)', {nsSeparator: '!!'})}
-            </Text>
-            <Wrap spacing={4}>
-              {CRITERIA_STATES.map((state) => (
-                <Checkbox
-                  key={state}
-                  isChecked={criteria.states.includes(state)}
-                  onChange={(e) =>
-                    save({
-                      states: e.target.checked
-                        ? [...criteria.states, state]
-                        : criteria.states.filter((one) => one !== state),
-                    })
-                  }
-                >
-                  {stateName(state)}
-                </Checkbox>
-              ))}
-            </Wrap>
-          </Box>
-          <Flex gap={4} wrap="wrap">
-            <NumberField
-              label={t('Trust above')}
-              value={criteria.trustAbove}
-              min={0}
-              optional
-              placeholder={t('Any', {nsSeparator: '!!'})}
-              onSave={(trustAbove) => save({trustAbove})}
-            />
-            <NumberField
-              label={t('epochs of age at least')}
-              value={criteria.minAge}
-              min={0}
-              optional
-              placeholder={t('Any', {nsSeparator: '!!'})}
-              onSave={(minAge) => save({minAge})}
-            />
-            <NumberField
-              label={t('iDNA of stake at least')}
-              value={criteria.minStake}
-              min={0}
-              whole={false}
-              optional
-              placeholder={t('Any', {nsSeparator: '!!'})}
-              onSave={(minStake) => save({minStake})}
-            />
-          </Flex>
+      <Checkbox
+        isChecked={criteria.named === true}
+        onChange={(e) => save({named: e.target.checked})}
+      >
+        {t('Only authors with a profile name')}
+      </Checkbox>
+      <ListField
+        label={t('Only these identities (addresses; none: everyone)', {
+          nsSeparator: '!!',
+        })}
+        value={criteria.only}
+        parse={addressList}
+        join={joinLines}
+        placeholder="0x…"
+        addresses
+        onSave={(only) => save({only})}
+      />
+      <ListField
+        label={t('All but these identities (addresses)')}
+        value={criteria.except}
+        parse={addressList}
+        join={joinLines}
+        placeholder="0x…"
+        addresses
+        onSave={(except) => save({except})}
+      />
+      {withTopics && (
+        <ListField
+          label={t('Only posts in these topics (commas)')}
+          value={criteria.topics || []}
+          parse={topicList}
+          join={joinWords}
+          placeholder="flips, validation"
+          onSave={(topics) => save({topics})}
+        />
+      )}
+      {withWords && (
+        <>
           <ListField
-            label={t('Only these identities (addresses; none: everyone)', {
-              nsSeparator: '!!',
-            })}
-            value={criteria.only}
-            parse={addressList}
-            join={joinLines}
-            placeholder="0x…"
-            addresses
-            onSave={(only) => save({only})}
+            label={t('Its text holds one of these words (commas)')}
+            value={criteria.mustWords}
+            parse={wordList}
+            join={joinWords}
+            onSave={(mustWords) => save({mustWords})}
           />
           <ListField
-            label={t('All but these identities (addresses)')}
-            value={criteria.except}
-            parse={addressList}
-            join={joinLines}
-            placeholder="0x…"
-            addresses
-            onSave={(except) => save({except})}
+            label={t('Its text holds none of these words (commas)')}
+            value={criteria.notWords}
+            parse={wordList}
+            join={joinWords}
+            onSave={(notWords) => save({notWords})}
           />
-          {withWords && (
-            <>
-              <ListField
-                label={t('Its text holds one of these words (commas)')}
-                value={criteria.mustWords}
-                parse={wordList}
-                join={joinWords}
-                onSave={(mustWords) => save({mustWords})}
-              />
-              <ListField
-                label={t('Its text holds none of these words (commas)')}
-                value={criteria.notWords}
-                parse={wordList}
-                join={joinWords}
-                onSave={(notWords) => save({notWords})}
-              />
-            </>
-          )}
-        </Stack>
+        </>
       )}
     </Stack>
   )

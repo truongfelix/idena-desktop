@@ -28,6 +28,25 @@ const MAX_WORDS = 50
 // As Social's hidden words (renderer hiding.js MAX_HIDDEN_WORD): a longer one would be cut there and never match.
 const MAX_WORD_LENGTH = 60
 const ADDRESS = /^0x[0-9a-f]{40}$/u
+// A topic's name, as Social takes it (renderer/screens/social/contract.js TOPIC_NAME).
+const TOPIC = /^[a-z0-9_]{3,21}$/u
+const MAX_TOPICS = 50
+/** How often an action may be done for one author (B-281): once a day or once a week. */
+const PER_AUTHOR = ['day', 'week']
+
+const topics = (value) =>
+  [
+    ...new Set(
+      (Array.isArray(value) ? value : [])
+        .map((one) =>
+          String(one || '')
+            .trim()
+            .toLowerCase()
+            .replace(/^r\//u, '')
+        )
+        .filter((one) => TOPIC.test(one))
+    ),
+  ].slice(0, MAX_TOPICS)
 
 const addresses = (value) =>
   [
@@ -67,7 +86,9 @@ function atLeast(value, whole) {
 
 /**
  * The criteria as saved, each field checked; null when none is set (the action reads or acts as without criteria).
- * `withWords`: the words the text must or must not hold (reads only).
+ * `withWords`: the words the text must or must not hold (reads only). B-281: `named` (only authors with a claimed
+ * profile name) and, with the words, `topics` (only posts in these topics); each is kept only when set, so criteria
+ * saved before read the same.
  */
 function normalizeCriteria(value, {withWords = false} = {}) {
   if (!value || typeof value !== 'object') return null
@@ -83,6 +104,10 @@ function normalizeCriteria(value, {withWords = false} = {}) {
     ...(withWords
       ? {mustWords: words(value.mustWords), notWords: words(value.notWords)}
       : {}),
+    ...(value.named === true ? {named: true} : {}),
+    ...(withWords && topics(value.topics).length
+      ? {topics: topics(value.topics)}
+      : {}),
   }
   const set =
     criteria.only.length ||
@@ -91,6 +116,8 @@ function normalizeCriteria(value, {withWords = false} = {}) {
     criteria.trustAbove !== null ||
     criteria.minAge !== null ||
     criteria.minStake !== null ||
+    criteria.named ||
+    criteria.topics ||
     (withWords && (criteria.mustWords.length || criteria.notWords.length))
   return set ? criteria : null
 }
@@ -103,13 +130,22 @@ function criteriaField(name, row) {
   }
   if (ONLY_TO_ACTIONS.includes(name)) {
     const onlyTo = normalizeCriteria(row.onlyTo)
-    return onlyTo ? {onlyTo} : {}
+    return {
+      ...(onlyTo ? {onlyTo} : {}),
+      // Once per author a day or a week (B-281), kept only when set.
+      ...(PER_AUTHOR.includes(row.perAuthor) ? {perAuthor: row.perAuthor} : {}),
+      // A private message only to who wrote to it first (B-281).
+      ...(name === 'message' && row.onlyAnswers === true
+        ? {onlyAnswers: true}
+        : {}),
+    }
   }
   return {}
 }
 
 module.exports = {
   ONLY_TO_ACTIONS,
+  PER_AUTHOR,
   STATES,
   WHO_ACTIONS,
   criteriaField,

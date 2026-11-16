@@ -1,4 +1,4 @@
-import {LIKE} from '../../social/contract'
+import {LIKE, topicOf} from '../../social/contract'
 import {postTargets} from '../../social/feed'
 import {shortAddress} from '../../social/people'
 import {validTipAmount} from '../../social/calls'
@@ -70,10 +70,19 @@ const DAY_S = 24 * 60 * 60
  * conversation, others} or {kind: 'person', others}), whether there is anything new, and the block it read up to.
  * The posts that tag it (B-264, `reads.tags`): at most `tagsLeft` (its questions left today), oldest first; those
  * past it are passed over for good (`tagsPassed`), never shown to a later run; `tagsShown` counts those it reads.
+ * The new posts (B-281): at most `reads.posts.perRun` a run with the window of a day, and `postsLeft` (its posts left
+ * today); `postsShown` counts those it reads.
  */
 export function socialDigest(
   social,
-  {reads, who = {}, facts = {}, collect = null, tagsLeft = Infinity},
+  {
+    reads,
+    who = {},
+    facts = {},
+    collect = null,
+    tagsLeft = Infinity,
+    postsLeft = Infinity,
+  },
   {point, scanned, now = Date.now()}
 ) {
   const {feed = [], me, names = {}, conversations = [], blocked} = social
@@ -81,7 +90,8 @@ export function socialDigest(
   // (criteria.js readAuthors). `collect` (a Set): the authors of what is new go in it, nothing is left out (the run
   // reads them first).
   const isBlocked = (address) => Boolean(blocked && blocked.has(address))
-  const readsFrom = (kind, address, text = null) => {
+  // `topic`: a new post's topic (null for none), for the posts' topics (B-281); a claimed name is a fact too.
+  const readsFrom = (kind, address, text = null, topic = undefined) => {
     if (collect) {
       collect.add(String(address).toLowerCase())
       return true
@@ -89,8 +99,9 @@ export function socialDigest(
     return passes(
       who[kind] || null,
       address,
-      facts[String(address).toLowerCase()],
-      text
+      {...facts[String(address).toLowerCase()], named: Boolean(names[address])},
+      text,
+      topic
     )
   }
   const from =
@@ -169,15 +180,20 @@ export function socialDigest(
         !isBlocked(call.author) &&
         isNew(call) &&
         !isTag({call}) &&
-        readsFrom('posts', call.author, call.message)
+        readsFrom('posts', call.author, call.message, topicOf(call.channel))
     )
     // The feed is newest first: the last day's posts, or the last N.
     fresh =
       window === 'day'
         ? fresh
             .filter(({call}) => call.time >= now / 1000 - DAY_S)
-            .slice(0, MAX_POSTS_DAY)
+            .slice(
+              0,
+              Math.min(MAX_POSTS_DAY, reads.posts.perRun || MAX_POSTS_DAY)
+            )
         : fresh.slice(0, reads.posts.count)
+    // Its posts left today (B-281): the newest stay, the others are passed over for good, as those past the window.
+    if (!collect) fresh = fresh.slice(0, Math.max(0, postsLeft))
     fresh.forEach((node) =>
       candidates.push({kind: 'post', height: node.call.height, node})
     )
@@ -395,6 +411,7 @@ export function socialDigest(
     empty,
     readTo: readUpTo(leftOut, lastHeight, from, scanned),
     tagsShown: counts.tag,
+    postsShown: counts.post,
     tagsPassed,
   }
 }

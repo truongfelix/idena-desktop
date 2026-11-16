@@ -172,11 +172,28 @@ function createAgent({
         : validationAgent(file)
     return agent ? agent.instructions : ''
   }
+  // Its own part for the validation's question, when it changed it (B-282), the same way.
+  const validationPartOf = (agentId) => {
+    if (!profiles) return null
+    const file = profiles.read()
+    const agent =
+      agentId !== undefined
+        ? file.agents.find((one) => one.id === agentId)
+        : validationAgent(file)
+    return (agent && agent.appParts && agent.appParts.validation) || null
+  }
 
   /** One flip to the model, the answer read. Throws the provider's error. */
-  const askFlip = async (config, flip, timeoutMs, running, instructions) => {
+  const askFlip = async (
+    config,
+    flip,
+    timeoutMs,
+    running,
+    instructions,
+    part = null
+  ) => {
     const checked = checkFlip(flip)
-    const {system, parts} = flipQuestion(checked, instructions)
+    const {system, parts} = flipQuestion(checked, instructions, part)
     const controller = new AbortController()
     running.add(controller)
     try {
@@ -204,6 +221,7 @@ function createAgent({
         id: undefined,
         config: settings.read(),
         instructions: instructionsOf(undefined),
+        part: validationPartOf(undefined),
       }
       return {answering: one, reporting: one}
     }
@@ -218,6 +236,7 @@ function createAgent({
           effort: agent.effort,
         },
         instructions: agent.instructions,
+        part: (agent.appParts && agent.appParts.validation) || null,
       }
     const answerer = validationAgent(file)
     const reporter = reportAgent(file)
@@ -281,11 +300,19 @@ function createAgent({
             flip,
             timeoutMs,
             solving,
-            answering.instructions
+            answering.instructions,
+            answering.part
           )
         : Promise.resolve(null),
       asksReport
-        ? askFlip(asker.config, flip, timeoutMs, solving, asker.instructions)
+        ? askFlip(
+            asker.config,
+            flip,
+            timeoutMs,
+            solving,
+            asker.instructions,
+            asker.part
+          )
         : Promise.resolve(null),
     ])
     const answer = answered.status === 'fulfilled' ? answered.value : null
@@ -486,7 +513,11 @@ function createAgent({
       try {
         const answer = await ask(
           connection(agent),
-          socialSystem(held, agent.instructions),
+          socialSystem(
+            held,
+            agent.instructions,
+            (agent.appParts && agent.appParts.social) || null
+          ),
           [
             {
               type: 'text',
@@ -534,7 +565,10 @@ function createAgent({
         throw new Error(`the agent may not do it (${check.reason})`)
       }
       const question = storyQuestion({words, idea, parts, notThese})
-      const system = storySystem(agent.instructions)
+      const system = storySystem(
+        agent.instructions,
+        (agent.appParts && agent.appParts.flipStory) || null
+      )
       const controller = new AbortController()
       writing.add(controller)
       try {
@@ -671,7 +705,8 @@ function createAgent({
           flip,
           timeoutMs,
           writing,
-          agent.instructions
+          agent.instructions,
+          (agent.appParts && agent.appParts.validation) || null
         )
       } catch (error) {
         log({
@@ -699,7 +734,8 @@ function createAgent({
           flip,
           timeoutMs,
           testing,
-          instructionsOf(agentId)
+          instructionsOf(agentId),
+          validationPartOf(agentId)
         )
         log({
           agentId: logged,

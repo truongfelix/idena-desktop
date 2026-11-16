@@ -1,56 +1,54 @@
 /* eslint-disable react/prop-types */
 import * as React from 'react'
-import {
-  Button,
-  ButtonGroup,
-  Flex,
-  Heading,
-  Stack,
-  Text,
-  Wrap,
-} from '@chakra-ui/react'
+import {Box, Button, Flex, Grid, Heading, Stack, Text} from '@chakra-ui/react'
 import {useTranslation} from 'react-i18next'
 import {HDivider} from '../../shared/components/components'
-import {SecondaryButton} from '../../shared/components/button'
 import {InfoTip} from '../../shared/components/info-tip'
-import {ActionInfo, useAppTexts} from './app-texts'
+import {useAppTexts} from './app-texts'
 import {SettingsSection} from '../settings/components'
 import {
   AREAS,
-  LEVELS,
+  SINGLE_HOLDER,
   areaNames,
   heldBy,
   levelLabel,
   spendingActions,
 } from './catalog'
-import {LimitFields, NumberField} from './limit-fields'
+import {NumberField} from './limit-fields'
 import {drawsPictures} from './flip-story'
-import {CriteriaFields} from './criteria-fields'
-import {ReadRow} from './read-row'
+import {READ_COLS, ReadRow} from './read-row'
+import {DO_COLS, DoRow} from './do-row'
 import {nothingToActOn} from './page-sections'
-
-// The actions on others: only to whom the person's criteria pick (B-266).
-export const ONLY_TO = ['reply', 'like', 'message', 'tip']
+import {FlipStarts} from './flip-starts'
+import {areaCount, firstArea, isOn, rowOf, withLevels, withRow} from './rights'
 
 /**
- * "What it may do": the agent's actions by area (Q-64), each Off, Ask me or Alone with its limit a day, and the
- * catalog to add them from; the list of actions to add stays open, so several are added in a row. An action one
- * other agent holds (the validation's answers) cannot be added.
+ * "What it may do": the agent's rights as one table per area of the app (Q-64, B-280). Every right of an area is a
+ * row, Off until given: what it reads (on or off, whose, how many) and what it does (Off, Ask me or Alone, its limit
+ * a day, on what). An action one other agent holds (the validation's answers) cannot be given.
  */
 export function ActionsSection({agent, agents, catalog, onChange}) {
   const {t} = useTranslation()
   const texts = useAppTexts(
-    ['post', 'reply', 'like', 'message', 'tip'].filter(
-      (id) => agent.actions[id] && agent.actions[id].level !== 'off'
-    )
+    ['post', 'reply', 'like', 'message', 'tip'].filter((id) => isOn(agent, id))
   )
-  const [isAdding, setIsAdding] = React.useState(false)
+  const [area, setArea] = React.useState(() => firstArea(agent, catalog, AREAS))
   const names = areaNames(t)
-  const rows = catalog.filter(({id}) => agent.actions[id])
-  const addable = catalog.filter(({id}) => !agent.actions[id])
+  const held = catalog.filter(({id}) => isOn(agent, id))
+  const inArea = catalog.filter((entry) => entry.area === area)
+  const reads = inArea.filter(({kind}) => kind === 'read')
+  const does = inArea.filter(({kind}) => kind !== 'read')
+  // What the area's actions need, for an area whose reads are not rights of their own.
+  const needs = [
+    ...new Set(
+      does.filter(({id}) => isOn(agent, id)).flatMap((entry) => entry.reads)
+    ),
+  ]
 
   const setActions = (change) =>
     onChange((a) => ({...a, actions: change(a.actions)}))
+  const changeRow = (entry) => (patch) =>
+    setActions((actions) => withRow(actions, entry, patch))
 
   return (
     <SettingsSection
@@ -61,65 +59,47 @@ export function ActionsSection({agent, agents, catalog, onChange}) {
         {nsSeparator: '!!'}
       )}
       summary={
-        rows.length
-          ? rows
-              .map(({id, label, kind}) => {
-                const {level} = agent.actions[id]
+        held.length
+          ? held
+              .map(({id, label, kind}) =>
                 // A read is on or off (B-262).
-                if (kind === 'read')
-                  return `${label}: ${level === 'off' ? t('Off') : t('On')}`
-                return `${label}: ${levelLabel(level, t)}`
-              })
+                kind === 'read'
+                  ? label
+                  : `${label}: ${levelLabel(agent.actions[id].level, t)}`
+              )
               .join(', ')
           : t('Nothing', {nsSeparator: '!!'})
       }
     >
-      <Stack spacing={4}>
-        <Flex>
-          <SecondaryButton
-            aria-expanded={isAdding}
-            isDisabled={!isAdding && addable.length === 0}
-            onClick={() => setIsAdding(!isAdding)}
-          >
-            {isAdding ? t('Done') : t('Add actions')}
-          </SecondaryButton>
+      <Stack spacing={5}>
+        <Flex role="tablist" aria-label={t('Areas')} gap={2} wrap="wrap">
+          {AREAS.map((one) => {
+            const isPicked = one === area
+            return (
+              <Button
+                key={one}
+                role="tab"
+                aria-selected={isPicked}
+                size="sm"
+                variant={isPicked ? 'solid' : 'outline'}
+                colorScheme={isPicked ? 'blue' : 'gray'}
+                onClick={() => setArea(one)}
+              >
+                {names[one]}
+                <Text as="span" fontWeight={400} ml={2}>
+                  {t('{{on}} of {{of}}', areaCount(agent, catalog, one))}
+                </Text>
+              </Button>
+            )
+          })}
         </Flex>
-        {isAdding && (
-          <Stack borderWidth={1} borderRadius="md" p={4} spacing={3}>
-            {addable.length === 0 && (
-              <Text color="muted">{t('Every action is in its list.')}</Text>
-            )}
-            {AREAS.map((area) => {
-              const inArea = addable.filter((row) => row.area === area)
-              if (!inArea.length) return null
-              return (
-                <Stack key={area} spacing={2}>
-                  <Text fontWeight={500}>{names[area]}</Text>
-                  <Wrap spacing={2}>
-                    {inArea.map(({id, label, defaults}) => {
-                      const holder = heldBy(id, agent, agents)
-                      return (
-                        <Button
-                          key={id}
-                          variant="outline"
-                          isDisabled={Boolean(holder)}
-                          title={holder ? heldText(id, holder, t) : undefined}
-                          onClick={() =>
-                            setActions((actions) => ({
-                              ...actions,
-                              [id]: defaults || {level: 'off'},
-                            }))
-                          }
-                        >
-                          {`+ ${label}`}
-                        </Button>
-                      )
-                    })}
-                  </Wrap>
-                </Stack>
-              )
-            })}
-          </Stack>
+        {area === 'flips' && (
+          <FlipStarts
+            catalog={catalog}
+            onPick={(levels) =>
+              setActions((actions) => withLevels(actions, catalog, levels))
+            }
+          />
         )}
         {nothingToActOn(agent) && (
           <Text color="orange.500">
@@ -129,59 +109,106 @@ export function ActionsSection({agent, agents, catalog, onChange}) {
             )}
           </Text>
         )}
-        {rows.length === 0 ? (
-          <Text color="muted">
-            {t('No action yet: it can do nothing.', {nsSeparator: '!!'})}
-          </Text>
-        ) : (
-          AREAS.map((area) => {
-            const inArea = rows.filter((row) => row.area === area)
-            if (!inArea.length) return null
-            return (
-              <Stack key={area} spacing={0}>
-                <Heading as="h3" fontSize="md" fontWeight={500} mb={1}>
-                  {names[area]}
-                </Heading>
-                {inArea.map(({id, label, info, perDay, kind}) =>
-                  kind === 'read' ? (
+        <Box overflowX="auto">
+          <Stack spacing={6} minW="640px" role="tabpanel">
+            <Box>
+              <Heading as="h3" fontSize="md" fontWeight={500} mb={2}>
+                {t('It reads')}
+              </Heading>
+              {reads.length > 0 ? (
+                <Grid
+                  templateColumns={READ_COLS}
+                  columnGap={4}
+                  alignItems="start"
+                >
+                  <ColumnNames
+                    names={[
+                      t('Read'),
+                      t('What'),
+                      t('Only these'),
+                      t('How many'),
+                    ]}
+                  />
+                  {reads.map((entry) => (
                     <ReadRow
-                      key={id}
-                      id={id}
-                      label={label}
-                      info={info}
-                      row={agent.actions[id]}
-                      setActions={setActions}
+                      key={entry.id}
+                      entry={entry}
+                      row={rowOf(agent, entry)}
+                      change={changeRow(entry)}
                     />
-                  ) : (
-                    <ActionRow
-                      key={id}
-                      id={id}
-                      label={label}
-                      info={info}
-                      sent={texts && texts.sent[id]}
-                      perDay={perDay}
+                  ))}
+                </Grid>
+              ) : (
+                <Text color="muted">
+                  {needs.length > 0 && needs.join(' · ')}
+                  {needs.length === 0 &&
+                    (does.some(({id}) => isOn(agent, id))
+                      ? t('Nothing', {nsSeparator: '!!'})
+                      : t('Nothing, while its actions here are Off.'))}
+                </Text>
+              )}
+            </Box>
+            <Box>
+              <Heading as="h3" fontSize="md" fontWeight={500} mb={2}>
+                {t('It does')}
+              </Heading>
+              <Grid templateColumns={DO_COLS} columnGap={4} alignItems="start">
+                <ColumnNames
+                  names={[
+                    t('What'),
+                    t('Who decides'),
+                    t('Limit'),
+                    t('Only on'),
+                  ]}
+                />
+                {does.map((entry) => {
+                  const holder = heldBy(entry.id, agent, agents)
+                  const saved = agent.actions[entry.id]
+                  return (
+                    <DoRow
+                      key={entry.id}
+                      entry={entry}
+                      row={rowOf(agent, entry)}
+                      sent={texts && texts.sent[entry.id]}
+                      holder={holder ? heldText(entry.id, holder, t) : null}
                       // Make the pictures needs a service that draws (B-258): the row says so.
                       note={
-                        id === 'flipPictures' && !drawsPictures(agent)
+                        entry.id === 'flipPictures' && !drawsPictures(agent)
                           ? t(
                               'Its service draws no pictures: choose an image model in its connection, on a service that has one.',
                               {nsSeparator: '!!'}
                             )
                           : null
                       }
-                      row={agent.actions[id]}
-                      setActions={setActions}
+                      change={changeRow(entry)}
+                      // Kept Off by an older file: no other agent can be given it until it is taken out.
+                      onFree={
+                        SINGLE_HOLDER.includes(entry.id) &&
+                        saved &&
+                        saved.level === 'off'
+                          ? () => changeRow(entry)({level: 'off'})
+                          : null
+                      }
                     />
                   )
-                )}
-              </Stack>
-            )
-          })
-        )}
+                })}
+              </Grid>
+            </Box>
+          </Stack>
+        </Box>
         <OverallLimit agent={agent} catalog={catalog} onChange={onChange} />
       </Stack>
     </SettingsSection>
   )
+}
+
+/** The names of a table's columns, the first cells of its grid. */
+function ColumnNames({names}) {
+  return names.map((name) => (
+    <Text key={name} fontSize="sm" color="muted" pb={2}>
+      {name}
+    </Text>
+  ))
 }
 
 /**
@@ -221,89 +248,4 @@ function heldText(id, name, t) {
   return id === 'report'
     ? t('{{name}} already reports in the validation', {name})
     : t('{{name}} already answers the validation', {name})
-}
-
-function ActionRow({id, label, info, sent, perDay, note, row, setActions}) {
-  const {t} = useTranslation()
-  return (
-    <>
-      <HDivider />
-      <Flex py={3} gap={4} align="center" justify="space-between" wrap="wrap">
-        <Stack spacing={2} flex="1 1 260px" minW={0}>
-          <Flex align="center" gap={2}>
-            <Text fontWeight={500}>{label}</Text>
-            <InfoTip label={label}>
-              <ActionInfo info={info} sent={sent} />
-            </InfoTip>
-          </Flex>
-          {note && (
-            <Text fontSize="sm" color="muted">
-              {note}
-            </Text>
-          )}
-          {perDay && (
-            <LimitFields
-              kind={perDay}
-              row={row}
-              onChange={(change) =>
-                setActions((actions) => ({
-                  ...actions,
-                  [id]: {...actions[id], ...change},
-                }))
-              }
-            />
-          )}
-          {ONLY_TO.includes(id) && row.level !== 'off' && (
-            <CriteriaFields
-              title={t('Only to')}
-              value={row.onlyTo || null}
-              onChange={(onlyTo) =>
-                setActions((actions) => ({
-                  ...actions,
-                  [id]: {...actions[id], onlyTo},
-                }))
-              }
-            />
-          )}
-        </Stack>
-        <ButtonGroup isAttached size="sm" role="radiogroup" aria-label={label}>
-          {LEVELS.map((level) => {
-            const isOn = row.level === level
-            return (
-              <Button
-                key={level}
-                role="radio"
-                aria-checked={isOn}
-                variant={isOn ? 'solid' : 'outline'}
-                colorScheme={isOn ? 'blue' : 'gray'}
-                onClick={() =>
-                  !isOn &&
-                  setActions((actions) => ({
-                    ...actions,
-                    [id]: {...actions[id], level},
-                  }))
-                }
-              >
-                {levelLabel(level, t)}
-              </Button>
-            )
-          })}
-        </ButtonGroup>
-        <Button
-          size="sm"
-          variant="link"
-          aria-label={t('Remove {{action}}', {action: label})}
-          onClick={() =>
-            setActions((actions) => {
-              const next = {...actions}
-              delete next[id]
-              return next
-            })
-          }
-        >
-          {t('Remove')}
-        </Button>
-      </Flex>
-    </>
-  )
 }

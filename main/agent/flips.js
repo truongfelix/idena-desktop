@@ -3,6 +3,8 @@
 // shows its two keywords, and why it should be reported: one or more of the nine report reasons of the validation
 // screen, each with the model's confidence; a flip is reported when one reason reaches that reason's threshold.
 
+const {fillPart} = require('./app-parts')
+
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024
 /** A rule break the model is this sure of, even below its threshold, keeps a flip from being marked best. */
 const DOUBT = 0.5
@@ -73,8 +75,12 @@ const FLIP_SUGGESTION = [
   'rule.',
 ].join('\n')
 
-/** The question's text: what the answer means, the agent's Instructions when it has some, then the format. */
-function flipSystem(instructions = '') {
+/**
+ * The question's text: what the answer means, the agent's Instructions when it has some, then the format. `custom`:
+ * the agent's own part for the validation's question (B-282, app-parts.js), sent in place of it.
+ */
+function flipSystem(instructions = '', custom = null) {
+  if (custom) return fillPart(custom, {instructions})
   const own = typeof instructions === 'string' ? instructions.trim() : ''
   return own
     ? [
@@ -137,7 +143,11 @@ function checkFlip(flip) {
 }
 
 /** The question: its text (flipSystem), its parts: the keywords, then the left story's four pictures, then the right one's. */
-function flipQuestion({images, orders, words}, instructions = '') {
+function flipQuestion(
+  {images, orders, words},
+  instructions = '',
+  custom = null
+) {
   const parts = []
   const keywords = words.length
     ? `Keywords: ${words
@@ -150,7 +160,7 @@ function flipQuestion({images, orders, words}, instructions = '') {
     orders[s].forEach((i) => parts.push({type: 'image', ...images[i]}))
   })
   parts.push({type: 'text', text: 'Your JSON answer:'})
-  return {system: flipSystem(instructions), parts}
+  return {system: flipSystem(instructions, custom), parts}
 }
 
 /** A reply longer than this is cut before it is read: an answer is a few lines. */

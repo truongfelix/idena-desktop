@@ -33,6 +33,7 @@ import {ModelSection} from '../settings/agent/model-section'
 import {ReportRulesSection} from '../settings/agent/report-rules-section'
 import {ActivitySection} from '../settings/agent/activity-section'
 import {ActionsSection} from './actions-section'
+import {AppPartSection} from './app-part-section'
 import {saveAgentFile} from './agent-file'
 import {AgentBadge} from './agents-list'
 import {actionCatalog} from './catalog'
@@ -206,7 +207,10 @@ export function AgentPage({id}) {
         )}
       />
       <InstructionsSection agent={agent} onChange={save} />
+      <AppPartSection key={`part-${agent.id}`} agent={agent} onChange={save} />
       <ActionsSection
+        // Another agent's page opens on its own area, its editors closed.
+        key={agent.id}
         agent={agent}
         agents={list.agents}
         catalog={catalog}
