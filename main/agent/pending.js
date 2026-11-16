@@ -403,8 +403,10 @@ function createPending({
         const counted = isDaily(action) ? doneToday(agentId, action) : 0
         const check = decide(agentId, action, {usage: counted})
         // Asking, but To approve has no room left for it: propose would refuse it after the work was paid for.
+        // Past its limit stays the reason: a run skips it, nothing would go to To approve.
         if (
           check.decision === 'ask' &&
+          !OVER_LIMIT.includes(check.reason) &&
           (items.length >= MAX_PENDING ||
             items.filter((one) => one.agentId === agentId).length >=
               MAX_PENDING_PER_AGENT)

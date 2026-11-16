@@ -5,6 +5,8 @@ import {SecondaryButton} from '../../shared/components/button'
 import {useSuccessToast} from '../../shared/hooks/use-toast'
 import {useSocial} from '../social/provider'
 import {agentErrorText} from '../settings/agent/api'
+import {useIdentityState} from '../../shared/providers/identity-context'
+import {useEpochState} from '../../shared/providers/epoch-context'
 import {
   flipsReady,
   isFlipsAgent,
@@ -61,11 +63,15 @@ export function RunNow({agent, paused, onDone}) {
   const social = useSocial()
   const toast = useSuccessToast()
   const [isRunning, setIsRunning] = React.useState(false)
+  // Read here, so that the button is enabled as soon as they come.
+  const identity = useIdentityState()
+  const epoch = useEpochState()
   if (!isSocialAgent(agent) && !isFlipsAgent(agent)) return null
   // One on Social waits for the scan; one in the Flips area for the identity and the epoch (B-258).
   let waits = null
   if (isSocialAgent(agent) && !socialReady(social)) waits = 'social'
-  else if (isFlipsAgent(agent) && !flipsReady()) waits = 'flips'
+  else if (isFlipsAgent(agent) && !flipsReady({identity, epoch}))
+    waits = 'flips'
   return (
     <SecondaryButton
       isLoading={isRunning}

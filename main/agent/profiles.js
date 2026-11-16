@@ -294,6 +294,8 @@ function withFlipPictures(value, actions) {
   const saved = value.actions && value.actions.flipStory
   if (!story || actions.flipPictures || !text(value.imageModel, 200, ''))
     return actions
+  // 0: this build wrote it for a Make the pictures removed or Off (a round trip through an older build): it stays so.
+  if (saved && saved.picturesPerDay === 0) return actions
   const perDay =
     saved && 'picturesPerDay' in saved
       ? normalizeLimit(saved.picturesPerDay, null)

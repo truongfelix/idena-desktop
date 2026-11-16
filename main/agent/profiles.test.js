@@ -566,6 +566,10 @@ describe('agent profiles', () => {
         },
       }
       expect(normalizeAgent(off).actions.flipStory.picturesPerDay).toBe(0)
+      // A round trip through an older build (it drops the mark and Make the pictures): it stays removed.
+      const {flipSteps, ...roundTrip} = normalizeAgent(removed)
+      expect(flipSteps).toBe(true)
+      expect(normalizeAgent(roundTrip).actions.flipPictures).toBeUndefined()
     })
 
     test('the file is written whole: nothing left beside it', () => {

@@ -72,7 +72,11 @@ async function act(
 ) {
   const day = new Date(deps.now()).toDateString()
   const failure = `${agent.id}:${step}:${key}`
-  if (failedToday.get(failure) === day) return 'next'
+  // Held (its billed work failed today): counted, so a run does not read as having found nothing.
+  if (failedToday.get(failure) === day) {
+    count.skipped += 1
+    return 'next'
+  }
   const may = await deps.call('mayDo', {agentId: agent.id, action: step})
   if (may.decision === 'off') return 'stop'
   if (may.decision === 'ask' && OVER_LIMIT.includes(may.reason)) {
@@ -157,8 +161,8 @@ async function act(
       detail: [detail, done].filter(Boolean).join(' · '),
     })
   } catch (error) {
+    // Not remembered: what failed here is the app's part (a node briefly away), tried again at the next run.
     count.failed += 1
-    failedToday.set(failure, day)
     // Never done (refused before it reached the chain): its count is given back to the day.
     await deps.call('didAction', {
       agentId: agent.id,
@@ -350,8 +354,15 @@ const STEPS = {
             agentId: agent.id,
             flip: question,
           })
-          // An answer it could not read (cut short, in prose) is no verdict: a failed flip would be deleted.
-          if (!answer || !answer.answer)
+          // An answer it could not read (cut short, in prose) carries nothing: no verdict, or a failed flip would be
+          // deleted. One that picks no side but reports the flip, or marks its keywords, is a verdict.
+          if (
+            !answer ||
+            (!answer.answer &&
+              !answer.relevance &&
+              !answer.report &&
+              !(answer.reasons && answer.reasons.length))
+          )
             throw new Error('the answer could not be read')
           return verdictOf(answer, {
             storySide,
@@ -385,6 +396,7 @@ const STEPS = {
       // eslint-disable-next-line no-await-in-loop
       const next = await act(agent, 'flipSubmit', deps, count, {
         key: flip.id,
+        fresh: () => sameDraft(deps.store.getFlip(flip.id), flip),
         propose: () => ({
           detail: keywordsLine(flip),
           target: {flipId: flip.id},
@@ -411,6 +423,8 @@ const STEPS = {
       // eslint-disable-next-line no-await-in-loop
       const next = await act(agent, 'flipDelete', deps, count, {
         key: flip.id,
+        // Reworked since the judge failed it: not deleted.
+        fresh: () => sameDraft(deps.store.getFlip(flip.id), flip),
         propose: () => ({
           body: deps.verdictText(flip.agentVerdict),
           detail: keywordsLine(flip),
@@ -443,6 +457,9 @@ export async function runFlipsAgent(agent, ctx, deps) {
   const held = heldFlipSteps(agent)
   if (!held.length) return {result: 'off', detail: ''}
   await settleOrphans(deps)
+  // The failures of earlier days are forgotten.
+  const today = new Date(deps.now()).toDateString()
+  failedToday.forEach((day, key) => day !== today && failedToday.delete(key))
   const count = {alone: 0, ask: 0, skipped: 0, failed: 0}
   // eslint-disable-next-line no-restricted-syntax
   // eslint-disable-next-line no-await-in-loop

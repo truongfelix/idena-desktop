@@ -373,4 +373,72 @@ describe('a Flips run', () => {
       ],
     ])
   })
+
+  test('a reply that picks no side but reports the flip is a failing verdict: the draft is deleted', async () => {
+    const {agent, deps, store} = setup({
+      levels: {flipJudge: 'alone', flipDelete: 'alone'},
+      flips: [ready()],
+      answer: () => ({
+        answer: null,
+        relevance: 'irrelevant',
+        report: true,
+        reasons: [{reason: 4, confidence: 0.9}],
+      }),
+      agentId: 'reports',
+    })
+    await runFlipsAgent(agent, {identity, epoch}, deps)
+    expect(store.getFlip('agents').agentVerdict).toMatchObject({
+      pass: false,
+      reported: true,
+    })
+    expect(store.getFlip('agents').type).toBe('Removed')
+  })
+
+  test('a submit that failed (the node away) is tried again at the next run', async () => {
+    const passed = ready({
+      id: 'ok',
+      agentFlip: {by: 'a2', stage: 'drafted', waiting: null, declined: {}},
+    })
+    passed.agentVerdict = {
+      contents: contentsKey(passed),
+      pass: true,
+      waiting: null,
+      declined: false,
+    }
+    const {agent, deps} = setup({
+      levels: {flipSubmit: 'alone'},
+      flips: [passed],
+      agentId: 'retries',
+    })
+    deps.submit.mockRejectedValueOnce(new Error('the node did not answer'))
+    expect(
+      (await runFlipsAgent(agent, {identity, epoch}, deps)).count
+    ).toMatchObject({failed: 1})
+    await runFlipsAgent(agent, {identity, epoch}, deps)
+    expect(deps.submit).toHaveBeenCalledTimes(2)
+  })
+
+  test('a failed draft reworked meanwhile is not deleted alone', async () => {
+    const failed = ready({id: 'reworked'})
+    failed.agentVerdict = {
+      contents: contentsKey(failed),
+      pass: false,
+      waiting: null,
+      declined: false,
+    }
+    const {agent, deps, store} = setup({
+      levels: {flipDelete: 'alone'},
+      flips: [failed],
+      agentId: 'rework',
+    })
+    // The person moves a picture while the step asks whether it may.
+    const {call} = deps
+    deps.call = async (command, data) => {
+      if (command === 'mayDo')
+        store.updateDraft({id: 'reworked', order: [1, 2, 3, 0]})
+      return call(command, data)
+    }
+    await runFlipsAgent(agent, {identity, epoch}, deps)
+    expect(store.getFlip('reworked').type).toBe(FlipType.Draft)
+  })
 })

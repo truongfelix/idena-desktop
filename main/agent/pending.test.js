@@ -286,6 +286,15 @@ describe('To approve', () => {
       reason: 'too many actions waiting',
     })
     await expect(may('send')).resolves.toMatchObject({decision: 'off'})
+    // Full and past its limit: the limit is the reason (a run skips it).
+    agent = start([story('alone', 0)])
+    for (let i = 0; i < MAX_PENDING_PER_AGENT; i += 1)
+      // eslint-disable-next-line no-await-in-loop
+      await agent.handle('propose', proposal())
+    await expect(may()).resolves.toMatchObject({
+      decision: 'ask',
+      reason: 'above the limit',
+    })
   })
 
   test(`at most ${MAX_PENDING_PER_AGENT} actions of one agent wait: the others still can`, async () => {
