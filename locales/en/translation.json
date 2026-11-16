@@ -2164,5 +2164,5 @@
   "Its text holds one of these words (commas)": "Its text holds one of these words (commas)",
   "Its text holds none of these words (commas)": "Its text holds none of these words (commas)",
   "Whose": "Whose",
-  "Not an address, not kept: {{list}}": "Not an address, not kept: {{list}}"
+  "Not an address, nothing saved: {{list}}": "Not an address, nothing saved: {{list}}"
 }

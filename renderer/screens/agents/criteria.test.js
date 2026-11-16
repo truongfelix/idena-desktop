@@ -38,6 +38,10 @@ describe('an author and the criteria', () => {
     expect(passes(words, A, human, 'A flipper')).toBe(false)
     expect(passes(words, A, human, 'Idena, scampering')).toBe(true)
     expect(passes(words, A, human, null)).toBe(true)
+    // As Social hides words: accents ignored.
+    expect(passes({...none, notWords: ['cafe']}, A, human, 'Un Café ?')).toBe(
+      false
+    )
     expect(
       passes(
         {...none, states: ['Human'], trustAbove: 50, minStake: 1000},
@@ -58,10 +62,16 @@ describe("the authors' facts", () => {
   beforeEach(forgetAuthors)
 
   test('only what the criteria need is read, once, and kept a while', async () => {
+    // Vouched reads the authors' own states too: a vouched member has no identity of its own.
     expect(criteriaNeeds([null, {...none, states: ['Vouched']}])).toEqual({
-      identity: false,
+      identity: true,
       vouched: true,
       trust: false,
+    })
+    expect(criteriaNeeds([{...none, trustAbove: 1}])).toEqual({
+      identity: false,
+      vouched: false,
+      trust: true,
     })
     const settled = jest.fn(async (method, list) =>
       list.map(([address]) => ({

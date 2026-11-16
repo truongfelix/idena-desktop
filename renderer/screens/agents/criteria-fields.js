@@ -81,9 +81,9 @@ function ListField({
 }) {
   const {t} = useTranslation()
   const [draft, setDraft] = React.useState(join(value))
+  // The lines that are not addresses, found when the field is left.
+  const [wrong, setWrong] = React.useState([])
   React.useEffect(() => setDraft(join(value)), [value, join])
-  // What is not an address is not kept: said here, never dropped unseen.
-  const wrong = addresses ? parse(draft).filter((one) => !isAddress(one)) : []
   return (
     <Box>
       <Text fontSize="sm" color="muted" mb={1}>
@@ -97,15 +97,18 @@ function ListField({
         placeholder={placeholder}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={(e) => {
-          const next = parse(e.currentTarget.value).filter(
-            (one) => !addresses || isAddress(one)
-          )
+          const next = parse(e.currentTarget.value)
+          // A list with a line that is not an address is not saved: the text stays, said wrong, until fixed (a
+          // mistyped address must never empty "only these" into everyone).
+          const bad = addresses ? next.filter((one) => !isAddress(one)) : []
+          setWrong(bad)
+          if (bad.length) return
           if (join(next) !== join(value)) onSave(next)
         }}
       />
       {wrong.length > 0 && (
         <Text fontSize="sm" color="red.500" mt={1}>
-          {t('Not an address, not kept: {{list}}', {
+          {t('Not an address, nothing saved: {{list}}', {
             list: wrong.join(', '),
             nsSeparator: '!!',
           })}

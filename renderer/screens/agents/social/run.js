@@ -153,13 +153,19 @@ export async function runSocialAgent(agent, social, deps) {
   for (const planned of plan.actions) {
     const {action} = planned
     // Whom it acts on (B-266): a target outside the action's criteria is refused, whatever the model asked.
-    const whom =
-      planned.item && (planned.item.author || (planned.item.others || [])[0])
-    // A target it cannot know is refused too: the check never fails open.
+    // Every one it acts on: a post's author, or each person of a message. A target it cannot know is refused too:
+    // the check never fails open.
+    let whom = []
+    if (planned.item)
+      whom = planned.item.author
+        ? [planned.item.author]
+        : planned.item.others || []
     if (
       onlyTo[action] &&
-      (!whom ||
-        !passes(onlyTo[action], whom, facts[String(whom).toLowerCase()]))
+      (!whom.length ||
+        !whom.every((one) =>
+          passes(onlyTo[action], one, facts[String(one).toLowerCase()])
+        ))
     ) {
       count.skipped += 1
       // eslint-disable-next-line no-await-in-loop

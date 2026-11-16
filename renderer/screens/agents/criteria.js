@@ -1,10 +1,10 @@
 import {
-  identityStates,
   isValidated,
   isVouchable,
   readEntries,
   readTrust,
 } from '../social/profiles'
+import {wordFilter} from '../social/hiding'
 
 // Whose posts, answers and messages an agent reads, and whom it acts on (B-266): the criteria the person sets on a
 // read action (`who`) or an action on others (`onlyTo`), checked as saved in main/agent/criteria.js. Each author is
@@ -25,7 +25,11 @@ export function criteriaNeeds(list) {
   list.filter(Boolean).forEach((one) => {
     if (one.minAge !== null || one.minStake !== null) needs.identity = true
     if (one.states.some((state) => state !== 'Vouched')) needs.identity = true
-    if (one.states.includes('Vouched')) needs.vouched = true
+    // A vouched member is one without an identity of its own: its state is read too.
+    if (one.states.includes('Vouched')) {
+      needs.vouched = true
+      needs.identity = true
+    }
     if (one.trustAbove !== null) needs.trust = true
   })
   return needs
@@ -77,17 +81,32 @@ export async function readAuthors(
         settled,
         asked.map((a) => ['v:', a])
       )
-      const states = await identityStates(settled, [
-        ...asked,
-        ...vouchers.filter(Boolean),
-      ])
+      const voucherOf = asked.map((a, i) =>
+        vouchers[i] ? String(vouchers[i]).toLowerCase() : null
+      )
+      const asking = [...new Set(voucherOf.filter(Boolean))]
+      // Each voucher's state on its own: one failed read leaves out only the members it vouches for.
+      const answers = asking.length
+        ? await settled(
+            'dna_identity',
+            asking.map((v) => [v])
+          )
+        : []
+      const voucherState = {}
+      asking.forEach((v, i) => {
+        const result = answers[i] && answers[i].result
+        voucherState[v] = result ? result.state || 'Undefined' : null
+      })
       // A vouched member in standing, as the profiles count it: no identity of its own, its voucher validated.
       asked.forEach((a, i) => {
-        const voucher = vouchers[i] ? String(vouchers[i]).toLowerCase() : null
+        const voucher = voucherOf[i]
+        if (voucher === null) {
+          facts[a].vouched = false
+          return
+        }
+        if (!('state' in facts[a]) || voucherState[voucher] === null) return
         facts[a].vouched =
-          voucher !== null &&
-          isVouchable(states[a]) &&
-          isValidated(states[voucher])
+          isVouchable(facts[a].state) && isValidated(voucherState[voucher])
       })
     } catch {
       // Left out.
@@ -113,13 +132,16 @@ export async function readAuthors(
   return facts
 }
 
-const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')
-
-/** Whether `word` is in `text` as a whole word (not "art" in "party"): letters and digits around it end it. */
-const hasWord = (text, word) =>
-  new RegExp(`(^|[^\\p{L}\\p{N}])${escape(word)}($|[^\\p{L}\\p{N}])`, 'u').test(
-    text
-  )
+// The words as Social hides them (hiding.js): whole words, accents ignored; built once per criteria.
+const filters = new WeakMap()
+const filtersOf = (criteria) => {
+  if (!filters.has(criteria))
+    filters.set(criteria, {
+      must: wordFilter(criteria.mustWords || []),
+      not: wordFilter(criteria.notWords || []),
+    })
+  return filters.get(criteria)
+}
 
 /** Forgets the authors read (a test, or the node changed). */
 export const forgetAuthors = () => known.clear()
@@ -157,17 +179,8 @@ export function passes(criteria, address, facts = {}, text = null) {
   )
     return false
   if (text === null) return true
-  const lower = String(text).toLowerCase()
-  if (
-    criteria.mustWords &&
-    criteria.mustWords.length &&
-    !criteria.mustWords.some((word) => hasWord(lower, word))
-  )
-    return false
-  if (
-    criteria.notWords &&
-    criteria.notWords.some((word) => hasWord(lower, word))
-  )
-    return false
+  const {must, not} = filtersOf(criteria)
+  if (!must.isEmpty && !must.matches(String(text))) return false
+  if (!not.isEmpty && not.matches(String(text))) return false
   return true
 }

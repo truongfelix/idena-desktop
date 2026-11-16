@@ -2164,5 +2164,5 @@
   "Its text holds one of these words (commas)": "Son texte contient un de ces mots (virgules)",
   "Its text holds none of these words (commas)": "Son texte ne contient aucun de ces mots (virgules)",
   "Whose": "De qui",
-  "Not an address, not kept: {{list}}": "Pas une adresse, non gardée : {{list}}"
+  "Not an address, nothing saved: {{list}}": "Pas une adresse, rien n’est gardé : {{list}}"
 }
