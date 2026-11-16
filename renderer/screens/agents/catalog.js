@@ -8,7 +8,10 @@ export function areaNames(t) {
 }
 export const AREAS = ['flips', 'validation', 'social']
 
-/** The actions an agent can be given, in the catalog's order: `info` says what each is for. */
+/**
+ * The actions an agent can be given, in the catalog's order: `info` says what each is for, `scope` what it acts on
+ * or reads when that is fixed (the table's "Only" cell, B-280).
+ */
 export function actionCatalog(t) {
   return [
     // The Flips area's steps (B-258): each its own right; the agents hand a flip from one step to the next through
@@ -16,6 +19,7 @@ export function actionCatalog(t) {
     {
       id: 'flipStory',
       area: 'flips',
+      scope: t('The flip you make, and the keyword pairs without a flip yet'),
       label: t('Write flip stories'),
       info: t(
         "Writes flip stories and their picture prompts, as your Instructions ask, from the flip's two keywords: in the flip editor when you ask, and in its runs a new draft for each keyword pair that has no flip yet, while flips are left to make.",
@@ -28,6 +32,7 @@ export function actionCatalog(t) {
     {
       id: 'flipPictures',
       area: 'flips',
+      scope: t('The flip you make, and the agent drafts with their story'),
       label: t('Make the pictures'),
       info: t(
         "Draws a story's pictures with its service's image model: in the flip editor when you ask, and in its runs the three pictures of each agent draft that has its story. Its service bills each picture.",
@@ -40,6 +45,7 @@ export function actionCatalog(t) {
     {
       id: 'flipDraft',
       area: 'flips',
+      scope: t('Agent drafts with their pictures'),
       label: t('Draft the flip'),
       info: t(
         "Makes a flip of an agent draft that has its pictures, as the flip editor's Protect images and Shuffle steps do: the noise, the nonsense image (made as your choice in Protect images says), a shuffled order. Nothing is sent to the model.",
@@ -52,6 +58,7 @@ export function actionCatalog(t) {
     {
       id: 'flipJudge',
       area: 'flips',
+      scope: t('Drafts ready to send, yours too'),
       label: t('Judge the flip'),
       info: t(
         'Asks the model about each draft ready to send as a validator would see it: its two orders, its keywords, the reasons to report. Your own drafts too: it changes nothing in them. It passes when the model finds the story, sees both keywords and finds nothing to report.',
@@ -64,6 +71,7 @@ export function actionCatalog(t) {
     {
       id: 'flipSubmit',
       area: 'flips',
+      scope: t('Agent drafts the judge passed, unchanged since'),
       label: t('Submit the flip'),
       info: t(
         'Sends an agent draft the judge passed, unchanged since, outside the validation. A flip costs no fee.',
@@ -76,6 +84,7 @@ export function actionCatalog(t) {
     {
       id: 'flipDelete',
       area: 'flips',
+      scope: t('Agent drafts the judge failed'),
       label: t('Delete a draft'),
       info: t(
         'Deletes an agent draft the judge failed. Your own drafts are never deleted.',
@@ -88,6 +97,7 @@ export function actionCatalog(t) {
     {
       id: 'answerFlip',
       area: 'validation',
+      scope: t('The flips of the session'),
       label: t('Answer the flips'),
       info: t(
         'Answers the flips of a validation. Ask me: its answer is shown, you choose.',
@@ -98,6 +108,7 @@ export function actionCatalog(t) {
     {
       id: 'report',
       area: 'validation',
+      scope: t('The flips of the session'),
       label: t('Report flips'),
       info: t(
         'Reports the flips that break a rule, as When to report sets it.'
@@ -118,6 +129,7 @@ export function actionCatalog(t) {
     {
       id: 'reply',
       area: 'social',
+      scope: t('What it read'),
       label: t('Reply and comment'),
       info: t('Answers the posts, replies and comments it read.'),
       reads: [],
@@ -129,6 +141,7 @@ export function actionCatalog(t) {
     {
       id: 'like',
       area: 'social',
+      scope: t('What it read'),
       label: t('Like posts'),
       info: t('Likes the posts, replies and comments it read.'),
       reads: [],
@@ -140,6 +153,9 @@ export function actionCatalog(t) {
     {
       id: 'message',
       area: 'social',
+      scope: t(
+        'Its conversations, the authors it read, who liked or tipped it'
+      ),
       label: t('Private messages'),
       info: t(
         'Writes private messages: in its conversations, to the author of a post it read, or to someone who liked or tipped it.',
@@ -154,6 +170,7 @@ export function actionCatalog(t) {
     {
       id: 'tip',
       area: 'social',
+      scope: t('Posts it read'),
       label: t('Tip posts'),
       info: t(
         'Tips the authors of posts it read. You set the amount of each tip; it picks the posts.'
@@ -181,6 +198,7 @@ export function actionCatalog(t) {
       id: 'readOwnPosts',
       area: 'social',
       kind: 'read',
+      scope: t('Its own'),
       label: t('Read its own posts'),
       info: t(
         'Its own last posts, to go on from them (a series, what it already said).'

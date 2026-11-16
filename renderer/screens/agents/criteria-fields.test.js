@@ -4,7 +4,7 @@ import {
   criteriaLine,
   wordList,
 } from './criteria-fields'
-import {ONLY_TO} from './actions-section'
+import {ONLY_TO} from './do-row'
 import {WHO_READS} from './read-row'
 
 const main = require('../../../main/agent/criteria')

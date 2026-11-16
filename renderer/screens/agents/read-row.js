@@ -1,12 +1,12 @@
 /* eslint-disable react/prop-types */
 import * as React from 'react'
-import {Button, Flex, Stack, Switch, Text} from '@chakra-ui/react'
+import {Box, Flex, Grid, Switch, Text} from '@chakra-ui/react'
 import {useTranslation} from 'react-i18next'
 import {HDivider, Input, Select} from '../../shared/components/components'
 import {InfoTip} from '../../shared/components/info-tip'
 import {NumberField, readNumber} from './limit-fields'
 import {useDraft} from './page-sections'
-import {CriteriaFields} from './criteria-fields'
+import {CriteriaEditor, CriteriaSummary} from './criteria-fields'
 
 // The reads of what others wrote: whose, by criteria (B-266).
 export const WHO_READS = [
@@ -16,8 +16,21 @@ export const WHO_READS = [
   'readTags',
 ]
 
+/** The columns of a read's row (B-280): its switch, what, only these, how many. */
+export const READ_COLS =
+  '56px minmax(0, 1.3fr) minmax(0, 1.5fr) minmax(0, 1.2fr)'
+
 /** The most posts "the last N" reads (main/agent/profiles.js MAX_POSTS_READ). */
 const MAX_POSTS_READ = 50
+
+/** A cell with nothing to set. */
+export function NoCell() {
+  return (
+    <Text color="muted" aria-hidden>
+      —
+    </Text>
+  )
+}
 
 /** Read all Social posts: the last 24 hours, or the last N posts. */
 function PostsWindow({row, onChange}) {
@@ -56,27 +69,42 @@ function PostsWindow({row, onChange}) {
 }
 
 /**
- * One read the agent is given (B-262): on or off, never Ask me (reading spends nothing); Read all Social posts with
- * its window.
+ * One read of an area (B-262, B-280): on or off, never Ask me (reading spends nothing); whose it reads, and how many.
+ * `row` is the agent's own or the catalog's defaults set to Off (rights.js), `change(patch)` changes it.
  */
-export function ReadRow({id, label, info, row, setActions}) {
+export function ReadRow({entry, row, change}) {
   const {t} = useTranslation()
+  const [open, setOpen] = React.useState(false)
+  const {id, label, info, scope} = entry
   const isOn = row.level !== 'off'
-  const change = (patch) =>
-    setActions((actions) => ({...actions, [id]: {...actions[id], ...patch}}))
+  const hasWho = WHO_READS.includes(id)
   return (
     <>
       <HDivider />
-      <Flex py={3} gap={4} align="center" justify="space-between" wrap="wrap">
-        <Stack spacing={2} flex="1 1 260px" minW={0}>
-          <Flex align="center" gap={2}>
-            <Text fontWeight={500}>{label}</Text>
-            <InfoTip label={label}>{info}</InfoTip>
-          </Flex>
-          {id === 'readPosts' && isOn && (
-            <PostsWindow row={row} onChange={change} />
+      <Grid templateColumns={READ_COLS} gap={4} py={3} alignItems="start">
+        <Switch
+          aria-label={label}
+          isChecked={isOn}
+          onChange={(e) => change({level: e.target.checked ? 'alone' : 'off'})}
+        />
+        <Flex align="center" gap={2}>
+          <Text fontWeight={500}>{label}</Text>
+          <InfoTip label={label}>{info}</InfoTip>
+        </Flex>
+        <Box opacity={isOn ? 1 : 0.5}>
+          {hasWho && (
+            <CriteriaSummary
+              label={t('Only these')}
+              value={row.who || null}
+              open={open}
+              onToggle={() => setOpen((now) => !now)}
+            />
           )}
-          {id === 'readTags' && isOn && (
+          {!hasWho && (scope ? <Text>{scope}</Text> : <NoCell />)}
+        </Box>
+        <Box opacity={isOn ? 1 : 0.5}>
+          {id === 'readPosts' && <PostsWindow row={row} onChange={change} />}
+          {id === 'readTags' && (
             // Its questions of the day (B-264): empty, no limit.
             <NumberField
               label={t('posts at most a day (a day in UTC)')}
@@ -87,35 +115,18 @@ export function ReadRow({id, label, info, row, setActions}) {
               onSave={(limit) => change({limit})}
             />
           )}
-          {WHO_READS.includes(id) && isOn && (
-            <CriteriaFields
-              title={t('Whose')}
-              value={row.who || null}
-              withWords
-              onChange={(who) => change({who})}
-            />
-          )}
-        </Stack>
-        <Switch
-          aria-label={label}
-          isChecked={isOn}
-          onChange={(e) => change({level: e.target.checked ? 'alone' : 'off'})}
-        />
-        <Button
-          size="sm"
-          variant="link"
-          aria-label={t('Remove {{action}}', {action: label})}
-          onClick={() =>
-            setActions((actions) => {
-              const next = {...actions}
-              delete next[id]
-              return next
-            })
-          }
-        >
-          {t('Remove')}
-        </Button>
-      </Flex>
+          {id !== 'readPosts' && id !== 'readTags' && <NoCell />}
+        </Box>
+      </Grid>
+      {hasWho && open && (
+        <Box pb={4} maxW="xl">
+          <CriteriaEditor
+            value={row.who || null}
+            withWords
+            onChange={(who) => change({who})}
+          />
+        </Box>
+      )}
     </>
   )
 }
