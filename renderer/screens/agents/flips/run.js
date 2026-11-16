@@ -184,6 +184,15 @@ async function act(
   return 'next'
 }
 
+/**
+ * What the judge and Delete a sent flip know of the sent flips (B-277): this epoch's (the node's list for the identity),
+ * and whether an agent may delete one (`ctx.judgeSent`: else the judge leaves them, nothing would read its verdict).
+ */
+const sentOf = (ctx) => ({
+  sent: (ctx.identity && ctx.identity.flips) || [],
+  judgeSent: Boolean(ctx.judgeSent),
+})
+
 /** A new agent draft for `pair`, its story written: the nonsense picture's slot picked as the editor picks it. */
 export function newAgentDraft({id, pair, words, story, by, at, random}) {
   const start = {originalOrder: [0, 1, 2, 3], adversarialImageId: 3}
@@ -352,7 +361,11 @@ const STEPS = {
   /** Judge the flip: the validation's question on each draft protected and shuffled, its verdict kept with it. */
   async flipJudge(agent, ctx, deps, count) {
     // eslint-disable-next-line no-restricted-syntax
-    for (const flip of draftsAt('flipJudge', deps.store.getFlips())) {
+    for (const flip of draftsAt(
+      'flipJudge',
+      deps.store.getFlips(),
+      sentOf(ctx)
+    )) {
       // eslint-disable-next-line no-await-in-loop
       const next = await act(agent, 'flipJudge', deps, count, {
         key: flip.id,
@@ -461,7 +474,11 @@ const STEPS = {
   async flipDeleteSent(agent, ctx, deps, count) {
     if (!canMakeFlips(ctx.identity, ctx.epoch)) return
     // eslint-disable-next-line no-restricted-syntax
-    for (const flip of draftsAt('flipDeleteSent', deps.store.getFlips())) {
+    for (const flip of draftsAt(
+      'flipDeleteSent',
+      deps.store.getFlips(),
+      sentOf(ctx)
+    )) {
       // eslint-disable-next-line no-await-in-loop
       const next = await act(agent, 'flipDeleteSent', deps, count, {
         key: flip.id,
@@ -474,7 +491,8 @@ const STEPS = {
           wait: true,
           body: deps.verdictText(flip.agentVerdict),
           detail: keywordsLine(flip),
-          target: {flipId: flip.id},
+          // Its sending, by its transaction: a flip sent again later is another one.
+          target: {flipId: flip.id, txHash: flip.txHash || null},
           cost: cost.maxFee,
         }),
         apply: async (cost, waiting) => {
@@ -485,7 +503,7 @@ const STEPS = {
             })
             return ''
           }
-          return deps.deleteSent(flip.id, cost)
+          return deps.deleteSent(flip.id, cost, flip.txHash || null)
         },
       })
       if (next === 'stop') return

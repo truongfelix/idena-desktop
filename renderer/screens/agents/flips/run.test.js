@@ -40,6 +40,12 @@ const identity = {
   flipKeyWordPairs: [{id: 4, words: [10, 11], used: false}],
 }
 const epoch = {currentPeriod: 'None'}
+// B-277: this epoch's sent flips (the node's list), and an agent may delete one.
+const sentCtx = {
+  identity: {...identity, flips: ['bafy-sent']},
+  epoch,
+  judgeSent: true,
+}
 
 /** The agent holding `levels` ({step: level}), and the run's fakes. */
 function setup({
@@ -455,6 +461,8 @@ describe('a Flips run', () => {
     const sent = ready({
       id: 'sent',
       type: FlipType.Published,
+      hash: 'bafy-sent',
+      txHash: '0xsent',
       agentFlip: undefined,
     })
     sent.agentVerdict = {
@@ -468,12 +476,12 @@ describe('a Flips run', () => {
       flips: [sent],
       agentId: 'deletes-sent',
     })
-    await runFlipsAgent(agent, {identity, epoch}, deps)
-    expect(deps.deleteSent).toHaveBeenCalledWith('sent', {
-      from: '0xme',
-      payload: '0x0a',
-      maxFee: 2,
-    })
+    await runFlipsAgent(agent, sentCtx, deps)
+    expect(deps.deleteSent).toHaveBeenCalledWith(
+      'sent',
+      {from: '0xme', payload: '0x0a', maxFee: 2},
+      '0xsent'
+    )
     expect(store.getFlip('sent').type).toBe(FlipType.Deleting)
     // The cost goes to propose, where its iDNA a day is checked; past it, it waits for the person.
     expect(deps.call).toHaveBeenCalledWith(
@@ -490,6 +498,8 @@ describe('a Flips run', () => {
     const sent = ready({
       id: 'sent',
       type: FlipType.Published,
+      hash: 'bafy-sent',
+      txHash: '0xsent',
       agentFlip: undefined,
     })
     sent.agentVerdict = {
@@ -503,7 +513,7 @@ describe('a Flips run', () => {
       flips: [sent],
       agentId: 'asks-sent',
     })
-    await runFlipsAgent(agent, {identity, epoch}, deps)
+    await runFlipsAgent(agent, sentCtx, deps)
     expect(deps.deleteSent).not.toHaveBeenCalled()
     expect(store.getFlip('sent').agentSent.waiting).toEqual({
       step: 'flipDeleteSent',
@@ -511,7 +521,7 @@ describe('a Flips run', () => {
     })
     // Marked: the next run proposes it no more.
     deps.call.mockClear()
-    await runFlipsAgent(agent, {identity, epoch}, deps)
+    await runFlipsAgent(agent, sentCtx, deps)
     expect(deps.call).not.toHaveBeenCalledWith('propose', expect.anything())
   })
 })
