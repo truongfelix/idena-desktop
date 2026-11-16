@@ -69,6 +69,27 @@ describe('the Agents section lines', () => {
     expect(budgetLine(agent({budgetPerDay: 0.05}), t)).toBe(
       'Up to 0.05 iDNA a day'
     )
+    // B-269: the actions' own limits add up; the overall one caps them; one without its own spends up to all of it.
+    const actions = {
+      like: {level: 'alone', limit: 10, spendPerDay: 0.02},
+      tip: {level: 'ask', limit: 5, amount: 1},
+      reply: {level: 'off', limit: 5, spendPerDay: 9},
+    }
+    expect(budgetLine(agent({actions, budgetPerDay: null}), t)).toBe(
+      'Up to 5.02 iDNA a day'
+    )
+    expect(budgetLine(agent({actions, budgetPerDay: 1}), t)).toBe(
+      'Up to 1 iDNA a day'
+    )
+    expect(
+      budgetLine(
+        agent({
+          actions: {...actions, post: {level: 'alone', limit: null}},
+          budgetPerDay: 8,
+        }),
+        t
+      )
+    ).toBe('Up to 8 iDNA a day')
   })
 
   test('the validation answers can be added only while no other agent holds them', () => {

@@ -324,17 +324,42 @@ export function readsList(agent, catalog, t) {
   return reads.length ? reads : [t('Nothing')]
 }
 
+// The actions that spend iDNA (B-269: each with its own limit a day).
+const SPENDING = ['post', 'reply', 'like', 'message', 'tip']
+
 /** The agent's actions that spend iDNA (the budget counts them), by label. */
 export const spendingActions = (agent, catalog) =>
   catalog.filter(({id, spends}) => spends && agent.actions[id])
 
-/** Its budget, in words; none for an agent whose actions spend nothing (`catalog` given), whatever was set before. */
+/**
+ * The most it may spend alone a day, in words (B-269): its overall limit when set, else what its actions' own limits
+ * add up to (an action's iDNA a day, a tip's daily amount); none for an agent whose actions spend nothing (`catalog`
+ * given), whatever was set before.
+ */
 export function budgetLine(agent, t, catalog = null) {
-  const {budgetPerDay} = agent
   if (catalog && spendingActions(agent, catalog).length === 0)
     return t('Spends no iDNA')
-  if (budgetPerDay === null || budgetPerDay === 0) return t('Spends no iDNA')
-  return t('Up to {{amount}} iDNA a day', {amount: budgetPerDay})
+  const limits = Object.entries(agent.actions || {})
+    .filter(([id, row]) => SPENDING.includes(id) && row && row.level !== 'off')
+    .map(([id, row]) => {
+      if (typeof row.spendPerDay === 'number') return row.spendPerDay
+      if (id === 'tip' && typeof row.limit === 'number') return row.limit
+      return null
+    })
+  const own = limits.reduce((sum, limit) => sum + (limit || 0), 0)
+  const overall =
+    typeof agent.budgetPerDay === 'number' ? agent.budgetPerDay : null
+  // An action without its own limit spends within the overall one, up to all of it.
+  let most = own
+  if (overall !== null)
+    most =
+      limits.length && limits.every((limit) => limit !== null)
+        ? Math.min(overall, own)
+        : overall
+  if (!most) return t('Spends no iDNA')
+  return t('Up to {{amount}} iDNA a day', {
+    amount: Math.round(most * 100) / 100,
+  })
 }
 
 /** Where the model runs, as the cards show it. */

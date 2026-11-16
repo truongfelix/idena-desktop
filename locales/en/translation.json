@@ -1907,7 +1907,6 @@
   "Instructions": "Instructions",
   "What it reads": "What it reads",
   "Set by its actions; the model is sent nothing else.": "Set by its actions; the model is sent nothing else.",
-  "When and how much": "When and how much",
   "Runs": "Runs",
   "At each validation": "At each validation",
   "Every day": "Every day",
@@ -2102,8 +2101,6 @@
   "an answer": "an answer",
   "a tip": "a tip",
   "a private message": "a private message",
-  "When it runs: on its schedule, and when something comes to it. The budget is the most it may spend a day in iDNA, fees included, on what it does alone; with none, it spends nothing alone. The model's own service bills apart.": "When it runs: on its schedule, and when something comes to it. The budget is the most it may spend a day in iDNA, fees included, on what it does alone; with none, it spends nothing alone. The model's own service bills apart.",
-  "Budget a day, in iDNA": "Budget a day, in iDNA",
   "An agent waits for you": "An agent waits for you",
   "An agent is on": "An agent is on",
   "Everything the agent did, asked for or was refused, newest first. The log is kept until the app closes.": "Everything the agent did, asked for or was refused, newest first. The log is kept until the app closes.",
@@ -2113,8 +2110,6 @@
   "Agent: reports": "Agent: reports",
   "Check the keywords yourself.": "Check the keywords yourself.",
   "{{name}} already reports in the validation": "{{name}} already reports in the validation",
-  "Its actions spend no iDNA: no budget to set.": "Its actions spend no iDNA: no budget to set.",
-  "For {{actions}}": "For {{actions}}",
   "Not added: {{actions}}. Another agent of yours already holds it.": "Not added: {{actions}}. Another agent of yours already holds it.",
   "Agent's pick · it would mark this flip best": "Agent's pick · it would mark this flip best",
   "Its actions on Social have nothing to act on: give it something to read.": "Its actions on Social have nothing to act on: give it something to read.",
@@ -2141,5 +2136,11 @@
   "What the app sends with your Instructions": "What the app sends with your Instructions",
   "Add the suggestion for flip stories": "Add the suggestion for flip stories",
   "Add the suggestion for the validation": "Add the suggestion for the validation",
-  "Add the suggestion for Social": "Add the suggestion for Social"
+  "Add the suggestion for Social": "Add the suggestion for Social",
+  "All actions together": "All actions together",
+  "Optional: the most iDNA a day its actions spend alone together, fees included, beside each action’s own. An action spends alone only within a limit, its own or this one; with none, it waits for you. The model’s own service bills apart.": "Optional: the most iDNA a day its actions spend alone together, fees included, beside each action’s own. An action spends alone only within a limit, its own or this one; with none, it waits for you. The model’s own service bills apart.",
+  "iDNA at most a day, fees included": "iDNA at most a day, fees included",
+  "pictures at most a day": "pictures at most a day",
+  "When it runs": "When it runs",
+  "On its schedule, and when something comes to it. What it may spend is set on each action that costs money.": "On its schedule, and when something comes to it. What it may spend is set on each action that costs money."
 }

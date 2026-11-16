@@ -15,8 +15,16 @@ import {SecondaryButton} from '../../shared/components/button'
 import {InfoTip} from '../../shared/components/info-tip'
 import {ActionInfo, useAppTexts} from './app-texts'
 import {SettingsSection} from '../settings/components'
-import {AREAS, LEVELS, areaNames, heldBy, levelLabel} from './catalog'
-import {LimitFields} from './limit-fields'
+import {
+  AREAS,
+  LEVELS,
+  areaNames,
+  heldBy,
+  levelLabel,
+  spendingActions,
+} from './catalog'
+import {LimitFields, NumberField} from './limit-fields'
+import {drawsPictures} from './flip-story'
 import {ReadRow} from './read-row'
 import {nothingToActOn} from './page-sections'
 
@@ -147,7 +155,12 @@ export function ActionsSection({agent, agents, catalog, onChange}) {
                       label={label}
                       info={info}
                       sent={texts && texts.sent[id]}
-                      perDay={perDay}
+                      // A story agent whose service draws: its pictures a day (B-269).
+                      perDay={
+                        id === 'flipStory' && drawsPictures(agent)
+                          ? 'pictures'
+                          : perDay
+                      }
                       row={agent.actions[id]}
                       setActions={setActions}
                     />
@@ -157,8 +170,41 @@ export function ActionsSection({agent, agents, catalog, onChange}) {
             )
           })
         )}
+        <OverallLimit agent={agent} catalog={catalog} onChange={onChange} />
       </Stack>
     </SettingsSection>
+  )
+}
+
+/**
+ * The optional limit of all its actions together (B-269): the most iDNA a day it spends alone, fees included, beside
+ * each action's own. Only for an agent with an action that spends iDNA.
+ */
+function OverallLimit({agent, catalog, onChange}) {
+  const {t} = useTranslation()
+  if (!spendingActions(agent, catalog).length) return null
+  return (
+    <>
+      <HDivider />
+      <Flex align="center" gap={2} pt={3} wrap="wrap">
+        <Text fontWeight={500}>{t('All actions together')}</Text>
+        <InfoTip label={t('All actions together')}>
+          {t(
+            'Optional: the most iDNA a day its actions spend alone together, fees included, beside each action’s own. An action spends alone only within a limit, its own or this one; with none, it waits for you. The model’s own service bills apart.',
+            {nsSeparator: '!!'}
+          )}
+        </InfoTip>
+        <NumberField
+          label={t('iDNA at most a day, fees included')}
+          value={agent.budgetPerDay}
+          min={0}
+          whole={false}
+          optional
+          placeholder={t('None', {nsSeparator: '!!'})}
+          onSave={(budgetPerDay) => onChange((a) => ({...a, budgetPerDay}))}
+        />
+      </Flex>
+    </>
   )
 }
 
