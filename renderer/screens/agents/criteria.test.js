@@ -137,6 +137,31 @@ describe("the authors' facts", () => {
     expect(facts[C].vouched).toBe(false)
   })
 
+  test("a voucher's failed read leaves out only the members it vouches for", async () => {
+    const C = `0x${'c'.repeat(40)}`
+    const V = `0x${'d'.repeat(40)}`
+    const W = `0x${'e'.repeat(40)}`
+    const settled = jest.fn(async (method, list) => {
+      if (method === 'contract_readMap')
+        return list.map(([, , key]) => ({
+          result: key === `0x${Buffer.from(A).toString('hex')}` ? V : W,
+        }))
+      return list.map(([address]) =>
+        address === W
+          ? {error: new Error('node busy')}
+          : {result: {state: address === V ? 'Human' : 'Undefined'}}
+      )
+    })
+    const facts = await readAuthors(
+      [A, C],
+      criteriaNeeds([{...none, states: ['Vouched']}]),
+      {settled, call: jest.fn()}
+    )
+    expect(facts[A].vouched).toBe(true)
+    // C's voucher could not be read: left out (asked again next run), never counted as not vouched.
+    expect('vouched' in facts[C]).toBe(false)
+  })
+
   test('a read that fails leaves the facts out', async () => {
     const settled = jest.fn(async () => {
       throw new Error('node down')

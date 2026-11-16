@@ -83,7 +83,12 @@ function ListField({
   const [draft, setDraft] = React.useState(join(value))
   // The lines that are not addresses, found when the field is left.
   const [wrong, setWrong] = React.useState([])
-  React.useEffect(() => setDraft(join(value)), [value, join])
+  // The saved list shown again when it changes, but never over a refused text the person is still to fix.
+  const refused = React.useRef(false)
+  refused.current = wrong.length > 0
+  React.useEffect(() => {
+    if (!refused.current) setDraft(join(value))
+  }, [value, join])
   return (
     <Box>
       <Text fontSize="sm" color="muted" mb={1}>

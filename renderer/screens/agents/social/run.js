@@ -155,8 +155,10 @@ export async function runSocialAgent(agent, social, deps) {
     // Whom it acts on (B-266): a target outside the action's criteria is refused, whatever the model asked.
     // Every one it acts on: a post's author, or each person of a message. A target it cannot know is refused too:
     // the check never fails open.
+    // A message goes to the people the plan picked (plan.js `others`), the other actions to the item's author.
     let whom = []
-    if (planned.item)
+    if (action === 'message') whom = planned.others || []
+    else if (planned.item)
       whom = planned.item.author
         ? [planned.item.author]
         : planned.item.others || []

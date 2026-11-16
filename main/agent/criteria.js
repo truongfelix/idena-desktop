@@ -20,7 +20,8 @@ const ONLY_TO_ACTIONS = ['reply', 'like', 'message', 'tip']
 
 const MAX_ADDRESSES = 200
 const MAX_WORDS = 50
-const MAX_WORD_LENGTH = 100
+// As Social's hidden words (renderer hiding.js MAX_HIDDEN_WORD): a longer one would be cut there and never match.
+const MAX_WORD_LENGTH = 60
 const ADDRESS = /^0x[0-9a-f]{40}$/u
 
 const addresses = (value) =>
