@@ -2091,7 +2091,7 @@
   "The last {{count}} posts": "Les {{count}} dernières publications",
   "Its notifications: likes, answers, tips": "Ses notifications : j'aime, réponses, pourboires",
   "Its private messages": "Ses messages privés",
-  "Your words to the agent: who it is, what it should do and how. They go to the model with each of its actions; the app adds what each action needs, the data it reads and the form of the answer, and that part stays the app's.": "Vos mots à l'agent : qui il est, ce qu'il doit faire et comment. Ils vont au modèle avec chacune de ses actions ; l'app ajoute ce dont chaque action a besoin, les données qu'il lit et la forme de la réponse, et cette partie reste celle de l'app.",
+  "Your words to the agent: who it is, what it should do and how. They go to the model with each of its actions; the app adds only the data each action reads and the form of the answer, shown in each action's ⓘ.": "Vos mots à l'agent : qui il est, ce qu'il doit faire et comment. Ils vont au modèle avec chacune de ses actions ; l'app n'ajoute que les données que chaque action lit et la forme de la réponse, montrées dans le ⓘ de chaque action.",
   "The last 24 hours": "Les dernières 24 heures",
   "The last posts": "Les dernières publications",
   "How many posts": "Combien de publications",
@@ -2137,5 +2137,9 @@
   "Put it in picture {{n}}": "La mettre en image {{n}}",
   "The prompts of {{name}}": "Les prompts de {{name}}",
   "Make it again": "La refaire",
-  "Make the image": "Faire l'image"
+  "Make the image": "Faire l'image",
+  "What the app sends with your Instructions": "Ce que l'app envoie avec vos instructions",
+  "Add the suggestion for flip stories": "Ajouter la suggestion pour les histoires de flips",
+  "Add the suggestion for the validation": "Ajouter la suggestion pour la validation",
+  "Add the suggestion for Social": "Ajouter la suggestion pour Social"
 }

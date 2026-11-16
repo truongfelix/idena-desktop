@@ -2091,7 +2091,7 @@
   "The last {{count}} posts": "The last {{count}} posts",
   "Its notifications: likes, answers, tips": "Its notifications: likes, answers, tips",
   "Its private messages": "Its private messages",
-  "Your words to the agent: who it is, what it should do and how. They go to the model with each of its actions; the app adds what each action needs, the data it reads and the form of the answer, and that part stays the app's.": "Your words to the agent: who it is, what it should do and how. They go to the model with each of its actions; the app adds what each action needs, the data it reads and the form of the answer, and that part stays the app's.",
+  "Your words to the agent: who it is, what it should do and how. They go to the model with each of its actions; the app adds only the data each action reads and the form of the answer, shown in each action's ⓘ.": "Your words to the agent: who it is, what it should do and how. They go to the model with each of its actions; the app adds only the data each action reads and the form of the answer, shown in each action's ⓘ.",
   "The last 24 hours": "The last 24 hours",
   "The last posts": "The last posts",
   "How many posts": "How many posts",
@@ -2137,5 +2137,9 @@
   "Put it in picture {{n}}": "Put it in picture {{n}}",
   "The prompts of {{name}}": "The prompts of {{name}}",
   "Make it again": "Make it again",
-  "Make the image": "Make the image"
+  "Make the image": "Make the image",
+  "What the app sends with your Instructions": "What the app sends with your Instructions",
+  "Add the suggestion for flip stories": "Add the suggestion for flip stories",
+  "Add the suggestion for the validation": "Add the suggestion for the validation",
+  "Add the suggestion for Social": "Add the suggestion for Social"
 }

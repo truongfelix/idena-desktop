@@ -5,6 +5,7 @@ const {createReadPoints} = require('./read-points')
 const {agentSettings, reportAgent, validationAgent} = require('./profiles')
 const {checkFlip, flipQuestion, mediaType, readFlipAnswer} = require('./flips')
 const {readStories, storyQuestion, storySystem} = require('./stories')
+const {appTexts} = require('./app-texts')
 const {socialHeld, socialSystem} = require('./social')
 const providers = require('./providers')
 
@@ -673,6 +674,8 @@ function createAgent({
       return null
     },
     /** The log, newest first; with `agentId`, that agent's lines and the pause and resume of all agents. */
+    // What the app adds to the Instructions per action, and the suggestions (B-268): the agent page's ⓘ.
+    appTexts: () => appTexts(),
     activity: (data) => {
       // No agent named (no data, or none in it): every line.
       const agentId = data ? data.agentId : undefined
