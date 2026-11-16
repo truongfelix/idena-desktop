@@ -6,6 +6,10 @@ import {HDivider, Input, Select} from '../../shared/components/components'
 import {InfoTip} from '../../shared/components/info-tip'
 import {readNumber} from './limit-fields'
 import {useDraft} from './page-sections'
+import {CriteriaFields} from './criteria-fields'
+
+// The reads of what others wrote: whose, by criteria (B-266).
+const WHO_READS = ['readPosts', 'readNotifications', 'readMessages']
 
 /** The most posts "the last N" reads (main/agent/profiles.js MAX_POSTS_READ). */
 const MAX_POSTS_READ = 50
@@ -66,6 +70,14 @@ export function ReadRow({id, label, info, row, setActions}) {
           </Flex>
           {id === 'readPosts' && isOn && (
             <PostsWindow row={row} onChange={change} />
+          )}
+          {WHO_READS.includes(id) && isOn && (
+            <CriteriaFields
+              title={t('Whose')}
+              value={row.who || null}
+              withWords
+              onChange={(who) => change({who})}
+            />
           )}
         </Stack>
         <Switch
