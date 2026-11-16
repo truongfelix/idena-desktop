@@ -14,7 +14,8 @@ import {
   runSocialAgent,
   scannedHeight,
 } from './social/run'
-import {EVENT_MIN_MS, eventPending} from './social/events'
+import {EVENT_MIN_MS, eventPending, eventReadBy} from './social/events'
+import {tagsLeftOf} from './social/tags'
 import {
   prepareSocialAction,
   sendSocialAction,
@@ -37,12 +38,13 @@ const runs = new Map()
 const lastEvent = new Map()
 const eventFails = new Map()
 
-/** The events that may run the agent: only those it reads (likes, answers, tips: Notifications; messages). */
+/**
+ * The events that may run the agent: only those it reads (likes, answers, tips: Notifications; messages; the posts
+ * that tag it).
+ */
 export function eventsRead(agent) {
   const {reads = {}, events = []} = agent
-  return events.filter((one) =>
-    one === 'message' ? reads.messages : reads.notifications
-  )
+  return events.filter((one) => eventReadBy(one, reads))
 }
 
 /** Whether an event may still run the agent today: not after MAX_TRIES failed event runs that day. */
@@ -251,7 +253,7 @@ export function AgentRunner() {
         const state = socialState(socialRef.current)
         // eslint-disable-next-line no-restricted-syntax
         for (const agent of active) {
-          const events = eventsRead(agent)
+          let events = eventsRead(agent)
           if (
             due.includes(agent) ||
             !events.length ||
@@ -260,6 +262,17 @@ export function AgentRunner() {
           )
             // eslint-disable-next-line no-continue
             continue
+          // A tag starts a run only while it has questions left today (B-264): past them, a run would read none.
+          if (events.includes('tag')) {
+            // eslint-disable-next-line no-await-in-loop
+            const today = await agentCall('tagsToday', {
+              agentId: agent.id,
+            }).catch(() => null)
+            if (tagsLeftOf(agent.reads.tags.perDay, today) === 0)
+              events = events.filter((one) => one !== 'tag')
+            // eslint-disable-next-line no-continue
+            if (!events.length) continue
+          }
           // eslint-disable-next-line no-await-in-loop
           const point = await agentCall('readPoint', {agentId: agent.id}).catch(
             () => null

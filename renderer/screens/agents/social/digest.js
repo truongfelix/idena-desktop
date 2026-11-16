@@ -3,6 +3,7 @@ import {postTargets} from '../../social/feed'
 import {shortAddress} from '../../social/people'
 import {validTipAmount} from '../../social/calls'
 import {passes} from '../criteria'
+import {tagName, tags} from './tags'
 
 // What an agent reads on Idena Social when it runs (B-239): what came after its read point (a block height), and
 // only what its actions need. Each item gets a label (p1, c1) that its answer names; the app keeps what each label
@@ -67,10 +68,12 @@ const DAY_S = 24 * 60 * 60
  * ends what is read (`readTo` stops before its block), so the next run shows it. Returns {text, labels, empty,
  * readTo}: the model's input, what each label stands for ({kind: 'post', node, post, target, author}, {kind: 'chat',
  * conversation, others} or {kind: 'person', others}), whether there is anything new, and the block it read up to.
+ * The posts that tag it (B-264, `reads.tags`): at most `tagsLeft` (its questions left today), oldest first; those
+ * past it are passed over for good (`tagsPassed`), never shown to a later run; `tagsShown` counts those it reads.
  */
 export function socialDigest(
   social,
-  {reads, who = {}, facts = {}, collect = null},
+  {reads, who = {}, facts = {}, collect = null, tagsLeft = Infinity},
   {point, scanned, now = Date.now()}
 ) {
   const {feed = [], me, names = {}, conversations = [], blocked} = social
@@ -96,6 +99,13 @@ export function socialDigest(
   const name = (address) => names[address] || shortAddress(address)
   const targets = postTargets(feed)
   const window = reads?.posts?.window || 'off'
+  // Its profile name, tagged as "@name" (B-264): without one claimed, nothing tags it.
+  const tagged = reads?.tags ? tagName(names[me]) : null
+  // A post that tags it is read only as a tag, within the day's questions: never as an answer or a new post besides.
+  const isTag = (node) =>
+    Boolean(tagged) &&
+    node.call.author !== me &&
+    tags(node.call.message, tagged)
 
   // Every new item, each with the block that makes it new.
   const candidates = []
@@ -112,6 +122,7 @@ export function socialDigest(
           typeof node.id === 'number' &&
           isNew(node.call) &&
           node.call.message !== LIKE &&
+          !isTag(node) &&
           readsFrom('notifications', node.call.author, node.call.message)
       )
       .forEach((one) =>
@@ -157,6 +168,7 @@ export function socialDigest(
         call.author !== me &&
         !isBlocked(call.author) &&
         isNew(call) &&
+        !isTag({call}) &&
         readsFrom('posts', call.author, call.message)
     )
     // The feed is newest first: the last day's posts, or the last N.
@@ -170,6 +182,20 @@ export function socialDigest(
       candidates.push({kind: 'post', height: node.call.height, node})
     )
   }
+  // The posts, replies and comments that tag it (B-264): its questions, with the post each one answers.
+  if (tagged)
+    walk(feed)
+      .filter(
+        ({node}) =>
+          typeof node.id === 'number' &&
+          isTag(node) &&
+          !isBlocked(node.call.author) &&
+          isNew(node.call) &&
+          readsFrom('tags', node.call.author, node.call.message)
+      )
+      .forEach((one) =>
+        candidates.push({kind: 'tag', height: one.node.call.height, ...one})
+      )
   if (reads?.messages)
     conversations.forEach((conversation) => {
       if (
@@ -227,9 +253,11 @@ export function socialDigest(
     chat: MAX_CONVERSATIONS,
     tip: MAX_TIPS,
     like: MAX_TIPS,
+    tag: MAX_ANSWERS,
   }
-  const counts = {answer: 0, post: 0, chat: 0, tip: 0, like: 0}
-  const lines = {answer: [], post: [], chat: [], tip: [], like: []}
+  const counts = {answer: 0, post: 0, chat: 0, tip: 0, like: 0, tag: 0}
+  const lines = {answer: [], post: [], chat: [], tip: [], like: [], tag: []}
+  let tagsPassed = 0
   // A person (a tipper, a liker) once: the agent may write to them.
   let people = 0
   const personLabel = (address) => {
@@ -255,6 +283,12 @@ export function socialDigest(
   let lastHeight = null
   // eslint-disable-next-line no-restricted-syntax
   for (const item of candidates) {
+    // Past the day's questions: passed over for good, the read goes on (first come, first served).
+    if (item.kind === 'tag' && counts.tag >= tagsLeft) {
+      tagsPassed += 1
+      // eslint-disable-next-line no-continue
+      continue
+    }
     if (counts[item.kind] >= caps[item.kind]) {
       leftOut = item
       break
@@ -271,6 +305,18 @@ export function socialDigest(
         item.parent.call.message,
         item.parent.call.hasMedia
       )}"): "${shownText(item.node.call.message, item.node.call.hasMedia)}"`
+    } else if (item.kind === 'tag') {
+      const id = label(item.node, item.post)
+      const answering = item.parent
+        ? `, answering ${name(item.parent.call.author)} ("${shownText(
+            item.parent.call.message,
+            item.parent.call.hasMedia
+          )}")`
+        : ''
+      text = `${id} by ${name(item.node.call.author)}${answering}: "${shownText(
+        item.node.call.message,
+        item.node.call.hasMedia
+      )}"`
     } else if (item.kind === 'post') {
       const id = label(item.node, item.node)
       const likes = item.node.likeCalls.length
@@ -329,6 +375,7 @@ export function socialDigest(
     ['Tips to you:', lines.tip],
     ['Likes to you:', lines.like],
     ['Answers to you:', lines.answer],
+    ['Posts that tag you:', lines.tag],
     ['New posts:', lines.post],
     ['Private messages to you:', lines.chat],
   ]
@@ -347,5 +394,7 @@ export function socialDigest(
     labels,
     empty,
     readTo: readUpTo(leftOut, lastHeight, from, scanned),
+    tagsShown: counts.tag,
+    tagsPassed,
   }
 }

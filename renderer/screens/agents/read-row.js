@@ -4,12 +4,17 @@ import {Button, Flex, Stack, Switch, Text} from '@chakra-ui/react'
 import {useTranslation} from 'react-i18next'
 import {HDivider, Input, Select} from '../../shared/components/components'
 import {InfoTip} from '../../shared/components/info-tip'
-import {readNumber} from './limit-fields'
+import {NumberField, readNumber} from './limit-fields'
 import {useDraft} from './page-sections'
 import {CriteriaFields} from './criteria-fields'
 
 // The reads of what others wrote: whose, by criteria (B-266).
-export const WHO_READS = ['readPosts', 'readNotifications', 'readMessages']
+export const WHO_READS = [
+  'readPosts',
+  'readNotifications',
+  'readMessages',
+  'readTags',
+]
 
 /** The most posts "the last N" reads (main/agent/profiles.js MAX_POSTS_READ). */
 const MAX_POSTS_READ = 50
@@ -70,6 +75,17 @@ export function ReadRow({id, label, info, row, setActions}) {
           </Flex>
           {id === 'readPosts' && isOn && (
             <PostsWindow row={row} onChange={change} />
+          )}
+          {id === 'readTags' && isOn && (
+            // Its questions of the day (B-264): empty, no limit.
+            <NumberField
+              label={t('posts at most a day (a day in UTC)')}
+              value={typeof row.limit === 'number' ? row.limit : null}
+              min={0}
+              optional
+              placeholder={t('None', {nsSeparator: '!!'})}
+              onSave={(limit) => change({limit})}
+            />
           )}
           {WHO_READS.includes(id) && isOn && (
             <CriteriaFields

@@ -38,7 +38,7 @@ function socialSystem(held, instructions) {
   const actions = socialHeld(held)
   const own = typeof instructions === 'string' ? instructions.trim() : ''
   return [
-    'The app gives you, from Idena Social, your own last posts, then what happened since your last run: tips to you, answers to you, new posts, private messages. Each has a label (p1 a post, c1 a conversation, u1 a person).',
+    'The app gives you, from Idena Social, your own last posts, then what happened since your last run: tips to you, answers to you, posts that tag you, new posts, private messages. Each has a label (p1 a post, c1 a conversation, u1 a person).',
     GUARD,
     '',
     ...(own ? ['Instructions from the person you act for:', own, ''] : []),

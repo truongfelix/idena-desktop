@@ -10,6 +10,7 @@ import {
 } from '../../shared/components/components'
 import {SettingsSection} from '../settings/components'
 import {useAppTexts} from './app-texts'
+import {eventReadBy} from './social/events'
 
 // The agent page's sections (B-255): its Instructions, when it runs and what it spends (what it reads is among its
 // actions since B-262). Each says
@@ -162,7 +163,8 @@ export function nothingToActOn({actions, reads}) {
     acting &&
     reads.posts.window === 'off' &&
     !reads.notifications &&
-    !reads.messages
+    !reads.messages &&
+    !reads.tags
   )
 }
 
@@ -173,6 +175,7 @@ function eventNames(t) {
     answer: t('an answer'),
     tip: t('a tip'),
     message: t('a private message'),
+    tag: t('a post that tags it'),
   }
 }
 
@@ -235,7 +238,7 @@ export function ScheduleSection({agent, onChange}) {
         <Stack spacing={2}>
           <Text>
             {t(
-              'Also runs when it gets (what it reads: its notifications, its private messages)',
+              'Also runs when it gets (what it reads: its notifications, its private messages, the posts that tag it)',
               {nsSeparator: '!!'}
             )}
           </Text>
@@ -244,11 +247,7 @@ export function ScheduleSection({agent, onChange}) {
               <Checkbox
                 key={id}
                 // An event it does not read could start a run that shows it nothing (B-255).
-                isDisabled={
-                  !(id === 'message'
-                    ? agent.reads.messages
-                    : agent.reads.notifications)
-                }
+                isDisabled={!eventReadBy(id, agent.reads)}
                 isChecked={agent.events.includes(id)}
                 onChange={(e) => {
                   const on = e.target.checked

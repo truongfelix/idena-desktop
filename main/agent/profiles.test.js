@@ -71,6 +71,7 @@ describe('agent profiles', () => {
         own: false,
         notifications: false,
         messages: false,
+        tags: null,
       },
       events: [],
     })
@@ -116,7 +117,30 @@ describe('agent profiles', () => {
       own: true,
       notifications: true,
       messages: false,
+      tags: null,
     })
+    // The posts that tag it (B-264): its questions a day (none: no limit), whose, and the event they start.
+    const answering = normalizeAgent({
+      events: ['tag', 'week'],
+      actions: {
+        readTags: {level: 'alone', limit: 3, who: {states: ['Human', 'x']}},
+      },
+    })
+    expect(answering.reads.tags).toEqual({perDay: 3})
+    expect(answering.actions.readTags.who.states).toEqual(['Human'])
+    expect(answering.events).toEqual(['tag'])
+    expect(
+      normalizeAgent({actions: {readTags: {level: 'alone', limit: null}}}).reads
+        .tags
+    ).toEqual({perDay: null})
+    expect(
+      normalizeAgent({actions: {readTags: {level: 'off', limit: 3}}}).reads.tags
+    ).toBe(null)
+    // A part of a question is none.
+    expect(
+      normalizeAgent({actions: {readTags: {level: 'alone', limit: 2.5}}}).reads
+        .tags
+    ).toEqual({perDay: 2})
     // Once they are actions, a read turned off stays off (no migration again).
     const off = normalizeAgent({
       ...migrated,
@@ -142,6 +166,7 @@ describe('agent profiles', () => {
       own: false,
       notifications: true,
       messages: true,
+      tags: null,
     })
     // A joke agent (B-237) read its tips, not others' posts.
     expect(
@@ -151,6 +176,7 @@ describe('agent profiles', () => {
       own: true,
       notifications: true,
       messages: false,
+      tags: null,
     })
     // Only actions not Off count; Post alone reads no notifications.
     expect(
@@ -163,6 +189,7 @@ describe('agent profiles', () => {
       own: true,
       notifications: false,
       messages: false,
+      tags: null,
     })
     expect(
       normalizeAgent({actions: {post: {level: 'off'}}}).reads.posts.window
@@ -174,6 +201,7 @@ describe('agent profiles', () => {
       own: false,
       notifications: false,
       messages: false,
+      tags: null,
     })
     // The daily joke's routine is gone (B-255): a saved task is not kept.
     expect(normalizeAgent({task: 'joke'})).not.toHaveProperty('task')

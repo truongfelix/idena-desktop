@@ -37,8 +37,11 @@ const DEFAULT_TIME = '09:00'
 const POST_WINDOWS = ['off', 'day', 'count']
 const MAX_POSTS_READ = 50
 const DEFAULT_POSTS_READ = 10
-/** The events that start a run besides the schedule: a like, an answer, a tip or a private message to it. */
-const EVENTS = ['like', 'answer', 'tip', 'message']
+/**
+ * The events that start a run besides the schedule: a like, an answer, a tip or a private message to it, a post that
+ * tags it (B-264).
+ */
+const EVENTS = ['like', 'answer', 'tip', 'message', 'tag']
 
 /** The read actions (B-262): what the agent is given to read on Social, each on or off. */
 const READ_ACTIONS = [
@@ -46,6 +49,7 @@ const READ_ACTIONS = [
   'readOwnPosts',
   'readNotifications',
   'readMessages',
+  'readTags',
 ]
 
 /** The posts' window of Read all Social posts: the last 24 hours, or the last N posts. */
@@ -72,6 +76,15 @@ function readsOf(actions) {
     own: isOn(actions.readOwnPosts),
     notifications: isOn(actions.readNotifications),
     messages: isOn(actions.readMessages),
+    // The posts that tag it (B-264), at most `perDay` a day (null: no limit).
+    tags: isOn(actions.readTags)
+      ? {
+          perDay:
+            typeof actions.readTags.limit === 'number'
+              ? Math.floor(actions.readTags.limit)
+              : null,
+        }
+      : null,
   }
 }
 

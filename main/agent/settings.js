@@ -41,6 +41,8 @@ const ACTIONS = {
   readOwnPosts: {level: 'off', limit: null},
   readNotifications: {level: 'off', limit: null},
   readMessages: {level: 'off', limit: null},
+  // The posts that tag it (B-264): `limit` is how many it reads a day (a day in UTC), the questions of a service.
+  readTags: {level: 'off', limit: 5},
   ads: {level: 'off', limit: null},
   oracleVote: {level: 'off', limit: null},
   invite: {level: 'off', limit: null},

@@ -2,6 +2,7 @@ import {socialDigest} from './digest'
 import {criteriaNeeds, passes} from '../criteria'
 import {doneOnFeed, readPlan} from './plan'
 import {mostCost} from './execute'
+import {tagsLeftOf} from './tags'
 import {shortAddress} from '../../social/people'
 
 // One run of an agent on Idena Social (B-239, B-240): the app reads what came since its read point (digest.js), the
@@ -93,11 +94,22 @@ export async function runSocialAgent(agent, social, deps) {
   if (typeof scanned !== 'number')
     return {result: 'failed', detail: t('Social has not read the chain yet')}
   const point = await call('readPoint', {agentId: agent.id})
+  // Its questions left today (B-264): the posts that tag it it may still read, a day in UTC, asked before anything
+  // else is read. Unknown, the run fails before reading (passed over, they would be lost), as for its read point: a
+  // later run reads them.
+  let tagsLeft = 0
+  if (agent.reads?.tags) {
+    const today = await call('tagsToday', {agentId: agent.id})
+    if (typeof today !== 'number')
+      return {result: 'failed', detail: t('its questions of the day unknown')}
+    tagsLeft = tagsLeftOf(agent.reads.tags.perDay, today)
+  }
   // Whose it reads and whom it acts on (B-266): the authors of what is new read first, when a criterion needs it.
   const who = {
     posts: agent.actions.readPosts?.who || null,
     notifications: agent.actions.readNotifications?.who || null,
     messages: agent.actions.readMessages?.who || null,
+    tags: agent.actions.readTags?.who || null,
   }
   const onlyTo = Object.fromEntries(
     held.map((action) => [action, agent.actions[action]?.onlyTo || null])
@@ -116,12 +128,29 @@ export async function runSocialAgent(agent, social, deps) {
   }
   const digest = socialDigest(
     social,
-    {reads: agent.reads, who, facts},
+    {reads: agent.reads, who, facts, tagsLeft},
     {point, scanned}
   )
+  // The posts that tag it past its questions of the day: never read, named in Activity once the point passed them.
+  // A line that could not be written stops nothing.
+  const tellPassed = () =>
+    digest.tagsPassed
+      ? call('didAction', {
+          agentId: agent.id,
+          action: 'readTags',
+          skipped: true,
+          detail: t('{{count}} past its questions of the day, not read', {
+            count: digest.tagsPassed,
+            nsSeparator: '!!',
+          }),
+        }).catch((error) =>
+          global.logger?.warn('agent activity line not written', error?.message)
+        )
+      : null
   // Nothing to read, and no post of its own to write: the model is not asked (its service bills each question).
   if (digest.empty && !held.includes('post')) {
     await call('setReadPoint', {agentId: agent.id, height: digest.readTo})
+    await tellPassed()
     return {result: 'nothing new', detail: ''}
   }
   const {answer} = await call('planSocial', {
@@ -140,7 +169,12 @@ export async function runSocialAgent(agent, social, deps) {
     call('didAction', {agentId: agent.id, action, ...fields})
   // Read: the point moves before any action, so a run stopped midway (the app closed, the window reloaded) never
   // shows the same items again, and never tips or messages twice; what it did not do yet is lost instead.
+  // The posts that tag it it was shown count as its questions of the day, first (a failed save of the point must
+  // not give them again).
+  if (digest.tagsShown)
+    await call('countTags', {agentId: agent.id, n: digest.tagsShown})
   await call('setReadPoint', {agentId: agent.id, height: digest.readTo})
+  await tellPassed()
   // eslint-disable-next-line no-restricted-syntax
   // eslint-disable-next-line no-await-in-loop
   for (const {action, reason} of plan.dropped.slice(0, DROPPED_LINES))
@@ -247,12 +281,9 @@ export async function runSocialAgent(agent, social, deps) {
       })
     }
   }
-  return {
-    result: 'done',
-    detail: t(
-      '{{alone}} done alone, {{ask}} in To approve, {{skipped}} not done, {{failed}} failed',
-      {...count, nsSeparator: '!!'}
-    ),
-    count,
-  }
+  const done = t(
+    '{{alone}} done alone, {{ask}} in To approve, {{skipped}} not done, {{failed}} failed',
+    {...count, nsSeparator: '!!'}
+  )
+  return {result: 'done', detail: done, count}
 }

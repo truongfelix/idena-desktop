@@ -144,6 +144,33 @@ export function actionCatalog(t) {
       reads: [],
       defaults: {level: 'alone'},
     },
+    // The posts that tag it (B-264): questions to a service, at most a number a day.
+    {
+      id: 'readTags',
+      area: 'social',
+      kind: 'read',
+      label: t('Read the posts that tag it'),
+      info: t(
+        'The posts, replies and comments anywhere on Social that hold @ and its profile name, with the post each one answers. At most the number a day you set (a day in UTC), first come first served: those past it are never read. Without a profile name, nothing tags it.',
+        {nsSeparator: '!!'}
+      ),
+      reads: [],
+      // Only validated identities, at first (owner 2026-11-15).
+      defaults: {
+        level: 'alone',
+        limit: 5,
+        who: {
+          only: [],
+          except: [],
+          states: ['Newbie', 'Verified', 'Human'],
+          trustAbove: null,
+          minAge: null,
+          minStake: null,
+          mustWords: [],
+          notWords: [],
+        },
+      },
+    },
   ]
 }
 
@@ -158,6 +185,14 @@ export function socialReadsList({reads}, t) {
   if (reads.notifications)
     out.push(t('Its notifications: likes, answers, tips', {nsSeparator: '!!'}))
   if (reads.messages) out.push(t('Its private messages'))
+  if (reads.tags)
+    out.push(
+      typeof reads.tags.perDay === 'number'
+        ? t('The posts that tag it, {{count}} a day', {
+            count: reads.tags.perDay,
+          })
+        : t('The posts that tag it')
+    )
   return out
 }
 
@@ -220,6 +255,8 @@ export function actionName(action, t) {
       return t('Invite')
     case 'flipStory':
       return t('Write flip stories')
+    case 'readTags':
+      return t('Read the posts that tag it')
     default:
       return action
   }
