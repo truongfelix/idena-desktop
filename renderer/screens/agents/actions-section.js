@@ -117,7 +117,7 @@ export function ActionsSection({agent, agents, catalog, onChange}) {
             ))}
           </Flex>
         )}
-        {area === 'social' && nothingToActOn(agent) && (
+        {nothingToActOn(agent) && (
           <Text color="orange.500">
             {t(
               'Its actions on Social have nothing to act on: give it something to read.',
@@ -156,9 +156,11 @@ export function ActionsSection({agent, agents, catalog, onChange}) {
                 </Grid>
               ) : (
                 <Text color="muted">
-                  {needs.length
-                    ? needs.join(' · ')
-                    : t('Nothing, while its actions here are Off.')}
+                  {needs.length > 0 && needs.join(' · ')}
+                  {needs.length === 0 &&
+                    (does.some(({id}) => isOn(agent, id))
+                      ? t('Nothing', {nsSeparator: '!!'})
+                      : t('Nothing, while its actions here are Off.'))}
                 </Text>
               )}
             </Box>
@@ -200,12 +202,7 @@ export function ActionsSection({agent, agents, catalog, onChange}) {
                         SINGLE_HOLDER.includes(entry.id) &&
                         saved &&
                         saved.level === 'off'
-                          ? () =>
-                              setActions((actions) => {
-                                const next = {...actions}
-                                delete next[entry.id]
-                                return next
-                              })
+                          ? () => changeRow(entry)({level: 'off'})
                           : null
                       }
                     />

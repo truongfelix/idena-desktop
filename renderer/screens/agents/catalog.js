@@ -426,9 +426,13 @@ export function levelLabel(level, t) {
   return t('Off')
 }
 
-/** The agent's actions in one line, each with its level, in the catalog's order. */
+/** Whether the agent holds a right that is not Off (the table keeps a right set to Off as a row, B-280). */
+const holds = (agent, id) =>
+  Boolean(agent.actions[id]) && agent.actions[id].level !== 'off'
+
+/** The agent's actions that are not Off in one line, each with its level, in the catalog's order. */
 export function actionsLine(agent, catalog, t) {
-  const rows = catalog.filter(({id}) => agent.actions[id])
+  const rows = catalog.filter(({id}) => holds(agent, id))
   if (!rows.length) return t('None yet')
   return rows
     .map(({id, label, kind}) => {

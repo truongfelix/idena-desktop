@@ -207,6 +207,8 @@ export function AgentPage({id}) {
       />
       <InstructionsSection agent={agent} onChange={save} />
       <ActionsSection
+        // Another agent's page opens on its own area, its editors closed.
+        key={agent.id}
         agent={agent}
         agents={list.agents}
         catalog={catalog}

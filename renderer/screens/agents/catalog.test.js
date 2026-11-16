@@ -42,6 +42,17 @@ describe('the Agents section lines', () => {
         t
       )
     ).toBe('Answer the flips (Alone), Report flips (Ask me)')
+    // A right set to Off stays a row of the table (B-280): the line leaves it out.
+    expect(
+      actionsLine(
+        agent({actions: {post: {level: 'off'}, like: {level: 'ask'}}}),
+        catalog,
+        t
+      )
+    ).toBe('Like posts (Ask me)')
+    expect(
+      actionsLine(agent({actions: {post: {level: 'off'}}}), catalog, t)
+    ).toBe('None yet')
   })
 
   test('the model reads only what its actions that are not off need, each once', () => {

@@ -2182,7 +2182,6 @@
   "All but these identities (addresses)": "Toutes sauf ces identités (adresses)",
   "Its text holds one of these words (commas)": "Son texte contient un de ces mots (virgules)",
   "Its text holds none of these words (commas)": "Son texte ne contient aucun de ces mots (virgules)",
-  "Whose": "De qui",
   "Not an address, nothing saved: {{list}}": "Pas une adresse, rien n’est gardé : {{list}}",
   "Its service draws no pictures: choose an image model in its connection, on a service that has one.": "Son service ne dessine pas d'images : choisissez un modèle d'images dans sa connexion, sur un service qui en a un.",
   "Writes flip stories and their picture prompts, as your Instructions ask, from the flip's two keywords: in the flip editor when you ask, and in its runs a new draft for each keyword pair that has no flip yet, while flips are left to make.": "Écrit des histoires de flips et les prompts de leurs images, comme vos instructions le demandent, à partir des deux mots-clés du flip : dans l'éditeur de flips quand vous le demandez, et à chacun de ses passages un nouveau brouillon pour chaque paire de mots-clés qui n'a pas encore de flip, tant qu'il reste des flips à faire.",

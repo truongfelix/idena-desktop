@@ -17,10 +17,7 @@ export const isOn = (agent, id) =>
  * another agent can be given it; any other keeps its limits while Off.
  */
 export function withRow(actions, entry, patch) {
-  const row = {
-    ...(actions[entry.id] || {...(entry.defaults || {}), level: 'off'}),
-    ...patch,
-  }
+  const row = {...rowOf({actions}, entry), ...patch}
   if (SINGLE_HOLDER.includes(entry.id) && row.level === 'off') {
     const next = {...actions}
     delete next[entry.id]
