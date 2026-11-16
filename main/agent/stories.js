@@ -1,155 +1,35 @@
-// The agent's "Write flip stories" action (B-236): for a flip's two keywords, one story of 3 or 4 panels and one
-// image prompt per panel, from the owner's templates (notes/agent-flip-story-template.md, approved 2026-11-13 and
-// 2026-11-15). The templates are the app's part of the action; the agent's Instructions go in before their output
-// format, as with the flips (flips.js), so whatever they say, the format the app reads comes last.
-
-const TEMPLATE_3 = [
-  'You are an expert visual storyteller specializing in simple, creative, three-panel stories for Idena Flip challenges.',
-  '',
-  'Your task is to create ONE three-panel story using the following two keywords, and then write three image-generation prompts (one per panel) that I can use to generate the images of the story.',
-  '',
-  '- Keyword 1: {KEYWORD_1}',
-  '- Keyword 2: {KEYWORD_2}',
-  '',
-  '### Storytelling Rules',
-  '',
-  '1. Simple and immediately understandable: A 12-year-old should understand the whole story at a glance, without captions, dialogue, or written text.',
-  '2. One main actor: Use one central character throughout the story.',
-  '3. One clear goal: The main character has a simple, understandable objective.',
-  '4. Logical sequence: The three panels form a coherent chain of actions with clear cause and effect.',
-  '5. Both keywords are essential:',
-  '   - Both keywords are visually prominent and central to the story.',
-  '   - Both keywords actively contribute to the events.',
-  '   - Neither keyword is decorative or randomly inserted.',
-  '   - Removing either keyword would break the story.',
-  '6. Three distinct panels: Each panel shows one significant, easily recognizable visual change.',
-  '7. Clear progression:',
-  '   - Panel 1 sets up the situation and the goal.',
-  '   - Panel 2 shows the key action or turning point.',
-  '   - Panel 3 shows the clear, satisfying result.',
-  '   No unexplained jumps, repeated actions, or sudden resets.',
-  '8. Visual storytelling only: No written words, signs, labels, numbers, speech bubbles, or text on screens or pages.',
-  '9. Originality: Avoid predictable templates, especially stories that begin with a character waking up.',
-  '10. No artificial tricks: No counting tricks, thumbs-up/thumbs-down gestures, or other arbitrary visual shortcuts to connect the keywords.',
-  '',
-  '### Image Prompt Rules',
-  '',
-  'Each of the three image prompts must:',
-  '- Be self-contained (each prompt will be used separately, so repeat all needed details in every prompt).',
-  '- Describe the main character identically in all three prompts (same species/age, clothing, colors, distinctive features) to keep visual consistency.',
-  '- Keep the same art style, setting, lighting, and color palette across all three prompts.',
-  '- Show both keywords clearly and recognizably whenever they appear in the panel.',
-  '- Describe one clear action or state, with the character and keywords in the foreground and a simple, uncluttered background.',
-  '- Explicitly state: "no text, no letters, no numbers, no signs, no speech bubbles, no watermark."',
-  '- Specify a square format (1:1) composition.',
-  '',
-  '### Output Format',
-  '',
-  '**Story Title:** A short, descriptive title.',
-  '',
-  '**Main Character:** One-sentence description of the single central actor.',
-  '',
-  '**Goal:** What the character wants to achieve.',
-  '',
-  '**Story Summary:**',
-  '- Panel 1: Initial situation and goal.',
-  '- Panel 2: Key action or turning point.',
-  '- Panel 3: Clear resolution.',
-  '',
-  '**Keyword Integration:** One sentence per keyword explaining why it is indispensable.',
-  '',
-  '**Image Prompt 1:** [full, standalone prompt]',
-  '',
-  '**Image Prompt 2:** [full, standalone prompt]',
-  '',
-  '**Image Prompt 3:** [full, standalone prompt]',
-  '',
-  '### Final Instructions',
-  '',
-  '- Generate exactly one story with exactly three panels.',
-  '- Prioritize simplicity, creativity, visual clarity, and logical continuity.',
-  '- Each image prompt should be 60–120 words, concrete and visual, with no storytelling commentary.',
-  '- Do not generate the images yourself, and do not perform image verification, quality scoring, or publishing.',
-].join('\n')
-
-const TEMPLATE_4 = [
-  'You are an expert visual storyteller specializing in simple, creative, four-panel stories for Idena Flip challenges.',
-  '',
-  'Your task is to create ONE four-panel story using the following two keywords, and then write four image-generation prompts (one per panel) that I can use to generate the images of the story.',
-  '',
-  '- Keyword 1: {KEYWORD_1}',
-  '- Keyword 2: {KEYWORD_2}',
-  '',
-  '### Storytelling Rules',
-  '',
-  '1. Simple and immediately understandable: A 12-year-old should understand the whole story at a glance, without captions, dialogue, or written text.',
-  '2. One main actor: Use one central character throughout the story.',
-  '3. One clear goal: The main character has a simple, understandable objective.',
-  '4. Logical sequence: The four panels form a coherent chain of actions with clear cause and effect, so that only one order of the panels makes sense.',
-  '5. Both keywords are essential:',
-  '   - Both keywords are visually prominent and central to the story.',
-  '   - Both keywords actively contribute to the events.',
-  '   - Neither keyword is decorative or randomly inserted.',
-  '   - Removing either keyword would break the story.',
-  '6. Four distinct panels: Each panel shows one significant, easily recognizable visual change from the panel before it.',
-  '7. Clear progression:',
-  '   - Panel 1 sets up the situation and the goal.',
-  '   - Panel 2 shows the first action toward the goal.',
-  '   - Panel 3 shows the key turning point: a complication, a discovery, or the decisive action.',
-  '   - Panel 4 shows the clear, satisfying result.',
-  '   No unexplained jumps, repeated actions, or sudden resets.',
-  '8. Visual storytelling only: No written words, signs, labels, numbers, speech bubbles, or text on screens or pages.',
-  '9. Originality: Avoid predictable templates, especially stories that begin with a character waking up.',
-  '10. No artificial tricks: No counting tricks, thumbs-up/thumbs-down gestures, or other arbitrary visual shortcuts to connect the keywords.',
-  '',
-  '### Image Prompt Rules',
-  '',
-  'Each of the four image prompts must:',
-  '- Be self-contained (each prompt will be used separately, so repeat all needed details in every prompt).',
-  '- Describe the main character identically in all four prompts (same species/age, clothing, colors, distinctive features) to keep visual consistency.',
-  '- Keep the same art style, setting, lighting, and color palette across all four prompts.',
-  '- Show both keywords clearly and recognizably whenever they appear in the panel.',
-  '- Describe one clear action or state, with the character and keywords in the foreground and a simple, uncluttered background.',
-  '- Explicitly state: "no text, no letters, no numbers, no signs, no speech bubbles, no watermark."',
-  '- Specify a square format (1:1) composition.',
-  '',
-  '### Output Format',
-  '',
-  '**Story Title:** A short, descriptive title.',
-  '',
-  '**Main Character:** One-sentence description of the single central actor.',
-  '',
-  '**Goal:** What the character wants to achieve.',
-  '',
-  '**Story Summary:**',
-  '- Panel 1: Initial situation and goal.',
-  '- Panel 2: First action toward the goal.',
-  '- Panel 3: Key turning point.',
-  '- Panel 4: Clear resolution.',
-  '',
-  '**Keyword Integration:** One sentence per keyword explaining why it is indispensable.',
-  '',
-  '**Image Prompt 1:** [full, standalone prompt]',
-  '',
-  '**Image Prompt 2:** [full, standalone prompt]',
-  '',
-  '**Image Prompt 3:** [full, standalone prompt]',
-  '',
-  '**Image Prompt 4:** [full, standalone prompt]',
-  '',
-  '### Final Instructions',
-  '',
-  '- Generate exactly one story with exactly four panels.',
-  '- Prioritize simplicity, creativity, visual clarity, and logical continuity.',
-  '- Each image prompt should be 60–120 words, concrete and visual, with no storytelling commentary.',
-  '- Do not generate the images yourself, and do not perform image verification, quality scoring, or publishing.',
-].join('\n')
+// The agent's "Write flip stories" action (B-236, B-268): for a flip's two keywords, the stories and image prompts the
+// person's Instructions ask for. Nothing of the app's tells the model how to write them (owner 2026-11-16, ruling
+// Q-62 changed): the model gets the Instructions, the action's data (the keywords, the person's idea for this story,
+// the parts asked, the stories given before) and the answer's format, which the app reads. The format comes last, so
+// whatever the Instructions say, it is the one the app reads.
 
 const MAX_KEYWORD_LENGTH = 200
+const MAX_IDEA_LENGTH = 2000
+/** The prompts of one answer at most, all its stories together: "3 stories of 4 pictures" fits. */
+const MAX_PROMPTS = 12
+const MAX_FIELD = 2000
+const MAX_STORY = 4000
+/** The earlier stories' titles sent as "not these", the latest ones. */
+const MAX_NOT_THESE = 10
 
-/** The question's text for `panels` (3 or 4) and the flip's two keywords, with the agent's Instructions. */
-function storySystem(panels, words, instructions = '') {
-  if (panels !== 3 && panels !== 4) throw new Error('a story has 3 or 4 panels')
+/** What a story run can give: the stories told in words, the image prompts (the pictures are drawn from those). */
+const PARTS = ['story', 'prompts']
+
+/** The answer's format: the app's whole part of the system text. */
+const FORMAT = [
+  'Answer with one JSON object and nothing else:',
+  '{"stories": [{"title": "a short title", "story": "the story told in words", "prompts": ["one image prompt per picture", "..."]}]}',
+  `"story" only when the story is asked, "prompts" only when the prompts are asked; ${MAX_PROMPTS} prompts at most in all the stories.`,
+].join('\n')
+
+/** The system text: the agent's Instructions when it has some, then the format. */
+function storySystem(instructions = '') {
+  const own = typeof instructions === 'string' ? instructions.trim() : ''
+  return own ? `${own}\n\n${FORMAT}` : FORMAT
+}
+
+function checkWords(words) {
   if (
     !Array.isArray(words) ||
     words.length !== 2 ||
@@ -163,90 +43,114 @@ function storySystem(panels, words, instructions = '') {
     )
   )
     throw new Error("a story needs the flip's two keywords")
-  // A description is cut, never refused: a long community one must not stop the story.
+}
+
+/** The parts asked, in the format's order; at least one. */
+function checkParts(parts) {
+  const asked = PARTS.filter(
+    (part) => Array.isArray(parts) && parts.includes(part)
+  )
+  if (!asked.length)
+    throw new Error('a story run asks for the story, the prompts or both')
+  return asked
+}
+
+/**
+ * The question: the flip's keywords (a description cut, never refused: a long community one must not stop the story),
+ * the person's idea for this story, the parts asked and the titles of the stories given before ("Try another story").
+ */
+function storyQuestion({words, idea = '', parts, notThese = []} = {}) {
+  checkWords(words)
+  const asked = checkParts(parts)
   const keyword = ({name, desc}) => {
     const about = (desc || '').trim().slice(0, MAX_KEYWORD_LENGTH)
     return about ? `${name.trim()} (${about})` : name.trim()
   }
-  // A function as replacement: a "$&" in a keyword stays as it is.
-  const text = (panels === 3 ? TEMPLATE_3 : TEMPLATE_4)
-    .replace('{KEYWORD_1}', () => keyword(words[0]))
-    .replace('{KEYWORD_2}', () => keyword(words[1]))
-  const own = typeof instructions === 'string' ? instructions.trim() : ''
-  if (!own) return text
-  const at = text.indexOf('### Output Format')
-  return `${text.slice(
-    0,
-    at
-  )}### The instructions of the person who runs you, for this and every task\n\n${own}\n\n${text.slice(
-    at
-  )}`
+  const own =
+    typeof idea === 'string' ? idea.trim().slice(0, MAX_IDEA_LENGTH) : ''
+  const before = (Array.isArray(notThese) ? notThese : [])
+    .filter((title) => typeof title === 'string' && title.trim())
+    .slice(-MAX_NOT_THESE)
+    .map((title) => title.trim().slice(0, MAX_FIELD))
+  return [
+    "The flip's two keywords:",
+    `1. ${keyword(words[0])}`,
+    `2. ${keyword(words[1])}`,
+    ...(own ? ['', 'The idea of the person for this story:', own] : []),
+    '',
+    `Asked: ${asked
+      .map((part) => (part === 'story' ? 'the story' : 'the image prompts'))
+      .join(' and ')}.`,
+    ...(before.length
+      ? [
+          '',
+          'Stories given before, not to give again:',
+          ...before.map((title) => `- ${title}`),
+        ]
+      : []),
+  ].join('\n')
 }
 
-const MAX_FIELD = 2000
+const cut = (value, max) =>
+  typeof value === 'string' ? value.trim().slice(0, max) : ''
 
-// The labels of the template's output format: a field runs to the next one of them (or a heading, or a rule), so a
-// bold phrase inside a prompt does not cut it.
-const LABELS = [
-  'Story Title',
-  'Main Character',
-  'Goal',
-  'Story Summary',
-  'Keyword Integration',
-  'Image Prompt \\d+',
-]
-const LABEL = `(?:${LABELS.join('|')})`
-// A label starts a line as bold ("**Goal"), a heading ("### Goal") or followed by its colon ("Goal:"): a line that
-// only begins with the word ("Goal posts …") goes on.
-const NEXT = `\\n[ \\t]*(?:[-*][ \\t]+)?(?:\\*\\*${LABEL}\\b|#{1,6}[ \\t]*${LABEL}\\b|${LABEL}(?:[ \\t]*\\([^)\\n]*\\))?[ \\t]*:)|\\n#{1,6}[ \\t]|\\n[-*_]{3,}[ \\t]*(?:\\n|$)|$`
-
-/**
- * The text after a label, written "**Goal:** …", "**Goal**: …", "### Goal", "Goal:" or with a note in brackets
- * ("**Image Prompt 1 (Panel 1):**"), up to the next label.
- */
-function field(text, label) {
-  const escaped = label.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')
-  const match = new RegExp(
-    `(?:^|\\n)[ \\t]*(?:[-*][ \\t]+)?(?:\\*\\*|#{1,6}[ \\t]*)?${escaped}(?:[ \\t]*\\([^)\\n]*\\))?[ \\t]*:?[ \\t]*(?:\\*\\*)?[ \\t]*:?([\\s\\S]*?)(?=${NEXT})`,
-    'iu'
-  ).exec(text)
-  return match ? match[1].trim().slice(0, MAX_FIELD) : ''
-}
-
-/** A prompt: its first paragraph, so that closing words after it are not sent to the image model. */
-const firstParagraph = (value) => value.split(/\n[ \t]*\n/u)[0].trim()
-
-/**
- * The model's answer read: the story's title, character, goal, its panels' summary, why each keyword matters, and one
- * prompt per panel. Throws when a prompt is missing: the person would get fewer pictures than panels.
- */
-function readStory(text, panels) {
-  const reply = String(text || '').slice(0, 64 * 1024)
-  const summary = field(reply, 'Story Summary')
-  // Each panel's own line ("- Panel 2: …"), never a mention of a panel inside another line.
-  const panelLines = Array.from({length: panels}, (_, i) => {
-    const m = new RegExp(
-      `^[ \\t]*(?:[-*][ \\t]+)?(?:\\*\\*)?Panel ${
-        i + 1
-      }[ \\t]*:?(?:\\*\\*)?:?[ \\t]*(.+)$`,
-      'imu'
-    ).exec(summary)
-    return m ? m[1].replace(/\*\*/gu, '').trim().slice(0, MAX_FIELD) : ''
-  })
-  const prompts = Array.from({length: panels}, (_, i) =>
-    firstParagraph(field(reply, `Image Prompt ${i + 1}`))
-  )
-  const missing = prompts.findIndex((p) => !p)
-  if (missing >= 0)
-    throw new Error(`the answer has no prompt for panel ${missing + 1}`)
-  return {
-    title: field(reply, 'Story Title'),
-    character: field(reply, 'Main Character'),
-    goal: field(reply, 'Goal'),
-    panels: panelLines,
-    keywords: field(reply, 'Keyword Integration'),
-    prompts,
+/** The JSON object of a reply: as it came, or inside a code block or other words around it. */
+function jsonOf(reply) {
+  try {
+    return JSON.parse(reply)
+  } catch {
+    const start = reply.indexOf('{')
+    const end = reply.lastIndexOf('}')
+    if (start < 0 || end <= start) return null
+    try {
+      return JSON.parse(reply.slice(start, end + 1))
+    } catch {
+      return null
+    }
   }
 }
 
-module.exports = {TEMPLATE_3, TEMPLATE_4, readStory, storySystem}
+/**
+ * The model's answer read: its stories, each with its title, its story in words (when asked) and its prompts (when
+ * asked), MAX_PROMPTS prompts at most in all (the ones after are dropped). Throws when the parts asked are not there:
+ * the person would get nothing to use.
+ */
+function readStories(text, parts) {
+  const asked = checkParts(parts)
+  const answer = jsonOf(
+    String(text || '')
+      .slice(0, 64 * 1024)
+      .trim()
+  )
+  if (!answer || !Array.isArray(answer.stories))
+    throw new Error('the answer is not in the format asked')
+  let left = asked.includes('prompts') ? MAX_PROMPTS : 0
+  const stories = answer.stories
+    .filter((one) => one && typeof one === 'object')
+    .map((one) => {
+      const prompts = (Array.isArray(one.prompts) ? one.prompts : [])
+        .map((prompt) => cut(prompt, MAX_FIELD))
+        .filter(Boolean)
+        .slice(0, left)
+      left -= prompts.length
+      return {
+        title: cut(one.title, MAX_FIELD),
+        story: asked.includes('story') ? cut(one.story, MAX_STORY) : '',
+        prompts,
+      }
+    })
+    .filter((one) => one.story || one.prompts.length)
+  if (asked.includes('prompts') && !stories.some((one) => one.prompts.length))
+    throw new Error('the answer has no image prompt')
+  if (!stories.length) throw new Error('the answer has no story')
+  return {stories}
+}
+
+module.exports = {
+  FORMAT,
+  MAX_PROMPTS,
+  PARTS,
+  readStories,
+  storyQuestion,
+  storySystem,
+}

@@ -4,7 +4,7 @@ const {createPending} = require('./pending')
 const {createReadPoints} = require('./read-points')
 const {agentSettings, reportAgent, validationAgent} = require('./profiles')
 const {checkFlip, flipQuestion, mediaType, readFlipAnswer} = require('./flips')
-const {readStory, storySystem} = require('./stories')
+const {readStories, storyQuestion, storySystem} = require('./stories')
 const {socialHeld, socialSystem} = require('./social')
 const providers = require('./providers')
 
@@ -507,11 +507,12 @@ function createAgent({
       }
     },
     /**
-     * A flip's story (B-236): for the agent `agentId` holding "Write flip stories" (not Off), one story of `panels`
-     * (3 or 4) panels for the flip's two keywords `words`, and one image prompt per panel, read from its answer. Nothing
-     * goes to the chain: the person copies the prompts, or the images come into the flip editor for them to check.
+     * A flip's stories (B-236, B-268): for the agent `agentId` holding "Write flip stories" (not Off), the stories and
+     * image prompts its Instructions ask for, for the flip's two keywords `words`, the person's `idea`, the `parts`
+     * asked ('story', 'prompts') and the titles given before (`notThese`). Nothing goes to the chain: the person reads
+     * the stories, edits the prompts, and the pictures come into the flip editor for them to choose.
      */
-    async writeStory({agentId, panels, words, timeoutMs} = {}) {
+    async writeStory({agentId, words, idea, parts, notThese, timeoutMs} = {}) {
       if (!profiles) throw new Error('no agents')
       const file = profiles.read()
       const agent = file.agents.find((one) => one.id === agentId)
@@ -526,7 +527,8 @@ function createAgent({
         })
         throw new Error(`the agent may not do it (${check.reason})`)
       }
-      const system = storySystem(panels, words, agent.instructions)
+      const question = storyQuestion({words, idea, parts, notThese})
+      const system = storySystem(agent.instructions)
       const controller = new AbortController()
       writing.add(controller)
       try {
@@ -538,21 +540,24 @@ function createAgent({
             key: key.read(destination(agent)),
           },
           system,
-          [{type: 'text', text: 'Write the story and its prompts now.'}],
+          [{type: 'text', text: question}],
           {
             timeoutMs: clampTimeout(timeoutMs),
             signal: controller.signal,
             maxTokens: STORY_MAX_TOKENS,
           }
         )
-        const story = readStory(answer, panels)
+        const written = readStories(answer, parts)
         log({
           agentId,
           action: 'flipStory',
           decision: check.decision,
-          detail: story.title,
+          detail: written.stories
+            .map((one) => one.title)
+            .filter(Boolean)
+            .join(' · '),
         })
-        return story
+        return written
       } catch (error) {
         log({
           agentId,
