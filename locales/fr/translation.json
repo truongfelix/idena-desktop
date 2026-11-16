@@ -2281,5 +2281,6 @@
   "is where the app lists the actions it may do.": "est la place où l'app liste les actions qu'il peut faire.",
   "Delete a sent flip": "Effacer un flip envoyé",
   "Deletes a sent flip the judge failed, yours or an agent's. A deletion costs a fee: set the iDNA it may spend a day; past it, or without a limit, it waits for you.": "Efface un flip envoyé que le juge a refusé, le vôtre ou celui d'un agent. Effacer coûte des frais : réglez les iDNA qu'il peut dépenser par jour ; au-delà, ou sans limite, il attend votre accord.",
-  "wants to delete a sent flip": "veut effacer un flip envoyé"
+  "wants to delete a sent flip": "veut effacer un flip envoyé",
+  "Sent flips the judge failed, yours too": "Les flips envoyés que le juge a refusés, les vôtres aussi"
 }

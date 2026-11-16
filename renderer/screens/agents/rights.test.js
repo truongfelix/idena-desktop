@@ -88,7 +88,10 @@ describe('the areas', () => {
 
 describe('the starting points of Flips', () => {
   test('each sets every step of the catalog, and no other right', () => {
-    const steps = catalog.filter(({area}) => area === 'flips').map(({id}) => id)
+    // Deleting a sent flip costs a fee (B-277): it is a row of Flips that no starting point sets.
+    const steps = catalog
+      .filter(({area, id}) => area === 'flips' && id !== 'flipDeleteSent')
+      .map(({id}) => id)
     expect(FLIP_STEPS).toEqual(steps)
     flipStarts(t).forEach(({levels}) =>
       expect(Object.keys(levels)).toEqual(steps)

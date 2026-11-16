@@ -97,6 +97,7 @@ export function actionCatalog(t) {
     {
       id: 'flipDeleteSent',
       area: 'flips',
+      scope: t('Sent flips the judge failed, yours too'),
       label: t('Delete a sent flip'),
       info: t(
         "Deletes a sent flip the judge failed, yours or an agent's. A deletion costs a fee: set the iDNA it may spend a day; past it, or without a limit, it waits for you.",
