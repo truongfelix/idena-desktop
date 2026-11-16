@@ -5,6 +5,7 @@
 // whatever the Instructions say, it is the one the app reads.
 
 const {firstJsonObject} = require('./flips')
+const {fillPart} = require('./app-parts')
 
 const MAX_KEYWORD_LENGTH = 200
 const MAX_IDEA_LENGTH = 2000
@@ -25,8 +26,12 @@ const FORMAT = [
   `"story" only when the story is asked, "prompts" only when the prompts are asked; ${MAX_PROMPTS} prompts at most in all the stories.`,
 ].join('\n')
 
-/** The system text: the agent's Instructions when it has some, then the format. */
-function storySystem(instructions = '') {
+/**
+ * The system text: the agent's Instructions when it has some, then the format. `custom`: the agent's own part for
+ * the flip stories (B-282, app-parts.js), sent in place of it.
+ */
+function storySystem(instructions = '', custom = null) {
+  if (custom) return fillPart(custom, {instructions})
   const own = typeof instructions === 'string' ? instructions.trim() : ''
   return own ? `${own}\n\n${FORMAT}` : FORMAT
 }

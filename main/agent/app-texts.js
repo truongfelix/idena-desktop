@@ -8,7 +8,9 @@ const {
   SOCIAL_SUGGESTION,
   socialHeld,
   socialSystem,
+  socialTemplate,
 } = require('./social')
+const {INSTRUCTIONS_SLOT} = require('./app-parts')
 
 /**
  * The owner's story template of 2026-11-13 and 2026-11-15 (four panels), as a suggestion for the Instructions: its
@@ -84,6 +86,16 @@ function flipExample() {
 }
 
 /**
+ * The app's part of each area with its slots (B-282, app-parts.js): what the agent's page shows locked, and what an
+ * unlocked text starts from.
+ */
+const defaultParts = () => ({
+  flipStory: storySystem(INSTRUCTIONS_SLOT),
+  validation: flipSystem(INSTRUCTIONS_SLOT),
+  social: socialTemplate(),
+})
+
+/**
  * Each action's app part as sent without Instructions (the system text, then the question with stand-ins for the
  * data), and the suggestions: the ⓘ and the Instructions' "Add the suggestion". `held`: the Social actions the agent
  * holds, as its run lists them.
@@ -110,7 +122,8 @@ function appTexts({held = SOCIAL_ACTIONS} = {}) {
       answerFlip: FLIP_SUGGESTION,
       social: SOCIAL_SUGGESTION,
     },
+    parts: defaultParts(),
   }
 }
 
-module.exports = {STORY_SUGGESTION, appTexts}
+module.exports = {STORY_SUGGESTION, appTexts, defaultParts}

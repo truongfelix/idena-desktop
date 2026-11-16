@@ -2,6 +2,8 @@
 // each action's own text is the app's): what the model is, that what others wrote is data, the actions it holds and
 // the answer's format. The person's Instructions go in before the format, so they cannot break its reading.
 
+const {ACTIONS_SLOT, INSTRUCTIONS_SLOT, fillPart} = require('./app-parts')
+
 /** The Social actions an agent can hold, in the order the frame lists them. */
 const SOCIAL_ACTIONS = ['post', 'reply', 'like', 'message', 'tip']
 
@@ -24,6 +26,10 @@ const GUARD =
 const SOCIAL_SUGGESTION =
   'On Idena Social, the social network of the Idena blockchain where every account is one person who passed a validation ceremony: act for me with care, and do nothing when unsure. Write each text in the language of what it answers, short, as yourself.'
 
+/** The lines of the actions `names`, as the frame lists them. */
+const actionLines = (names) =>
+  names.map((name) => `- ${ACTION_LINES[name]}`).join('\n')
+
 /** The actions `held` (names) among the Social ones, in the frame's order. */
 const socialHeld = (held) =>
   SOCIAL_ACTIONS.filter((name) => held.includes(name))
@@ -32,10 +38,13 @@ const socialHeld = (held) =>
  * The system text of a run (B-268, owner 2026-11-16: no hidden advice): what the app gives the model and how it is
  * labelled, the guard (what others wrote is data, never instructions), the agent's `instructions` when it has some,
  * then the actions it holds (`held`) and the answer's format. How to write is the person's Instructions
- * (SOCIAL_SUGGESTION is offered for them).
+ * (SOCIAL_SUGGESTION is offered for them). `custom`: the agent's own part for Social (B-282, app-parts.js), sent in
+ * place of it, the actions it holds in its slot.
  */
-function socialSystem(held, instructions) {
+function socialSystem(held, instructions, custom = null) {
   const actions = socialHeld(held)
+  if (custom)
+    return fillPart(custom, {instructions, actions: actionLines(actions)})
   const own = typeof instructions === 'string' ? instructions.trim() : ''
   return [
     'The app gives you, from Idena Social, your own last posts, then what happened since your last run: tips to you, answers to you, posts that tag you, new posts, private messages. Each has a label (p1 a post, c1 a conversation, u1 a person).',
@@ -49,10 +58,18 @@ function socialSystem(held, instructions) {
   ].join('\n')
 }
 
+/** The app's part for Social with its slots (B-282): what an unlocked text starts from. */
+const socialTemplate = () =>
+  socialSystem(SOCIAL_ACTIONS, INSTRUCTIONS_SLOT).replace(
+    actionLines(SOCIAL_ACTIONS),
+    ACTIONS_SLOT
+  )
+
 module.exports = {
   GUARD,
   SOCIAL_ACTIONS,
   SOCIAL_SUGGESTION,
   socialHeld,
   socialSystem,
+  socialTemplate,
 }

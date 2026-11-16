@@ -1,6 +1,8 @@
 const crypto = require('crypto')
 const fs = require('fs-extra')
 const {criteriaField} = require('./criteria')
+const {normalizeParts} = require('./app-parts')
+const {defaultParts} = require('./app-texts')
 const {
   ACTIONS,
   LEVELS,
@@ -274,6 +276,7 @@ function normalizeAgent(input, {id = newAgentId} = {}) {
   const schedule =
     value.schedule && typeof value.schedule === 'object' ? value.schedule : {}
   // A number, or a number written as text; anything else (an empty field included) is no budget.
+  const appParts = normalizeParts(value.appParts, defaultParts())
   const budget =
     typeof value.budgetPerDay === 'number' ||
     (typeof value.budgetPerDay === 'string' && value.budgetPerDay.trim())
@@ -307,6 +310,8 @@ function normalizeAgent(input, {id = newAgentId} = {}) {
     reportThresholds,
     // Its actions read with the Flips area's steps (B-258): see withFlipPictures.
     flipSteps: true,
+    // The app's parts it changed (B-282), only when it changed one: an older build reads the app's own.
+    ...(Object.keys(appParts).length ? {appParts} : {}),
   }
 }
 
