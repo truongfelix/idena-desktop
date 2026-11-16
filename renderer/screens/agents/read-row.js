@@ -156,7 +156,20 @@ export function ReadRow({entry, row, change}) {
             onSave={(limit) => change({limit})}
           />
         )}
-        {id !== 'readPosts' && id !== 'readTags' && <NoCell />}
+        {id === 'readOwnPosts' && (
+          // How many of its last posts (owner 2026-11-17): empty, the app's ten.
+          <NumberField
+            label={t('of its last posts at most')}
+            value={typeof row.limit === 'number' ? row.limit : null}
+            min={1}
+            optional
+            placeholder="10"
+            onSave={(limit) =>
+              change({limit: limit > MAX_POSTS_READ ? MAX_POSTS_READ : limit})
+            }
+          />
+        )}
+        {!['readPosts', 'readTags', 'readOwnPosts'].includes(id) && <NoCell />}
       </Box>
       {hasWho && open && (
         <Box gridColumn="1 / -1" pb={4} maxW="xl">

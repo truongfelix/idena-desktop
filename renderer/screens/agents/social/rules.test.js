@@ -113,6 +113,24 @@ describe('the rules of a run', () => {
     expect(rules.allows('tip', [BOB])).toBeNull()
   })
 
+  test('what the agent did, as the main process noted it, counts before the chain shows it', () => {
+    const noted = [
+      {action: 'tip', who: ANN, height: 100},
+      {action: 'tip', who: BOB, height: 100 - 8 * DAY_BLOCKS},
+    ]
+    const rules = actionRules(
+      {tip: {perAuthor: 'week'}, like: {perAuthor: 'day'}},
+      {me: ME},
+      120,
+      [],
+      noted
+    )
+    expect(rules.allows('tip', [ANN])).toBe('once per author')
+    // Older than the period, and another action: no.
+    expect(rules.allows('tip', [BOB])).toBeNull()
+    expect(rules.allows('like', [ANN])).toBeNull()
+  })
+
   test('a message only to who wrote first, when the row asks for it', () => {
     const strict = actionRules({message: {onlyAnswers: true}}, social(), 9000)
     expect(strict.allows('message', [BOB])).toBeNull()

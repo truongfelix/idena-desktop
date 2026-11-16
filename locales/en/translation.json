@@ -2285,5 +2285,6 @@
   "is where the app lists the actions it may do; without it, the list goes at the end.": "is where the app lists the actions it may do; without it, the list goes at the end.",
   "You changed the app’s part for this area. What is sent is in What the app adds.": "You changed the app’s part for this area. What is sent is in What the app adds.",
   "Not a topic name, nothing saved: {{list}}": "Not a topic name, nothing saved: {{list}}",
-  "{{count}} past its posts of the day, not read": "{{count}} past its posts of the day, not read"
+  "{{count}} past its posts of the day, not read": "{{count}} past its posts of the day, not read",
+  "of its last posts at most": "of its last posts at most"
 }

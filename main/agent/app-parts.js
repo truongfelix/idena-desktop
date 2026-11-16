@@ -41,14 +41,15 @@ function fillPart(template, {instructions = '', actions = ''} = {}) {
  */
 function normalizeParts(value, defaults) {
   const saved = value && typeof value === 'object' ? value : {}
+  // A text past the longest is cut there (the page's editor cannot write one; a file edited by hand can): the
+  // person's text is never replaced by the app's unsaid.
   return Object.fromEntries(
     PARTS.filter(
       (name) =>
         typeof saved[name] === 'string' &&
         saved[name].trim() &&
-        saved[name].length <= MAX_PART_LENGTH &&
         saved[name].trim() !== defaults[name].trim()
-    ).map((name) => [name, saved[name]])
+    ).map((name) => [name, saved[name].slice(0, MAX_PART_LENGTH)])
   )
 }
 

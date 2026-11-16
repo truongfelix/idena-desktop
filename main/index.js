@@ -190,6 +190,7 @@ const agentFile = (name) => join(app.getPath('userData'), 'agent', name)
 const agentProfiles = createAgentProfiles({
   file: () => agentFile('agents.json'),
   singleFile: () => agentFile('settings.json'),
+  partsFile: () => agentFile('agent-parts.json'),
   logger,
 })
 const agent = createAgent({

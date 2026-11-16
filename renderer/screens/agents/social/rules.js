@@ -80,9 +80,10 @@ export function wroteFirst({conversations = [], me}) {
  * author', 'did not write first') or null; `did(action, whom)` counts one this run asked for (done alone or waiting
  * in To approve), so a second one for the same author in the run is refused too. `rows`: the agent's actions,
  * `scanned` the last block read, `waiting` what earlier runs left in To approve ([{action, whom}]): each counts as
- * done for its author until the person decides. The chain is read only when a row has a rule.
+ * done for its author until the person decides; `noted` what the agent did as the main process kept it
+ * ([{action, who, height}]). The chain is read only when a row has a rule.
  */
-export function actionRules(rows, social, scanned, waiting = []) {
+export function actionRules(rows, social, scanned, waiting = [], noted = []) {
   let acts = null
   let wrote = null
   const key = (action, one) => `${action}:${String(one).toLowerCase()}`
@@ -102,8 +103,18 @@ export function actionRules(rows, social, scanned, waiting = []) {
       if (!blocks) return null
       acts = acts || lastActs(social)
       const recent = (one) => {
-        const last = acts[action]?.get(String(one).toLowerCase())
-        return typeof last === 'number' && last > scanned - blocks
+        const who = String(one).toLowerCase()
+        const last = acts[action]?.get(who)
+        return (
+          (typeof last === 'number' && last > scanned - blocks) ||
+          // Done by the agent and noted by the main process: sent, maybe not in a block the scan read yet.
+          noted.some(
+            (act) =>
+              act.action === action &&
+              act.who === who &&
+              act.height > scanned - blocks
+          )
+        )
       }
       return whom.some((one) => asked.has(key(action, one)) || recent(one))
         ? 'once per author'

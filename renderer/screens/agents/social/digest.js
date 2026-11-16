@@ -294,7 +294,10 @@ export function socialDigest(
   const own = reads?.own
     ? feed
         .filter(({call}) => call.author === me && call.height <= scanned)
-        .slice(0, OWN_POSTS_SHOWN)
+        .slice(
+          0,
+          typeof reads.ownCount === 'number' ? reads.ownCount : OWN_POSTS_SHOWN
+        )
         .reverse()
         .map(({call}) => `- "${shownText(call.message, call.hasMedia)}"`)
     : []

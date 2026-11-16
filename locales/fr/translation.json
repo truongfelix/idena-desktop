@@ -2285,5 +2285,6 @@
   "is where the app lists the actions it may do; without it, the list goes at the end.": "est la place où l'app liste les actions qu'il peut faire ; sans lui, la liste va à la fin.",
   "You changed the app’s part for this area. What is sent is in What the app adds.": "Vous avez modifié la partie de l'app pour ce domaine. Ce qui est envoyé est dans Ce que l'app ajoute.",
   "Not a topic name, nothing saved: {{list}}": "Pas un nom de sujet, rien enregistré : {{list}}",
-  "{{count}} past its posts of the day, not read": "{{count}} au-delà de ses publications du jour, non lues"
+  "{{count}} past its posts of the day, not read": "{{count}} au-delà de ses publications du jour, non lues",
+  "of its last posts at most": "de ses dernières publications au plus"
 }

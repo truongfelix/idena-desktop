@@ -716,6 +716,67 @@ describe('a Social run', () => {
     })
   })
 
+  test('once per author: a like sent counts at the next run, before the chain shows it', async () => {
+    const agent = start({
+      readPosts: {level: 'alone', window: 'count', count: 50},
+      like: {level: 'alone', limit: 5, perAuthor: 'day'},
+    })
+    const label = (social, id, more = {}) =>
+      [
+        ...socialDigest(
+          social,
+          {reads: agent.reads},
+          {point: null, scanned: HEAD, ...more}
+        ).labels,
+      ].find(([, item]) => item.node?.id === id)[0]
+    answer = JSON.stringify({actions: [{do: 'like', to: label(state(), 30)}]})
+    await expect(runSocialAgent(agent, state(), deps())).resolves.toMatchObject(
+      {count: {alone: 1}}
+    )
+    await expect(main.handle('actsDone', {agentId: ID})).resolves.toEqual([
+      {action: 'like', who: ANN, height: HEAD},
+    ])
+    // The next run: the feed does not show the like yet, a new post of Ann is not liked.
+    const next = state({
+      head: HEAD + 3,
+      feed: [node(32, ANN, 'A new post', HEAD + 2), ...feed()],
+    })
+    answer = JSON.stringify({
+      actions: [
+        {do: 'like', to: label(next, 32, {point: HEAD, scanned: HEAD + 3})},
+      ],
+    })
+    const again = deps()
+    await expect(runSocialAgent(agent, next, again)).resolves.toMatchObject({
+      count: {alone: 0, skipped: 1},
+    })
+    expect(again.sent).toEqual([])
+  })
+
+  test('its own posts: as many as its row says, ten without a number', () => {
+    const mine = Array.from({length: 12}, (_, i) =>
+      node(100 + i, ME, `Mine ${i}`, 9000 + i)
+    ).reverse()
+    const own = (reads) =>
+      socialDigest(
+        state({feed: mine}),
+        {reads: {posts: {window: 'off', count: 10}, ...reads}},
+        {point: 9900, scanned: HEAD}
+      ).text.match(/Mine \d+/gu) || []
+    expect(own({own: true})).toHaveLength(10)
+    expect(own({own: true, ownCount: 3})).toEqual([
+      'Mine 9',
+      'Mine 10',
+      'Mine 11',
+    ])
+    expect(own({own: false, ownCount: 3})).toEqual([])
+    const agent = start({readOwnPosts: {level: 'alone', limit: 3}})
+    expect(agent.reads).toMatchObject({own: true, ownCount: 3})
+    expect('ownCount' in start({readOwnPosts: {level: 'alone'}}).reads).toBe(
+      false
+    )
+  })
+
   test('a private message only to who wrote to it first (B-281)', async () => {
     const agent = start({
       readPosts: {level: 'alone', window: 'count', count: 50},

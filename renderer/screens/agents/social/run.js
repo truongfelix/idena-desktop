@@ -230,7 +230,8 @@ export async function runSocialAgent(agent, social, deps) {
         return {action, whom: target.others}
       return {action, whom: target && target.author ? [target.author] : []}
     })
-  const rules = actionRules(agent.actions, social, scanned, waiting)
+  const noted = (await call('actsDone', {agentId: agent.id})) || []
+  const rules = actionRules(agent.actions, social, scanned, waiting, noted)
   const names = social.names || {}
   // eslint-disable-next-line no-restricted-syntax
   for (const planned of plan.actions) {
@@ -337,6 +338,14 @@ export async function runSocialAgent(agent, social, deps) {
       // eslint-disable-next-line no-await-in-loop
       const done = await deps.send(pending)
       count.alone += 1
+      // Noted for once per author, until the chain shows it; a note that fails stops nothing.
+      // eslint-disable-next-line no-await-in-loop
+      await call('noteActs', {
+        agentId: agent.id,
+        action,
+        whom,
+        height: scanned,
+      }).catch(() => {})
       // eslint-disable-next-line no-await-in-loop
       await log(action, {ok: true, cost, detail: `${detail} · ${done}`})
     } catch (error) {

@@ -98,6 +98,17 @@ function readsOf(actions) {
         }
       : {window: 'off', count: (posts && posts.count) || DEFAULT_POSTS_READ},
     own: isOn(actions.readOwnPosts),
+    // How many of its last posts it reads (owner 2026-11-17): the row's limit, kept only when set (else the
+    // digest's own number).
+    ...(isOn(actions.readOwnPosts) &&
+    typeof actions.readOwnPosts.limit === 'number'
+      ? {
+          ownCount: Math.min(
+            MAX_POSTS_READ,
+            Math.floor(actions.readOwnPosts.limit)
+          ),
+        }
+      : {}),
     notifications: isOn(actions.readNotifications),
     messages: isOn(actions.readMessages),
     // The posts that tag it (B-264), at most `perDay` a day (null: no limit).
@@ -442,7 +453,7 @@ const reportAgent = (file) =>
  * The file of agents (`file`), read with its defaults; with none yet, the single agent's setup (`singleFile`) read
  * as one agent, written to `file` only at the first change.
  */
-function createAgentProfiles({file, singleFile, logger}) {
+function createAgentProfiles({file, singleFile, partsFile, logger}) {
   const readJson = (path) => {
     try {
       return {value: fs.readJsonSync(path)}
@@ -452,10 +463,27 @@ function createAgentProfiles({file, singleFile, logger}) {
       return {missing: error.code === 'ENOENT'}
     }
   }
+  // The app's parts an agent changed (B-282) are kept in a file of their own (`partsFile`), by agent: a build
+  // before B-282 rewrites the file of agents without the fields it does not know, and would drop them. Read back
+  // into each agent; one still in the file of agents (saved before this) stays.
+  const withParts = (value) => {
+    if (!partsFile || !value || !Array.isArray(value.agents)) return value
+    const side = readJson(partsFile()).value
+    const parts = side && typeof side.parts === 'object' ? side.parts : null
+    if (!parts) return value
+    return {
+      ...value,
+      agents: value.agents.map((agent) =>
+        agent && !agent.appParts && parts[agent.id]
+          ? {...agent, appParts: parts[agent.id]}
+          : agent
+      ),
+    }
+  }
   return {
     read() {
       const saved = readJson(file())
-      if (saved.value) return normalizeAgents(saved.value)
+      if (saved.value) return normalizeAgents(withParts(saved.value))
       // An unreadable file of agents is not replaced by the older setup: its agents would come back.
       if (!saved.missing || !singleFile)
         return {v: FORMAT, paused: false, agents: []}
@@ -468,7 +496,28 @@ function createAgentProfiles({file, singleFile, logger}) {
       const normalized = normalizeAgents(value)
       // Written beside, then renamed over the file: a power cut leaves the old file or the new one, never half.
       const temp = `${file()}.tmp`
-      fs.outputJsonSync(temp, normalized, {spaces: 2})
+      if (!partsFile) {
+        fs.outputJsonSync(temp, normalized, {spaces: 2})
+        fs.renameSync(temp, file())
+        return normalized
+      }
+      // The parts first, then the agents without them.
+      const parts = Object.fromEntries(
+        normalized.agents
+          .filter((agent) => agent.appParts)
+          .map((agent) => [agent.id, agent.appParts])
+      )
+      const partsTemp = `${partsFile()}.tmp`
+      fs.outputJsonSync(partsTemp, {v: 1, parts}, {spaces: 2})
+      fs.renameSync(partsTemp, partsFile())
+      fs.outputJsonSync(
+        temp,
+        {
+          ...normalized,
+          agents: normalized.agents.map(({appParts, ...agent}) => agent),
+        },
+        {spaces: 2}
+      )
       fs.renameSync(temp, file())
       return normalized
     },
