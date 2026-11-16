@@ -3,6 +3,8 @@ const fs = require('fs-extra')
 // How far each agent read Idena Social (B-239): the block its last run read up to, kept by the main process in one
 // JSON file of the user data folder (agent-read.json), so that a restart does not show it the same posts and
 // messages again. A run reads what came after its point, then moves it to the block it read up to.
+// The same file keeps when each agent's last run ended without failing (B-274), so a daily agent runs once a day,
+// not again at each start of the app; a build before it reads `points` alone and drops `runs` when it saves.
 
 const ID_PATTERN = /^[0-9a-f]{16}$/u
 
@@ -19,12 +21,26 @@ function readPoints(value) {
   )
 }
 
+/** The last runs saved, each one checked: {agentId: ms}. */
+function readRuns(value) {
+  const saved = value && typeof value === 'object' ? value.runs : null
+  if (!saved || typeof saved !== 'object') return {}
+  return Object.fromEntries(
+    Object.entries(saved).filter(
+      ([id, at]) => ID_PATTERN.test(id) && Number.isSafeInteger(at) && at > 0
+    )
+  )
+}
+
 /** The points over `file` (none: kept until the app closes). */
-function createReadPoints({file = null, logger = null} = {}) {
+function createReadPoints({file = null, logger = null, now = Date.now} = {}) {
   let points = {}
+  let runs = {}
   if (file)
     try {
-      points = readPoints(fs.readJsonSync(file()))
+      const saved = fs.readJsonSync(file())
+      points = readPoints(saved)
+      runs = readRuns(saved)
     } catch (error) {
       if (error.code !== 'ENOENT' && logger)
         logger.warn('agent read points unreadable', error.toString())
@@ -34,7 +50,7 @@ function createReadPoints({file = null, logger = null} = {}) {
     if (!file) return
     try {
       const temp = `${file()}.tmp`
-      fs.outputJsonSync(temp, {v: 1, points}, {spaces: 2})
+      fs.outputJsonSync(temp, {v: 1, points, runs}, {spaces: 2})
       fs.renameSync(temp, file())
     } catch (error) {
       if (logger) logger.warn('agent read points not written', error.toString())
@@ -61,14 +77,34 @@ function createReadPoints({file = null, logger = null} = {}) {
         }
         return points[agentId]
       },
+      /** When the agent `agentId`'s last run ended without failing (ms), or null. */
+      lastRun(data) {
+        const id = data && data.agentId
+        return Object.prototype.hasOwnProperty.call(runs, id) ? runs[id] : null
+      },
+      /** The agent `agentId`'s run ended now without failing. */
+      setLastRun(data) {
+        const agentId = data && data.agentId
+        if (!ID_PATTERN.test(agentId)) throw new Error('no agent named')
+        runs = {...runs, [agentId]: now()}
+        save()
+        return runs[agentId]
+      },
     },
     /** After a change of the agents (`liveIds`, the ids left): a removed agent's point goes with it. */
     keepOnly(liveIds) {
       const kept = Object.fromEntries(
         Object.entries(points).filter(([id]) => liveIds.includes(id))
       )
-      if (Object.keys(kept).length !== Object.keys(points).length) {
+      const keptRuns = Object.fromEntries(
+        Object.entries(runs).filter(([id]) => liveIds.includes(id))
+      )
+      if (
+        Object.keys(kept).length !== Object.keys(points).length ||
+        Object.keys(keptRuns).length !== Object.keys(runs).length
+      ) {
         points = kept
+        runs = keptRuns
         save()
       }
     },

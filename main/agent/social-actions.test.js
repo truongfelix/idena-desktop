@@ -200,6 +200,49 @@ describe('Social actions', () => {
     await expect(again.handle('readPoint', {agentId: ID})).resolves.toBe(null)
   })
 
+  test("an agent's last run outlives a restart, keeps the read points, and goes with its agent (B-274)", async () => {
+    const at = new Date(2026, 10, 15, 12).getTime()
+    const agent = start([social({reply: {level: 'ask'}})])
+    await expect(agent.handle('lastRun', {agentId: ID})).resolves.toBe(null)
+    await agent.handle('setReadPoint', {agentId: ID, height: 500})
+    await expect(agent.handle('setLastRun', {agentId: ID})).resolves.toBe(at)
+    const file = path.join(dir, 'agent-read.json')
+    expect(fs.readJsonSync(file)).toEqual({
+      v: 1,
+      points: {[ID]: 500},
+      runs: {[ID]: at},
+    })
+    await expect(start().handle('lastRun', {agentId: ID})).resolves.toBe(at)
+    await expect(start().handle('readPoint', {agentId: ID})).resolves.toBe(500)
+    await expect(agent.handle('setLastRun', {agentId: 'x'})).rejects.toThrow(
+      'no agent named'
+    )
+    // A file of a build before it (points alone), or a damaged time: read, the time unknown.
+    fs.writeJsonSync(file, {v: 1, points: {[ID]: 7}, runs: {[ID]: 'noon'}})
+    await expect(start().handle('lastRun', {agentId: ID})).resolves.toBe(null)
+    await expect(start().handle('readPoint', {agentId: ID})).resolves.toBe(7)
+    await start().handle('setLastRun', {agentId: ID})
+    const again = start()
+    await again.handle('removeAgent', {agentId: ID})
+    await expect(again.handle('lastRun', {agentId: ID})).resolves.toBe(null)
+    expect(fs.readJsonSync(file).runs).toEqual({})
+  })
+
+  test('a run names what started it in Activity, one of four kinds (B-274)', async () => {
+    const agent = start([social({reply: {level: 'ask'}})])
+    await agent.handle('runStarted', {agentId: ID, why: 'daily'})
+    await expect(
+      agent.handle('runStarted', {agentId: ID, why: 'weekly'})
+    ).rejects.toThrow('no such run')
+    await expect(
+      agent.handle('runStarted', {agentId: 'bbbbbbbbbbbbbbbb', why: 'now'})
+    ).rejects.toThrow('no such agent')
+    const lines = await agent.handle('activity', {agentId: ID})
+    expect(lines.filter((line) => line.action === 'run')).toEqual([
+      expect.objectContaining({agentId: ID, action: 'run', decision: 'daily'}),
+    ])
+  })
+
   test('the run is asked with the frame, the Instructions before the format, only the actions not Off', async () => {
     const agent = start([
       social({

@@ -16,6 +16,8 @@ const providers = require('./providers')
 const MIN_TIMEOUT_MS = 1000
 const MAX_TIMEOUT_MS = 120 * 1000
 const MAX_ACTIVITY = 200
+// What starts a Social run (B-274): its time of the day, its hour, an event it reads, or Run now.
+const RUN_KINDS = ['daily', 'hourly', 'event', 'now']
 /** What an agent is given to read for a text (the joke agent: its recent jokes), and what its answer may be. */
 const MAX_INPUT_TEXT = 20000
 const MAX_ANSWER_TEXT = 4000
@@ -97,7 +99,7 @@ function createAgent({
 
   // How far each agent read Idena Social (read-points.js).
   const readPoints = profiles
-    ? createReadPoints({file: readPointsFile, logger})
+    ? createReadPoints({file: readPointsFile, logger, now})
     : null
 
   // The agents of the validation that are on (answering, reporting), by id: one that stops being so ends its question.
@@ -375,6 +377,15 @@ function createAgent({
     ...(readPoints ? readPoints.commands : {}),
     /** An action an agent prepared (pending.js propose): refused, to do alone, or waiting in To approve. */
     ...(pending ? {propose: (data) => pending.propose(data)} : {}),
+    /** A Social run of the agent `agentId` starts (B-274): Activity names what started it. */
+    runStarted({agentId, why} = {}) {
+      if (!profiles) throw new Error('no agents')
+      if (!profiles.read().agents.some((one) => one.id === agentId))
+        throw new Error('no such agent')
+      if (!RUN_KINDS.includes(why)) throw new Error('no such run')
+      log({agentId, action: 'run', decision: why})
+      return null
+    },
     status,
     saveSettings(data) {
       const saved = settings.write(data)

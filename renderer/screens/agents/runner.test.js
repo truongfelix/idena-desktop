@@ -4,13 +4,22 @@ import {
   eventsAllowed,
   eventsRead,
   afterRun,
+  dailyDue,
   hourlyDue,
   isSocialAgent,
+  runAgentNow,
   runDue,
   socialState,
+  todayAt,
 } from './runner'
+import {runSocialAgent} from './social/run'
+import {failedLine} from './run-now'
 
 jest.mock('../social/provider', () => ({useSocial: () => null}))
+jest.mock('./social/run', () => ({
+  ...jest.requireActual('./social/run'),
+  runSocialAgent: jest.fn(),
+}))
 
 const DAY = 'Sat Nov 14 2026'
 const NOW = 1000000
@@ -87,5 +96,77 @@ describe("the agents' runs in the window", () => {
     fails = afterEventRun(fails, DAY, 'failed')
     expect(eventsAllowed(fails, DAY)).toBe(false)
     expect(eventsAllowed(fails, 'Sun Nov 15 2026')).toBe(true)
+  })
+
+  test('a daily agent runs once a day: a run since its time, before a restart or by Run now, counts (B-274)', () => {
+    const daily = {kind: 'daily', time: '09:00'}
+    const nine = todayAt(daily, new Date(2026, 10, 16, 12, 0).getTime())
+    const noon = nine + 3 * 3600 * 1000
+    expect(new Date(nine).getHours()).toBe(9)
+    // Never ran, or last ran yesterday or this morning before 09:00: it runs.
+    expect(dailyDue(daily, noon, null)).toBe(true)
+    expect(dailyDue(daily, noon, nine - 24 * 3600 * 1000)).toBe(true)
+    expect(dailyDue(daily, noon, nine - 60 * 1000)).toBe(true)
+    // Ran after 09:00 today (the app since restarted, or Run now at 10:00): not again.
+    expect(dailyDue(daily, noon, nine)).toBe(false)
+    expect(dailyDue(daily, noon, nine + 3600 * 1000)).toBe(false)
+    // Before its time: never.
+    expect(dailyDue(daily, nine - 60 * 1000, null)).toBe(false)
+  })
+})
+
+describe('one run (B-274, B-273)', () => {
+  const agent = {
+    id: 'aaaaaaaaaaaaaaaa',
+    enabled: true,
+    actions: {post: {level: 'alone'}},
+    schedule: {kind: 'daily', time: '09:00'},
+  }
+  const social = {feed: [], me: '0x1', profiles: {}, people: {}}
+  const t = (text, values = {}) =>
+    text.replace(/\{\{(\w+)\}\}/gu, (_, name) => String(values[name]))
+  let calls
+  beforeEach(() => {
+    calls = []
+    global.ipcRenderer = {
+      invoke: jest.fn(async (channel, command, data) => {
+        calls.push([command, data])
+        return null
+      }),
+    }
+  })
+  afterEach(() => {
+    delete global.ipcRenderer
+  })
+
+  test('Activity names what started it; a run that read counts as its run, a failed one does not', async () => {
+    runSocialAgent.mockResolvedValueOnce({result: 'done', detail: ''})
+    await runAgentNow(agent, social, t)
+    expect(calls).toEqual([
+      ['runStarted', {agentId: agent.id, why: 'now'}],
+      ['setLastRun', {agentId: agent.id}],
+    ])
+    calls = []
+    runSocialAgent.mockResolvedValueOnce({result: 'nothing new', detail: ''})
+    await runAgentNow(agent, social, t, 'daily')
+    expect(calls).toEqual([
+      ['runStarted', {agentId: agent.id, why: 'daily'}],
+      ['setLastRun', {agentId: agent.id}],
+    ])
+    calls = []
+    runSocialAgent.mockRejectedValueOnce(new Error('the answer was cut short'))
+    await expect(runAgentNow(agent, social, t, 'event')).rejects.toThrow(
+      'cut short'
+    )
+    expect(calls).toEqual([['runStarted', {agentId: agent.id, why: 'event'}]])
+  })
+
+  test("the message after a failed Run now holds the reason alone, without Electron's wrapping", () => {
+    const error = new Error(
+      "Error invoking remote method 'agent': Error: the answer was cut short (the longest answer is 50 tokens)"
+    )
+    expect(failedLine(error, t)).toBe(
+      'It failed: the answer was cut short (the longest answer is 50 tokens)'
+    )
   })
 })
