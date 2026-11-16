@@ -5,7 +5,7 @@ import {SecondaryButton} from '../../shared/components/button'
 import {useSuccessToast} from '../../shared/hooks/use-toast'
 import {useSocial} from '../social/provider'
 import {agentErrorText} from '../settings/agent/api'
-import {isSocialAgent, runAgentNow, socialReady} from './runner'
+import {isFlipsAgent, isSocialAgent, runAgentNow, socialReady} from './runner'
 
 /** What a run says, in words. */
 export function runLine({result, detail}, t) {
@@ -52,8 +52,9 @@ export function RunNow({agent, paused, onDone}) {
   const social = useSocial()
   const toast = useSuccessToast()
   const [isRunning, setIsRunning] = React.useState(false)
-  if (!isSocialAgent(agent)) return null
-  const ready = socialReady(social)
+  if (!isSocialAgent(agent) && !isFlipsAgent(agent)) return null
+  // A Flips agent runs at once (B-258); one on Social waits for the scan.
+  const ready = !isSocialAgent(agent) || socialReady(social)
   return (
     <SecondaryButton
       isLoading={isRunning}

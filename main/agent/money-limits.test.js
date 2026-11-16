@@ -158,7 +158,7 @@ describe('the money limits of the actions', () => {
       actions: {
         like: {level: 'alone', limit: 10, spendPerDay: '0.5'},
         post: {level: 'alone', limit: null, spendPerDay: -1},
-        flipStory: {level: 'ask', picturesPerDay: 4},
+        flipPictures: {level: 'ask', picturesPerDay: 4},
       },
     })
     const profiles = createAgentProfiles({
@@ -167,6 +167,6 @@ describe('the money limits of the actions', () => {
     const [agent] = profiles.read().agents
     expect(agent.actions.like.spendPerDay).toBe(0.5)
     expect(agent.actions.post.spendPerDay).toBeNull()
-    expect(agent.actions.flipStory.picturesPerDay).toBe(4)
+    expect(agent.actions.flipPictures.picturesPerDay).toBe(4)
   })
 })

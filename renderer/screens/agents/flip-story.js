@@ -34,6 +34,24 @@ export function storyAgentOf(list) {
   )
 }
 
+/**
+ * The agent that draws the pictures (B-258 Make the pictures, its own right): on, not paused, "Make the pictures" not
+ * Off, on a service that draws. Null without one.
+ */
+export function pictureAgentOf(list) {
+  if (!list || list.paused) return null
+  return (
+    list.agents.find(
+      (a) =>
+        a.enabled &&
+        a.actions.flipPictures &&
+        a.actions.flipPictures.level !== 'off' &&
+        // eslint-disable-next-line no-use-before-define
+        drawsPictures(a)
+    ) || null
+  )
+}
+
 /** The flip's two keywords, as the agent is sent them (a description cut at 200 characters); null without both. */
 export function storyWords(keywords) {
   const words = (keywords && keywords.words) || []
@@ -228,7 +246,7 @@ export function FlipStoryHelper({keywords, story: saved, onStory}) {
   const current = React.useRef(key)
   current.current = key
   const run = React.useRef(0)
-  const canDraw = drawsPictures(agent)
+  const canDraw = Boolean(pictureAgentOf(list))
   // The titles given so far for these keywords, read when a run starts.
   const titles = React.useRef([])
   titles.current = kept ? kept.titles : []
@@ -366,7 +384,7 @@ const FRAME_WIDTH = 440
 const FRAME_HEIGHT = 330
 
 /** A drawn picture as a flip frame: 440 x 330, the picture whole on white, a PNG data URL. */
-async function asFrame({mediaType, data}) {
+export async function asFrame({mediaType, data}) {
   const img = new Image()
   img.src = `data:${mediaType};base64,${data}`
   await img.decode()
@@ -448,20 +466,23 @@ export function FlipStoryPrompts({
     },
     []
   )
-  const agent = storyAgentOf(list)
+  // The prompts come from the draft (an agent's story, B-258: maybe written by another agent's run); the pictures
+  // from the agent holding Make the pictures.
+  const painter = pictureAgentOf(list)
+  const agent = storyAgentOf(list) || painter
   const words = storyWords(keywords)
   const kept = storyForKeywords(saved, words)
   const all = promptsOf(kept)
-  const canDraw = drawsPictures(agent) && Boolean(onImage)
+  const canDraw = Boolean(painter) && Boolean(onImage)
   const slots = freeSlots(originalOrder, adversarialImageId)
 
   const draw = React.useCallback(
     async (prompt) => {
-      if (!agent) return
+      if (!painter) return
       setError(null)
       setDrawing(prompt)
       try {
-        const frame = await asFrame(await drawStoryPicture(agent.id, prompt))
+        const frame = await asFrame(await drawStoryPicture(painter.id, prompt))
         if (!alive.current) return
         drawn.set(prompt, frame)
         setDrawnCount((n) => n + 1)
@@ -473,12 +494,12 @@ export function FlipStoryPrompts({
     },
     // The agent object is new at each read of the list: its id says when it changed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [agent && agent.id]
+    [painter && painter.id]
   )
 
   // Alone, the pictures asked: the agent's prompts drawn once each, one after the other, as the step opens (one loop:
   // a prompt the person edits afterwards is drawn by their click, never on its own).
-  const isAlone = agent && agent.actions.flipStory.level === 'alone'
+  const isAlone = painter && painter.actions.flipPictures.level === 'alone'
   const wantsPictures = Boolean(kept && kept.parts.includes('images'))
   const opening = React.useRef(all)
   if (!opening.current.length) opening.current = all

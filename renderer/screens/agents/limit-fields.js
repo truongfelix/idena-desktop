@@ -87,22 +87,41 @@ function SpendField({row, onChange}) {
   )
 }
 
+/** A Flips step's actions a day in its runs (B-258): empty, no limit. */
+function StepsField({row, onChange}) {
+  const {t} = useTranslation()
+  return (
+    <NumberField
+      label={t('at most a day')}
+      value={row.limit ?? null}
+      min={0}
+      optional
+      placeholder={t('None', {nsSeparator: '!!'})}
+      onSave={(limit) => onChange({limit})}
+    />
+  )
+}
+
 /**
- * The fields of one action's row: `kind` is 'count', 'idna' (a tip's) or 'pictures' (a story agent that draws),
- * `onChange(change)` changes the row.
+ * The fields of one action's row: `kind` is 'count', 'idna' (a tip's), 'steps' (a Flips step, B-258) or 'pictures'
+ * (Make the pictures: its flips and its pictures a day), `onChange(change)` changes the row.
  */
 export function LimitFields({kind, row, onChange}) {
   const {t} = useTranslation()
+  if (kind === 'steps') return <StepsField row={row} onChange={onChange} />
   if (kind === 'pictures')
     return (
-      <NumberField
-        label={t('pictures at most a day')}
-        value={row.picturesPerDay ?? null}
-        min={0}
-        optional
-        placeholder={t('None', {nsSeparator: '!!'})}
-        onSave={(picturesPerDay) => onChange({picturesPerDay})}
-      />
+      <Flex gap={4} wrap="wrap">
+        <StepsField row={row} onChange={onChange} />
+        <NumberField
+          label={t('pictures at most a day')}
+          value={row.picturesPerDay ?? null}
+          min={0}
+          optional
+          placeholder={t('None', {nsSeparator: '!!'})}
+          onSave={(picturesPerDay) => onChange({picturesPerDay})}
+        />
+      </Flex>
     )
   if (kind === 'idna')
     return (

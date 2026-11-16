@@ -1,11 +1,17 @@
 import * as React from 'react'
 import {useTranslation} from 'react-i18next'
 import {useSocial} from '../social/provider'
+import {useIdentityState} from '../../shared/providers/identity-context'
+import {useEpochState} from '../../shared/providers/epoch-context'
+import {useSettingsState} from '../../shared/providers/settings-context'
 import {shownNames} from '../social/profiles'
 import {blockedAddresses} from '../social/people'
 import {historyDone} from '../social/scan'
 import {agentsList, lastAgentsList, onAgentsChange} from '../settings/agent/api'
-import {executors} from './pending-api'
+import {decliners, executors} from './pending-api'
+import {heldFlipSteps} from './flips/drafts'
+import {runFlipsAgent} from './flips/run'
+import {flipsDecliners, flipsDeps, flipsExecutors} from './flips/execute'
 import {readAuthors} from './criteria'
 import {socialRpc, socialRpcSettled} from '../social/node'
 import {
@@ -23,8 +29,9 @@ import {
 } from './social/execute'
 
 // The agents' runs in the window (B-243, B-239): every minute, each agent on, not paused, holding a Social action,
-// runs when its time comes (every hour, or once a day after its time), when the Social scan is up to date. An
-// approved action (To approve) is done with the same code.
+// runs when its time comes (every hour, or once a day after its time), when the Social scan is up to date. An agent
+// holding a Flips step (B-258) runs on its schedule too, its Social part only once the scan is up to date. An approved
+// action (To approve) is done with the same code.
 
 const CHECK_MS = 60 * 1000
 const HOUR_MS = 60 * 60 * 1000
@@ -78,6 +85,25 @@ export const socialState = (social) => ({
 
 /** Whether the agent runs on Idena Social: a Social action not Off. */
 export const isSocialAgent = (agent) => heldSocial(agent).length > 0
+
+/** Whether the agent runs in the Flips area (B-258): a Flips step not Off. */
+export const isFlipsAgent = (agent) => heldFlipSteps(agent).length > 0
+
+// What a Flips run reads of the app (the identity, the epoch, the Protect step's settings): the runner keeps it up to
+// date, so that Run now on an agent page has it too.
+const flipsState = {identity: null, epoch: null, settings: {}}
+
+/** The outcome of an agent's runs in two areas, one after the other: a failure first, else what they did. */
+export function bothRuns(first, second) {
+  const outcomes = [first, second].filter(Boolean)
+  if (!outcomes.length) return {result: 'off', detail: ''}
+  const failed = outcomes.find(({result}) => result === 'failed')
+  if (failed) return failed
+  const done = outcomes.filter(({result}) => result === 'done')
+  if (done.length)
+    return {result: 'done', detail: done.map(({detail}) => detail).join(' · ')}
+  return outcomes.find(({result}) => result === 'nothing new') || outcomes[0]
+}
 
 /**
  * Whether the Social scan holds the account's history up to the chain's head: before, what a run reads (its posts,
@@ -135,21 +161,22 @@ export async function runAgentNow(agent, social, t, why = 'now') {
   if (running.has(agent.id)) return {result: 'running', detail: ''}
   running.add(agent.id)
   try {
-    if (!isSocialAgent(agent)) return {result: 'off', detail: ''}
-    const state = socialState(social)
+    const onSocial = isSocialAgent(agent)
+    if (!onSocial && !isFlipsAgent(agent)) return {result: 'off', detail: ''}
     const startedAt = Date.now()
-    const outcome = await runSocialAgent(agent, state, {
-      t,
-      why,
-      agent: agentCall,
-      prepare: (item) => prepareSocialAction(item, state),
-      send: (pending) => sendSocialAction(pending),
-      readAuthors: (addresses, needs) =>
-        readAuthors(addresses, needs, {
-          settled: socialRpcSettled,
-          call: socialRpc,
-        }),
-    })
+    const outcome = bothRuns(
+      onSocial ? await runSocial(agent, social, t, why) : null,
+      isFlipsAgent(agent)
+        ? await runFlipsAgent(
+            agent,
+            {identity: flipsState.identity, epoch: flipsState.epoch},
+            flipsDeps({settings: flipsState.settings, t})
+          ).catch((error) => ({
+            result: 'failed',
+            detail: String(error?.message || error),
+          }))
+        : null
+    )
     // Only a daily agent reads it: the time the run started, so a run begun before its time is not its daily run.
     if (agent.schedule?.kind === 'daily' && ranFully(outcome.result))
       await agentCall('setLastRun', {agentId: agent.id, at: startedAt}).catch(
@@ -159,6 +186,23 @@ export async function runAgentNow(agent, social, t, why = 'now') {
   } finally {
     running.delete(agent.id)
   }
+}
+
+/** The Social part of a run (B-239). */
+function runSocial(agent, social, t, why) {
+  const state = socialState(social)
+  return runSocialAgent(agent, state, {
+    t,
+    why,
+    agent: agentCall,
+    prepare: (item) => prepareSocialAction(item, state),
+    send: (pending) => sendSocialAction(pending),
+    readAuthors: (addresses, needs) =>
+      readAuthors(addresses, needs, {
+        settled: socialRpcSettled,
+        call: socialRpc,
+      }),
+  })
 }
 
 /** Whether an hourly agent's run is due now: never run in this window, or its next time come. */
@@ -190,14 +234,21 @@ export function AgentRunner() {
   const [list, setList] = React.useState(lastAgentsList)
   const socialRef = React.useRef(social)
   socialRef.current = social
+  // What a Flips run reads, as it is now.
+  flipsState.identity = useIdentityState()
+  flipsState.epoch = useEpochState()
+  flipsState.settings = useSettingsState()
 
-  // An approved Social action (To approve) is done with the Social state as it is then.
+  // An approved Social action (To approve) is done with the Social state as it is then; a Flips step with the draft
+  // as it is then.
   React.useEffect(() => {
     Object.assign(
       executors,
-      socialExecutors(() => socialState(socialRef.current))
+      socialExecutors(() => socialState(socialRef.current)),
+      flipsExecutors(t)
     )
-  }, [])
+    Object.assign(decliners, flipsDecliners())
+  }, [t])
   const busy = React.useRef(false)
 
   React.useEffect(() => {
@@ -220,9 +271,13 @@ export function AgentRunner() {
       if (busy.current || list.paused) return
       const now = Date.now()
       const day = new Date(now).toDateString()
-      if (!socialReady(socialRef.current)) return
+      // An agent on Social waits for the scan to be up to date (its run would read it), one only in the Flips area
+      // does not (B-258).
+      const socialOk = socialReady(socialRef.current)
       const active = list.agents.filter(
-        (agent) => agent.enabled && isSocialAgent(agent)
+        (agent) =>
+          agent.enabled &&
+          (isSocialAgent(agent) ? socialOk : isFlipsAgent(agent))
       )
       busy.current = true
       try {
@@ -255,6 +310,7 @@ export function AgentRunner() {
         for (const agent of active) {
           let events = eventsRead(agent)
           if (
+            !socialOk ||
             due.includes(agent) ||
             !events.length ||
             !eventsAllowed(eventFails.get(agent.id), day) ||

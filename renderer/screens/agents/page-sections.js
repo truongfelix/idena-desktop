@@ -114,7 +114,8 @@ function Suggestions({agent, onChange}) {
   const offers = [
     [['flipStory'], 'flipStory', t('Add the suggestion for flip stories')],
     [
-      ['answerFlip', 'report'],
+      // The judge of the drafts asks the validation's question (B-258).
+      ['answerFlip', 'report', 'flipJudge'],
       'answerFlip',
       t('Add the suggestion for the validation'),
     ],
