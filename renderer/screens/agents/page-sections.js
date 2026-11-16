@@ -180,11 +180,18 @@ function eventNames(t) {
   }
 }
 
+/**
+ * The events the agent page offers (B-276): only those it reads (B-255: one it does not read would start a run that
+ * shows it nothing), [[id, label]]; reading none, none at all (owner 2026-11-16).
+ */
+export const eventsOffered = (agent, names) =>
+  Object.entries(names).filter(([id]) => eventReadBy(id, agent.reads))
+
 /** "When it runs": its schedule and the events that start a run (what it spends is on its actions, B-269). */
 export function ScheduleSection({agent, onChange}) {
   const {t} = useTranslation()
   const [time, setTime] = useDraft(agent.schedule.time)
-  const events = eventNames(t)
+  const events = eventsOffered(agent, eventNames(t))
   return (
     <SettingsSection
       title={t('When it runs')}
@@ -236,35 +243,35 @@ export function ScheduleSection({agent, onChange}) {
             </FormControlWithLabel>
           )}
         </Flex>
-        <Stack spacing={2}>
-          <Text>
-            {t(
-              'Also runs when it gets (what it reads: its notifications, its private messages, the posts that tag it)',
-              {nsSeparator: '!!'}
-            )}
-          </Text>
-          <Wrap spacing={4}>
-            {Object.entries(events).map(([id, label]) => (
-              <Checkbox
-                key={id}
-                // An event it does not read could start a run that shows it nothing (B-255).
-                isDisabled={!eventReadBy(id, agent.reads)}
-                isChecked={agent.events.includes(id)}
-                onChange={(e) => {
-                  const on = e.target.checked
-                  onChange((a) => ({
-                    ...a,
-                    events: on
-                      ? [...a.events.filter((one) => one !== id), id]
-                      : a.events.filter((one) => one !== id),
-                  }))
-                }}
-              >
-                {label}
-              </Checkbox>
-            ))}
-          </Wrap>
-        </Stack>
+        {events.length > 0 && (
+          <Stack spacing={2}>
+            <Text>
+              {t(
+                'Also runs when it gets (what it reads: its notifications, its private messages, the posts that tag it)',
+                {nsSeparator: '!!'}
+              )}
+            </Text>
+            <Wrap spacing={4}>
+              {events.map(([id, label]) => (
+                <Checkbox
+                  key={id}
+                  isChecked={agent.events.includes(id)}
+                  onChange={(e) => {
+                    const on = e.target.checked
+                    onChange((a) => ({
+                      ...a,
+                      events: on
+                        ? [...a.events.filter((one) => one !== id), id]
+                        : a.events.filter((one) => one !== id),
+                    }))
+                  }}
+                >
+                  {label}
+                </Checkbox>
+              ))}
+            </Wrap>
+          </Stack>
+        )}
       </Stack>
     </SettingsSection>
   )
