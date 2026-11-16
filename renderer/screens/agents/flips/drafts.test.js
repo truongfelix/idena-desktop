@@ -205,15 +205,25 @@ describe('the flip as the judge sees it', () => {
     expect(verdictOf(null, at).pass).toBe(false)
   })
 
-  test('the story for the pictures: the first with three prompts, three of them', () => {
+  test('the story for the pictures: the first with three prompts or more, four of them at most (B-283)', () => {
+    const story = {
+      stories: [
+        {title: 'short', prompts: ['a', 'b']},
+        {title: 'long', prompts: ['1', '2', '3', '4', '5']},
+      ],
+    }
+    expect(storyForPictures(story)).toEqual({
+      title: 'long',
+      prompts: ['1', '2', '3', '4'],
+    })
     expect(
-      storyForPictures({
-        stories: [
-          {title: 'short', prompts: ['a', 'b']},
-          {title: 'long', prompts: ['1', '2', '3', '4']},
-        ],
-      })
-    ).toEqual({title: 'long', prompts: ['1', '2', '3']})
+      storyForPictures({stories: [{title: 'three', prompts: ['1', '2', '3']}]})
+    ).toEqual({title: 'three', prompts: ['1', '2', '3']})
+    // A draft's story: as many prompts as the draft has slots for; too few, none.
+    expect(storyForPictures(story, 3).prompts).toEqual(['1', '2', '3'])
+    expect(
+      storyForPictures({stories: [{prompts: ['1', '2', '3']}]}, 4)
+    ).toBeNull()
     expect(storyForPictures({stories: [{prompts: ['a']}]})).toBeNull()
     expect(storyForPictures(null)).toBeNull()
   })

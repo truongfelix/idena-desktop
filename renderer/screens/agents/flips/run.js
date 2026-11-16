@@ -2,6 +2,7 @@ import {FlipType} from '../../../shared/types'
 import {placeAdversarial} from '../../flips/utils'
 import {draftStory, freeSlots, storyWords} from '../flip-story'
 import {
+  MAX_STORY_PICTURES,
   STORY_PICTURES,
   canMakeFlips,
   draftsAt,
@@ -193,9 +194,22 @@ const sentOf = (ctx) => ({
   judgeSent: Boolean(ctx.judgeSent),
 })
 
-/** A new agent draft for `pair`, its story written: the nonsense picture's slot picked as the editor picks it. */
-export function newAgentDraft({id, pair, words, story, by, at, random}) {
-  const start = {originalOrder: [0, 1, 2, 3], adversarialImageId: 3}
+/**
+ * A new agent draft for `pair`, its story written. A story of three pictures: the nonsense picture's slot picked as
+ * the editor picks it. A story of four (`pictures`, B-283): every slot is the story's, no nonsense picture.
+ */
+export function newAgentDraft({
+  id,
+  pair,
+  words,
+  story,
+  by,
+  at,
+  random,
+  pictures = STORY_PICTURES,
+}) {
+  const adversarialImageId = pictures >= MAX_STORY_PICTURES ? -1 : 3
+  const start = {originalOrder: [0, 1, 2, 3], adversarialImageId}
   const {originalOrder} = {...start, ...placeAdversarial(start, random)}
   return {
     id,
@@ -208,7 +222,7 @@ export function newAgentDraft({id, pair, words, story, by, at, random}) {
     protectedImages: Array.from({length: 4}, () => null),
     noise: Array.from({length: 4}, () => null),
     adversarialImage: '',
-    adversarialImageId: 3,
+    adversarialImageId,
     adversarialPlaced: true,
     originalOrder,
     order: originalOrder,
@@ -245,7 +259,7 @@ const STEPS = {
           const one = storyForPictures(written)
           if (!one)
             throw new Error(
-              `no story with ${STORY_PICTURES} image prompts in the answer`
+              `no story with at least ${STORY_PICTURES} image prompts in the answer`
             )
           return {
             one,
@@ -262,7 +276,7 @@ const STEPS = {
           detail: words.map(({name}) => name).join(' / '),
           target: {flipId: id},
         }),
-        apply: ({story, id}, waiting) => {
+        apply: ({one, story, id}, waiting) => {
           const draft = newAgentDraft({
             id,
             pair,
@@ -271,6 +285,7 @@ const STEPS = {
             by: agent.id,
             at: new Date(deps.now()).toISOString(),
             random: deps.random,
+            pictures: one.prompts.length,
           })
           deps.store.addDraft({
             ...draft,
@@ -291,12 +306,13 @@ const STEPS = {
         key: flip.id,
         fresh: () => sameDraft(deps.store.getFlip(flip.id), flip),
         work: async () => {
-          const one = storyForPictures(flip.story)
-          if (!one) throw new Error('the draft has no story to draw')
+          // As many pictures as the draft has slots for: three beside a nonsense picture, four without one.
           const slots = freeSlots(flip.originalOrder, flip.adversarialImageId)
+          const one = storyForPictures(flip.story, slots.length)
+          if (!one) throw new Error('the draft has no story to draw')
           const images = Array.from({length: 4}, () => null)
           // One after the other: a service drawing one at a time is not asked for three at once.
-          for (let i = 0; i < STORY_PICTURES; i += 1)
+          for (let i = 0; i < slots.length; i += 1)
             // eslint-disable-next-line no-await-in-loop
             images[slots[i].slot] = await deps.draw(agent.id, one.prompts[i])
           return {images}

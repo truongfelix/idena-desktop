@@ -23,6 +23,17 @@ describe('what a story run sends', () => {
     expect(FORMAT).not.toMatch(/panel|storyteller|12-year-old|waking/iu)
   })
 
+  test('without a number in the Instructions, the format asks one story with four image prompts (B-283)', () => {
+    expect(storySystem('')).toContain(
+      'Unless the instructions above ask for another number: one story, with 4 image prompts.'
+    )
+    // The Instructions still come first: a number of theirs is the one the line defers to.
+    const system = storySystem('Three stories of six pictures.')
+    expect(system.indexOf('Three stories')).toBeLessThan(
+      system.indexOf('Unless the instructions above')
+    )
+  })
+
   test('the question: the keywords, the idea, the parts asked and the stories given before', () => {
     expect(
       storyQuestion({
