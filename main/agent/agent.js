@@ -573,14 +573,15 @@ function createAgent({
     },
     /**
      * One picture of a flip's story (B-236 Make the images), drawn by the image model of the agent `agentId`, which
-     * must hold "Write flip stories" (not Off): {mediaType, data}. It goes into the flip editor for the person to check.
+     * must hold "Make the pictures" (not Off, B-258): {mediaType, data}. It goes into the flip editor for the person to
+     * check, or into an agent's draft (a Flips run).
      */
     async drawStoryPicture({agentId, prompt, timeoutMs} = {}) {
       if (!profiles) throw new Error('no agents')
       const file = profiles.read()
       const agent = file.agents.find((one) => one.id === agentId)
       if (!agent) throw new Error('no such agent')
-      const check = checkAction(agentSettings(file, agent), 'flipStory')
+      const check = checkAction(agentSettings(file, agent), 'flipPictures')
       if (check.decision === 'off') {
         log({
           agentId,
@@ -594,7 +595,7 @@ function createAgent({
         throw new Error('no prompt')
       // Its pictures a day (B-269): each one is billed by its service. Counted when asked, and kept with the day's
       // tally (pending.js): a restart keeps the count. A failure the service cannot have billed is given back.
-      const limit = agent.actions.flipStory.picturesPerDay
+      const limit = agent.actions.flipPictures.picturesPerDay
       const drawnToday = pending.picturesToday(agentId)
       if (typeof limit === 'number' && drawnToday + 1 > limit) {
         log({
@@ -641,6 +642,45 @@ function createAgent({
         throw error
       } finally {
         writing.delete(controller)
+      }
+    },
+    /**
+     * A draft judged as a validator would (B-258 Judge the flip): the validation's question on `flip` (its four
+     * pictures, its two orders, its keywords) to the agent `agentId`, which must hold "Judge the flip" (not Off). The
+     * answer as the validation reads it; the renderer makes it the draft's verdict.
+     */
+    async judgeFlip({agentId, flip, timeoutMs} = {}) {
+      if (!profiles) throw new Error('no agents')
+      const file = profiles.read()
+      const agent = file.agents.find((one) => one.id === agentId)
+      if (!agent) throw new Error('no such agent')
+      const config = agentSettings(file, agent)
+      const check = checkAction(config, 'flipJudge')
+      if (check.decision === 'off') {
+        log({
+          agentId,
+          action: 'flipJudge',
+          decision: 'off',
+          detail: check.reason,
+        })
+        throw new Error(`the agent may not do it (${check.reason})`)
+      }
+      try {
+        return await askFlip(
+          {...config, maxTokens: agent.maxTokens, effort: agent.effort},
+          flip,
+          timeoutMs,
+          writing,
+          agent.instructions
+        )
+      } catch (error) {
+        log({
+          agentId,
+          action: 'flipJudge',
+          decision: 'failed',
+          detail: error.message,
+        })
+        throw error
       }
     },
     /**

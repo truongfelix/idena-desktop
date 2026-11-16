@@ -6,7 +6,8 @@ import {ErrorAlert, Textarea} from '../../shared/components/components'
 import {PrimaryButton, SecondaryButton} from '../../shared/components/button'
 import {agentErrorText} from '../settings/agent/api'
 import {actionWants} from './catalog'
-import {approveAction, declineAction, executors} from './pending-api'
+import {approveAction, declineItem, executors} from './pending-api'
+import {FlipPreview} from './flips/preview'
 
 function formatTime(ms) {
   return new Date(ms).toLocaleString([], {
@@ -88,6 +89,7 @@ function PendingItem({item}) {
             </Box>
           )
         )}
+        <FlipPreview item={item} />
         {item.detail && (
           <Text fontSize="sm" color="muted">
             {item.detail}
@@ -131,7 +133,7 @@ function PendingItem({item}) {
         )}
         <SecondaryButton
           isDisabled={isBusy || isRunning}
-          onClick={() => act(() => declineAction(item.id))}
+          onClick={() => act(() => declineItem(item))}
         >
           {t('Decline')}
         </SecondaryButton>

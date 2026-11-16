@@ -18,7 +18,19 @@ const MAX_TEXT_LENGTH = 10000
  * iDNA tipped per day (DAILY_AMOUNT_ACTIONS), never its fees: it lets no tip go alone (B-269: the action's own iDNA a
  * day, fees included, or the overall limit does); the others count iDNA sent, or per validation.
  */
-const DAILY_COUNT_ACTIONS = new Set(['post', 'reply', 'like', 'message'])
+const DAILY_COUNT_ACTIONS = new Set([
+  'post',
+  'reply',
+  'like',
+  'message',
+  // The Flips area's steps in a run (B-258): each one's actions a day.
+  'flipStory',
+  'flipPictures',
+  'flipDraft',
+  'flipJudge',
+  'flipSubmit',
+  'flipDelete',
+])
 const DAILY_AMOUNT_ACTIONS = new Set(['tip'])
 const MAX_DETAIL_LENGTH = 500
 /**
@@ -379,6 +391,29 @@ function createPending({
     },
     commands: {
       pending: list,
+      /**
+       * What the agent may do with `action` now, nothing counted (B-258): a Flips run asks before a step whose work is
+       * billed (a story, pictures, a judgement), so that a step past its limit asks the model nothing. The action
+       * itself then goes through propose, which counts it.
+       */
+      mayDo(data) {
+        const {agentId, action} = data || {}
+        if (!Object.prototype.hasOwnProperty.call(ACTIONS, action))
+          return {decision: 'off', reason: 'unknown action'}
+        const counted = isDaily(action) ? doneToday(agentId, action) : 0
+        const check = decide(agentId, action, {usage: counted})
+        // Asking, but To approve has no room left for it: propose would refuse it after the work was paid for.
+        // Past its limit stays the reason: a run skips it, nothing would go to To approve.
+        if (
+          check.decision === 'ask' &&
+          !OVER_LIMIT.includes(check.reason) &&
+          (items.length >= MAX_PENDING ||
+            items.filter((one) => one.agentId === agentId).length >=
+              MAX_PENDING_PER_AGENT)
+        )
+          return {decision: 'off', reason: 'too many actions waiting'}
+        return check
+      },
       /**
        * How an action the agent did alone went (after a propose that said so, which counted it): logged. `release`:
        * it was never sent (refused before), its count and cost are given back to the day.

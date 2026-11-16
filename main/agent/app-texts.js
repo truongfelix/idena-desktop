@@ -99,6 +99,10 @@ function appTexts({held = SOCIAL_ACTIONS} = {}) {
       flipStory: `${storySystem('')}\n\n${QUESTION}\n${storyExample()}`,
       answerFlip: flips,
       report: flips,
+      // A draft judged as a validator would (B-258): the validation's question.
+      flipJudge: flips,
+      // A picture is drawn from its prompt alone: the service gets nothing else.
+      flipPictures: `${QUESTION}\n(one image prompt of the story)`,
       ...Object.fromEntries(SOCIAL_ACTIONS.map((name) => [name, social])),
     },
     suggestions: {

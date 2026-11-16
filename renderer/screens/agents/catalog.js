@@ -11,14 +11,79 @@ export const AREAS = ['flips', 'validation', 'social']
 /** The actions an agent can be given, in the catalog's order: `info` says what each is for. */
 export function actionCatalog(t) {
   return [
+    // The Flips area's steps (B-258): each its own right; the agents hand a flip from one step to the next through
+    // the drafts. One agent may hold them all, or each agent one.
     {
       id: 'flipStory',
       area: 'flips',
       label: t('Write flip stories'),
       info: t(
-        "Writes flip stories and their picture prompts in the flip editor, as your Instructions ask, from the flip's two keywords and your idea."
+        "Writes flip stories and their picture prompts, as your Instructions ask, from the flip's two keywords: in the flip editor when you ask, and in its runs a new draft for each keyword pair that has no flip yet, while flips are left to make.",
+        {nsSeparator: '!!'}
       ),
       reads: [t('The two keywords of the flip you make')],
+      defaults: {level: 'off', limit: 3},
+      perDay: 'steps',
+    },
+    {
+      id: 'flipPictures',
+      area: 'flips',
+      label: t('Make the pictures'),
+      info: t(
+        "Draws a story's pictures with its service's image model: in the flip editor when you ask, and in its runs the three pictures of each agent draft that has its story. Its service bills each picture.",
+        {nsSeparator: '!!'}
+      ),
+      reads: [t('The picture prompts of the story')],
+      defaults: {level: 'off', limit: 3, picturesPerDay: 9},
+      perDay: 'pictures',
+    },
+    {
+      id: 'flipDraft',
+      area: 'flips',
+      label: t('Draft the flip'),
+      info: t(
+        "Makes a flip of an agent draft that has its pictures, as the flip editor's Protect images and Shuffle steps do: the noise, the nonsense image (made as your choice in Protect images says), a shuffled order. Nothing is sent to the model.",
+        {nsSeparator: '!!'}
+      ),
+      reads: [],
+      defaults: {level: 'off', limit: 3},
+      perDay: 'steps',
+    },
+    {
+      id: 'flipJudge',
+      area: 'flips',
+      label: t('Judge the flip'),
+      info: t(
+        'Asks the model about each draft ready to send as a validator would see it: its two orders, its keywords, the reasons to report. Your own drafts too: it changes nothing in them. It passes when the model finds the story, sees both keywords and finds nothing to report.',
+        {nsSeparator: '!!'}
+      ),
+      reads: [t('The pictures and keywords of the drafts ready to send')],
+      defaults: {level: 'off', limit: 5},
+      perDay: 'steps',
+    },
+    {
+      id: 'flipSubmit',
+      area: 'flips',
+      label: t('Submit the flip'),
+      info: t(
+        'Sends an agent draft the judge passed, unchanged since, outside the validation. A flip costs no fee.',
+        {nsSeparator: '!!'}
+      ),
+      reads: [],
+      defaults: {level: 'off', limit: 3},
+      perDay: 'steps',
+    },
+    {
+      id: 'flipDelete',
+      area: 'flips',
+      label: t('Delete a draft'),
+      info: t(
+        'Deletes an agent draft the judge failed. Your own drafts are never deleted.',
+        {nsSeparator: '!!'}
+      ),
+      reads: [],
+      defaults: {level: 'off', limit: 3},
+      perDay: 'steps',
     },
     {
       id: 'answerFlip',
@@ -221,6 +286,18 @@ export function actionWants(action, t) {
       return t('wants to vote in an oracle voting')
     case 'invite':
       return t('wants to send an invitation')
+    case 'flipStory':
+      return t('wrote a flip story')
+    case 'flipPictures':
+      return t("drew a flip's pictures")
+    case 'flipDraft':
+      return t('made a flip of a draft')
+    case 'flipJudge':
+      return t('judged a flip')
+    case 'flipSubmit':
+      return t('wants to submit a flip')
+    case 'flipDelete':
+      return t('wants to delete a draft')
     default:
       return t('wants to act')
   }
@@ -255,6 +332,17 @@ export function actionName(action, t) {
       return t('Invite')
     case 'flipStory':
       return t('Write flip stories')
+    case 'flipPictures':
+    case 'flipImage':
+      return t('Make the pictures')
+    case 'flipDraft':
+      return t('Draft the flip')
+    case 'flipJudge':
+      return t('Judge the flip')
+    case 'flipSubmit':
+      return t('Submit the flip')
+    case 'flipDelete':
+      return t('Delete a draft')
     case 'readTags':
       return t('Read the posts that tag it')
     default:

@@ -232,6 +232,23 @@ function normalizeAgent(input, {id = newAgentId} = {}) {
     !READ_ACTIONS.some((name) => value.actions && value.actions[name])
   if (beforeReadActions)
     actions = {...actions, ...readActionsBefore(value, actions)}
+  // Saved before the Flips area's steps were rights of their own (B-258: no `flipSteps`): an agent whose "Write flip
+  // stories" drew the pictures (an image model set) holds Make the pictures at the same level, with its pictures a
+  // day. Once: a later save carries the mark, and a removed Make the pictures stays removed.
+  if (value.flipSteps !== true) actions = withFlipPictures(value, actions)
+  // What a build before B-258 reads: its stories draw within flipStory's pictures a day. Without Make the pictures
+  // (or Off), none (0): a downgrade does not draw more than this build.
+  if (actions.flipStory)
+    actions = {
+      ...actions,
+      flipStory: {
+        ...actions.flipStory,
+        picturesPerDay:
+          actions.flipPictures && actions.flipPictures.level !== 'off'
+            ? actions.flipPictures.picturesPerDay
+            : 0,
+      },
+    }
   const schedule =
     value.schedule && typeof value.schedule === 'object' ? value.schedule : {}
   // A number, or a number written as text; anything else (an empty field included) is no budget.
@@ -266,6 +283,26 @@ function normalizeAgent(input, {id = newAgentId} = {}) {
     maxTokens: normalizeMaxTokens(value.maxTokens),
     effort: normalizeEffort(value.effort),
     reportThresholds,
+    // Its actions read with the Flips area's steps (B-258): see withFlipPictures.
+    flipSteps: true,
+  }
+}
+
+/** The actions of an agent saved before B-258 (withFlipPictures' caller): Make the pictures where its stories drew. */
+function withFlipPictures(value, actions) {
+  const story = actions.flipStory
+  const saved = value.actions && value.actions.flipStory
+  if (!story || actions.flipPictures || !text(value.imageModel, 200, ''))
+    return actions
+  // 0: this build wrote it for a Make the pictures removed or Off (a round trip through an older build): it stays so.
+  if (saved && saved.picturesPerDay === 0) return actions
+  const perDay =
+    saved && 'picturesPerDay' in saved
+      ? normalizeLimit(saved.picturesPerDay, null)
+      : null
+  return {
+    ...actions,
+    flipPictures: {level: story.level, limit: null, picturesPerDay: perDay},
   }
 }
 

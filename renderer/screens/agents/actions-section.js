@@ -159,11 +159,15 @@ export function ActionsSection({agent, agents, catalog, onChange}) {
                       label={label}
                       info={info}
                       sent={texts && texts.sent[id]}
-                      // A story agent whose service draws: its pictures a day (B-269).
-                      perDay={
-                        id === 'flipStory' && drawsPictures(agent)
-                          ? 'pictures'
-                          : perDay
+                      perDay={perDay}
+                      // Make the pictures needs a service that draws (B-258): the row says so.
+                      note={
+                        id === 'flipPictures' && !drawsPictures(agent)
+                          ? t(
+                              'Its service draws no pictures: choose an image model in its connection, on a service that has one.',
+                              {nsSeparator: '!!'}
+                            )
+                          : null
                       }
                       row={agent.actions[id]}
                       setActions={setActions}
@@ -219,7 +223,7 @@ function heldText(id, name, t) {
     : t('{{name}} already answers the validation', {name})
 }
 
-function ActionRow({id, label, info, sent, perDay, row, setActions}) {
+function ActionRow({id, label, info, sent, perDay, note, row, setActions}) {
   const {t} = useTranslation()
   return (
     <>
@@ -232,6 +236,11 @@ function ActionRow({id, label, info, sent, perDay, row, setActions}) {
               <ActionInfo info={info} sent={sent} />
             </InfoTip>
           </Flex>
+          {note && (
+            <Text fontSize="sm" color="muted">
+              {note}
+            </Text>
+          )}
           {perDay && (
             <LimitFields
               kind={perDay}

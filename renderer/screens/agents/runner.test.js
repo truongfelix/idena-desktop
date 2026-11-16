@@ -11,6 +11,8 @@ import {
   runDue,
   socialState,
   todayAt,
+  bothRuns,
+  flipsReady,
 } from './runner'
 import {runSocialAgent} from './social/run'
 import {failedLine} from './run-now'
@@ -182,5 +184,32 @@ describe('one run (B-274, B-273)', () => {
     expect(failedLine(error, t)).toBe(
       'It failed: the answer was cut short (the longest answer is 50 tokens)'
     )
+  })
+})
+
+// B-258: a Flips run reads the identity and the epoch: before they come, it is not run (it would find nothing to do,
+// and an hourly agent would then wait an hour).
+describe('a Flips run waits for the identity and the epoch', () => {
+  test('ready only with both', () => {
+    const identity = {address: '0x1', state: 'Human'}
+    const epoch = {currentPeriod: 'None'}
+    expect(flipsReady({identity, epoch})).toBe(true)
+    expect(flipsReady({identity: null, epoch})).toBe(false)
+    expect(flipsReady({identity: {}, epoch})).toBe(false)
+    expect(flipsReady({identity, epoch: null})).toBe(false)
+  })
+
+  test('two areas run: a failure first, else what they did', () => {
+    const done = (detail) => ({result: 'done', detail})
+    expect(bothRuns(done('a'), done('b'))).toEqual(done('a · b'))
+    expect(bothRuns({result: 'failed', detail: 'x'}, done('b'))).toEqual({
+      result: 'failed',
+      detail: 'x',
+    })
+    expect(bothRuns(null, {result: 'nothing new', detail: ''})).toEqual({
+      result: 'nothing new',
+      detail: '',
+    })
+    expect(bothRuns(null, null)).toEqual({result: 'off', detail: ''})
   })
 })

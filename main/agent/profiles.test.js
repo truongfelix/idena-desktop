@@ -74,6 +74,7 @@ describe('agent profiles', () => {
         tags: null,
       },
       events: [],
+      flipSteps: true,
     })
     // What it reads and its events: each field checked (B-255).
     expect(
@@ -517,6 +518,58 @@ describe('agent profiles', () => {
       expect(normalizeAgent({budgetPerDay: true}).budgetPerDay).toBeNull()
       expect(normalizeAgent({budgetPerDay: '0.05'}).budgetPerDay).toBe(0.05)
       expect(normalizeAgent({budgetPerDay: 0}).budgetPerDay).toBe(0)
+    })
+
+    // B-258: Make the pictures became a right of its own; an agent whose stories drew keeps drawing.
+    test('an agent saved before the Flips steps draws with Make the pictures, once', () => {
+      const before = {
+        name: 'Story agent',
+        imageModel: 'gpt-image-1',
+        actions: {flipStory: {level: 'alone', limit: null, picturesPerDay: 6}},
+      }
+      const agent = normalizeAgent(before)
+      expect(agent.actions.flipPictures).toEqual({
+        level: 'alone',
+        limit: null,
+        picturesPerDay: 6,
+      })
+      // A build before B-258 reads its pictures a day on Write flip stories: kept there.
+      expect(agent.actions.flipStory).toEqual({
+        level: 'alone',
+        limit: null,
+        picturesPerDay: 6,
+      })
+      // A build before B-269 kept no pictures a day: none.
+      const older = normalizeAgent({
+        ...before,
+        actions: {flipStory: {level: 'ask', limit: null}},
+      })
+      expect(older.actions.flipPictures).toEqual({
+        level: 'ask',
+        limit: null,
+        picturesPerDay: null,
+      })
+      // No image model: its stories never drew, it gets nothing new.
+      expect(
+        normalizeAgent({...before, imageModel: ''}).actions.flipPictures
+      ).toBeUndefined()
+      // Saved since: a Make the pictures the person removed stays removed.
+      const removed = {...agent, actions: {flipStory: agent.actions.flipStory}}
+      expect(normalizeAgent(removed).actions.flipPictures).toBeUndefined()
+      // ... and a build before B-258 then draws no picture with its stories (Off the same).
+      expect(normalizeAgent(removed).actions.flipStory.picturesPerDay).toBe(0)
+      const off = {
+        ...agent,
+        actions: {
+          ...agent.actions,
+          flipPictures: {...agent.actions.flipPictures, level: 'off'},
+        },
+      }
+      expect(normalizeAgent(off).actions.flipStory.picturesPerDay).toBe(0)
+      // A round trip through an older build (it drops the mark and Make the pictures): it stays removed.
+      const {flipSteps, ...roundTrip} = normalizeAgent(removed)
+      expect(flipSteps).toBe(true)
+      expect(normalizeAgent(roundTrip).actions.flipPictures).toBeUndefined()
     })
 
     test('the file is written whole: nothing left beside it', () => {

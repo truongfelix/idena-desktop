@@ -16,8 +16,21 @@ const agent = (command, data) =>
  */
 export const executors = {}
 
+/**
+ * What a Decline undoes in the app, for the actions whose result is already kept when they wait (a Flips step's draft,
+ * B-258): `decliners[action](item)`, after the main process took the item off the list.
+ */
+export const decliners = {}
+
 export const pendingActions = () => agent('pending')
 export const declineAction = (id) => agent('decline', {id})
+
+/** The person declines the item: off the list, then what the agent's step already wrote is undone. */
+export async function declineItem(item, undo = decliners) {
+  await declineAction(item.id)
+  const settle = undo[item.action]
+  if (settle) await settle(item)
+}
 
 /**
  * Approves the item, with the person's edit of its text: the main process checks again that the agent may do it,

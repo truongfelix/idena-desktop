@@ -46,9 +46,24 @@ const ACTIONS = {
   ads: {level: 'off', limit: null},
   oracleVote: {level: 'off', limit: null},
   invite: {level: 'off', limit: null},
-  // A flip's story and image prompts, written for the person in the flip editor (B-236); nothing reaches the chain.
-  // `picturesPerDay` (B-269): the most pictures its service draws a day (each one is billed); null: no limit.
+  // The Flips area (B-258, owner 2026-11-16): the flip editor's steps, each its own right; agents hand a flip over
+  // from one step to the next through the drafts (renderer/screens/agents/flips/). `limit` counts the step's actions
+  // a day in a run (null: none). Write the story: a flip's story and image prompts (the flip editor, B-236), and in a
+  // run a new draft for a keyword pair without a flip.
+  // `picturesPerDay`: Make the pictures' own, copied here for a build before B-258, whose stories draw within it
+  // (profiles.js); this build never reads it.
   flipStory: {level: 'off', limit: null, picturesPerDay: null},
+  // Make the pictures (B-236's Make the images, its own right since B-258): `picturesPerDay` (B-269) the most pictures
+  // its service draws a day (each one is billed); null: no limit.
+  flipPictures: {level: 'off', limit: null, picturesPerDay: null},
+  // Draft the flip: the pictures in their order, protected (noise, the nonsense picture) and shuffled.
+  flipDraft: {level: 'off', limit: null},
+  // Judge the flip: the validation's question on a draft, its verdict kept with the draft.
+  flipJudge: {level: 'off', limit: null},
+  // Submit the flip: a draft the judge passed, unchanged since (no fee).
+  flipSubmit: {level: 'off', limit: null},
+  // Delete a draft: a draft of an agent the judge failed (it never reached the chain: no fee).
+  flipDelete: {level: 'off', limit: null},
 }
 
 const MAX_MODEL_LENGTH = 200
