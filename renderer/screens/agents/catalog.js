@@ -86,6 +86,20 @@ export function actionCatalog(t) {
       perDay: 'steps',
     },
     {
+      id: 'flipDeleteSent',
+      area: 'flips',
+      label: t('Delete a sent flip'),
+      info: t(
+        "Deletes a sent flip the judge failed, yours or an agent's. A deletion costs a fee: set the iDNA it may spend a day; past it, or without a limit, it waits for you.",
+        {nsSeparator: '!!'}
+      ),
+      reads: [],
+      defaults: {level: 'off', limit: 1},
+      perDay: 'count',
+      // It spends iDNA (the deletion's fee): the budget counts it.
+      spends: true,
+    },
+    {
       id: 'answerFlip',
       area: 'validation',
       label: t('Answer the flips'),
@@ -298,6 +312,8 @@ export function actionWants(action, t) {
       return t('wants to submit a flip')
     case 'flipDelete':
       return t('wants to delete a draft')
+    case 'flipDeleteSent':
+      return t('wants to delete a sent flip')
     default:
       return t('wants to act')
   }
@@ -343,6 +359,8 @@ export function actionName(action, t) {
       return t('Submit the flip')
     case 'flipDelete':
       return t('Delete a draft')
+    case 'flipDeleteSent':
+      return t('Delete a sent flip')
     case 'readTags':
       return t('Read the posts that tag it')
     default:

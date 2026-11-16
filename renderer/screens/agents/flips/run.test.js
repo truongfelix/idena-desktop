@@ -129,6 +129,15 @@ function setup({
       adversarialImage: 'nonsense',
       noise: [null, null, null, null],
     })),
+    deleteCost: jest.fn(async () => ({
+      from: '0xme',
+      payload: '0x0a',
+      maxFee: 2,
+    })),
+    deleteSent: jest.fn(async (id) => {
+      store.updateDraft({id, type: FlipType.Deleting})
+      return '0xtx'
+    }),
     submit: jest.fn(async (id) => {
       store.updateDraft({
         id,
@@ -440,5 +449,69 @@ describe('a Flips run', () => {
     }
     await runFlipsAgent(agent, {identity, epoch}, deps)
     expect(store.getFlip('reworked').type).toBe(FlipType.Draft)
+  })
+
+  test('a sent flip the judge failed is deleted alone, its fee proposed as its cost', async () => {
+    const sent = ready({
+      id: 'sent',
+      type: FlipType.Published,
+      agentFlip: undefined,
+    })
+    sent.agentVerdict = {
+      contents: contentsKey(sent),
+      pass: false,
+      waiting: null,
+      declined: false,
+    }
+    const {agent, deps, store} = setup({
+      levels: {flipDeleteSent: 'alone'},
+      flips: [sent],
+      agentId: 'deletes-sent',
+    })
+    await runFlipsAgent(agent, {identity, epoch}, deps)
+    expect(deps.deleteSent).toHaveBeenCalledWith('sent', {
+      from: '0xme',
+      payload: '0x0a',
+      maxFee: 2,
+    })
+    expect(store.getFlip('sent').type).toBe(FlipType.Deleting)
+    // The cost goes to propose, where its iDNA a day is checked; past it, it waits for the person.
+    expect(deps.call).toHaveBeenCalledWith(
+      'propose',
+      expect.objectContaining({
+        action: 'flipDeleteSent',
+        cost: 2,
+        skipOverLimit: false,
+      })
+    )
+  })
+
+  test('with Ask me, the sent flip waits in To approve, marked', async () => {
+    const sent = ready({
+      id: 'sent',
+      type: FlipType.Published,
+      agentFlip: undefined,
+    })
+    sent.agentVerdict = {
+      contents: contentsKey(sent),
+      pass: false,
+      waiting: null,
+      declined: false,
+    }
+    const {agent, deps, store} = setup({
+      levels: {flipDeleteSent: 'ask'},
+      flips: [sent],
+      agentId: 'asks-sent',
+    })
+    await runFlipsAgent(agent, {identity, epoch}, deps)
+    expect(deps.deleteSent).not.toHaveBeenCalled()
+    expect(store.getFlip('sent').agentSent.waiting).toEqual({
+      step: 'flipDeleteSent',
+      id: 'item1',
+    })
+    // Marked: the next run proposes it no more.
+    deps.call.mockClear()
+    await runFlipsAgent(agent, {identity, epoch}, deps)
+    expect(deps.call).not.toHaveBeenCalledWith('propose', expect.anything())
   })
 })

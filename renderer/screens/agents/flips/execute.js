@@ -1,6 +1,7 @@
 import {nanoid} from 'nanoid'
+import {CID} from 'multiformats'
 import {FlipType} from '../../../shared/types'
-import {loadKeyword} from '../../../shared/utils/utils'
+import {callRpc, loadKeyword} from '../../../shared/utils/utils'
 import {shuffle} from '../../../shared/utils/arr'
 import {resizeImageToDataUrl} from '../../../shared/utils/image-canvas'
 import {
@@ -113,10 +114,62 @@ async function submitDraft(flipId) {
   return hash || ''
 }
 
+const DELETE_FLIP_TX = 0xe
+
+/** The payload of a flip's deletion (idena-go's DeleteFlipAttachment): field 1, the flip's CID bytes. */
+export function deletePayload(hash) {
+  const {bytes} = CID.parse(hash)
+  const hex = (n) => n.toString(16).padStart(2, '0')
+  if (bytes.length > 127) throw new Error('invalid flip hash')
+  return `0x0a${hex(bytes.length)}${Array.from(bytes, hex).join('')}`
+}
+
+/** The node's call (callRpc: its result, or it throws the node's error). */
+const rpc = (method, params) => callRpc(method, ...params)
+
+/**
+ * The most a sent flip's deletion may cost, in iDNA (B-277): the node's dry run of the transaction (its fee depends on
+ * its size only), twice over as the other actions' max fee. {from, payload, maxFee}.
+ */
+export async function deleteCost(flip, call = rpc) {
+  const from = await call('dna_getCoinbaseAddr', [])
+  const payload = deletePayload(flip.hash)
+  const estimate = await call('bcn_estimateTx', [
+    {type: DELETE_FLIP_TX, from, payload},
+  ])
+  const fee = Number(estimate ? estimate.txFee : NaN)
+  if (!(fee > 0)) throw new Error('the fee of the deletion is not known')
+  return {from, payload, maxFee: Math.ceil(fee * 2 * 1e6) / 1e6}
+}
+
+/**
+ * Deletes the sent flip the judge failed, as it is, within `maxFee` (deleteCost): the transaction sent, the flip marked
+ * as being deleted (the Flips list follows it until mined).
+ */
+async function deleteSent(flipId, cost, call = rpc) {
+  const flip = store().getFlip(flipId)
+  if (!flip || flip.type !== FlipType.Published)
+    throw new Error('the flip is not a sent flip any more')
+  if (!judgedFail(flip))
+    throw new Error('the flip changed since the judge failed it')
+  const {from, payload, maxFee} = cost || (await deleteCost(flip, call))
+  const txHash = await call('dna_sendTransaction', [
+    {type: DELETE_FLIP_TX, from, payload, maxFee},
+  ])
+  store().updateDraft({
+    id: flip.id,
+    txHash,
+    type: FlipType.Deleting,
+    agentSent: {...(flip.agentSent || {}), waiting: null},
+  })
+  return txHash
+}
+
 /** A declined step settled on the draft (declinedChange); nothing when the draft is gone. */
 function settle(flipId, step) {
   const flip = store().getFlip(flipId)
-  if (!flip || flip.type !== FlipType.Draft) return
+  // A sent flip too (B-277): the judge's verdict on it, its deletion.
+  if (!flip || ![FlipType.Draft, FlipType.Published].includes(flip.type)) return
   const change = declinedChange(step, flip)
   if (change.remove) store().deleteDraft(flip.id)
   else store().updateDraft({id: flip.id, ...change})
@@ -146,6 +199,8 @@ export function flipsDeps({settings, t}) {
         })
       ),
     submit: submitDraft,
+    deleteCost: (flip) => deleteCost(flip),
+    deleteSent: (flipId, cost) => deleteSent(flipId, cost),
     settle,
     verdictText: (verdict) => verdictText(verdict, t),
     newId: nanoid,
@@ -189,6 +244,14 @@ export function flipsExecutors(t) {
     }),
     // Sent as it is (submitDraft clears the wait); a failure leaves it waiting, with its error.
     flipSubmit: approved('flipSubmit', (flip) => submitDraft(flip.id)),
+    // A sent flip (B-277), as it is when approved: its fee estimated again.
+    flipDeleteSent: async (item) => {
+      const flipId = item.target && item.target.flipId
+      const flip = store().getFlip(flipId)
+      if (!flip || waitingItem(flip, 'flipDeleteSent') !== item.id)
+        throw new Error('the flip changed since: not done')
+      return deleteSent(flipId)
+    },
     flipDelete: approved('flipDelete', (flip) => {
       // Reworked since the judge failed it: not deleted.
       if (!judgedFail(flip))
@@ -209,6 +272,7 @@ export const flipsDecliners = () =>
       'flipJudge',
       'flipSubmit',
       'flipDelete',
+      'flipDeleteSent',
     ].map((step) => [
       step,
       (item) => {

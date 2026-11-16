@@ -81,7 +81,8 @@ describe('the drafts waiting at each step', () => {
       draftsAt('flipJudge', [mine, unshuffled, judged, changed, sent]).map(
         ({id}) => id
       )
-    ).toEqual(['person', 'changed'])
+      // A sent flip too, since B-277 (Delete a sent flip).
+    ).toEqual(['person', 'changed', 'sent'])
   })
 
   test('Submit takes only an agent draft the judge passed as it is now', () => {
@@ -281,5 +282,51 @@ describe('a declined step', () => {
         },
       })
     ).toEqual(['flipStory', 'flipSubmit'])
+  })
+})
+
+// B-277: sent flips.
+describe('sent flips', () => {
+  const sent = (fields = {}) =>
+    draft('drafted', {
+      id: 'sent',
+      type: FlipType.Published,
+      agentFlip: undefined,
+      ...fields,
+    })
+
+  test('the judge also takes a sent flip without a verdict on it as it is', () => {
+    expect(draftsAt('flipJudge', [sent()]).map(({id}) => id)).toEqual(['sent'])
+    // Passed before it was sent (an agent's): not judged again.
+    expect(draftsAt('flipJudge', [passed(sent())])).toEqual([])
+    // Being deleted, or waiting for the person's approval of its deletion: not judged.
+    expect(draftsAt('flipJudge', [sent({type: FlipType.Deleting})])).toEqual([])
+    expect(
+      draftsAt('flipJudge', [
+        sent({agentSent: {waiting: {step: 'flipDeleteSent', id: 'i'}}}),
+      ])
+    ).toEqual([])
+  })
+
+  test('Delete a sent flip takes a sent flip the judge failed, not one declined or waiting', () => {
+    const failed = passed(sent(), {pass: false})
+    expect(draftsAt('flipDeleteSent', [failed]).map(({id}) => id)).toEqual([
+      'sent',
+    ])
+    expect(draftsAt('flipDeleteSent', [passed(sent())])).toEqual([])
+    const declined = {...failed, ...declinedChange('flipDeleteSent', failed)}
+    expect(draftsAt('flipDeleteSent', [declined])).toEqual([])
+    const waiting = {
+      ...failed,
+      agentSent: {waiting: {step: 'flipDeleteSent', id: 'i'}},
+    }
+    expect(draftsAt('flipDeleteSent', [waiting])).toEqual([])
+    expect(orphans([waiting], []).map(({step}) => step)).toEqual([
+      'flipDeleteSent',
+    ])
+    // A draft the judge failed is Delete a draft's, never this one's.
+    expect(
+      draftsAt('flipDeleteSent', [passed(draft('drafted'), {pass: false})])
+    ).toEqual([])
   })
 })

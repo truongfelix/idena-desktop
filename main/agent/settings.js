@@ -64,6 +64,9 @@ const ACTIONS = {
   flipSubmit: {level: 'off', limit: null},
   // Delete a draft: a draft of an agent the judge failed (it never reached the chain: no fee).
   flipDelete: {level: 'off', limit: null},
+  // Delete a sent flip (B-277): a sent flip the judge failed; its deletion costs a fee, counted in `spendPerDay` (the
+  // most iDNA it spends a day alone, B-269) or the agent's overall limit.
+  flipDeleteSent: {level: 'off', limit: null, spendPerDay: null},
 }
 
 const MAX_MODEL_LENGTH = 200

@@ -30,6 +30,7 @@ const DAILY_COUNT_ACTIONS = new Set([
   'flipJudge',
   'flipSubmit',
   'flipDelete',
+  'flipDeleteSent',
 ])
 const DAILY_AMOUNT_ACTIONS = new Set(['tip'])
 const MAX_DETAIL_LENGTH = 500

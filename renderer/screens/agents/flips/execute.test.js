@@ -1,6 +1,17 @@
 import {FlipType} from '../../../shared/types'
+import {callRpc} from '../../../shared/utils/utils'
 import {contentsKey} from './drafts'
-import {flipsDecliners, flipsExecutors} from './execute'
+import {
+  deleteCost,
+  deletePayload,
+  flipsDecliners,
+  flipsExecutors,
+} from './execute'
+
+jest.mock('../../../shared/utils/utils', () => ({
+  ...jest.requireActual('../../../shared/utils/utils'),
+  callRpc: jest.fn(),
+}))
 
 // To approve's Approve and Decline on a Flips step (B-258): on the draft as it is when clicked.
 
@@ -71,5 +82,99 @@ describe('Delete a draft in To approve', () => {
     expect(flip.type).toBe(FlipType.Draft)
     expect(flip.agentFlip.waiting).toBeNull()
     expect(flip.agentFlip.declined.flipDelete).toBe(contentsKey(flip))
+  })
+})
+
+// B-277: a sent flip's deletion.
+describe('Delete a sent flip', () => {
+  const HASH = 'bafkreiaz6cqfg7fdja6bu563tuvfbzbhyljwe3vunjq3hligdbongtdrwq'
+  // Field 1 of the flip's submit transaction mined on the devnet (bcn_transaction), the same CID bytes.
+  const PAYLOAD =
+    '0x0a240155122019f0a0537ca3483c1a77db9d2a50e427c2d3626eb46a61b3ad06185cd34c71b4'
+
+  afterEach(() => {
+    delete global.flipStore
+    callRpc.mockReset()
+  })
+
+  test("its payload is the flip's CID as the node encodes it", () => {
+    expect(deletePayload(HASH)).toBe(PAYLOAD)
+    expect(() => deletePayload('not a cid')).toThrow()
+  })
+
+  test("its most is twice the node's estimate; an estimate without a fee is refused", async () => {
+    const call = jest.fn(async (method) =>
+      method === 'dna_getCoinbaseAddr' ? '0xme' : {txFee: '1.25'}
+    )
+    await expect(deleteCost({hash: HASH}, call)).resolves.toEqual({
+      from: '0xme',
+      payload: PAYLOAD,
+      maxFee: 2.5,
+    })
+    expect(call).toHaveBeenCalledWith('bcn_estimateTx', [
+      {type: 0xe, from: '0xme', payload: PAYLOAD},
+    ])
+    await expect(
+      deleteCost({hash: HASH}, async () => ({txFee: '0'}))
+    ).rejects.toThrow('the fee of the deletion is not known')
+  })
+
+  function sentFailed(fields = {}) {
+    const flip = {
+      id: 's',
+      type: FlipType.Published,
+      hash: HASH,
+      keywordPairId: 2,
+      originalOrder: [0, 3, 1, 2],
+      order: [2, 1, 3, 0],
+      protectedImages: ['a', 'b', 'c', 'd'],
+      agentSent: {waiting: {step: 'flipDeleteSent', id: 'item'}},
+      ...fields,
+    }
+    return {
+      ...flip,
+      agentVerdict: {contents: contentsKey(flip), pass: false, waiting: null},
+    }
+  }
+  const sentItem = {id: 'item', action: 'flipDeleteSent', target: {flipId: 's'}}
+
+  test('approved, the deletion is sent and the flip followed as being deleted', async () => {
+    useStore([sentFailed()])
+    callRpc.mockImplementation(async (method) => {
+      if (method === 'dna_getCoinbaseAddr') return '0xme'
+      if (method === 'bcn_estimateTx') return {txFee: '1'}
+      if (method === 'dna_sendTransaction') return '0xtx'
+      throw new Error(method)
+    })
+    await expect(flipsExecutors(t).flipDeleteSent(sentItem)).resolves.toBe(
+      '0xtx'
+    )
+    expect(callRpc).toHaveBeenCalledWith('dna_sendTransaction', {
+      type: 0xe,
+      from: '0xme',
+      payload: PAYLOAD,
+      maxFee: 2,
+    })
+    expect(global.flipStore.getFlip('s')).toMatchObject({
+      type: FlipType.Deleting,
+      txHash: '0xtx',
+      agentSent: {waiting: null},
+    })
+  })
+
+  test('a sent flip whose verdict no longer holds is not deleted', async () => {
+    useStore([{...sentFailed(), order: [1, 2, 3, 0]}])
+    await expect(flipsExecutors(t).flipDeleteSent(sentItem)).rejects.toThrow(
+      'the flip changed since the judge failed it'
+    )
+    expect(callRpc).not.toHaveBeenCalled()
+  })
+
+  test('declined, it is not proposed again on the same flip', async () => {
+    useStore([sentFailed()])
+    await flipsDecliners().flipDeleteSent(sentItem)
+    const flip = global.flipStore.getFlip('s')
+    expect(flip.type).toBe(FlipType.Published)
+    expect(flip.agentSent).toEqual({waiting: null, declined: contentsKey(flip)})
   })
 })
