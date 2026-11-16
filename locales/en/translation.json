@@ -2278,5 +2278,8 @@
   "Keep it locked": "Keep it locked",
   "Flip stories": "Flip stories",
   "is where your Instructions go; without it, they go at the end.": "is where your Instructions go; without it, they go at the end.",
-  "is where the app lists the actions it may do.": "is where the app lists the actions it may do."
+  "is where the app lists the actions it may do.": "is where the app lists the actions it may do.",
+  "Delete a sent flip": "Delete a sent flip",
+  "Deletes a sent flip the judge failed, yours or an agent's. A deletion costs a fee: set the iDNA it may spend a day; past it, or without a limit, it waits for you.": "Deletes a sent flip the judge failed, yours or an agent's. A deletion costs a fee: set the iDNA it may spend a day; past it, or without a limit, it waits for you.",
+  "wants to delete a sent flip": "wants to delete a sent flip"
 }

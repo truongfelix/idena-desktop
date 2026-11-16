@@ -92,7 +92,21 @@ export const isFlipsAgent = (agent) => heldFlipSteps(agent).length > 0
 
 // What a Flips run reads of the app (the identity, the epoch, the Protect step's settings): the runner keeps it up to
 // date, so that Run now on an agent page has it too.
-const flipsState = {identity: null, epoch: null, settings: {}}
+const flipsState = {identity: null, epoch: null, settings: {}, list: null}
+
+/**
+ * Whether an agent on may delete a sent flip (B-277): the judge then judges sent flips too; else nothing would read
+ * its verdict, and each judgement is billed.
+ */
+export const deletesSent = (list) =>
+  Boolean(list) &&
+  !list.paused &&
+  list.agents.some(
+    (one) =>
+      one.enabled &&
+      one.actions.flipDeleteSent &&
+      one.actions.flipDeleteSent.level !== 'off'
+  )
 
 /**
  * Whether a Flips run can read what it needs: the identity and the epoch, both read from the node. Before, a run
@@ -177,7 +191,11 @@ export async function runAgentNow(agent, social, t, why = 'now') {
       isFlipsAgent(agent)
         ? await runFlipsAgent(
             agent,
-            {identity: flipsState.identity, epoch: flipsState.epoch},
+            {
+              identity: flipsState.identity,
+              epoch: flipsState.epoch,
+              judgeSent: deletesSent(flipsState.list),
+            },
             flipsDeps({settings: flipsState.settings, t})
           ).catch((error) => ({
             result: 'failed',
@@ -240,6 +258,7 @@ export function AgentRunner() {
   const {t} = useTranslation()
   const social = useSocial()
   const [list, setList] = React.useState(lastAgentsList)
+  flipsState.list = list
   const socialRef = React.useRef(social)
   socialRef.current = social
   // What a Flips run reads, as it is now.

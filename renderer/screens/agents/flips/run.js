@@ -68,7 +68,7 @@ async function act(
   step,
   deps,
   count,
-  {key, work, fresh, propose, apply}
+  {key, work, fresh, propose, apply, billed = true}
 ) {
   const day = new Date(deps.now()).toDateString()
   const failure = `${agent.id}:${step}:${key}`
@@ -91,7 +91,8 @@ async function act(
   }
   const fail = async (error) => {
     count.failed += 1
-    failedToday.set(failure, day)
+    // Only billed work is held for the day (`billed`: a model's answer, a picture).
+    if (billed) failedToday.set(failure, day)
     if (!logged(error))
       await deps.call('didAction', {
         agentId: agent.id,
@@ -118,7 +119,15 @@ async function act(
     })
     return 'next'
   }
-  const {body = '', detail = '', target} = propose(result)
+  // `cost`: the iDNA the action may spend, fees included (B-277); the other steps spend nothing.
+  // `wait`: past its iDNA a day, the action waits in To approve for the person (B-269) instead of being skipped.
+  const {
+    body = '',
+    detail = '',
+    target,
+    cost = 0,
+    wait = false,
+  } = propose(result)
   const decision = await deps.call('propose', {
     agentId: agent.id,
     action: step,
@@ -126,8 +135,8 @@ async function act(
     detail,
     target,
     amount: 1,
-    cost: 0,
-    skipOverLimit: true,
+    cost,
+    skipOverLimit: !wait,
   })
   if (decision.decision === 'ask' && decision.item) {
     try {
@@ -174,6 +183,15 @@ async function act(
   }
   return 'next'
 }
+
+/**
+ * What the judge and Delete a sent flip know of the sent flips (B-277): this epoch's (the node's list for the identity),
+ * and whether an agent may delete one (`ctx.judgeSent`: else the judge leaves them, nothing would read its verdict).
+ */
+const sentOf = (ctx) => ({
+  sent: (ctx.identity && ctx.identity.flips) || [],
+  judgeSent: Boolean(ctx.judgeSent),
+})
 
 /** A new agent draft for `pair`, its story written: the nonsense picture's slot picked as the editor picks it. */
 export function newAgentDraft({id, pair, words, story, by, at, random}) {
@@ -343,7 +361,11 @@ const STEPS = {
   /** Judge the flip: the validation's question on each draft protected and shuffled, its verdict kept with it. */
   async flipJudge(agent, ctx, deps, count) {
     // eslint-disable-next-line no-restricted-syntax
-    for (const flip of draftsAt('flipJudge', deps.store.getFlips())) {
+    for (const flip of draftsAt(
+      'flipJudge',
+      deps.store.getFlips(),
+      sentOf(ctx)
+    )) {
       // eslint-disable-next-line no-await-in-loop
       const next = await act(agent, 'flipJudge', deps, count, {
         key: flip.id,
@@ -440,6 +462,48 @@ const STEPS = {
           }
           deps.store.deleteDraft(flip.id)
           return ''
+        },
+      })
+      if (next === 'stop') return
+    }
+  },
+  /**
+   * Delete a sent flip (B-277): a sent flip the judge failed, as it is, the person's too; its fee, estimated by the
+   * node, counts in the action's iDNA a day (past it, or without a limit, it waits in To approve for the person).
+   */
+  async flipDeleteSent(agent, ctx, deps, count) {
+    if (!canMakeFlips(ctx.identity, ctx.epoch)) return
+    // eslint-disable-next-line no-restricted-syntax
+    for (const flip of draftsAt(
+      'flipDeleteSent',
+      deps.store.getFlips(),
+      sentOf(ctx)
+    )) {
+      // eslint-disable-next-line no-await-in-loop
+      const next = await act(agent, 'flipDeleteSent', deps, count, {
+        key: flip.id,
+        fresh: () => sameDraft(deps.store.getFlip(flip.id), flip),
+        // The node's dry run, billed nothing: a failure is tried again at the next run.
+        billed: false,
+        work: () => deps.deleteCost(flip),
+        propose: (cost) => ({
+          // Past its iDNA a day, it waits for the person: the flip is marked, it is never proposed twice.
+          wait: true,
+          body: deps.verdictText(flip.agentVerdict),
+          detail: keywordsLine(flip),
+          // Its sending, by its transaction: a flip sent again later is another one.
+          target: {flipId: flip.id, txHash: flip.txHash || null},
+          cost: cost.maxFee,
+        }),
+        apply: async (cost, waiting) => {
+          if (waiting) {
+            deps.store.updateDraft({
+              id: flip.id,
+              agentSent: {...(flip.agentSent || {}), waiting},
+            })
+            return ''
+          }
+          return deps.deleteSent(flip.id, cost, flip.txHash || null)
         },
       })
       if (next === 'stop') return

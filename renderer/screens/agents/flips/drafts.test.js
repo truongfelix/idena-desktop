@@ -81,6 +81,7 @@ describe('the drafts waiting at each step', () => {
       draftsAt('flipJudge', [mine, unshuffled, judged, changed, sent]).map(
         ({id}) => id
       )
+      // A sent flip only when an agent may delete one (B-277, below).
     ).toEqual(['person', 'changed'])
   })
 
@@ -281,5 +282,73 @@ describe('a declined step', () => {
         },
       })
     ).toEqual(['flipStory', 'flipSubmit'])
+  })
+})
+
+// B-277: sent flips.
+describe('sent flips', () => {
+  const sent = (fields = {}) =>
+    draft('drafted', {
+      id: 'sent',
+      type: FlipType.Published,
+      hash: 'bafy-sent',
+      agentFlip: undefined,
+      ...fields,
+    })
+  // This epoch's sent flips, as the node lists them for the identity; an agent may delete one.
+  const ctx = {sent: ['bafy-sent'], judgeSent: true}
+
+  test('the judge also takes a sent flip of this epoch without a verdict on it as it is', () => {
+    expect(draftsAt('flipJudge', [sent()], ctx).map(({id}) => id)).toEqual([
+      'sent',
+    ])
+    // Passed before it was sent (an agent's): not judged again.
+    expect(draftsAt('flipJudge', [passed(sent())], ctx)).toEqual([])
+    // Being deleted, or waiting for the person's approval of its deletion: not judged.
+    expect(
+      draftsAt('flipJudge', [sent({type: FlipType.Deleting})], ctx)
+    ).toEqual([])
+    expect(
+      draftsAt(
+        'flipJudge',
+        [sent({agentSent: {waiting: {step: 'flipDeleteSent', id: 'i'}}})],
+        ctx
+      )
+    ).toEqual([])
+    // No agent may delete one: nothing would read the verdict, it is not judged (each judgement is billed).
+    expect(draftsAt('flipJudge', [sent()], {...ctx, judgeSent: false})).toEqual(
+      []
+    )
+    // Another epoch's (not in the node's list): left alone.
+    expect(draftsAt('flipJudge', [sent()], {...ctx, sent: []})).toEqual([])
+  })
+
+  test('Delete a sent flip takes a sent flip the judge failed, not one declined, waiting or being sent', () => {
+    const failed = passed(sent(), {pass: false})
+    expect(draftsAt('flipDeleteSent', [failed], ctx).map(({id}) => id)).toEqual(
+      ['sent']
+    )
+    expect(draftsAt('flipDeleteSent', [failed], {...ctx, sent: []})).toEqual([])
+    expect(draftsAt('flipDeleteSent', [passed(sent())], ctx)).toEqual([])
+    const declined = {...failed, ...declinedChange('flipDeleteSent', failed)}
+    expect(draftsAt('flipDeleteSent', [declined], ctx)).toEqual([])
+    const waiting = {
+      ...failed,
+      agentSent: {waiting: {step: 'flipDeleteSent', id: 'i'}},
+    }
+    expect(draftsAt('flipDeleteSent', [waiting], ctx)).toEqual([])
+    expect(orphans([waiting], []).map(({step}) => step)).toEqual([
+      'flipDeleteSent',
+    ])
+    // Deleted by the person meanwhile (a draft again): its wait is still settled.
+    expect(
+      orphans([{...waiting, type: FlipType.Draft}], []).map(({step}) => step)
+    ).toEqual(['flipDeleteSent'])
+    const sending = {...failed, agentSent: {sending: true}}
+    expect(draftsAt('flipDeleteSent', [sending], ctx)).toEqual([])
+    // A draft the judge failed is Delete a draft's, never this one's.
+    expect(
+      draftsAt('flipDeleteSent', [passed(draft('drafted'), {pass: false})], ctx)
+    ).toEqual([])
   })
 })

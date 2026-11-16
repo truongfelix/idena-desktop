@@ -2278,5 +2278,8 @@
   "Keep it locked": "Garder verrouillé",
   "Flip stories": "Histoires de flips",
   "is where your Instructions go; without it, they go at the end.": "est la place de vos Instructions ; sans lui, elles vont à la fin.",
-  "is where the app lists the actions it may do.": "est la place où l'app liste les actions qu'il peut faire."
+  "is where the app lists the actions it may do.": "est la place où l'app liste les actions qu'il peut faire.",
+  "Delete a sent flip": "Effacer un flip envoyé",
+  "Deletes a sent flip the judge failed, yours or an agent's. A deletion costs a fee: set the iDNA it may spend a day; past it, or without a limit, it waits for you.": "Efface un flip envoyé que le juge a refusé, le vôtre ou celui d'un agent. Effacer coûte des frais : réglez les iDNA qu'il peut dépenser par jour ; au-delà, ou sans limite, il attend votre accord.",
+  "wants to delete a sent flip": "veut effacer un flip envoyé"
 }
