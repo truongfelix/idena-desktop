@@ -3,6 +3,7 @@ import {criteriaNeeds, passes} from '../criteria'
 import {doneOnFeed, readPlan} from './plan'
 import {mostCost} from './execute'
 import {tagsLeftOf} from './tags'
+import {actionRules} from './rules'
 import {shortAddress} from '../../social/people'
 
 // One run of an agent on Idena Social (B-239, B-240): the app reads what came since its read point (digest.js), the
@@ -104,6 +105,14 @@ export async function runSocialAgent(agent, social, deps) {
       return {result: 'failed', detail: t('its questions of the day unknown')}
     tagsLeft = tagsLeftOf(agent.reads.tags.perDay, today)
   }
+  // Its new posts left today (B-281), asked the same way.
+  let postsLeft = Infinity
+  if (typeof agent.reads?.posts?.perDay === 'number') {
+    const today = await call('postsToday', {agentId: agent.id})
+    if (typeof today !== 'number')
+      return {result: 'failed', detail: t('its posts of the day unknown')}
+    postsLeft = Math.max(0, agent.reads.posts.perDay - today)
+  }
   // Whose it reads and whom it acts on (B-266): the authors of what is new read first, when a criterion needs it.
   const who = {
     posts: agent.actions.readPosts?.who || null,
@@ -128,7 +137,7 @@ export async function runSocialAgent(agent, social, deps) {
   }
   const digest = socialDigest(
     social,
-    {reads: agent.reads, who, facts, tagsLeft},
+    {reads: agent.reads, who, facts, tagsLeft, postsLeft},
     {point, scanned}
   )
   // The posts that tag it past its questions of the day: never read, named in Activity once the point passed them.
@@ -173,6 +182,8 @@ export async function runSocialAgent(agent, social, deps) {
   // not give them again).
   if (digest.tagsShown)
     await call('countTags', {agentId: agent.id, n: digest.tagsShown})
+  if (digest.postsShown && postsLeft !== Infinity)
+    await call('countPosts', {agentId: agent.id, n: digest.postsShown})
   await call('setReadPoint', {agentId: agent.id, height: digest.readTo})
   await tellPassed()
   // eslint-disable-next-line no-restricted-syntax
@@ -184,6 +195,9 @@ export async function runSocialAgent(agent, social, deps) {
     })
 
   const count = {alone: 0, ask: 0, skipped: 0, failed: 0}
+  // Once per author, and a message only to who wrote first (B-281).
+  const rules = actionRules(agent.actions, social, scanned)
+  const names = social.names || {}
   // eslint-disable-next-line no-restricted-syntax
   for (const planned of plan.actions) {
     const {action} = planned
@@ -201,7 +215,10 @@ export async function runSocialAgent(agent, social, deps) {
       onlyTo[action] &&
       (!whom.length ||
         !whom.every((one) =>
-          passes(onlyTo[action], one, facts[String(one).toLowerCase()])
+          passes(onlyTo[action], one, {
+            ...facts[String(one).toLowerCase()],
+            named: Boolean(names[one]),
+          })
         ))
     ) {
       count.skipped += 1
@@ -209,6 +226,22 @@ export async function runSocialAgent(agent, social, deps) {
       await log(action, {
         skipped: true,
         detail: t('not done: outside its criteria', {nsSeparator: '!!'}),
+      })
+      // eslint-disable-next-line no-continue
+      continue
+    }
+    const refused = whom.length ? rules.allows(action, whom) : null
+    if (refused) {
+      count.skipped += 1
+      // eslint-disable-next-line no-await-in-loop
+      await log(action, {
+        skipped: true,
+        detail:
+          refused === 'once per author'
+            ? t('not done: once per author', {nsSeparator: '!!'})
+            : t('not done: they did not write to it first', {
+                nsSeparator: '!!',
+              }),
       })
       // eslint-disable-next-line no-continue
       continue
@@ -246,6 +279,8 @@ export async function runSocialAgent(agent, social, deps) {
     })
     if (decision.decision === 'ask') count.ask += 1
     else if (decision.decision !== 'alone') count.skipped += 1
+    // Asked for in this run, done or waiting: the author's once.
+    if (['ask', 'alone'].includes(decision.decision)) rules.did(action, whom)
     // eslint-disable-next-line no-continue
     if (decision.decision !== 'alone') continue
     // A tip's amount changed by the person since it was prepared: not sent, its count given back.

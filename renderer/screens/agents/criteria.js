@@ -150,10 +150,26 @@ export const forgetAuthors = () => known.clear()
  * Whether `address` (with its `facts`, readAuthors) and its `text` pass `criteria`; no criteria pass everyone. A state
  * picked passes when the author is in one of them (Vouched: a vouched member in standing); the words, whole words: one
  * of `mustWords` in the text, none of `notWords`, for an item with a text (`text` null: a like or a tip, no words).
+ * B-281: `named` passes an author with a claimed profile name (`facts.named`); `topics` passes a post in one of them
+ * (`topic`: its topic's name, null for a post in none; undefined for what is no post, which the topics leave alone).
  */
-export function passes(criteria, address, facts = {}, text = null) {
+export function passes(
+  criteria,
+  address,
+  facts = {},
+  text = null,
+  topic = undefined
+) {
   if (!criteria) return true
   const who = String(address || '').toLowerCase()
+  if (criteria.named === true && facts.named !== true) return false
+  if (
+    criteria.topics &&
+    criteria.topics.length &&
+    topic !== undefined &&
+    !criteria.topics.includes(topic)
+  )
+    return false
   if (criteria.only.length && !criteria.only.includes(who)) return false
   if (criteria.except.includes(who)) return false
   if (

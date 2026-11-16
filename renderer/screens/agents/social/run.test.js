@@ -635,6 +635,171 @@ describe('a Social run', () => {
     )
   })
 
+  test('once per author (B-281): a second like for the same author is not done, in the run or within the day', async () => {
+    const agent = start({
+      readPosts: {level: 'alone', window: 'count', count: 50},
+      like: {level: 'alone', limit: 5, perAuthor: 'day'},
+    })
+    expect(agent.actions.like.perAuthor).toBe('day')
+    const two = state({feed: [node(31, ANN, 'A second post', 9995), ...feed()]})
+    const labels = (social, more = {}) => [
+      ...socialDigest(
+        social,
+        {reads: agent.reads},
+        {point: null, scanned: HEAD, ...more}
+      ).labels,
+    ]
+    const p = (social, id, more) =>
+      labels(social, more).find(([, item]) => item.node?.id === id)[0]
+    answer = JSON.stringify({
+      actions: [
+        {do: 'like', to: p(two, 30)},
+        {do: 'like', to: p(two, 31)},
+      ],
+    })
+    const d = deps()
+    const result = await runSocialAgent(agent, two, d)
+    expect(result.count).toMatchObject({alone: 1, skipped: 1})
+    expect(d.sent).toHaveLength(1)
+    const lines = await main.handle('activity', {agentId: ID})
+    expect(lines.map(({detail}) => detail)).toEqual(
+      expect.arrayContaining(['not done: once per author'])
+    )
+    // A later run the same day: its like is on the chain, a new post of Ann is not liked.
+    const later = state({
+      head: HEAD + 100,
+      feed: [
+        node(32, ANN, 'A third post', HEAD + 50),
+        node(30, ANN, 'liked', 9990, [], [{author: ME, height: HEAD + 1}]),
+      ],
+    })
+    answer = JSON.stringify({
+      actions: [
+        {do: 'like', to: p(later, 32, {point: HEAD, scanned: HEAD + 100})},
+      ],
+    })
+    const again = deps()
+    const second = await runSocialAgent(agent, later, again)
+    expect(second.count).toMatchObject({alone: 0, skipped: 1})
+    expect(again.sent).toEqual([])
+  })
+
+  test('a private message only to who wrote to it first (B-281)', async () => {
+    const agent = start({
+      readPosts: {level: 'alone', window: 'count', count: 50},
+      readMessages: {level: 'alone'},
+      message: {level: 'alone', limit: 3, onlyAnswers: true},
+    })
+    expect(agent.actions.message.onlyAnswers).toBe(true)
+    const labels = [
+      ...socialDigest(
+        state(),
+        {reads: agent.reads},
+        {point: null, scanned: HEAD}
+      ).labels,
+    ]
+    const ann = labels.find(([, item]) => item.node?.id === 30)[0]
+    const bob = labels.find(([, item]) => item.kind === 'chat')[0]
+    answer = JSON.stringify({
+      actions: [
+        {do: 'message', to: ann, text: 'Hello Ann'},
+        {do: 'message', to: bob, text: 'Fine, thank you'},
+      ],
+    })
+    const d = deps()
+    const result = await runSocialAgent(agent, state(), d)
+    expect(result.count).toMatchObject({alone: 1, skipped: 1})
+    expect(d.sent.map(({target}) => target.others)).toEqual([[BOB]])
+    const lines = await main.handle('activity', {agentId: ID})
+    expect(lines.map(({detail}) => detail)).toEqual(
+      expect.arrayContaining(['not done: they did not write to it first'])
+    )
+  })
+
+  test('its new posts a day (B-281): the newest within what is left, the count kept by the main process', async () => {
+    const agent = start({
+      readPosts: {level: 'alone', window: 'count', count: 50, perDay: 1},
+      like: {level: 'alone', limit: 5},
+    })
+    expect(agent.reads.posts.perDay).toBe(1)
+    const two = state({feed: [node(31, ANN, 'A second post', 9995), ...feed()]})
+    answer = JSON.stringify({actions: []})
+    const d = deps()
+    await runSocialAgent(agent, two, d)
+    await expect(main.handle('postsToday', {agentId: ID})).resolves.toBe(1)
+    // The same day, a new post: none left today, the model is not asked about it.
+    const later = state({
+      head: HEAD + 100,
+      feed: [node(32, ANN, 'A third post', HEAD + 50), ...two.feed],
+    })
+    await expect(runSocialAgent(agent, later, deps())).resolves.toMatchObject({
+      result: 'nothing new',
+    })
+    await expect(main.handle('postsToday', {agentId: ID})).resolves.toBe(1)
+  })
+
+  test('the posts read (B-281): at most a number a run with the window of a day, a topic, a claimed name', () => {
+    const now = HEAD * 20 * 1000
+    const posts = [
+      {...node(33, BOB, 'In flips', 9997)},
+      node(32, ANN, 'Third', 9996),
+      node(31, ANN, 'Second', 9995),
+      ...feed(),
+    ]
+    posts[0].call.channel = 'r/flips'
+    const run = (reads, who = {}) =>
+      socialDigest(
+        state({feed: posts}),
+        {
+          reads: {
+            ...READ_ALL,
+            notifications: false,
+            messages: false,
+            posts: reads,
+          },
+          who,
+        },
+        {point: 9900, scanned: HEAD, now}
+      ).text
+    const capped = run({window: 'day', count: 10, perRun: 2})
+    expect(capped).toContain('In flips')
+    expect(capped).toContain('Third')
+    expect(capped).not.toContain('Second')
+    const topic = run(
+      {window: 'count', count: 50},
+      {
+        posts: {
+          only: [],
+          except: [],
+          states: [],
+          trustAbove: null,
+          minAge: null,
+          minStake: null,
+          topics: ['flips'],
+        },
+      }
+    )
+    expect(topic).toContain('In flips')
+    expect(topic).not.toContain('Third')
+    const named = run(
+      {window: 'count', count: 50},
+      {
+        posts: {
+          only: [],
+          except: [],
+          states: [],
+          trustAbove: null,
+          minAge: null,
+          minStake: null,
+          named: true,
+        },
+      }
+    )
+    // Only Bob claimed a name.
+    expect(named).toContain('In flips')
+    expect(named).not.toContain('Third')
+  })
+
   test("whose it reads: the model's question holds only the authors that pass", () => {
     const who = {
       posts: {

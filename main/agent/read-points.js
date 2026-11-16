@@ -7,7 +7,7 @@ const fs = require('fs-extra')
 // not again at each start of the app. A build before it reads `points` alone and drops `runs` when it saves.
 // It keeps too how many posts that tag it each agent read today (B-264, a day in UTC): its questions of the day, so a
 // restart does not give it the day's questions again. An older build drops `tags` when it saves (the count starts
-// again that day).
+// again that day). And, the same way, how many new posts each agent read today (B-281, `posts`): its posts a day.
 
 const ID_PATTERN = /^[0-9a-f]{16}$/u
 
@@ -38,9 +38,9 @@ function readRuns(value) {
 /** The day of `ms` in UTC, as YYYY-MM-DD: the questions' day (B-264). */
 const utcDay = (ms) => new Date(ms).toISOString().slice(0, 10)
 
-/** The tags counted, each one checked: {agentId: {day, n}}. */
-function readTags(value) {
-  const saved = value && typeof value === 'object' ? value.tags : null
+/** The counts of a day saved under `field` (`tags`, `posts`), each one checked: {agentId: {day, n}}. */
+function readCounts(value, field) {
+  const saved = value && typeof value === 'object' ? value[field] : null
   if (!saved || typeof saved !== 'object') return {}
   return Object.fromEntries(
     Object.entries(saved).filter(
@@ -60,12 +60,14 @@ function createReadPoints({file = null, logger = null, now = Date.now} = {}) {
   let points = {}
   let runs = {}
   let tags = {}
+  let posts = {}
   if (file)
     try {
       const saved = fs.readJsonSync(file())
       points = readPoints(saved)
       runs = readRuns(saved)
-      tags = readTags(saved)
+      tags = readCounts(saved, 'tags')
+      posts = readCounts(saved, 'posts')
     } catch (error) {
       if (error.code !== 'ENOENT' && logger)
         logger.warn('agent read points unreadable', error.toString())
@@ -75,7 +77,7 @@ function createReadPoints({file = null, logger = null, now = Date.now} = {}) {
     if (!file) return
     try {
       const temp = `${file()}.tmp`
-      fs.outputJsonSync(temp, {v: 1, points, runs, tags}, {spaces: 2})
+      fs.outputJsonSync(temp, {v: 1, points, runs, tags, posts}, {spaces: 2})
       fs.renameSync(temp, file())
     } catch (error) {
       if (logger) logger.warn('agent read points not written', error.toString())
@@ -135,6 +137,25 @@ function createReadPoints({file = null, logger = null, now = Date.now} = {}) {
         }
         return before + n
       },
+      /** How many new posts the agent `agentId` read today (a day in UTC, B-281). */
+      postsToday(data) {
+        const one = posts[data && data.agentId]
+        return one && one.day === utcDay(now()) ? one.n : 0
+      },
+      /** The agent `agentId` read `n` more new posts today; returns today's count. */
+      countPosts(data) {
+        const {agentId, n} = data || {}
+        if (!ID_PATTERN.test(agentId)) throw new Error('no agent named')
+        if (!Number.isSafeInteger(n) || n < 0) throw new Error('not a count')
+        const day = utcDay(now())
+        const before =
+          posts[agentId] && posts[agentId].day === day ? posts[agentId].n : 0
+        if (n > 0) {
+          posts = {...posts, [agentId]: {day, n: before + n}}
+          save()
+        }
+        return before + n
+      },
     },
     /** After a change of the agents (`liveIds`, the ids left): a removed agent's point goes with it. */
     keepOnly(liveIds) {
@@ -147,14 +168,19 @@ function createReadPoints({file = null, logger = null, now = Date.now} = {}) {
       const keptTags = Object.fromEntries(
         Object.entries(tags).filter(([id]) => liveIds.includes(id))
       )
+      const keptPosts = Object.fromEntries(
+        Object.entries(posts).filter(([id]) => liveIds.includes(id))
+      )
       if (
         Object.keys(kept).length !== Object.keys(points).length ||
         Object.keys(keptRuns).length !== Object.keys(runs).length ||
-        Object.keys(keptTags).length !== Object.keys(tags).length
+        Object.keys(keptTags).length !== Object.keys(tags).length ||
+        Object.keys(keptPosts).length !== Object.keys(posts).length
       ) {
         points = kept
         runs = keptRuns
         tags = keptTags
+        posts = keptPosts
         save()
       }
     },
