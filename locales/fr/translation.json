@@ -2215,5 +2215,6 @@
   "The draft is gone.": "Le brouillon n'existe plus.",
   "Its pictures, in the story order": "Ses images, dans l'ordre de l'histoire",
   "The story order": "L'ordre de l'histoire",
-  "The shuffled order": "L'ordre mélangé"
+  "The shuffled order": "L'ordre mélangé",
+  "Waits for the node to give the identity and the epoch.": "Attend que le nœud donne l'identité et l'époque."
 }

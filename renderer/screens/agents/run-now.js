@@ -5,7 +5,13 @@ import {SecondaryButton} from '../../shared/components/button'
 import {useSuccessToast} from '../../shared/hooks/use-toast'
 import {useSocial} from '../social/provider'
 import {agentErrorText} from '../settings/agent/api'
-import {isFlipsAgent, isSocialAgent, runAgentNow, socialReady} from './runner'
+import {
+  flipsReady,
+  isFlipsAgent,
+  isSocialAgent,
+  runAgentNow,
+  socialReady,
+} from './runner'
 
 /** What a run says, in words. */
 export function runLine({result, detail}, t) {
@@ -33,13 +39,16 @@ export const failedLine = (error, t) =>
   runLine({result: 'failed', detail: agentErrorText(error)}, t)
 
 /** Why Run now is off, or nothing. */
-function buttonTitle({enabled, paused, ready}, t) {
+function buttonTitle({enabled, paused, waits}, t) {
   if (!enabled) return t('Turn the agent on first.')
   if (paused)
     return t('Every agent is paused: none acts until you resume them.', {
       nsSeparator: '!!',
     })
-  if (!ready) return t('Waits for Social to read the chain up to now.')
+  if (waits === 'social')
+    return t('Waits for Social to read the chain up to now.')
+  if (waits === 'flips')
+    return t('Waits for the node to give the identity and the epoch.')
   return undefined
 }
 
@@ -53,13 +62,15 @@ export function RunNow({agent, paused, onDone}) {
   const toast = useSuccessToast()
   const [isRunning, setIsRunning] = React.useState(false)
   if (!isSocialAgent(agent) && !isFlipsAgent(agent)) return null
-  // A Flips agent runs at once (B-258); one on Social waits for the scan.
-  const ready = !isSocialAgent(agent) || socialReady(social)
+  // One on Social waits for the scan; one in the Flips area for the identity and the epoch (B-258).
+  let waits = null
+  if (isSocialAgent(agent) && !socialReady(social)) waits = 'social'
+  else if (isFlipsAgent(agent) && !flipsReady()) waits = 'flips'
   return (
     <SecondaryButton
       isLoading={isRunning}
-      isDisabled={!agent.enabled || paused || !ready}
-      title={buttonTitle({enabled: agent.enabled, paused, ready}, t)}
+      isDisabled={!agent.enabled || paused || waits !== null}
+      title={buttonTitle({enabled: agent.enabled, paused, waits}, t)}
       onClick={async () => {
         setIsRunning(true)
         let line

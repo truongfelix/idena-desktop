@@ -2215,5 +2215,6 @@
   "The draft is gone.": "The draft is gone.",
   "Its pictures, in the story order": "Its pictures, in the story order",
   "The story order": "The story order",
-  "The shuffled order": "The shuffled order"
+  "The shuffled order": "The shuffled order",
+  "Waits for the node to give the identity and the epoch.": "Waits for the node to give the identity and the epoch."
 }

@@ -94,6 +94,13 @@ export const isFlipsAgent = (agent) => heldFlipSteps(agent).length > 0
 // date, so that Run now on an agent page has it too.
 const flipsState = {identity: null, epoch: null, settings: {}}
 
+/**
+ * Whether a Flips run can read what it needs: the identity and the epoch, both read from the node. Before, a run
+ * would find nothing to do, and an hourly agent would wait an hour (a daily one, its day).
+ */
+export const flipsReady = (state = flipsState) =>
+  Boolean(state.identity && state.identity.address && state.epoch)
+
 /** The outcome of an agent's runs in two areas, one after the other: a failure first, else what they did. */
 export function bothRuns(first, second) {
   const outcomes = [first, second].filter(Boolean)
@@ -275,10 +282,13 @@ export function AgentRunner() {
       // An agent on Social waits for the scan to be up to date (its run would read it), one only in the Flips area
       // does not (B-258).
       const socialOk = socialReady(socialRef.current)
+      const flipsOk = flipsReady()
       const active = list.agents.filter(
         (agent) =>
           agent.enabled &&
-          (isSocialAgent(agent) ? socialOk : isFlipsAgent(agent))
+          (!isSocialAgent(agent) || socialOk) &&
+          (!isFlipsAgent(agent) || flipsOk) &&
+          (isSocialAgent(agent) || isFlipsAgent(agent))
       )
       busy.current = true
       try {
