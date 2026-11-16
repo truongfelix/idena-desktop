@@ -22,8 +22,12 @@ export const FLIP_STEPS = [
 /** Where an agent's draft is: its story written, its pictures drawn, protected and shuffled, sent to the chain. */
 export const STAGES = ['story', 'pictures', 'drafted', 'submitted']
 
-/** The story pictures of a flip: the fourth is the nonsense picture, as a new flip in the editor has it. */
+/**
+ * The story pictures of a flip: three with the nonsense picture, as a new flip in the editor has it, or all four
+ * without one (B-283, owner 2026-11-17: a draft holds the pictures its story has).
+ */
 export const STORY_PICTURES = 3
+export const MAX_STORY_PICTURES = 4
 
 /** The Flips steps the agent holds (not Off), in the run's order. */
 export const heldFlipSteps = (agent) =>
@@ -271,16 +275,26 @@ export function freePairs(identity, flips) {
     .slice(0, room)
 }
 
-/** The first story with enough prompts for the flip's pictures, with only those prompts; null without one. */
-export function storyForPictures(story) {
+/**
+ * The first story with enough prompts for a flip's pictures, with only those prompts; null without one. A new story
+ * (`pictures` not given): at least three prompts, four kept when it has them. A draft's story: as many as the draft
+ * has slots for (`pictures`).
+ */
+export function storyForPictures(story, pictures = null) {
   const stories = (story && Array.isArray(story.stories) && story.stories) || []
+  const least = pictures === null ? STORY_PICTURES : pictures
   const one = stories.find(
     (item) =>
-      item &&
-      Array.isArray(item.prompts) &&
-      item.prompts.length >= STORY_PICTURES
+      item && Array.isArray(item.prompts) && item.prompts.length >= least
   )
-  return one ? {...one, prompts: one.prompts.slice(0, STORY_PICTURES)} : null
+  if (!one) return null
+  return {
+    ...one,
+    prompts: one.prompts.slice(
+      0,
+      pictures === null ? MAX_STORY_PICTURES : pictures
+    ),
+  }
 }
 
 /** An order of the four pictures for the flip's shuffled side: any but the story's, and not the story's with one moved. */

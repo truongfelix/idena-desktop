@@ -11,6 +11,8 @@ const MAX_KEYWORD_LENGTH = 200
 const MAX_IDEA_LENGTH = 2000
 /** The prompts of one answer at most, all its stories together: "3 stories of 4 pictures" fits. */
 const MAX_PROMPTS = 12
+/** The prompts of a story when the Instructions give no number: one for each picture of a flip. */
+const DEFAULT_PROMPTS = 4
 const MAX_FIELD = 2000
 const MAX_STORY = 4000
 /** The earlier stories' titles sent as "not these", the latest ones. */
@@ -24,6 +26,8 @@ const FORMAT = [
   'Answer with one JSON object and nothing else:',
   '{"stories": [{"title": "a short title", "story": "the story told in words", "prompts": ["one image prompt per picture", "..."]}]}',
   `"story" only when the story is asked, "prompts" only when the prompts are asked; ${MAX_PROMPTS} prompts at most in all the stories.`,
+  // What is asked without a word of the person's on it (owner 2026-11-17, B-283): a flip's four pictures.
+  `Unless the instructions above ask for another number: one story, with ${DEFAULT_PROMPTS} image prompts.`,
 ].join('\n')
 
 /**

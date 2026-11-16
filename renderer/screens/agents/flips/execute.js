@@ -72,6 +72,8 @@ export function verdictText(verdict, t) {
  */
 async function searchPictures(flip, settings) {
   const source = settings.flipAdversarialSource
+  // A draft of four story pictures has no nonsense picture to make (B-283).
+  if (flip.adversarialImageId === -1) return []
   if (!adversarialSearchNeeded(source) || settings.imageSearch !== true)
     return []
   const words = (flip.keywords && flip.keywords.words) || []

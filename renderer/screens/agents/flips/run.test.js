@@ -218,8 +218,42 @@ describe('a Flips run', () => {
       agentFlip: {...flip.agentFlip, waiting: null},
     })
     await runFlipsAgent(agent, {identity, epoch}, deps)
-    expect(deps.draw).toHaveBeenCalledTimes(3)
-    expect(store.getFlip('new').agentFlip.stage).toBe('drafted')
+    // The story has four prompts (B-283): four story pictures, no nonsense picture.
+    expect(deps.draw).toHaveBeenCalledTimes(4)
+    const drafted = store.getFlip('new')
+    expect(drafted.adversarialImageId).toBe(-1)
+    expect(drafted.images.filter(Boolean)).toHaveLength(4)
+    expect(deps.draw.mock.calls.map(([, prompt]) => prompt)).toEqual([
+      'p1',
+      'p2',
+      'p3',
+      'p4',
+    ])
+    expect(drafted.agentFlip.stage).toBe('drafted')
+  })
+
+  test('a story of four prompts goes to the chain with four story pictures (B-283)', async () => {
+    const levels = Object.fromEntries(ALL.map((id) => [id, 'alone']))
+    const {agent, deps, store} = setup({levels, answer: () => null})
+    deps.ipc.mockImplementation(async (command, data) => {
+      if (command === 'writeStory')
+        return {
+          stories: [
+            {title: 'T', story: 'S', prompts: ['p1', 'p2', 'p3', 'p4', 'p5']},
+          ],
+        }
+      return rightAnswer(store.getFlip('new').originalOrder)(data.flip)
+    })
+    await runFlipsAgent(agent, {identity, epoch}, deps)
+    const flip = store.getFlip('new')
+    expect(flip.type).toBe(FlipType.Publishing)
+    expect(flip.adversarialImageId).toBe(-1)
+    expect(flip.originalOrder).toEqual([0, 1, 2, 3])
+    // Four prompts kept of the five, each picture in its slot, a shuffled side that is not the story's.
+    expect(flip.story.stories[0].prompts).toEqual(['p1', 'p2', 'p3', 'p4'])
+    expect(flip.images.filter(Boolean)).toHaveLength(4)
+    expect(flip.order).not.toEqual(flip.originalOrder)
+    expect(deps.submit).toHaveBeenCalledWith('new')
   })
 
   test('past its limit a day, a step asks the model nothing', async () => {
