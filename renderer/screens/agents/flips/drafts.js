@@ -15,6 +15,8 @@ export const FLIP_STEPS = [
   'flipJudge',
   'flipSubmit',
   'flipDelete',
+  // A sent flip the judge fails (B-277): its deletion costs a fee.
+  'flipDeleteSent',
 ]
 
 /** Where an agent's draft is: its story written, its pictures drawn, protected and shuffled, sent to the chain. */
@@ -80,9 +82,31 @@ export function sameDraft(now, before) {
       contentsKey(flip),
       (flip.images || []).map((src) => (src ? hash(String(src)) : '')),
       flip.agentFlip ? [flip.agentFlip.stage, flip.agentFlip.waiting] : null,
+      // A sent flip's deletion waiting or being sent (B-277): a second run never sends it again.
+      flip.agentSent || null,
     ])
-  return Boolean(now) && now.type === FlipType.Draft && key(now) === key(before)
+  return (
+    Boolean(now) &&
+    // A draft, or a sent flip (B-277: the judge and Delete a sent flip read those too).
+    [FlipType.Draft, FlipType.Published].includes(now.type) &&
+    now.type === before.type &&
+    key(now) === key(before)
+  )
 }
+
+/** The item of To approve a sent flip waits on (Delete a sent flip, B-277), or null. */
+const sentWaiting = (flip) =>
+  (flip && flip.agentSent && flip.agentSent.waiting) || null
+
+/**
+ * A sent flip of this epoch the agents may act on (B-277): one the node lists for the identity (`sent`: its flips'
+ * hashes), not being deleted already.
+ */
+const sentNow = (flip, sent) =>
+  flip.type === FlipType.Published &&
+  Array.isArray(sent) &&
+  sent.includes(flip.hash) &&
+  !(flip.agentSent && flip.agentSent.sending)
 
 /** Whether the flip is protected and shuffled: four protected pictures and an order that is not the story's. */
 export function isShuffled(flip) {
@@ -141,7 +165,7 @@ const atStage = (flip, stage) =>
  * - flipDelete: an agent's draft the judge failed as it is.
  * Write the story makes new drafts (freePairs), it takes none.
  */
-export function draftsAt(step, flips) {
+export function draftsAt(step, flips, {sent = [], judgeSent = false} = {}) {
   const list = (Array.isArray(flips) ? flips : [])
     .filter(Boolean)
     .slice()
@@ -156,9 +180,12 @@ export function draftsAt(step, flips) {
     case 'flipJudge':
       return list.filter(
         (flip) =>
-          flip.type === FlipType.Draft &&
-          // An agent's draft waiting in To approve for another step is judged once that is settled.
-          !(isAgentDraft(flip) && waitingOf(flip)) &&
+          // An agent's draft waiting in To approve for another step is judged once that is settled. A sent flip
+          // too (B-277): one an agent sent was passed already, so these are mostly the flips sent from the editor.
+          ((flip.type === FlipType.Draft &&
+            !(isAgentDraft(flip) && waitingOf(flip))) ||
+            // Only while an agent may delete one (`judgeSent`), and only this epoch's.
+            (judgeSent && sentNow(flip, sent) && !sentWaiting(flip))) &&
           isShuffled(flip) &&
           !currentVerdict(flip)
       )
@@ -175,6 +202,15 @@ export function draftsAt(step, flips) {
           atStage(flip, 'drafted') &&
           judgedFail(flip) &&
           !declinedNow(flip, step)
+      )
+    // B-277: a sent flip the judge failed as it is, the person's or an agent's; not one the person declined.
+    case 'flipDeleteSent':
+      return list.filter(
+        (flip) =>
+          sentNow(flip, sent) &&
+          judgedFail(flip) &&
+          !sentWaiting(flip) &&
+          !(flip.agentSent && flip.agentSent.declined === contentsKey(flip))
       )
     default:
       return []
@@ -355,6 +391,8 @@ export function declinedChange(step, flip) {
           declined: true,
         },
       }
+    case 'flipDeleteSent':
+      return {agentSent: {waiting: null, declined: contentsKey(flip)}}
     case 'flipSubmit':
     case 'flipDelete':
       return {
@@ -372,6 +410,10 @@ export function declinedChange(step, flip) {
 export function waitingItem(flip, step) {
   if (step === 'flipJudge')
     return (flip.agentVerdict && flip.agentVerdict.waiting) || null
+  if (step === 'flipDeleteSent') {
+    const sent = sentWaiting(flip)
+    return sent ? sent.id : null
+  }
   const waiting = waitingOf(flip)
   return waiting && waiting.step === step ? waiting.id : null
 }
@@ -388,8 +430,15 @@ export function orphans(flips, pendingIds) {
     if (isAgentDraft(flip) && waiting && !live.has(waiting.id))
       out.push({flip, step: waiting.step})
     const judged = flip.agentVerdict && flip.agentVerdict.waiting
-    if (flip.type === FlipType.Draft && judged && !live.has(judged))
+    if (
+      [FlipType.Draft, FlipType.Published].includes(flip.type) &&
+      judged &&
+      !live.has(judged)
+    )
       out.push({flip, step: 'flipJudge'})
+    // Any type: a flip the person deleted meanwhile keeps no wait for an item gone.
+    const sent = sentWaiting(flip)
+    if (sent && !live.has(sent.id)) out.push({flip, step: 'flipDeleteSent'})
   })
   return out
 }

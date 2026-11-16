@@ -2216,5 +2216,8 @@
   "Its pictures, in the story order": "Ses images, dans l'ordre de l'histoire",
   "The story order": "L'ordre de l'histoire",
   "The shuffled order": "L'ordre mélangé",
-  "Waits for the node to give the identity and the epoch.": "Attend que le nœud donne l'identité et l'époque."
+  "Waits for the node to give the identity and the epoch.": "Attend que le nœud donne l'identité et l'époque.",
+  "Delete a sent flip": "Effacer un flip envoyé",
+  "Deletes a sent flip the judge failed, yours or an agent's. A deletion costs a fee: set the iDNA it may spend a day; past it, or without a limit, it waits for you.": "Efface un flip envoyé que le juge a refusé, le vôtre ou celui d'un agent. Effacer coûte des frais : réglez les iDNA qu'il peut dépenser par jour ; au-delà, ou sans limite, il attend votre accord.",
+  "wants to delete a sent flip": "veut effacer un flip envoyé"
 }
