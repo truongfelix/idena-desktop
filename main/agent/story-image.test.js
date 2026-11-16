@@ -124,6 +124,7 @@ describe("the agent's picture command", () => {
       },
       ask: jest.fn(),
       draw,
+      pendingFile: () => path.join(dir, 'pending.json'),
       now: () => 1,
     })
   }
@@ -173,6 +174,56 @@ describe("the agent's picture command", () => {
       ).rejects.toThrow('may not do it')
     }
     expect(draw).not.toHaveBeenCalled()
+  })
+
+  test('its pictures a day (B-269): past them, refused and logged; a failed one counts too', async () => {
+    const agent = start({flipStory: {level: 'ask', picturesPerDay: 2}})
+    const picture = () =>
+      agent.handle('drawStoryPicture', {
+        agentId: 'aaaaaaaaaaaaaaaa',
+        prompt: 'A kite.',
+      })
+    await expect(picture()).resolves.toMatchObject({mediaType: 'image/png'})
+    // The service may have drawn and billed it before it failed.
+    draw.mockRejectedValueOnce(new Error('service busy'))
+    await expect(picture()).rejects.toThrow('service busy')
+    await expect(picture()).rejects.toThrow('its 2 pictures a day are reached')
+    expect(draw).toHaveBeenCalledTimes(2)
+    // A refused key cannot have been billed: given back.
+    const other = start({flipStory: {level: 'ask', picturesPerDay: 3}})
+    draw.mockRejectedValueOnce(
+      new Error('the model answered HTTP 401: invalid key')
+    )
+    await expect(
+      other.handle('drawStoryPicture', {
+        agentId: 'aaaaaaaaaaaaaaaa',
+        prompt: 'A kite.',
+      })
+    ).rejects.toThrow('HTTP 401')
+    await expect(
+      other.handle('drawStoryPicture', {
+        agentId: 'aaaaaaaaaaaaaaaa',
+        prompt: 'A kite.',
+      })
+    ).resolves.toMatchObject({mediaType: 'image/png'})
+    // A restart keeps the day's count.
+    const again = start({flipStory: {level: 'ask', picturesPerDay: 2}})
+    await expect(
+      again.handle('drawStoryPicture', {
+        agentId: 'aaaaaaaaaaaaaaaa',
+        prompt: 'A kite.',
+      })
+    ).rejects.toThrow('its 2 pictures a day are reached')
+    // One drawn, the failed one, the refused key and the one after it: none more after the restart.
+    expect(draw).toHaveBeenCalledTimes(4)
+    const [line] = await agent.handle('activity', {
+      agentId: 'aaaaaaaaaaaaaaaa',
+    })
+    expect(line).toMatchObject({
+      action: 'flipImage',
+      decision: 'off',
+      detail: 'pictures a day reached',
+    })
   })
 
   test('the image model is kept with the agent and travels in its file', async () => {

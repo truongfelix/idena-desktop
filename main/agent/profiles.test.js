@@ -89,8 +89,8 @@ describe('agent profiles', () => {
       },
     })
     expect(migrated.actions).toEqual({
-      post: {level: 'alone', limit: null},
-      reply: {level: 'ask', limit: 5},
+      post: {level: 'alone', limit: null, spendPerDay: null},
+      reply: {level: 'ask', limit: 5, spendPerDay: null},
       readPosts: {level: 'alone', limit: null, window: 'count', count: 7},
       readOwnPosts: {level: 'alone', limit: null},
       readNotifications: {level: 'alone', limit: null},
@@ -185,8 +185,8 @@ describe('agent profiles', () => {
     expect(agent.actions).toEqual(
       // Plus the read actions an old file's Social actions bring (B-262), tested apart.
       expect.objectContaining({
-        post: {level: 'alone', limit: 1},
-        tip: {level: 'off', limit: 0, amount: 1},
+        post: {level: 'alone', limit: 1, spendPerDay: null},
+        tip: {level: 'off', limit: 0, amount: 1, spendPerDay: null},
       })
     )
     expect(agent.schedule).toEqual({kind: 'manual', time: '09:00'})
@@ -286,7 +286,7 @@ describe('agent profiles', () => {
       expect.objectContaining({
         answerFlip: {level: 'alone', limit: null},
         report: {level: 'off', limit: null},
-        tip: {level: 'ask', limit: 2, amount: 1},
+        tip: {level: 'ask', limit: 2, amount: 1, spendPerDay: null},
       })
     )
     expect(agent.reportThresholds[1]).toBe(0.6)
@@ -444,7 +444,7 @@ describe('agent profiles', () => {
           answerFlip: {level: 'alone', limit: null},
           // Not in its list before: read as Off, saved as Off.
           report: {level: 'off', limit: null},
-          tip: {level: 'ask', limit: 1, amount: 1},
+          tip: {level: 'ask', limit: 1, amount: 1, spendPerDay: null},
         })
       )
     })

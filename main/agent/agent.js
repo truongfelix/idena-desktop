@@ -24,6 +24,10 @@ const MAX_PLAN_TEXT = 12000
 const PLAN_MAX_TOKENS = 4096
 // Stories with 12 prompts of up to 120 words and each story in words (B-268): about 4,000 tokens; room for more.
 const STORY_MAX_TOKENS = 8192
+// A picture that failed before the service could draw it (B-269): the key refused, the service not reached, the
+// request stopped or never built. A deadline may come after the service drew and billed it: it counts.
+const NOT_BILLED =
+  /HTTP 40[13]\b|cannot be reached|^stopped$|no key|no image model|draws no pictures/u
 
 function clampTimeout(value) {
   // null, '' and booleans are numbers to Number(): 0, a 1 s deadline. Only a real number counts.
@@ -592,6 +596,20 @@ function createAgent({
       }
       if (typeof prompt !== 'string' || !prompt.trim())
         throw new Error('no prompt')
+      // Its pictures a day (B-269): each one is billed by its service. Counted when asked, and kept with the day's
+      // tally (pending.js): a restart keeps the count. A failure the service cannot have billed is given back.
+      const limit = agent.actions.flipStory.picturesPerDay
+      const drawnToday = pending.picturesToday(agentId)
+      if (typeof limit === 'number' && drawnToday + 1 > limit) {
+        log({
+          agentId,
+          action: 'flipImage',
+          decision: 'off',
+          detail: 'pictures a day reached',
+        })
+        throw new Error(`its ${limit} pictures a day are reached`)
+      }
+      pending.addPicture(agentId)
       const controller = new AbortController()
       writing.add(controller)
       try {
@@ -617,6 +635,7 @@ function createAgent({
         })
         return picture
       } catch (error) {
+        if (NOT_BILLED.test(error.message)) pending.addPicture(agentId, -1)
         log({
           agentId,
           action: 'flipImage',

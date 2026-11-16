@@ -28,12 +28,14 @@ const ACTIONS = {
   answerFlip: {level: 'ask', limit: null},
   report: {level: 'ask', limit: null},
   send: {level: 'off', limit: 0},
-  post: {level: 'off', limit: null},
+  // `spendPerDay` (B-269): the most iDNA the action spends a day alone, fees included; null: none of its own (the
+  // agent's overall limit, budgetPerDay, covers it, or the person decides).
+  post: {level: 'off', limit: null, spendPerDay: null},
   // Idena Social (B-239): replies and comments, likes, private messages.
-  reply: {level: 'off', limit: 5},
-  like: {level: 'off', limit: 10},
-  message: {level: 'off', limit: 3},
-  tip: {level: 'off', limit: 0, amount: 1},
+  reply: {level: 'off', limit: 5, spendPerDay: null},
+  like: {level: 'off', limit: 10, spendPerDay: null},
+  message: {level: 'off', limit: 3, spendPerDay: null},
+  tip: {level: 'off', limit: 0, amount: 1, spendPerDay: null},
   // What it reads on Social, given like any action (B-262): on ('alone') or off. Reading spends nothing.
   readPosts: {level: 'off', limit: null},
   readOwnPosts: {level: 'off', limit: null},
@@ -43,7 +45,8 @@ const ACTIONS = {
   oracleVote: {level: 'off', limit: null},
   invite: {level: 'off', limit: null},
   // A flip's story and image prompts, written for the person in the flip editor (B-236); nothing reaches the chain.
-  flipStory: {level: 'off', limit: null},
+  // `picturesPerDay` (B-269): the most pictures its service draws a day (each one is billed); null: no limit.
+  flipStory: {level: 'off', limit: null, picturesPerDay: null},
 }
 
 const MAX_MODEL_LENGTH = 200
@@ -123,6 +126,17 @@ function normalizeSettings(input) {
           ...('amount' in fallback
             ? {amount: normalizeTipAmount(row.amount, fallback.amount)}
             : {}),
+          // The money limits of an action (B-269), as the agents' file keeps them.
+          ...Object.fromEntries(
+            ['spendPerDay', 'picturesPerDay']
+              .filter((field) => field in fallback)
+              .map((field) => [
+                field,
+                field in row
+                  ? normalizeLimit(row[field], fallback[field])
+                  : fallback[field],
+              ])
+          ),
         },
       ]
     })

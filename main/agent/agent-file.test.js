@@ -76,7 +76,7 @@ describe('an agent as a file', () => {
       model: 'claude-sonnet-5-5',
       // A joke agent saved before reads were actions: its tips and its own posts, as it read them (B-262).
       actions: {
-        post: {level: 'alone', limit: 1},
+        post: {level: 'alone', limit: 1, spendPerDay: null},
         readOwnPosts: {level: 'alone', limit: null},
         readNotifications: {level: 'alone', limit: null},
       },

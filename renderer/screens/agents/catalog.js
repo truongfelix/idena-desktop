@@ -328,13 +328,40 @@ export function readsList(agent, catalog, t) {
 export const spendingActions = (agent, catalog) =>
   catalog.filter(({id, spends}) => spends && agent.actions[id])
 
-/** Its budget, in words; none for an agent whose actions spend nothing (`catalog` given), whatever was set before. */
+/**
+ * The most it may spend alone a day, in words (B-269): its overall limit when set, else what its Alone actions' own
+ * limits add up to (each one's iDNA a day, fees included); none for an agent whose actions spend nothing (`catalog`
+ * given), whatever was set before.
+ */
 export function budgetLine(agent, t, catalog = null) {
-  const {budgetPerDay} = agent
   if (catalog && spendingActions(agent, catalog).length === 0)
     return t('Spends no iDNA')
-  if (budgetPerDay === null || budgetPerDay === 0) return t('Spends no iDNA')
-  return t('Up to {{amount}} iDNA a day', {amount: budgetPerDay})
+  // What spends alone: the actions set to Alone among those that spend iDNA (Ask me spends only on a click).
+  const spending = (catalog || actionCatalog((text) => text))
+    .filter(({spends}) => spends)
+    .map(({id}) => id)
+  const limits = Object.entries(agent.actions || {})
+    .filter(
+      ([id, row]) => spending.includes(id) && row && row.level === 'alone'
+    )
+    .map(([, row]) =>
+      typeof row.spendPerDay === 'number' ? row.spendPerDay : null
+    )
+  const own = limits.reduce((sum, limit) => sum + (limit || 0), 0)
+  const overall =
+    typeof agent.budgetPerDay === 'number' ? agent.budgetPerDay : null
+  // Nothing spends alone (no Alone action that spends): no overall limit changes that.
+  if (!limits.length) return t('Spends no iDNA')
+  // An action without its own limit spends within the overall one, up to all of it.
+  let most = own
+  if (overall !== null)
+    most = limits.every((limit) => limit !== null)
+      ? Math.min(overall, own)
+      : overall
+  if (!most) return t('Spends no iDNA')
+  return t('Up to {{amount}} iDNA a day', {
+    amount: Math.round(most * 100) / 100,
+  })
 }
 
 /** Where the model runs, as the cards show it. */

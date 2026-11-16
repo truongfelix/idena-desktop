@@ -183,6 +183,17 @@ function normalizeActions(value) {
             ...('amount' in fallback
               ? {amount: normalizeTipAmount(row.amount, fallback.amount)}
               : {}),
+            // The money limits of an action (B-269): a number from 0, or none (null).
+            ...Object.fromEntries(
+              ['spendPerDay', 'picturesPerDay']
+                .filter((field) => field in fallback)
+                .map((field) => [
+                  field,
+                  field in row
+                    ? normalizeLimit(row[field], fallback[field])
+                    : fallback[field],
+                ])
+            ),
             ...(name === 'readPosts' ? postsWindow(row) : {}),
           },
         ]
