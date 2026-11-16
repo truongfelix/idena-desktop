@@ -126,15 +126,18 @@ export function ActionsSection({agent, agents, catalog, onChange}) {
           </Text>
         )}
         <Box overflowX="auto">
-          <Stack spacing={6} minW="760px" role="tabpanel">
+          <Stack spacing={6} minW="640px" role="tabpanel">
             <Box>
               <Heading as="h3" fontSize="md" fontWeight={500} mb={2}>
                 {t('It reads')}
               </Heading>
               {reads.length > 0 ? (
-                <>
+                <Grid
+                  templateColumns={READ_COLS}
+                  columnGap={4}
+                  alignItems="start"
+                >
                   <ColumnNames
-                    cols={READ_COLS}
                     names={[
                       t('Read'),
                       t('What'),
@@ -150,7 +153,7 @@ export function ActionsSection({agent, agents, catalog, onChange}) {
                       change={changeRow(entry)}
                     />
                   ))}
-                </>
+                </Grid>
               ) : (
                 <Text color="muted">
                   {needs.length
@@ -163,46 +166,52 @@ export function ActionsSection({agent, agents, catalog, onChange}) {
               <Heading as="h3" fontSize="md" fontWeight={500} mb={2}>
                 {t('It does')}
               </Heading>
-              <ColumnNames
-                cols={DO_COLS}
-                names={[t('What'), t('Who decides'), t('Limit'), t('Only on')]}
-              />
-              {does.map((entry) => {
-                const holder = heldBy(entry.id, agent, agents)
-                const saved = agent.actions[entry.id]
-                return (
-                  <DoRow
-                    key={entry.id}
-                    entry={entry}
-                    row={rowOf(agent, entry)}
-                    sent={texts && texts.sent[entry.id]}
-                    holder={holder ? heldText(entry.id, holder, t) : null}
-                    // Make the pictures needs a service that draws (B-258): the row says so.
-                    note={
-                      entry.id === 'flipPictures' && !drawsPictures(agent)
-                        ? t(
-                            'Its service draws no pictures: choose an image model in its connection, on a service that has one.',
-                            {nsSeparator: '!!'}
-                          )
-                        : null
-                    }
-                    change={changeRow(entry)}
-                    // Kept Off by an older file: no other agent can be given it until it is taken out.
-                    onFree={
-                      SINGLE_HOLDER.includes(entry.id) &&
-                      saved &&
-                      saved.level === 'off'
-                        ? () =>
-                            setActions((actions) => {
-                              const next = {...actions}
-                              delete next[entry.id]
-                              return next
-                            })
-                        : null
-                    }
-                  />
-                )
-              })}
+              <Grid templateColumns={DO_COLS} columnGap={4} alignItems="start">
+                <ColumnNames
+                  names={[
+                    t('What'),
+                    t('Who decides'),
+                    t('Limit'),
+                    t('Only on'),
+                  ]}
+                />
+                {does.map((entry) => {
+                  const holder = heldBy(entry.id, agent, agents)
+                  const saved = agent.actions[entry.id]
+                  return (
+                    <DoRow
+                      key={entry.id}
+                      entry={entry}
+                      row={rowOf(agent, entry)}
+                      sent={texts && texts.sent[entry.id]}
+                      holder={holder ? heldText(entry.id, holder, t) : null}
+                      // Make the pictures needs a service that draws (B-258): the row says so.
+                      note={
+                        entry.id === 'flipPictures' && !drawsPictures(agent)
+                          ? t(
+                              'Its service draws no pictures: choose an image model in its connection, on a service that has one.',
+                              {nsSeparator: '!!'}
+                            )
+                          : null
+                      }
+                      change={changeRow(entry)}
+                      // Kept Off by an older file: no other agent can be given it until it is taken out.
+                      onFree={
+                        SINGLE_HOLDER.includes(entry.id) &&
+                        saved &&
+                        saved.level === 'off'
+                          ? () =>
+                              setActions((actions) => {
+                                const next = {...actions}
+                                delete next[entry.id]
+                                return next
+                              })
+                          : null
+                      }
+                    />
+                  )
+                })}
+              </Grid>
             </Box>
           </Stack>
         </Box>
@@ -212,17 +221,13 @@ export function ActionsSection({agent, agents, catalog, onChange}) {
   )
 }
 
-/** The names of a table's columns, over its rows. */
-function ColumnNames({cols, names}) {
-  return (
-    <Grid templateColumns={cols} gap={4} pb={2}>
-      {names.map((name) => (
-        <Text key={name} fontSize="sm" color="muted">
-          {name}
-        </Text>
-      ))}
-    </Grid>
-  )
+/** The names of a table's columns, the first cells of its grid. */
+function ColumnNames({names}) {
+  return names.map((name) => (
+    <Text key={name} fontSize="sm" color="muted" pb={2}>
+      {name}
+    </Text>
+  ))
 }
 
 /**

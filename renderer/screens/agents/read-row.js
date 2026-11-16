@@ -1,6 +1,6 @@
 /* eslint-disable react/prop-types */
 import * as React from 'react'
-import {Box, Flex, Grid, Switch, Text} from '@chakra-ui/react'
+import {Box, Flex, Switch, Text} from '@chakra-ui/react'
 import {useTranslation} from 'react-i18next'
 import {HDivider, Input, Select} from '../../shared/components/components'
 import {InfoTip} from '../../shared/components/info-tip'
@@ -16,9 +16,21 @@ export const WHO_READS = [
   'readTags',
 ]
 
-/** The columns of a read's row (B-280): its switch, what, only these, how many. */
+/**
+ * The columns of the reads' table (B-280): its switch, what, only these, how many. One grid for the whole table: a
+ * row is four cells of it, under a line across.
+ */
 export const READ_COLS =
-  '56px minmax(0, 1.3fr) minmax(0, 1.5fr) minmax(0, 1.2fr)'
+  'max-content minmax(0, 1.3fr) minmax(0, 1.5fr) minmax(0, 1.2fr)'
+
+/** The line over a row, across the table. */
+export function RowLine() {
+  return (
+    <Box gridColumn="1 / -1">
+      <HDivider />
+    </Box>
+  )
+}
 
 /** The most posts "the last N" reads (main/agent/profiles.js MAX_POSTS_READ). */
 const MAX_POSTS_READ = 50
@@ -80,46 +92,46 @@ export function ReadRow({entry, row, change}) {
   const hasWho = WHO_READS.includes(id)
   return (
     <>
-      <HDivider />
-      <Grid templateColumns={READ_COLS} gap={4} py={3} alignItems="start">
+      <RowLine />
+      <Box py={3}>
         <Switch
           aria-label={label}
           isChecked={isOn}
           onChange={(e) => change({level: e.target.checked ? 'alone' : 'off'})}
         />
-        <Flex align="center" gap={2}>
-          <Text fontWeight={500}>{label}</Text>
-          <InfoTip label={label}>{info}</InfoTip>
-        </Flex>
-        <Box opacity={isOn ? 1 : 0.5}>
-          {hasWho && (
-            <CriteriaSummary
-              label={t('Only these')}
-              value={row.who || null}
-              open={open}
-              onToggle={() => setOpen((now) => !now)}
-            />
-          )}
-          {!hasWho && (scope ? <Text>{scope}</Text> : <NoCell />)}
-        </Box>
-        <Box opacity={isOn ? 1 : 0.5}>
-          {id === 'readPosts' && <PostsWindow row={row} onChange={change} />}
-          {id === 'readTags' && (
-            // Its questions of the day (B-264): empty, no limit.
-            <NumberField
-              label={t('posts at most a day (a day in UTC)')}
-              value={typeof row.limit === 'number' ? row.limit : null}
-              min={0}
-              optional
-              placeholder={t('None', {nsSeparator: '!!'})}
-              onSave={(limit) => change({limit})}
-            />
-          )}
-          {id !== 'readPosts' && id !== 'readTags' && <NoCell />}
-        </Box>
-      </Grid>
+      </Box>
+      <Flex align="center" gap={2} py={3}>
+        <Text fontWeight={500}>{label}</Text>
+        <InfoTip label={label}>{info}</InfoTip>
+      </Flex>
+      <Box py={3} opacity={isOn ? 1 : 0.5}>
+        {hasWho && (
+          <CriteriaSummary
+            label={t('Only these')}
+            value={row.who || null}
+            open={open}
+            onToggle={() => setOpen((now) => !now)}
+          />
+        )}
+        {!hasWho && (scope ? <Text>{scope}</Text> : <NoCell />)}
+      </Box>
+      <Box py={3} opacity={isOn ? 1 : 0.5}>
+        {id === 'readPosts' && <PostsWindow row={row} onChange={change} />}
+        {id === 'readTags' && (
+          // Its questions of the day (B-264): empty, no limit.
+          <NumberField
+            label={t('posts at most a day (a day in UTC)')}
+            value={typeof row.limit === 'number' ? row.limit : null}
+            min={0}
+            optional
+            placeholder={t('None', {nsSeparator: '!!'})}
+            onSave={(limit) => change({limit})}
+          />
+        )}
+        {id !== 'readPosts' && id !== 'readTags' && <NoCell />}
+      </Box>
       {hasWho && open && (
-        <Box pb={4} maxW="xl">
+        <Box gridColumn="1 / -1" pb={4} maxW="xl">
           <CriteriaEditor
             value={row.who || null}
             withWords
