@@ -350,13 +350,14 @@ export function budgetLine(agent, t, catalog = null) {
   const own = limits.reduce((sum, limit) => sum + (limit || 0), 0)
   const overall =
     typeof agent.budgetPerDay === 'number' ? agent.budgetPerDay : null
+  // Nothing spends alone (no Alone action that spends): no overall limit changes that.
+  if (!limits.length) return t('Spends no iDNA')
   // An action without its own limit spends within the overall one, up to all of it.
   let most = own
   if (overall !== null)
-    most =
-      limits.length && limits.every((limit) => limit !== null)
-        ? Math.min(overall, own)
-        : overall
+    most = limits.every((limit) => limit !== null)
+      ? Math.min(overall, own)
+      : overall
   if (!most) return t('Spends no iDNA')
   return t('Up to {{amount}} iDNA a day', {
     amount: Math.round(most * 100) / 100,

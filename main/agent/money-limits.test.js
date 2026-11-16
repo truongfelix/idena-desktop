@@ -143,6 +143,14 @@ describe('the money limits of the actions', () => {
       decision: 'skipped',
       reason: 'above its daily iDNA',
     })
+    // After a restart (the tally saved since), it still counts what the build before spent.
+    const again = start({
+      actions: {post: {level: 'alone', limit: null, spendPerDay: 5}},
+    })
+    await expect(again('post', 0.6)).resolves.toMatchObject({
+      decision: 'skipped',
+      reason: 'above its daily iDNA',
+    })
   })
 
   test('the limits are kept with the agent; a broken one reads as none', async () => {

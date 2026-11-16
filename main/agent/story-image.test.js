@@ -189,6 +189,23 @@ describe("the agent's picture command", () => {
     await expect(picture()).rejects.toThrow('service busy')
     await expect(picture()).rejects.toThrow('its 2 pictures a day are reached')
     expect(draw).toHaveBeenCalledTimes(2)
+    // A refused key cannot have been billed: given back.
+    const other = start({flipStory: {level: 'ask', picturesPerDay: 3}})
+    draw.mockRejectedValueOnce(
+      new Error('the model answered HTTP 401: invalid key')
+    )
+    await expect(
+      other.handle('drawStoryPicture', {
+        agentId: 'aaaaaaaaaaaaaaaa',
+        prompt: 'A kite.',
+      })
+    ).rejects.toThrow('HTTP 401')
+    await expect(
+      other.handle('drawStoryPicture', {
+        agentId: 'aaaaaaaaaaaaaaaa',
+        prompt: 'A kite.',
+      })
+    ).resolves.toMatchObject({mediaType: 'image/png'})
     // A restart keeps the day's count.
     const again = start({flipStory: {level: 'ask', picturesPerDay: 2}})
     await expect(
@@ -197,7 +214,8 @@ describe("the agent's picture command", () => {
         prompt: 'A kite.',
       })
     ).rejects.toThrow('its 2 pictures a day are reached')
-    expect(draw).toHaveBeenCalledTimes(2)
+    // One drawn, the failed one, the refused key and the one after it: none more after the restart.
+    expect(draw).toHaveBeenCalledTimes(4)
     const [line] = await agent.handle('activity', {
       agentId: 'aaaaaaaaaaaaaaaa',
     })

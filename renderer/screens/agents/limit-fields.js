@@ -14,7 +14,10 @@ export function readNumber(text, {whole = true, min = 0} = {}) {
   const number = Number(value)
   if (!Number.isFinite(number) || number < min) return null
   if (whole && !Number.isInteger(number)) return null
-  return whole ? number : Math.round(number * 100) / 100
+  if (whole) return number
+  // To the hundredth; an amount that would round to 0 is refused, never saved as 0 (a 0 limit blocks every action).
+  const rounded = Math.round(number * 100) / 100
+  return number > 0 && rounded === 0 ? null : rounded
 }
 
 /**
@@ -42,7 +45,11 @@ export function NumberField({
       ? null
       : readNumber(text, {min, whole})
     if (next === null) setDraft(String(value ?? ''))
-    else if (next !== value) onSave(next)
+    else {
+      // The field shows what is kept (rounded to the hundredth).
+      setDraft(String(next))
+      if (next !== value) onSave(next)
+    }
   }
   return (
     <Flex align="center" gap={2}>

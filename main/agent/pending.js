@@ -15,7 +15,8 @@ const MAX_PENDING_PER_AGENT = 20
 const MAX_TEXT_LENGTH = 10000
 /**
  * The actions whose limit counts them per day (posts, replies, likes, private messages); a tip's limit counts the
- * iDNA tipped per day (DAILY_AMOUNT_ACTIONS); the others count iDNA sent, or per validation.
+ * iDNA tipped per day (DAILY_AMOUNT_ACTIONS), never its fees: it lets no tip go alone (B-269: the action's own iDNA a
+ * day, fees included, or the overall limit does); the others count iDNA sent, or per validation.
  */
 const DAILY_COUNT_ACTIONS = new Set(['post', 'reply', 'like', 'message'])
 const DAILY_AMOUNT_ACTIONS = new Set(['tip'])
@@ -93,7 +94,11 @@ function readItem(value) {
   }
 }
 
-/** The day's tally saved with the list ({day, spent, done}), or an empty one; another day's starts again. */
+/**
+ * The day's tally saved with the list, or an empty one; another day's starts again: {day, spent (by agent), done (by
+ * agent and action; 'flipImage' counts the pictures drawn), spentBy (by agent and action, B-269), before (a tally a
+ * build before B-269 began: each action counts all the agent spent)}.
+ */
 function readTally(saved, day) {
   const tally = saved && saved.tally
   const numbers = (value) =>
@@ -110,9 +115,11 @@ function readTally(saved, day) {
         // By agent and action (B-269): each action's own iDNA a day. A tally saved before has none: each action
         // counts as having spent all the agent spent today.
         spentBy: numbers(tally.spentBy),
-        ...(tally.spentBy && typeof tally.spentBy === 'object'
-          ? {}
-          : {before: true}),
+        // Kept in the file until the day ends: a restart still counts what the build before spent.
+        ...(tally.before === true ||
+        !(tally.spentBy && typeof tally.spentBy === 'object')
+          ? {before: true}
+          : {}),
       }
     : {day, spent: {}, done: {}, spentBy: {}}
 }
@@ -502,17 +509,17 @@ function createPending({
       )
       if (gone.length) changed()
     },
+    /** The pictures the agent's service drew today (B-269), kept with the day's tally: a restart keeps them. */
+    picturesToday: (agentId) => doneToday(agentId, 'flipImage'),
+    /** One more picture asked of its service today (`n` -1: one given back, never billed). */
+    addPicture(agentId, n = 1) {
+      addTally(agentId, 'flipImage', {n})
+      save()
+    },
     /**
      * The window was loaded again (a reload, a crash): an action it was doing never said how it went. It waits again,
      * with a warning: it may have been done.
      */
-    /** The pictures the agent's service drew today (B-269), kept with the day's tally: a restart keeps them. */
-    picturesToday: (agentId) => doneToday(agentId, 'flipImage'),
-    /** One more picture asked of its service today. */
-    addPicture(agentId) {
-      addTally(agentId, 'flipImage', {n: 1})
-      save()
-    },
     interrupted() {
       const running = items.filter((item) => item.state === 'running')
       running.forEach((item) => {

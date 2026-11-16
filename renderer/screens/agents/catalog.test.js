@@ -66,9 +66,22 @@ describe('the Agents section lines', () => {
       'At each validation'
     )
     expect(budgetLine(agent(), t)).toBe('Spends no iDNA')
-    expect(budgetLine(agent({budgetPerDay: 0.05}), t)).toBe(
-      'Up to 0.05 iDNA a day'
-    )
+    expect(
+      budgetLine(
+        agent({
+          actions: {like: {level: 'alone', limit: 10}},
+          budgetPerDay: 0.05,
+        }),
+        t
+      )
+    ).toBe('Up to 0.05 iDNA a day')
+    // Only Ask me: nothing spends alone, whatever the overall limit.
+    expect(
+      budgetLine(
+        agent({actions: {like: {level: 'ask', limit: 10}}, budgetPerDay: 1}),
+        t
+      )
+    ).toBe('Spends no iDNA')
     // B-269: the Alone actions' own limits add up (Ask me and Off spend nothing alone); the overall one caps them;
     // one without its own spends up to all of it.
     const actions = {
