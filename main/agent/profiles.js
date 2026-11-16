@@ -1,5 +1,6 @@
 const crypto = require('crypto')
 const fs = require('fs-extra')
+const {criteriaField} = require('./criteria')
 const {
   ACTIONS,
   LEVELS,
@@ -195,6 +196,8 @@ function normalizeActions(value) {
                 ])
             ),
             ...(name === 'readPosts' ? postsWindow(row) : {}),
+            // Whose it reads, whom it acts on (B-266): kept only when one is set.
+            ...criteriaField(name, row),
           },
         ]
       })

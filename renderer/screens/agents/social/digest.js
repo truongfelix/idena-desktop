@@ -2,6 +2,7 @@ import {LIKE} from '../../social/contract'
 import {postTargets} from '../../social/feed'
 import {shortAddress} from '../../social/people'
 import {validTipAmount} from '../../social/calls'
+import {passes} from '../criteria'
 
 // What an agent reads on Idena Social when it runs (B-239): what came after its read point (a block height), and
 // only what its actions need. Each item gets a label (p1, c1) that its answer names; the app keeps what each label
@@ -69,11 +70,26 @@ const DAY_S = 24 * 60 * 60
  */
 export function socialDigest(
   social,
-  {reads},
+  {reads, who = {}, facts = {}, collect = null},
   {point, scanned, now = Date.now()}
 ) {
   const {feed = [], me, names = {}, conversations = [], blocked} = social
+  // Whose it reads (B-266): each read's criteria (`who`: posts, notifications, messages) on the authors' `facts`
+  // (criteria.js readAuthors). `collect` (a Set): the authors of what is new go in it, nothing is left out (the run
+  // reads them first).
   const isBlocked = (address) => Boolean(blocked && blocked.has(address))
+  const readsFrom = (kind, address, text = null) => {
+    if (collect) {
+      collect.add(String(address).toLowerCase())
+      return true
+    }
+    return passes(
+      who[kind] || null,
+      address,
+      facts[String(address).toLowerCase()],
+      text
+    )
+  }
   const from =
     point === null || point === undefined ? scanned - FIRST_RUN_BLOCKS : point
   const isNew = (item) => item.height > from && item.height <= scanned
@@ -95,7 +111,8 @@ export function socialDigest(
           !isBlocked(node.call.author) &&
           typeof node.id === 'number' &&
           isNew(node.call) &&
-          node.call.message !== LIKE
+          node.call.message !== LIKE &&
+          readsFrom('notifications', node.call.author, node.call.message)
       )
       .forEach((one) =>
         candidates.push({kind: 'answer', height: one.node.call.height, ...one})
@@ -104,7 +121,11 @@ export function socialDigest(
     mine.forEach(({node}) => {
       node.likeCalls
         .filter(
-          (like) => like.author !== me && !isBlocked(like.author) && isNew(like)
+          (like) =>
+            like.author !== me &&
+            !isBlocked(like.author) &&
+            isNew(like) &&
+            readsFrom('notifications', like.author)
         )
         .forEach((like) =>
           candidates.push({
@@ -121,7 +142,8 @@ export function socialDigest(
             tip.from !== me &&
             !isBlocked(tip.from) &&
             isNew(tip) &&
-            validTipAmount(tip) !== null
+            validTipAmount(tip) !== null &&
+            readsFrom('notifications', tip.from)
         )
         .forEach((tip) =>
           candidates.push({kind: 'tip', height: tip.height, tip, node})
@@ -134,7 +156,8 @@ export function socialDigest(
         typeof id === 'number' &&
         call.author !== me &&
         !isBlocked(call.author) &&
-        isNew(call)
+        isNew(call) &&
+        readsFrom('posts', call.author, call.message)
     )
     // The feed is newest first: the last day's posts, or the last N.
     fresh =
@@ -160,6 +183,15 @@ export function socialDigest(
       const fresh = conversation.messages.filter(
         (message) => message.from !== me && isNew(message)
       )
+      if (
+        fresh.length &&
+        !readsFrom(
+          'messages',
+          conversation.others[0],
+          fresh.map((message) => message.text || '').join('\n')
+        )
+      )
+        return
       if (fresh.length)
         // At its newest message: a cut before it leaves the whole conversation for the next run, never half.
         candidates.push({

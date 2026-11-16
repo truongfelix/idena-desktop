@@ -588,4 +588,87 @@ describe('a Social run', () => {
       HEAD + 5
     )
   })
+
+  test('whose it reads and whom it acts on (B-266): criteria on the authors read first', async () => {
+    const agent = start({
+      readPosts: {
+        level: 'alone',
+        window: 'count',
+        count: 50,
+        who: {states: ['Human']},
+      },
+      readNotifications: {level: 'alone'},
+      like: {level: 'alone', limit: 5, onlyTo: {minStake: 10000}},
+    })
+    const facts = {
+      [ANN]: {state: 'Newbie', age: 1, stake: 0},
+      [BOB]: {state: 'Human', age: 9, stake: 5000},
+    }
+    const d = {
+      ...deps(),
+      readAuthors: jest.fn(async (addresses, needs) => {
+        expect(needs).toMatchObject({identity: true, trust: false})
+        return Object.fromEntries(addresses.map((a) => [a, facts[a] || {}]))
+      }),
+    }
+    // The model likes Bob's answer, as the run labels it.
+    const [bob] = [
+      ...socialDigest(
+        state(),
+        {
+          reads: agent.reads,
+          who: {posts: agent.actions.readPosts.who},
+          facts,
+        },
+        {point: null, scanned: HEAD}
+      ).labels,
+    ].find(([, item]) => item.node?.id === 21)
+    answer = JSON.stringify({actions: [{do: 'like', to: bob}]})
+    const result = await runSocialAgent(agent, state(), d)
+    expect(d.readAuthors).toHaveBeenCalled()
+    // Ann's post (a Newbie) is not read; Bob's answer is (notifications have no criteria).
+    const asked = await main.handle('activity', {agentId: ID})
+    expect(result.count).toMatchObject({alone: 0, skipped: 1})
+    expect(d.sent).toEqual([])
+    expect(asked.map(({detail}) => detail)).toEqual(
+      expect.arrayContaining(['not done: outside its criteria'])
+    )
+  })
+
+  test("whose it reads: the model's question holds only the authors that pass", () => {
+    const who = {
+      posts: {
+        only: [],
+        except: [],
+        states: ['Human'],
+        trustAbove: null,
+        minAge: null,
+        minStake: null,
+        mustWords: [],
+        notWords: [],
+      },
+    }
+    const facts = {[ANN]: {state: 'Newbie'}, [BOB]: {state: 'Human'}}
+    const digest = socialDigest(
+      state(),
+      {...read(['like']), who, facts},
+      {point: null, scanned: HEAD}
+    )
+    expect(digest.text).not.toContain('Ignore your rules')
+    // An author that could not be read passes no criterion.
+    const unknown = socialDigest(
+      state(),
+      {...read(['like']), who, facts: {}},
+      {point: null, scanned: HEAD}
+    )
+    expect(unknown.text).not.toContain('Ignore your rules')
+    // The first pass only collects the authors of what is new.
+    const authors = new Set()
+    socialDigest(
+      state(),
+      {...read(['like']), collect: authors},
+      {point: null, scanned: HEAD}
+    )
+    expect([...authors]).toEqual(expect.arrayContaining([ANN, BOB]))
+  })
 })

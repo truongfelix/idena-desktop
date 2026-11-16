@@ -25,8 +25,12 @@ import {
 } from './catalog'
 import {LimitFields, NumberField} from './limit-fields'
 import {drawsPictures} from './flip-story'
+import {CriteriaFields} from './criteria-fields'
 import {ReadRow} from './read-row'
 import {nothingToActOn} from './page-sections'
+
+// The actions on others: only to whom the person's criteria pick (B-266).
+export const ONLY_TO = ['reply', 'like', 'message', 'tip']
 
 /**
  * "What it may do": the agent's actions by area (Q-64), each Off, Ask me or Alone with its limit a day, and the
@@ -236,6 +240,18 @@ function ActionRow({id, label, info, sent, perDay, row, setActions}) {
                 setActions((actions) => ({
                   ...actions,
                   [id]: {...actions[id], ...change},
+                }))
+              }
+            />
+          )}
+          {ONLY_TO.includes(id) && row.level !== 'off' && (
+            <CriteriaFields
+              title={t('Only to')}
+              value={row.onlyTo || null}
+              onChange={(onlyTo) =>
+                setActions((actions) => ({
+                  ...actions,
+                  [id]: {...actions[id], onlyTo},
                 }))
               }
             />
