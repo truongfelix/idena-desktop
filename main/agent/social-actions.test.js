@@ -3,7 +3,7 @@ const path = require('path')
 const fs = require('fs-extra')
 const {createAgent} = require('./agent')
 const {createAgentProfiles, validationAgentSettings} = require('./profiles')
-const {socialSystem} = require('./social')
+const {GUARD, SOCIAL_SUGGESTION, socialSystem} = require('./social')
 
 // The Social actions in the main process (B-239, B-240): their daily counts, a tip's amount set by the person, the
 // over-limit skip of a Social run, what To approve keeps of each one, the read points, the run's question.
@@ -228,5 +228,15 @@ describe('Social actions', () => {
       'action off'
     )
     expect(ask).not.toHaveBeenCalled()
+  })
+})
+
+describe('the Social frame without hidden advice (B-268)', () => {
+  test('no Instructions: the data, the guard and the format, nothing of how to write', () => {
+    const system = socialSystem(['post'], '')
+    expect(system).toContain(GUARD)
+    expect(system).not.toContain('Instructions from the person')
+    expect(system).not.toMatch(/act with care|language of|short, as yourself/iu)
+    expect(SOCIAL_SUGGESTION).toMatch(/do nothing when unsure/u)
   })
 })

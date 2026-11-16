@@ -42,37 +42,48 @@ const REPORT_THRESHOLDS = {
   9: 0.9,
 }
 
-// The app's part of the question for a flip (B-235): what a flip is, the nine report rules whose numbers the answer
-// names, and the answer's JSON format, which the app reads. The person's Instructions go between the task and the
-// rules, so that whatever they say, the rules and the format come last, as the app wrote them.
-const TASK = [
-  'You solve flips in an Idena validation. A flip is a story of four pictures. You see the same four pictures in',
-  'two orders, LEFT and RIGHT: one order tells a story that makes sense from the first picture to the last, the',
-  'other does not. Pick the order that tells the story. When you are not sure, still pick the more probable one',
-  'and give it a low confidence.',
+// The app's part of the question for a flip (B-235, B-268): what the answer means (the two orders, the keywords), the
+// nine report reasons whose numbers the answer names, and the answer's JSON format, which the app reads; how to judge
+// a flip is the person's Instructions (owner 2026-11-16: no hidden text; FLIP_SUGGESTION is offered for them). The
+// Instructions go between the meaning and the format, so that whatever they say, the format comes last.
+const MEANING = [
+  'A flip of an Idena validation: the same four pictures in two orders, LEFT and RIGHT. One order tells a story',
+  'from the first picture to the last, the other does not. When keywords are given, they are the two words the',
+  "flip's story must show.",
 ].join('\n')
-const RULES_AND_FORMAT = [
-  'When keywords are given, also say whether the story clearly shows both of them, and list each rule the flip',
-  'breaks, by number, with how sure you are that it breaks it (none: an empty list). The rules:',
-  ...Object.entries(REPORT_REASONS).map(([n, text]) => `${n}. ${text}`),
+const FORMAT = [
   'Reply with one JSON object and nothing else:',
-  '{"answer": "left" | "right", "confidence": how sure the answer is, from 0 to 1,',
-  '"keywords": "shown" | "not shown" | null,',
-  '"reasons": [{"reason": rule number, "confidence": how sure the flip breaks it, from 0 to 1}],',
-  '"quality": with keywords, how good a flip it is, from 0 to 1 (a clear story, both keywords shown, no rule broken); else null}',
+  '{"answer": "left" | "right": the order that tells the story, "confidence": how sure the answer is, from 0 to 1,',
+  '"keywords": with keywords, "shown" | "not shown"; else null,',
+  '"reasons": [{"reason": number, "confidence": from 0 to 1}]: the report reasons the flip breaks, none: [],',
+  '"quality": with keywords, how good a flip it is, from 0 to 1; else null}',
+  'The report reasons, by number:',
+  ...Object.entries(REPORT_REASONS).map(([n, text]) => `${n}. ${text}`),
 ].join('\n')
 
-/** The question's text: the app's task, the agent's Instructions when it has some, then the rules and the format. */
+/**
+ * How the app asked a flip before B-268, as a suggestion for the Instructions (the agent's page inserts it): the
+ * person keeps it, edits it or writes their own.
+ */
+const FLIP_SUGGESTION = [
+  'When you solve a flip: pick the order that tells a story that makes sense from the first picture to the last.',
+  'When you are not sure, still pick the more probable one and give it a low confidence.',
+  'When keywords are given, say whether the story clearly shows both of them, and list each report reason the flip',
+  'breaks, with how sure you are that it breaks it. A good flip has a clear story, shows both keywords and breaks no',
+  'rule.',
+].join('\n')
+
+/** The question's text: what the answer means, the agent's Instructions when it has some, then the format. */
 function flipSystem(instructions = '') {
   const own = typeof instructions === 'string' ? instructions.trim() : ''
   return own
     ? [
-        TASK,
+        MEANING,
         'The instructions of the person who runs you, for this and every task:',
         own,
-        RULES_AND_FORMAT,
+        FORMAT,
       ].join('\n')
-    : [TASK, RULES_AND_FORMAT].join('\n')
+    : [MEANING, FORMAT].join('\n')
 }
 
 const SYSTEM = flipSystem('')
@@ -258,6 +269,9 @@ module.exports = {
   REPORT_REASONS,
   REPORT_THRESHOLDS,
   SYSTEM,
+  FLIP_SUGGESTION,
+  FLIP_FORMAT: FORMAT,
+  FLIP_MEANING: MEANING,
   checkFlip,
   firstJsonObject,
   flipQuestion,

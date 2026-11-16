@@ -79,20 +79,20 @@ describe("an agent's Instructions", () => {
     expect(sentSystem(1)).toBe(SYSTEM)
   })
 
-  test('written: sent with each flip, between the task and the rules, in the validation and the practice test', async () => {
+  test('written: sent with each flip, between the meaning and the format, in the validation and the practice test', async () => {
     const agent = start(OWN)
     await agent.handle('solveFlip', {flip})
     await agent.handle('testFlip', {flip, agentId: V})
     for (const n of [0, 1]) {
       const sent = sentSystem(n)
-      const task = sent.indexOf('You solve flips in an Idena validation.')
+      const meaning = sent.indexOf('A flip of an Idena validation:')
       const own = sent.indexOf(OWN)
-      const rules = sent.indexOf('1. a keyword is not clearly shown')
       const format = sent.indexOf('Reply with one JSON object')
-      expect(task).toBe(0)
-      expect(own).toBeGreaterThan(task)
-      expect(rules).toBeGreaterThan(own)
-      expect(format).toBeGreaterThan(rules)
+      const rules = sent.indexOf('1. a keyword is not clearly shown')
+      expect(meaning).toBe(0)
+      expect(own).toBeGreaterThan(meaning)
+      expect(format).toBeGreaterThan(own)
+      expect(rules).toBeGreaterThan(format)
       // The app's part is whole around them: the same question with the instructions taken out.
       expect(
         sent.replace(
@@ -108,9 +108,9 @@ describe("an agent's Instructions", () => {
     const sent = await agent
       .handle('solveFlip', {flip})
       .then(() => sentSystem())
-    expect(sent.endsWith(SYSTEM.slice(SYSTEM.indexOf('When keywords')))).toBe(
-      true
-    )
+    expect(
+      sent.endsWith(SYSTEM.slice(SYSTEM.indexOf('Reply with one JSON object')))
+    ).toBe(true)
   })
 
   test('the same text is the one sent for a post', async () => {
