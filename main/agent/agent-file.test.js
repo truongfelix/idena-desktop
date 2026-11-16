@@ -87,6 +87,7 @@ describe('an agent as a file', () => {
         own: true,
         notifications: true,
         messages: false,
+        tags: null,
       },
       events: [],
       reportThresholds: expect.any(Object),

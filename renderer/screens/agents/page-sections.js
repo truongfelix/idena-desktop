@@ -162,7 +162,8 @@ export function nothingToActOn({actions, reads}) {
     acting &&
     reads.posts.window === 'off' &&
     !reads.notifications &&
-    !reads.messages
+    !reads.messages &&
+    !reads.tags
   )
 }
 
@@ -173,7 +174,15 @@ function eventNames(t) {
     answer: t('an answer'),
     tip: t('a tip'),
     message: t('a private message'),
+    tag: t('a post that tags it'),
   }
+}
+
+/** Whether the agent reads what the event `id` is about (B-255): an event it does not read starts an empty run. */
+function eventReadBy(id, reads) {
+  if (id === 'message') return reads.messages
+  if (id === 'tag') return Boolean(reads.tags)
+  return reads.notifications
 }
 
 /** "When it runs": its schedule and the events that start a run (what it spends is on its actions, B-269). */
@@ -235,7 +244,7 @@ export function ScheduleSection({agent, onChange}) {
         <Stack spacing={2}>
           <Text>
             {t(
-              'Also runs when it gets (what it reads: its notifications, its private messages)',
+              'Also runs when it gets (what it reads: its notifications, its private messages, the posts that tag it)',
               {nsSeparator: '!!'}
             )}
           </Text>
@@ -244,11 +253,7 @@ export function ScheduleSection({agent, onChange}) {
               <Checkbox
                 key={id}
                 // An event it does not read could start a run that shows it nothing (B-255).
-                isDisabled={
-                  !(id === 'message'
-                    ? agent.reads.messages
-                    : agent.reads.notifications)
-                }
+                isDisabled={!eventReadBy(id, agent.reads)}
                 isChecked={agent.events.includes(id)}
                 onChange={(e) => {
                   const on = e.target.checked

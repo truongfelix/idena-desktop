@@ -223,6 +223,7 @@ describe('Social actions', () => {
       v: 1,
       points: {[ID]: 500},
       runs: {[ID]: at},
+      tags: {},
     })
     await expect(start().handle('lastRun', {agentId: ID})).resolves.toBe(at)
     await expect(start().handle('readPoint', {agentId: ID})).resolves.toBe(500)

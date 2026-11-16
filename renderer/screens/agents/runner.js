@@ -37,12 +37,17 @@ const runs = new Map()
 const lastEvent = new Map()
 const eventFails = new Map()
 
-/** The events that may run the agent: only those it reads (likes, answers, tips: Notifications; messages). */
+/**
+ * The events that may run the agent: only those it reads (likes, answers, tips: Notifications; messages; the posts
+ * that tag it).
+ */
 export function eventsRead(agent) {
   const {reads = {}, events = []} = agent
-  return events.filter((one) =>
-    one === 'message' ? reads.messages : reads.notifications
-  )
+  return events.filter((one) => {
+    if (one === 'message') return reads.messages
+    if (one === 'tag') return Boolean(reads.tags)
+    return reads.notifications
+  })
 }
 
 /** Whether an event may still run the agent today: not after MAX_TRIES failed event runs that day. */

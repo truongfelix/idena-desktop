@@ -15,7 +15,12 @@ const STATES = [
 ]
 
 /** The read actions on what others wrote (`who`) and the actions on others (`onlyTo`). */
-const WHO_ACTIONS = ['readPosts', 'readNotifications', 'readMessages']
+const WHO_ACTIONS = [
+  'readPosts',
+  'readNotifications',
+  'readMessages',
+  'readTags',
+]
 const ONLY_TO_ACTIONS = ['reply', 'like', 'message', 'tip']
 
 const MAX_ADDRESSES = 200
