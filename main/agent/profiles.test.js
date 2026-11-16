@@ -34,6 +34,20 @@ describe('agent profiles', () => {
   })
   afterEach(() => fs.removeSync(dir))
 
+  test("the model's longest answer and effort: checked, a broken one the app's or the model's default", () => {
+    expect(normalizeAgent({maxTokens: '2048', effort: 'xhigh'})).toMatchObject({
+      maxTokens: 2048,
+      effort: 'xhigh',
+    })
+    expect(normalizeAgent({maxTokens: 999999}).maxTokens).toBe(128000)
+    for (const maxTokens of [0, -5, 1.5, 'many', '', null, true]) {
+      expect(normalizeAgent({maxTokens}).maxTokens).toBeNull()
+    }
+    for (const effort of ['extreme', 'LOW', 3, null]) {
+      expect(normalizeAgent({effort}).effort).toBe('')
+    }
+  })
+
   test('a new agent is off, with no action, run by hand', () => {
     const agent = normalizeAgent({name: 'Joke agent'}, {id: ids()})
     expect(agent).toEqual({
@@ -48,6 +62,8 @@ describe('agent profiles', () => {
       actions: {},
       schedule: {kind: 'manual', time: '09:00'},
       budgetPerDay: null,
+      maxTokens: null,
+      effort: '',
       reportThresholds: REPORT_THRESHOLDS,
       // Reads nothing and runs on no event until the person says so (B-255).
       reads: {

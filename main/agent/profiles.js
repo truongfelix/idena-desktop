@@ -5,7 +5,9 @@ const {
   ACTIONS,
   LEVELS,
   defaultSettings,
+  normalizeEffort,
   normalizeLimit,
+  normalizeMaxTokens,
   normalizeSettings,
   normalizeTipAmount,
 } = require('./settings')
@@ -247,6 +249,9 @@ function normalizeAgent(input, {id = newAgentId} = {}) {
       time: normalizeTime(schedule.time),
     },
     budgetPerDay: !Number.isFinite(budget) || budget < 0 ? null : budget,
+    // The model's longest answer (null: the app's choice for each task) and its effort ('': the model's default).
+    maxTokens: normalizeMaxTokens(value.maxTokens),
+    effort: normalizeEffort(value.effort),
     reportThresholds,
   }
 }

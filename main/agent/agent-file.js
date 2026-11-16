@@ -25,6 +25,8 @@ function exportAgent(agent) {
       ...(address === DEFAULT_ADDRESSES[provider] ? {address} : {}),
       model: agent.model,
       ...(agent.imageModel ? {imageModel: agent.imageModel} : {}),
+      ...(agent.maxTokens ? {maxTokens: agent.maxTokens} : {}),
+      ...(agent.effort ? {effort: agent.effort} : {}),
       actions: agent.actions,
       reads: agent.reads,
       events: agent.events,

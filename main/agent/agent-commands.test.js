@@ -293,6 +293,17 @@ describe('the Agents section commands', () => {
     await expect(agent.handle('activity')).resolves.toEqual([])
   })
 
+  test("the validation asks with the answering agent's longest answer and effort (B-265)", async () => {
+    keys = [
+      {provider: 'anthropic', address: 'https://api.anthropic.com', key: 'k'},
+    ]
+    const agent = start([
+      {id: 'aaaaaaaaaaaaaaaa', ...validation, maxTokens: 700, effort: 'low'},
+    ])
+    await agent.handle('solveFlip', {flip})
+    expect(ask.mock.calls[0][0]).toMatchObject({maxTokens: 700, effort: 'low'})
+  })
+
   test("a practice try on an agent's page uses that agent's connection", async () => {
     const agent = start([
       {id: 'aaaaaaaaaaaaaaaa', ...validation},
@@ -310,6 +321,8 @@ describe('the Agents section commands', () => {
       provider: 'openai',
       address: 'https://x.test/v1',
       model: 'other-model',
+      maxTokens: null,
+      effort: '',
       key: 'k-open',
     })
     await agent.handle('testFlip', {flip})

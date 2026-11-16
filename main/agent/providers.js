@@ -6,7 +6,11 @@ const axios = require('axios')
 // headers hold the key).
 
 const ANTHROPIC_VERSION = '2023-06-01'
-const ANTHROPIC_MAX_TOKENS = 1024
+// The longest answer asked of an Anthropic model when neither the person nor the task sets one: a cap, not a cost
+// (only what it writes is billed). On a model whose thinking cannot be turned off, its thinking counts in it too.
+const ANTHROPIC_MAX_TOKENS = 4096
+/** The efforts an OpenAI-compatible service takes; the two above high are sent as high. */
+const OPENAI_EFFORTS = ['low', 'medium', 'high']
 const MAX_REPLY_BYTES = 1024 * 1024
 // A picture comes back in base64 in the JSON: a 1024x1024 PNG is a few MB.
 const MAX_IMAGE_REPLY_BYTES = 25 * 1024 * 1024
@@ -45,6 +49,26 @@ function checkAddress(provider, address) {
   return url.href.replace(/\/+$/u, '')
 }
 
+/** OpenAI's own API wants `max_completion_tokens` (its reasoning models refuse `max_tokens`); others `max_tokens`. */
+function isOpenAiApi(address) {
+  try {
+    return new URL(address).hostname === 'api.openai.com'
+  } catch {
+    return false
+  }
+}
+
+/** The person's limits for an OpenAI-compatible service, only those set: the service's defaults stay otherwise. */
+function openAiLimits(base, {maxTokens, effort}) {
+  const limits = {}
+  if (maxTokens)
+    limits[isOpenAiApi(base) ? 'max_completion_tokens' : 'max_tokens'] =
+      maxTokens
+  if (effort)
+    limits.reasoning_effort = OPENAI_EFFORTS.includes(effort) ? effort : 'high'
+  return limits
+}
+
 function openAiBody(model, system, parts) {
   return {
     model,
@@ -65,10 +89,11 @@ function openAiBody(model, system, parts) {
   }
 }
 
-function anthropicBody(model, system, parts, maxTokens = ANTHROPIC_MAX_TOKENS) {
+function anthropicBody(model, system, parts, maxTokens, effort) {
   return {
     model,
-    max_tokens: maxTokens,
+    max_tokens: maxTokens || ANTHROPIC_MAX_TOKENS,
+    ...(effort ? {output_config: {effort}} : {}),
     system,
     messages: [
       {
@@ -108,10 +133,14 @@ function replyText(provider, data) {
   return ''
 }
 
-/** The request for one question: url, headers and body, before it is sent. */
-/** `maxTokens`: the longest reply asked of an Anthropic model (a story's four prompts need more than a flip's JSON). */
+/**
+ * The request for one question: url, headers and body, before it is sent. The config's `maxTokens` and `effort` are
+ * the agent's (B-265: null and '' when the person set none); the option `maxTokens` is the task's own longest answer
+ * for an Anthropic model (a story's four prompts need more than a flip's JSON), sent only when the agent has none:
+ * the person's setting is the limit for every task, as on the other services.
+ */
 function buildRequest(
-  {provider, address, model, key},
+  {provider, address, model, key, maxTokens: agentMaxTokens, effort},
   system,
   parts,
   {maxTokens} = {}
@@ -127,7 +156,13 @@ function buildRequest(
         'anthropic-version': ANTHROPIC_VERSION,
         'x-api-key': key,
       },
-      body: anthropicBody(model, system, parts, maxTokens),
+      body: anthropicBody(
+        model,
+        system,
+        parts,
+        agentMaxTokens || maxTokens,
+        effort
+      ),
     }
   }
   const headers = {'content-type': 'application/json'}
@@ -135,8 +170,40 @@ function buildRequest(
   return {
     url: `${base}/chat/completions`,
     headers,
-    body: openAiBody(model, system, parts),
+    body: {
+      ...openAiBody(model, system, parts),
+      ...openAiLimits(base, {maxTokens: agentMaxTokens, effort}),
+    },
   }
+}
+
+/**
+ * Why the model stopped, when that makes its answer unusable (B-265): 'cut' (it reached the longest answer: a
+ * reply cut in the middle, or empty when its thinking took it all), 'refused' (the service or the model declined).
+ * null for an answer that ended by itself.
+ */
+function stopProblem(provider, data) {
+  if (provider === 'anthropic') {
+    const stop = data && data.stop_reason
+    if (stop === 'max_tokens' || stop === 'model_context_window_exceeded')
+      return 'cut'
+    if (stop === 'refusal') return 'refused'
+    return null
+  }
+  const reason = data && data.choices && data.choices[0]?.finish_reason
+  if (reason === 'length') return 'cut'
+  if (reason === 'content_filter') return 'refused'
+  return null
+}
+
+/** The error for an unusable stop, in words for Activity. */
+function stopError(problem, limit) {
+  if (problem === 'refused') return new Error('the model refused to answer')
+  return new Error(
+    limit
+      ? `the answer was cut short: it reached the longest answer (${limit} tokens)`
+      : 'the answer was cut short by the service'
+  )
 }
 
 /** A provider's error, as text for the user: its status and its own message, never the request. */
@@ -172,8 +239,9 @@ async function ask(
   const {url, headers, body} = buildRequest(config, system, parts, {
     maxTokens,
   })
+  let response
   try {
-    const response = await request({
+    response = await request({
       method: 'post',
       url,
       headers,
@@ -184,12 +252,15 @@ async function ask(
       maxContentLength: MAX_REPLY_BYTES,
       responseType: 'json',
     })
-    return replyText(config.provider, response.data)
   } catch (error) {
     // Stopped by the app (the agent paused, the test stopped): not the model's fault, nor a deadline.
     if (signal && signal.aborted) throw new Error('stopped')
     throw providerError(error)
   }
+  const problem = stopProblem(config.provider, response.data)
+  if (problem)
+    throw stopError(problem, body.max_tokens || body.max_completion_tokens)
+  return replyText(config.provider, response.data)
 }
 
 /**
@@ -268,4 +339,5 @@ module.exports = {
   drawImage,
   replyText,
   providerError,
+  stopProblem,
 }

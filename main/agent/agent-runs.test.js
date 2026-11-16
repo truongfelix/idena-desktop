@@ -74,6 +74,8 @@ describe("an agent's runs: its text, its budget, what it did alone", () => {
         provider: 'anthropic',
         address: 'https://api.anthropic.com',
         model: 'claude-sonnet-5-5',
+        maxTokens: null,
+        effort: '',
         key: 'sk-joke',
       },
       'Write one joke.',

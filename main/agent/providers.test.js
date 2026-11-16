@@ -1,4 +1,10 @@
-const {ask, buildRequest, checkAddress, replyText} = require('./providers')
+const {
+  ask,
+  buildRequest,
+  checkAddress,
+  replyText,
+  stopProblem,
+} = require('./providers')
 
 const parts = [
   {type: 'text', text: 'Which order?'},
@@ -87,6 +93,85 @@ describe('agent provider requests', () => {
     })
   })
 
+  const anthropic = {
+    provider: 'anthropic',
+    address: 'https://api.anthropic.com',
+    model: 'claude-x',
+    key: 'sk-ant',
+  }
+
+  test("Anthropic: the agent's longest answer over the task's, its effort when set (B-265)", () => {
+    const plain = buildRequest(anthropic, 's', parts).body
+    expect(plain.max_tokens).toBe(4096)
+    expect(plain).not.toHaveProperty('output_config')
+    expect(
+      buildRequest(anthropic, 's', parts, {maxTokens: 8000}).body
+    ).toMatchObject({max_tokens: 8000})
+    const set = buildRequest(
+      {...anthropic, maxTokens: 1500, effort: 'low'},
+      's',
+      parts,
+      {maxTokens: 8000}
+    ).body
+    // The person's setting is the limit, for a story or a plan too: the task's own room is for an agent without one.
+    expect(set.max_tokens).toBe(1500)
+    expect(set.output_config).toEqual({effort: 'low'})
+    expect(
+      buildRequest({...anthropic, maxTokens: 1500}, 's', parts).body.max_tokens
+    ).toBe(1500)
+  })
+
+  test('OpenAI-compatible: nothing added unless set; OpenAI itself takes max_completion_tokens (B-265)', () => {
+    const openai = {
+      provider: 'openai',
+      address: 'https://api.openai.com/v1',
+      model: 'm',
+      key: 'sk',
+    }
+    const plain = buildRequest(openai, 's', parts, {maxTokens: 8000}).body
+    expect(plain).not.toHaveProperty('max_tokens')
+    expect(plain).not.toHaveProperty('max_completion_tokens')
+    expect(plain).not.toHaveProperty('reasoning_effort')
+    expect(
+      buildRequest({...openai, maxTokens: 300, effort: 'medium'}, 's', parts)
+        .body
+    ).toMatchObject({max_completion_tokens: 300, reasoning_effort: 'medium'})
+    const local = buildRequest(
+      {
+        provider: 'local',
+        address: 'http://127.0.0.1:11434/v1',
+        model: 'm',
+        maxTokens: 300,
+        effort: 'max',
+      },
+      's',
+      parts
+    ).body
+    // Another server reads max_tokens; the efforts above high are sent as high.
+    expect(local).toMatchObject({max_tokens: 300, reasoning_effort: 'high'})
+    expect(local).not.toHaveProperty('max_completion_tokens')
+  })
+
+  test('why the model stopped: cut, refused, or nothing to say (B-265)', () => {
+    expect(stopProblem('anthropic', {stop_reason: 'max_tokens'})).toBe('cut')
+    expect(stopProblem('anthropic', {stop_reason: 'refusal'})).toBe('refused')
+    expect(
+      stopProblem('anthropic', {stop_reason: 'model_context_window_exceeded'})
+    ).toBe('cut')
+    expect(stopProblem('anthropic', {stop_reason: 'end_turn'})).toBeNull()
+    expect(stopProblem('anthropic', {})).toBeNull()
+    expect(stopProblem('openai', {choices: [{finish_reason: 'length'}]})).toBe(
+      'cut'
+    )
+    expect(
+      stopProblem('local', {choices: [{finish_reason: 'content_filter'}]})
+    ).toBe('refused')
+    expect(
+      stopProblem('local', {choices: [{finish_reason: 'stop'}]})
+    ).toBeNull()
+    expect(stopProblem('openai', null)).toBeNull()
+  })
+
   test('a hosted model without a key or a model is not asked', () => {
     expect(() =>
       buildRequest(
@@ -144,6 +229,45 @@ describe('agent provider calls', () => {
       maxRedirects: 0,
       timeout: 5000,
     })
+  })
+
+  test('a cut or refused answer is an error, with the limit it reached (B-265)', async () => {
+    const reply = (data) => jest.fn().mockResolvedValue({data})
+    await expect(
+      ask({...config, maxTokens: 50}, 's', parts, {
+        request: reply({
+          stop_reason: 'max_tokens',
+          content: [{type: 'text', text: 'The answer is'}],
+        }),
+      })
+    ).rejects.toThrow(
+      'the answer was cut short: it reached the longest answer (50 tokens)'
+    )
+    await expect(
+      ask(config, 's', parts, {
+        request: reply({stop_reason: 'refusal', content: []}),
+      })
+    ).rejects.toThrow('the model refused to answer')
+    await expect(
+      ask(
+        {provider: 'local', address: 'http://127.0.0.1:1/v1', model: 'm'},
+        's',
+        parts,
+        {
+          request: reply({
+            choices: [{finish_reason: 'length', message: {content: 'x'}}],
+          }),
+        }
+      )
+    ).rejects.toThrow('the answer was cut short by the service')
+    await expect(
+      ask(config, 's', parts, {
+        request: reply({
+          stop_reason: 'end_turn',
+          content: [{type: 'text', text: 'ok'}],
+        }),
+      })
+    ).resolves.toBe('ok')
   })
 
   test('an error says the status and the message, never the key', async () => {

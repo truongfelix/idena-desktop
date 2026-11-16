@@ -50,6 +50,28 @@ const ACTIONS = {
 }
 
 const MAX_MODEL_LENGTH = 200
+
+/**
+ * The model's effort (B-265): how hard it thinks before answering; '' = the model's own default. The Anthropic API
+ * takes all five; an OpenAI-compatible service takes low, medium and high (providers.js sends high for the two above).
+ */
+const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max']
+/** The longest answer a person may set, in tokens (the largest any current model writes). */
+const MAX_ANSWER_TOKENS = 128000
+
+/** The longest answer an agent's model may write, in tokens: a whole number from 1, else null (the app's choice). */
+function normalizeMaxTokens(value) {
+  if (typeof value !== 'number' && (typeof value !== 'string' || !value.trim()))
+    return null
+  const number = Number(value)
+  if (!Number.isInteger(number) || number < 1) return null
+  return Math.min(number, MAX_ANSWER_TOKENS)
+}
+
+/** One of EFFORTS, else '' (the model's default). */
+function normalizeEffort(value) {
+  return EFFORTS.includes(value) ? value : ''
+}
 const MAX_ADDRESS_LENGTH = 2048
 
 function defaultSettings() {
@@ -188,11 +210,15 @@ function createAgentSettings({file, logger}) {
 module.exports = {
   ACTIONS,
   DEFAULT_ADDRESSES,
+  EFFORTS,
   LEVELS,
+  MAX_ANSWER_TOKENS,
   PROVIDERS,
   createAgentSettings,
   defaultSettings,
+  normalizeEffort,
   normalizeLimit,
+  normalizeMaxTokens,
   normalizeSettings,
   normalizeTipAmount,
 }

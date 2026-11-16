@@ -129,6 +129,15 @@ function createAgent({
     : null
 
   const destination = ({provider, address}) => ({provider, address})
+  /** What a question to the agent's model is sent with: its service, model, longest answer, effort and key. */
+  const connection = (agent) => ({
+    provider: agent.provider,
+    address: agent.address,
+    model: agent.model,
+    maxTokens: agent.maxTokens,
+    effort: agent.effort,
+    key: key.read(destination(agent)),
+  })
 
   // Whether an agent other than the validation agent has its service's key: then a kept key that is not the
   // validation agent's may be that agent's, and the validation agent's Remove the key leaves it alone.
@@ -169,17 +178,10 @@ function createAgent({
     const controller = new AbortController()
     running.add(controller)
     try {
-      const text = await ask(
-        {
-          provider: config.provider,
-          address: config.address,
-          model: config.model,
-          key: key.read(destination(config)),
-        },
-        system,
-        parts,
-        {timeoutMs: clampTimeout(timeoutMs), signal: controller.signal}
-      )
+      const text = await ask(connection(config), system, parts, {
+        timeoutMs: clampTimeout(timeoutMs),
+        signal: controller.signal,
+      })
       return readFlipAnswer(text, {
         hasWords: checked.words.length > 0,
         thresholds: config.reportThresholds,
@@ -207,7 +209,12 @@ function createAgent({
     const view = (agent) =>
       agent && {
         id: agent.id,
-        config: agentSettings(file, agent),
+        // Its model's longest answer and effort (B-265), beside the settings the validation reads.
+        config: {
+          ...agentSettings(file, agent),
+          maxTokens: agent.maxTokens,
+          effort: agent.effort,
+        },
         instructions: agent.instructions,
       }
     const answerer = validationAgent(file)
@@ -430,12 +437,7 @@ function createAgent({
       writing.add(controller)
       try {
         const answer = await ask(
-          {
-            provider: agent.provider,
-            address: agent.address,
-            model: agent.model,
-            key: key.read(destination(agent)),
-          },
+          connection(agent),
           agent.instructions,
           [
             {
@@ -479,12 +481,7 @@ function createAgent({
       writing.add(controller)
       try {
         const answer = await ask(
-          {
-            provider: agent.provider,
-            address: agent.address,
-            model: agent.model,
-            key: key.read(destination(agent)),
-          },
+          connection(agent),
           socialSystem(held, agent.instructions),
           [
             {
@@ -538,12 +535,7 @@ function createAgent({
       writing.add(controller)
       try {
         const answer = await ask(
-          {
-            provider: agent.provider,
-            address: agent.address,
-            model: agent.model,
-            key: key.read(destination(agent)),
-          },
+          connection(agent),
           system,
           [{type: 'text', text: question}],
           {
