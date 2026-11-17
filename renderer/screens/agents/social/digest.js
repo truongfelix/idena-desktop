@@ -1,5 +1,5 @@
 import {LIKE, topicOf} from '../../social/contract'
-import {postTargets} from '../../social/feed'
+import {idKey, postTargets} from '../../social/feed'
 import {shortAddress} from '../../social/people'
 import {validTipAmount} from '../../social/calls'
 import {passes} from '../criteria'
@@ -19,6 +19,12 @@ export const MAX_TIPS = 30
 export const OWN_POSTS_SHOWN = 10
 export const MESSAGES_SHOWN = 5
 export const MAX_TEXT = 500
+/**
+ * The thread a tag sits in (B-290, owner 2026-11-17): besides the post it answers, the thread's first post, then the
+ * replies before it, the tag's own branch first, at most this many lines, each text cut shorter than a post's.
+ */
+export const MAX_THREAD = 8
+export const MAX_THREAD_TEXT = 200
 /** A first run reads about the last day of blocks (20 s each). */
 export const FIRST_RUN_BLOCKS = 4320
 
@@ -26,18 +32,23 @@ export const FIRST_RUN_BLOCKS = 4320
  * A text as the model reads it: on one quote, cut, a text on IPFS or a picture only named. `words`: the agent's own
  * words for those two (B-285), `onIpfs` and `withFile`.
  */
-export function shownText(message, hasMedia = false, words = {}) {
+export function shownText(
+  message,
+  hasMedia = false,
+  words = {},
+  max = MAX_TEXT
+) {
   const value = String(message || '')
   const text = value.startsWith('ipfs://')
     ? words.onIpfs ?? '[a text stored on IPFS, not read]'
     : value.replace(/\s+/gu, ' ').trim()
-  const cut = text.length > MAX_TEXT ? `${text.slice(0, MAX_TEXT)}…` : text
+  const cut = text.length > max ? `${text.slice(0, max)}…` : text
   return hasMedia
     ? `${cut} ${words.withFile ?? '[with a picture or a file]'}`.trim()
     : cut
 }
 
-/** Every node of the feed under `node`, with the post it is in. */
+/** Every node of the feed under `node`, with the post it is in and the node it answers. */
 function walk(feed) {
   const out = []
   const visit = (node, post, parent) => {
@@ -47,6 +58,10 @@ function walk(feed) {
   feed.forEach((post) => visit(post, post, null))
   return out
 }
+
+/** Two calls in chain order: their block, then their place in it (as the Social feed sorts). */
+const chainOrder = (a, b) =>
+  a.height - b.height || (a.index || 0) - (b.index || 0)
 
 /**
  * Where a run's reading ends: the scanned block, or before the block of the first item left out; when an item of that
@@ -311,6 +326,71 @@ export function socialDigest(
     labels.set(id, {kind: 'person', others: [address]})
     return id
   }
+  // The thread a tag in an answer sits in (B-290): the thread's first post and the replies before the tag, the tag's
+  // own branch first (the reply it sits under and its comments), then the other replies, nearest the tag kept; every
+  // author whatever their state (Whose picks the tags, not their context). Left out: the blocked authors and what
+  // answers them, a post a tag before it in this run already showed, what came after the tag. No label: the agent
+  // answers the tag, never these. The feed files every comment under its reply; what each one answers is its replyTo.
+  const shownInThread = new Set()
+  const threadText = (call) =>
+    shownText(call.message, call.hasMedia, words, MAX_THREAD_TEXT)
+  const threadOf = (item) => {
+    const tree = walk([item.post])
+    const byId = new Map(tree.map(({node}) => [idKey(node.id), node]))
+    // What a post answers, as the Social screen's comment tree reads it (feed.js commentTree): its replyTo when that
+    // is another post of this thread, else the one it is filed under.
+    const answeredBy = ({node, parent}) => {
+      const to = byId.get(idKey(node.call.replyTo))
+      return to && to !== node ? to : parent
+    }
+    // The tag's own line quotes what it answers; never a blocked author's text (the one it is filed under then).
+    const target = answeredBy(item)
+    const answered = isBlocked(target.call.author) ? item.parent : target
+    const branch = item.parent === item.post ? item.node : item.parent
+    const inBranch = ({node, parent}) => node === branch || parent === branch
+    const earlier = tree
+      .map((entry) => ({...entry, to: entry.parent && answeredBy(entry)}))
+      .filter(
+        ({node, to}) =>
+          typeof node.id === 'number' &&
+          node !== item.node &&
+          node !== answered &&
+          !shownInThread.has(node.id) &&
+          !isBlocked(node.call.author) &&
+          !(to && isBlocked(to.call.author)) &&
+          chainOrder(node.call, item.node.call) < 0
+      )
+      .sort((a, b) => chainOrder(a.node.call, b.node.call))
+    const first = earlier.find(({node}) => node === item.post)
+    const replies = earlier.filter(({node}) => node !== item.post)
+    const room = MAX_THREAD - (first ? 1 : 0)
+    const ownBranch = room > 0 ? replies.filter(inBranch).slice(-room) : []
+    const left = room - ownBranch.length
+    const others =
+      left > 0 ? replies.filter((one) => !inBranch(one)).slice(-left) : []
+    const kept = [...(first ? [first] : []), ...ownBranch, ...others].sort(
+      (a, b) => chainOrder(a.node.call, b.node.call)
+    )
+    // The first post is shown with each thread; the replies once a run.
+    ownBranch.concat(others).forEach(({node}) => shownInThread.add(node.id))
+    const thread = kept.map(({node, to}) => {
+      const author = name(node.call.author)
+      const text = threadText(node.call)
+      if (node === item.post)
+        return line(
+          'thread post',
+          {author, text},
+          `  the thread's first post, by ${author}: "${text}"`
+        )
+      const answering = name(to.call.author)
+      return line(
+        'thread reply',
+        {author, to: answering, text},
+        `  ${author}, answering ${answering}: "${text}"`
+      )
+    })
+    return {answered, thread}
+  }
   // Its own last posts, whatever the point (no label: nothing to act on); only when it is given that read (B-262).
   const own = reads?.own
     ? feed
@@ -359,16 +439,17 @@ export function socialDigest(
       const author = name(item.node.call.author)
       const said = shown(item.node.call.message, item.node.call.hasMedia)
       if (item.parent) {
-        const to = name(item.parent.call.author)
-        const parent = shown(
-          item.parent.call.message,
-          item.parent.call.hasMedia
-        )
-        text = line(
-          'tag in an answer',
-          {label: id, author, to, parent, text: said},
-          `${id} by ${author}, answering ${to} ("${parent}"): "${said}"`
-        )
+        const {answered, thread} = threadOf(item)
+        const to = name(answered.call.author)
+        const parent = shown(answered.call.message, answered.call.hasMedia)
+        text = [
+          line(
+            'tag in an answer',
+            {label: id, author, to, parent, text: said},
+            `${id} by ${author}, answering ${to} ("${parent}"): "${said}"`
+          ),
+          ...thread,
+        ].join('\n')
       } else
         text = line(
           'tag',
