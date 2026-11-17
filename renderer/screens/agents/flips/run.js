@@ -5,12 +5,17 @@ import {
   MAX_STORY_PICTURES,
   STORY_PICTURES,
   canMakeFlips,
+  declinedNow,
   draftsAt,
   freePairs,
   heldFlipSteps,
+  isShuffled,
   judgeQuestion,
+  judgedFail,
   orphans,
   permutationsOf,
+  rewritesAllowed,
+  rewritesOf,
   sameDraft,
   shuffledOrder,
   storyForPictures,
@@ -232,10 +237,222 @@ export function newAgentDraft({
   }
 }
 
+/**
+ * A failed draft written again in place (B-284): the same draft and keywords, a new story, its pictures and its
+ * protection gone, so that the next steps take it as a new one. `agentFlip.rewrites` counts it, `lastFail` keeps the
+ * verdict that asked for it.
+ */
+export function rewrittenDraft(flip, {story, pictures, by, at, random}) {
+  const {createdAt, keywords, agentFlip, ...fields} = newAgentDraft({
+    id: flip.id,
+    pair: {id: flip.keywordPairId},
+    words: [],
+    story,
+    by,
+    at,
+    random,
+    pictures,
+  })
+  return {
+    ...fields,
+    agentVerdict: null,
+    agentFlip: {
+      ...agentFlip,
+      rewrites: rewritesOf(flip) + 1,
+      lastFail: flip.agentVerdict || null,
+    },
+  }
+}
+
+/** The titles of the draft's stories, given to the model as the ones not to write again. */
+const titlesOf = (story) =>
+  ((story && Array.isArray(story.titles) && story.titles) || []).filter(Boolean)
+
+/**
+ * Write the story's second part (B-284): each agent draft the judge failed is written again in the same draft, at
+ * most as many times as the person set (rewritesAllowed); past that, it is reported once and left to the person.
+ * Not when this agent may delete the draft (Delete a draft takes it), unless the person declined its deletion.
+ */
+async function rewriteFailed(agent, deps, count) {
+  const most = rewritesAllowed(agent)
+  const deletes = heldFlipSteps(agent).includes('flipDelete')
+  // eslint-disable-next-line no-restricted-syntax
+  for (const flip of draftsAt('flipRewrite', deps.store.getFlips())) {
+    // eslint-disable-next-line no-continue
+    if (deletes && !declinedNow(flip, 'flipDelete')) continue
+    const done = rewritesOf(flip)
+    // Written again as often as it may be: left to the person (reportLeft).
+    // eslint-disable-next-line no-continue
+    if (done >= most) continue
+    const words = (flip.keywords && flip.keywords.words) || []
+    const line = `${keywordsLine(flip)} · written again (${
+      done + 1
+    } of ${most}) after its evaluation failed`
+    // eslint-disable-next-line no-await-in-loop
+    const next = await act(agent, 'flipStory', deps, count, {
+      key: flip.id,
+      // Still the draft the judge failed: not judged again or reworked meanwhile.
+      fresh: () => {
+        const now = deps.store.getFlip(flip.id)
+        return sameDraft(now, flip) && judgedFail(now)
+      },
+      work: async () => {
+        const sent = storyWords({words})
+        if (!sent) throw new Error('the keywords could not be read')
+        const written = await deps.ipc('writeStory', {
+          agentId: agent.id,
+          words: sent,
+          parts: ['story', 'prompts'],
+          notThese: titlesOf(flip.story),
+        })
+        const one = storyForPictures(written)
+        if (!one)
+          throw new Error(
+            `no story with at least ${STORY_PICTURES} image prompts in the answer`
+          )
+        return {
+          one,
+          story: draftStory({stories: [one]}, sent, {
+            idea: '',
+            parts: ['story', 'prompts'],
+            titles: titlesOf(flip.story),
+          }),
+        }
+      },
+      propose: ({one}) => ({
+        body: [one.title, one.story].filter(Boolean).join('\n\n'),
+        detail: line,
+        target: {flipId: flip.id},
+      }),
+      apply: ({one, story}, waiting) => {
+        // Ask me: the draft stays as it is until the person approves the new story (execute.js).
+        if (waiting) {
+          deps.store.updateDraft({
+            id: flip.id,
+            agentFlip: {
+              ...flip.agentFlip,
+              waiting,
+              proposed: {story, pictures: one.prompts.length, by: agent.id},
+            },
+          })
+          return ''
+        }
+        deps.store.updateDraft(
+          rewrittenDraft(flip, {
+            story,
+            pictures: one.prompts.length,
+            by: agent.id,
+            at: new Date(deps.now()).toISOString(),
+            random: deps.random,
+          })
+        )
+        return deps.verdictText(flip.agentVerdict)
+      },
+    })
+    if (next === 'stop') return 'stop'
+  }
+  return 'next'
+}
+
+/**
+ * The drafts that failed their evaluation after every rewrite allowed (B-284): each reported once in Activity for the
+ * flip as it is, and marked (`gaveUp`, read by the Flips list). They stay drafts: the person reworks or deletes them.
+ */
+async function reportLeft(agent, deps, count) {
+  const most = rewritesAllowed(agent)
+  const deletes = heldFlipSteps(agent).includes('flipDelete')
+  // eslint-disable-next-line no-restricted-syntax
+  for (const flip of draftsAt('flipRewrite', deps.store.getFlips())) {
+    const done = rewritesOf(flip)
+    if (
+      done < most ||
+      (deletes && !declinedNow(flip, 'flipDelete')) ||
+      flip.agentFlip.gaveUp === flip.agentVerdict.contents
+    )
+      // eslint-disable-next-line no-continue
+      continue
+    deps.store.updateDraft({
+      id: flip.id,
+      agentFlip: {...flip.agentFlip, gaveUp: flip.agentVerdict.contents},
+    })
+    count.failed += 1
+    // eslint-disable-next-line no-await-in-loop
+    await deps.call('didAction', {
+      agentId: agent.id,
+      action: 'flipStory',
+      ok: false,
+      detail: `${keywordsLine(
+        flip
+      )} · failed its evaluation after ${done} of ${most} rewrites, left to you · ${deps.verdictText(
+        flip.agentVerdict
+      )}`,
+    })
+  }
+}
+
+/** The judge's verdict on `flip` as it is: the validation's question asked of the agent's model. */
+async function judgement(agent, flip, deps) {
+  const {flip: question, storySide} = judgeQuestion(flip, deps.random)
+  const answer = await deps.ipc('judgeFlip', {
+    agentId: agent.id,
+    flip: question,
+  })
+  // An answer it could not read (cut short, in prose) carries nothing: no verdict, or a failed flip would be
+  // deleted. One that picks no side but reports the flip, or marks its keywords, is a verdict.
+  if (
+    !answer ||
+    (!answer.answer &&
+      !answer.relevance &&
+      !answer.report &&
+      !(answer.reasons && answer.reasons.length))
+  )
+    throw new Error('the answer could not be read')
+  return verdictOf(answer, {
+    storySide,
+    flip,
+    by: agent.id,
+    at: deps.now(),
+  })
+}
+
+/**
+ * A draft's evaluation asked by the person (the Flips list's Evaluate, B-284, Q-66): any draft protected and
+ * shuffled, theirs or an agent's, by the agent holding Judge the flip. Asked at once, whatever the step's level (the
+ * person's own click), and written on the draft. Returns the verdict; throws what the person is told.
+ */
+export async function evaluateDraft(agent, flipId, deps) {
+  const flip = deps.store.getFlip(flipId)
+  if (!flip || flip.type !== FlipType.Draft) throw new Error('gone')
+  if (!isShuffled(flip)) throw new Error('not ready')
+  if (
+    (flip.agentFlip && flip.agentFlip.waiting) ||
+    (flip.agentVerdict && flip.agentVerdict.waiting)
+  )
+    throw new Error('waiting')
+  const verdict = await judgement(agent, flip, deps)
+  if (!sameDraft(deps.store.getFlip(flipId), flip)) throw new Error('changed')
+  deps.store.updateDraft({id: flip.id, agentVerdict: verdict})
+  await deps
+    .call('didAction', {
+      agentId: agent.id,
+      action: 'flipJudge',
+      ok: true,
+      detail: `${keywordsLine(flip)} · asked in My Flips · ${deps.verdictText(
+        verdict
+      )}`,
+    })
+    .catch(() => {})
+  return verdict
+}
+
 const STEPS = {
-  /** Write the story: a new draft for each free keyword pair, while there are flips left to make. */
+  /**
+   * Write the story: a failed draft written again (rewriteFailed), then a new draft for each free keyword pair, while
+   * there are flips left to make.
+   */
   async flipStory(agent, ctx, deps, count) {
     if (!canMakeFlips(ctx.identity, ctx.epoch)) return
+    if ((await rewriteFailed(agent, deps, count)) === 'stop') return
     // eslint-disable-next-line no-restricted-syntax
     for (const pair of freePairs(ctx.identity, deps.store.getFlips())) {
       let words
@@ -386,29 +603,7 @@ const STEPS = {
       const next = await act(agent, 'flipJudge', deps, count, {
         key: flip.id,
         fresh: () => sameDraft(deps.store.getFlip(flip.id), flip),
-        work: async () => {
-          const {flip: question, storySide} = judgeQuestion(flip, deps.random)
-          const answer = await deps.ipc('judgeFlip', {
-            agentId: agent.id,
-            flip: question,
-          })
-          // An answer it could not read (cut short, in prose) carries nothing: no verdict, or a failed flip would be
-          // deleted. One that picks no side but reports the flip, or marks its keywords, is a verdict.
-          if (
-            !answer ||
-            (!answer.answer &&
-              !answer.relevance &&
-              !answer.report &&
-              !(answer.reasons && answer.reasons.length))
-          )
-            throw new Error('the answer could not be read')
-          return verdictOf(answer, {
-            storySide,
-            flip,
-            by: agent.id,
-            at: deps.now(),
-          })
-        },
+        work: () => judgement(agent, flip, deps),
         propose: (verdict) => ({
           body: deps.verdictText(verdict),
           detail: keywordsLine(flip),
@@ -541,9 +736,24 @@ export async function runFlipsAgent(agent, ctx, deps) {
   const today = new Date(deps.now()).toDateString()
   failedToday.forEach((day, key) => day !== today && failedToday.delete(key))
   const count = {alone: 0, ask: 0, skipped: 0, failed: 0}
-  // eslint-disable-next-line no-restricted-syntax
-  // eslint-disable-next-line no-await-in-loop
-  for (const step of held) await STEPS[step](agent, ctx, deps, count)
+  // The steps in their order; then again while a pass did something alone and left a draft the judge failed that
+  // may be written again (B-284), so that one run takes it to its next evaluation: at most once more for each
+  // rewrite allowed.
+  const most = held.includes('flipStory') ? rewritesAllowed(agent) : 0
+  for (let pass = 0; pass <= most; pass += 1) {
+    const before = count.alone
+    // eslint-disable-next-line no-restricted-syntax
+    // eslint-disable-next-line no-await-in-loop
+    for (const step of held) await STEPS[step](agent, ctx, deps, count)
+    if (
+      count.alone === before ||
+      !draftsAt('flipRewrite', deps.store.getFlips()).some(
+        (flip) => rewritesOf(flip) < most
+      )
+    )
+      break
+  }
+  if (held.includes('flipStory')) await reportLeft(agent, deps, count)
   const acted = count.alone + count.ask + count.skipped + count.failed
   if (!acted) return {result: 'nothing new', detail: '', count}
   return {

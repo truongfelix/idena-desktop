@@ -22,12 +22,12 @@ export function actionCatalog(t) {
       scope: t('The flip you make, and the keyword pairs without a flip yet'),
       label: t('Write flip stories'),
       info: t(
-        "Writes flip stories and their picture prompts, as your Instructions ask, from the flip's two keywords: in the flip editor when you ask, and in its runs a new draft for each keyword pair that has no flip yet, while flips are left to make.",
+        "Writes flip stories and their picture prompts, as your Instructions ask, from the flip's two keywords: in the flip editor when you ask, and in its runs a new draft for each keyword pair that has no flip yet, while flips are left to make. In its runs it also writes again, in the same draft, an agent draft that failed its evaluation, as many times as you set here (not when it may delete the draft).",
         {nsSeparator: '!!'}
       ),
       reads: [t('The two keywords of the flip you make')],
-      defaults: {level: 'off', limit: 3},
-      perDay: 'steps',
+      defaults: {level: 'off', limit: 3, rewrites: 2},
+      perDay: 'story',
     },
     {
       id: 'flipPictures',

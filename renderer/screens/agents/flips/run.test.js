@@ -1,6 +1,6 @@
 import {FlipType} from '../../../shared/types'
 import {contentsKey} from './drafts'
-import {runFlipsAgent} from './run'
+import {evaluateDraft, runFlipsAgent} from './run'
 
 // A Flips run (B-258) against a fake flip store and a fake agent channel: the main process's checks are pending.js's,
 // played here by `levels` (each step's level) and `limits` (each step's actions a day).
@@ -557,5 +557,275 @@ describe('a Flips run', () => {
     deps.call.mockClear()
     await runFlipsAgent(agent, sentCtx, deps)
     expect(deps.call).not.toHaveBeenCalledWith('propose', expect.anything())
+  })
+})
+
+// B-284: a draft the judge failed is written again in the same draft, at most as often as the person set.
+describe('a failed evaluation', () => {
+  const FIVE = [
+    'flipStory',
+    'flipPictures',
+    'flipDraft',
+    'flipJudge',
+    'flipSubmit',
+  ]
+  const alone = (steps) => Object.fromEntries(steps.map((id) => [id, 'alone']))
+  /** The judge's answers, one per question: true finds the story's side, false the other. */
+  const judging = (store, answers) => {
+    let asked = 0
+    return (flip) => {
+      const story = store.getFlip('new').originalOrder.join()
+      const right = flip.orders[0].join() === story ? 'left' : 'right'
+      const wrong = right === 'left' ? 'right' : 'left'
+      const pass = answers[Math.min(asked, answers.length - 1)]
+      asked += 1
+      return {
+        answer: pass ? right : wrong,
+        relevance: 'relevant',
+        report: false,
+        reasons: [],
+      }
+    }
+  }
+  const failed = () => {
+    const flip = {
+      id: 'f',
+      type: FlipType.Draft,
+      createdAt: '2026-11-16T09:00:00.000Z',
+      keywordPairId: 4,
+      keywords: {words: [{name: 'cat'}, {name: 'tree'}]},
+      originalOrder: [0, 3, 1, 2],
+      order: [2, 1, 3, 0],
+      adversarialImageId: 3,
+      images: ['i0', 'i1', 'i2', null],
+      protectedImages: ['data:a,AA', 'data:a,BB', 'data:a,CC', 'data:a,DD'],
+      story: {titles: ['Old title'], stories: []},
+      agentFlip: {by: 'a2', stage: 'drafted', waiting: null, declined: {}},
+    }
+    return {
+      ...flip,
+      agentVerdict: {
+        contents: contentsKey(flip),
+        pass: false,
+        waiting: null,
+        declined: false,
+      },
+    }
+  }
+
+  test('alone and without Delete a draft: reported, written again in the same draft, passed and sent in one run', async () => {
+    const {agent, deps, store, lines} = setup({
+      levels: alone(FIVE),
+      answer: () => null,
+      agentId: 'rewrites-1',
+    })
+    const judge = judging(store, [false, true])
+    const stories = []
+    deps.ipc.mockImplementation(async (command, data) => {
+      if (command === 'judgeFlip') return judge(data.flip)
+      stories.push(data)
+      return {
+        stories: [
+          {
+            title: `T${stories.length}`,
+            story: 'S',
+            prompts: ['p1', 'p2', 'p3'],
+          },
+        ],
+      }
+    })
+    const outcome = await runFlipsAgent(agent, {identity, epoch}, deps)
+    const flip = store.getFlip('new')
+    // One draft all along: its keywords held, never a second draft.
+    expect(store.getFlips()).toHaveLength(1)
+    expect(flip.type).toBe(FlipType.Publishing)
+    expect(flip.keywordPairId).toBe(4)
+    expect(flip.agentFlip.rewrites).toBe(1)
+    expect(flip.agentFlip.lastFail).toMatchObject({pass: false})
+    expect(flip.agentVerdict).toMatchObject({pass: true})
+    expect(flip.story.stories[0].title).toBe('T2')
+    // The second story is asked with the first one's title as one not to write again.
+    expect(stories).toHaveLength(2)
+    expect(stories[1].notThese).toEqual(['T1'])
+    // Reported: the failed verdict, then the rewrite, in Activity.
+    expect(lines).toContainEqual([
+      'flipJudge',
+      true,
+      undefined,
+      'w10 / w11 · fails',
+    ])
+    expect(lines).toContainEqual([
+      'flipStory',
+      true,
+      undefined,
+      'w10 / w11 · written again (1 of 2) after its evaluation failed · fails',
+    ])
+    expect(deps.submit).toHaveBeenCalledTimes(1)
+    expect(outcome.count).toMatchObject({failed: 0, skipped: 0})
+  })
+
+  test('past the rewrites the person set, the draft is left to them and reported once', async () => {
+    const {agent, deps, store, lines} = setup({
+      levels: alone(FIVE),
+      answer: () => null,
+      agentId: 'rewrites-2',
+    })
+    agent.actions.flipStory.rewrites = 1
+    const judge = judging(store, [false])
+    let written = 0
+    deps.ipc.mockImplementation(async (command, data) => {
+      if (command === 'judgeFlip') return judge(data.flip)
+      written += 1
+      return {stories: [{title: 'T', story: 'S', prompts: ['p1', 'p2', 'p3']}]}
+    })
+    await runFlipsAgent(agent, {identity, epoch}, deps)
+    const flip = store.getFlip('new')
+    expect(written).toBe(2)
+    expect(flip.type).toBe(FlipType.Draft)
+    expect(flip.agentFlip.rewrites).toBe(1)
+    expect(flip.agentFlip.gaveUp).toBe(contentsKey(flip))
+    const left = () =>
+      lines.filter(([, , , detail]) => /left to you/.test(detail))
+    expect(left()).toEqual([
+      [
+        'flipStory',
+        false,
+        undefined,
+        'w10 / w11 · failed its evaluation after 1 of 1 rewrites, left to you · fails',
+      ],
+    ])
+    expect(deps.submit).not.toHaveBeenCalled()
+    // The next run asks the model nothing and says nothing more.
+    deps.ipc.mockClear()
+    await runFlipsAgent(agent, {identity, epoch}, deps)
+    expect(deps.ipc).not.toHaveBeenCalled()
+    expect(left()).toHaveLength(1)
+  })
+
+  test('an agent that may delete the draft deletes it, and writes nothing again', async () => {
+    const {agent, deps, store} = setup({
+      levels: alone([...FIVE, 'flipDelete']),
+      flips: [failed()],
+      answer: () => null,
+      agentId: 'rewrites-3',
+    })
+    await runFlipsAgent(
+      agent,
+      {identity: {...identity, flipKeyWordPairs: []}, epoch},
+      deps
+    )
+    expect(store.getFlip('f').type).toBe('Removed')
+    expect(deps.ipc).not.toHaveBeenCalled()
+  })
+
+  test('with Ask me the new story waits in To approve and the draft stays as it is', async () => {
+    const {agent, deps, store, items} = setup({
+      levels: {flipStory: 'ask'},
+      flips: [failed()],
+      answer: () => null,
+      agentId: 'rewrites-4',
+    })
+    await runFlipsAgent(
+      agent,
+      {identity: {...identity, flipKeyWordPairs: []}, epoch},
+      deps
+    )
+    const flip = store.getFlip('f')
+    expect(items).toHaveLength(1)
+    expect(flip.agentFlip.waiting).toEqual({step: 'flipStory', id: 'item1'})
+    expect(flip.agentFlip.proposed).toMatchObject({
+      pictures: 4,
+      by: 'rewrites-4',
+    })
+    expect(flip.images).toEqual(['i0', 'i1', 'i2', null])
+    expect(flip.agentVerdict.pass).toBe(false)
+    expect(deps.ipc).toHaveBeenCalledWith(
+      'writeStory',
+      expect.objectContaining({notThese: ['Old title']})
+    )
+  })
+
+  test('a failed draft judged again meanwhile is not written over', async () => {
+    const {agent, deps, store} = setup({
+      levels: {flipStory: 'alone'},
+      flips: [failed()],
+      answer: () => null,
+      agentId: 'rewrites-5',
+    })
+    deps.ipc.mockImplementation(async () => {
+      // The person's Evaluate passes it while the story is written.
+      store.updateDraft({
+        id: 'f',
+        agentVerdict: {...store.getFlip('f').agentVerdict, pass: true},
+      })
+      return {stories: [{title: 'T', story: 'S', prompts: ['p1', 'p2', 'p3']}]}
+    })
+    await runFlipsAgent(
+      agent,
+      {identity: {...identity, flipKeyWordPairs: []}, epoch},
+      deps
+    )
+    expect(store.getFlip('f').images).toEqual(['i0', 'i1', 'i2', null])
+    expect(store.getFlip('f').agentFlip.rewrites).toBeUndefined()
+  })
+})
+
+// B-284: the Flips list's Evaluate, for any draft.
+describe('Evaluate asked for a draft', () => {
+  const draft = (over = {}) => ({
+    id: 'mine',
+    type: FlipType.Draft,
+    keywordPairId: 7,
+    keywords: {words: [{name: 'cat'}, {name: 'tree'}]},
+    originalOrder: [0, 3, 1, 2],
+    order: [2, 1, 3, 0],
+    adversarialImageId: 3,
+    protectedImages: ['data:a,AA', 'data:a,BB', 'data:a,CC', 'data:a,DD'],
+    ...over,
+  })
+
+  test("the person's own draft gets its verdict, whatever the step's level, and Activity says so", async () => {
+    const {agent, deps, store, lines, items} = setup({
+      levels: {flipJudge: 'ask'},
+      flips: [draft()],
+      answer: rightAnswer([0, 3, 1, 2]),
+      agentId: 'evaluates-1',
+    })
+    const verdict = await evaluateDraft(agent, 'mine', deps)
+    expect(verdict.pass).toBe(true)
+    expect(store.getFlip('mine').agentVerdict).toMatchObject({
+      pass: true,
+      waiting: null,
+      contents: contentsKey(store.getFlip('mine')),
+    })
+    expect(items).toHaveLength(0)
+    expect(lines).toEqual([
+      ['flipJudge', true, undefined, 'cat / tree · asked in My Flips · passes'],
+    ])
+  })
+
+  test('a draft not protected and shuffled, or waiting in To approve, is not sent to the model', async () => {
+    const {agent, deps} = setup({
+      levels: {flipJudge: 'alone'},
+      flips: [
+        draft({order: [0, 3, 1, 2]}),
+        draft({
+          id: 'waits',
+          agentFlip: {
+            by: 'a2',
+            stage: 'drafted',
+            waiting: {step: 'flipSubmit', id: 'item9'},
+          },
+        }),
+      ],
+      answer: rightAnswer([0, 3, 1, 2]),
+      agentId: 'evaluates-2',
+    })
+    await expect(evaluateDraft(agent, 'mine', deps)).rejects.toThrow(
+      'not ready'
+    )
+    await expect(evaluateDraft(agent, 'waits', deps)).rejects.toThrow('waiting')
+    await expect(evaluateDraft(agent, 'none', deps)).rejects.toThrow('gone')
+    expect(deps.ipc).not.toHaveBeenCalled()
   })
 })

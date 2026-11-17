@@ -58,6 +58,7 @@ import {
 import {rem} from '../../shared/theme'
 import {capitalize} from '../../shared/utils/string'
 import {reorder} from '../../shared/utils/arr'
+import {DraftAgentNote, useDraftStatus, useEvaluate} from './agent-note'
 import {FlipType} from '../../shared/types'
 import {
   Tooltip,
@@ -110,7 +111,7 @@ export function FlipCardList(props) {
   return <Wrap spacing="39px" {...props} />
 }
 
-export function FlipCard({flipService, onDelete}) {
+export function FlipCard({flipService, onDelete, judge = null}) {
   const {t} = useTranslation()
 
   const [current, send] = useActor(flipService)
@@ -136,6 +137,10 @@ export function FlipCard({flipService, onDelete}) {
   const isViewable = [FlipType.Published, FlipType.Archived].includes(type)
   const isEditable = [FlipType.Draft, FlipType.Invalid].includes(type)
   const isDeletable = [FlipType.Published, FlipType.Draft].includes(type)
+  // What the agents did with the draft (B-284), and its evaluation asked here (`judge`: the agent that judges).
+  const agentStatus = useDraftStatus(id, type === FlipType.Draft)
+  const {evaluate, busy: isEvaluating} = useEvaluate(judge, id)
+  const canEvaluate = type === FlipType.Draft && Boolean(judge)
 
   return (
     <WrapItem>
@@ -181,6 +186,7 @@ export function FlipCard({flipService, onDelete}) {
             <FlipCardSubtitle>
               {new Date(modifiedAt).toLocaleString()}
             </FlipCardSubtitle>
+            <DraftAgentNote status={agentStatus} />
           </Box>
           {isActionable && (
             <FlipCardMenu>
@@ -211,6 +217,16 @@ export function FlipCard({flipService, onDelete}) {
                     </HStack>
                   </FlipCardMenuItem>
                 </NextLink>
+              )}
+              {canEvaluate && (
+                <FlipCardMenuItem onClick={evaluate} isDisabled={isEvaluating}>
+                  <HStack spacing="2">
+                    <FlipCardMenuItemIcon icon={EyeIcon} />
+                    <Text as="span">
+                      {isEvaluating ? t('Evaluating...') : t('Evaluate')}
+                    </Text>
+                  </HStack>
+                </FlipCardMenuItem>
               )}
               {(isSubmittable || isEditable) && isDeletable && (
                 <MenuDivider color="gray.300" my={2} width={rem(145)} />

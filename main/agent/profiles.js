@@ -10,6 +10,7 @@ const {
   normalizeEffort,
   normalizeLimit,
   normalizeMaxTokens,
+  normalizeRewrites,
   normalizeSettings,
   normalizeTipAmount,
 } = require('./settings')
@@ -245,6 +246,9 @@ function normalizeActions(value) {
                     : fallback[field],
                 ])
             ),
+            ...('rewrites' in fallback
+              ? {rewrites: normalizeRewrites(row.rewrites, fallback.rewrites)}
+              : {}),
             ...(name === 'readPosts' ? postsWindow(row) : {}),
             // Whose it reads, whom it acts on (B-266): kept only when one is set.
             ...criteriaField(name, row),

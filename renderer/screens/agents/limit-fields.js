@@ -103,12 +103,26 @@ function StepsField({row, onChange}) {
 }
 
 /**
- * The fields of one action's row: `kind` is 'count', 'idna' (a tip's), 'steps' (a Flips step, B-258) or 'pictures'
- * (Make the pictures: its flips and its pictures a day), `onChange(change)` changes the row.
+ * The fields of one action's row: `kind` is 'count', 'idna' (a tip's), 'steps' (a Flips step, B-258), 'story' (Write
+ * flip stories: its stories a day and its rewrites of a failed draft) or 'pictures' (Make the pictures: its flips and
+ * its pictures a day), `onChange(change)` changes the row.
  */
 export function LimitFields({kind, row, onChange}) {
   const {t} = useTranslation()
   if (kind === 'steps') return <StepsField row={row} onChange={onChange} />
+  // Write flip stories (B-284): how many times a draft that failed its evaluation is written again.
+  if (kind === 'story')
+    return (
+      <Flex gap={4} wrap="wrap">
+        <StepsField row={row} onChange={onChange} />
+        <NumberField
+          label={t('rewrites of a draft that failed its evaluation')}
+          value={row.rewrites ?? 2}
+          min={0}
+          onSave={(rewrites) => onChange({rewrites})}
+        />
+      </Flex>
+    )
   if (kind === 'pictures')
     return (
       <Flex gap={4} wrap="wrap">
