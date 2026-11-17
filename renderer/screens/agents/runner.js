@@ -223,9 +223,8 @@ function runSocial(agent, social, t, why) {
     agent: agentCall,
     prepare: (item) => prepareSocialAction(item, state),
     send: (pending) => sendSocialAction(pending),
-    readAuthors: (addresses, needs, options) =>
+    readAuthors: (addresses, needs) =>
       readAuthors(addresses, needs, {
-        ...options,
         settled: socialRpcSettled,
         call: socialRpc,
       }),

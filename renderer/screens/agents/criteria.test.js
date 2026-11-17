@@ -140,23 +140,6 @@ describe("the authors' facts", () => {
       now: 1000 + 31 * 60 * 1000,
     })
     expect(settled).toHaveBeenCalledTimes(2)
-    // B-286: an author a rule refused is read again, unless it was read less than a minute ago.
-    const before = settled.mock.calls.length
-    const at = 1000 + 31 * 60 * 1000
-    await readAuthors([A], needs, {
-      settled,
-      call: jest.fn(),
-      now: at + 30 * 1000,
-      again: true,
-    })
-    expect(settled).toHaveBeenCalledTimes(before)
-    await readAuthors([A], needs, {
-      settled,
-      call: jest.fn(),
-      now: at + 2 * 60 * 1000,
-      again: true,
-    })
-    expect(settled).toHaveBeenCalledTimes(before + 1)
   })
 
   test('Vouched: a vouched member in standing (no identity of its own, its voucher validated)', async () => {

@@ -134,9 +134,7 @@ export async function runSocialAgent(agent, social, deps) {
   )
   const needs = criteriaNeeds([...Object.values(who), ...Object.values(onlyTo)])
   let facts = {}
-  const needsFacts =
-    needs.identity || needs.vouched || needs.trust || needs.named
-  if (needsFacts) {
+  if (needs.identity || needs.vouched || needs.trust || needs.named) {
     const authors = new Set()
     socialDigest(
       social,
@@ -146,29 +144,18 @@ export async function runSocialAgent(agent, social, deps) {
     // Without a reader, nothing is known of anyone: no criterion that needs it passes.
     facts = deps.readAuthors ? await deps.readAuthors([...authors], needs) : {}
   }
-  const digestWith = (known) =>
-    socialDigest(
-      social,
-      {
-        reads: agent.reads,
-        who,
-        facts: known,
-        tagsLeft,
-        postsLeft,
-        texts: agent.appParts || null,
-      },
-      {point, scanned}
-    )
-  let digest = digestWith(facts)
-  // An author a rule refused on facts kept from an earlier run is read again (B-286): what is passed over now is
-  // never read later.
-  if (needsFacts && digest.refused.size && deps.readAuthors) {
-    const again = await deps.readAuthors([...digest.refused], needs, {
-      again: true,
-    })
-    facts = {...facts, ...again}
-    digest = digestWith(facts)
-  }
+  const digest = socialDigest(
+    social,
+    {
+      reads: agent.reads,
+      who,
+      facts,
+      tagsLeft,
+      postsLeft,
+      texts: agent.appParts || null,
+    },
+    {point, scanned}
+  )
   // The posts that tag it past its questions of the day: never read, named in Activity once the point passed them.
   // A line that could not be written stops nothing.
   // The new posts past its posts of the day (B-281): named the same way.

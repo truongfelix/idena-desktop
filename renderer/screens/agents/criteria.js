@@ -14,11 +14,6 @@ import {wordFilter} from '../social/hiding'
 
 /** How long an author read is kept: its state, stake and Trust change at most a few times an epoch. */
 export const AUTHOR_TTL_MS = 30 * 60 * 1000
-/**
- * An author a rule refuses is read again before it is passed over (B-286), unless it was read less than this ago:
- * a post passed over is never read later, so it is not refused on facts from half an hour before.
- */
-export const RECHECK_MS = 60 * 1000
 /** The most authors whose Trust one run reads (each is several contract reads). */
 export const MAX_TRUST_READS = 100
 
@@ -45,20 +40,14 @@ export function criteriaNeeds(list) {
 /**
  * Each address's facts ({state, age, stake, vouched, trust}, lowercase keys) as `needs` asks, from the node
  * (`settled`: a batch of one method; `call`: one call) and kept for AUTHOR_TTL_MS. A read that failed leaves that
- * fact out: the criteria that need it do not pass. `again`: these authors' kept facts older than RECHECK_MS are
- * dropped first, so they are read anew (B-286).
+ * fact out: the criteria that need it do not pass.
  */
 export async function readAuthors(
   addresses,
   needs,
-  {settled, call, now = Date.now(), again = false}
+  {settled, call, now = Date.now()}
 ) {
   const list = [...new Set(addresses.map((a) => String(a).toLowerCase()))]
-  if (again)
-    list.forEach((a) => {
-      const kept = known.get(a)
-      if (kept && now - kept.at >= RECHECK_MS) known.delete(a)
-    })
   // The expired ones go: the cache holds only what is still fresh.
   known.forEach((kept, address) => {
     if (now - kept.at >= AUTHOR_TTL_MS) known.delete(address)

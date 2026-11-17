@@ -118,16 +118,12 @@ export function socialDigest(
     return {...read, named: read.named === true || Boolean(names[address])}
   }
   let postsPassed = 0
-  // The authors a rule refused (B-286): the run reads them again before it passes their posts over.
-  const refused = new Set()
   const readsFrom = (kind, address, text = null, topic = undefined) => {
     if (collect) {
       collect.add(String(address).toLowerCase())
       return true
     }
-    const ok = passes(who[kind] || null, address, factsOf(address), text, topic)
-    if (!ok) refused.add(String(address).toLowerCase())
-    return ok
+    return passes(who[kind] || null, address, factsOf(address), text, topic)
   }
   const from =
     point === null || point === undefined ? scanned - FIRST_RUN_BLOCKS : point
@@ -499,7 +495,6 @@ export function socialDigest(
     empty,
     readTo: readUpTo(leftOut, lastHeight, from, scanned),
     postsPassed,
-    refused,
     tagsShown: counts.tag,
     postsShown: counts.post,
     tagsPassed,
