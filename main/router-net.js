@@ -402,7 +402,24 @@ function createRouterNet({
     if (!answer.ok) throw new RouterError(answer)
   }
 
-  return {gatewayAt, knownHere, search, listen, find, mapping, remove, open}
+  /** The router's public address (GetExternalIPAddress), as it gives it; an empty answer gives null. */
+  async function externalAddress(gateway) {
+    const {answer} = await soap(gateway, 'GetExternalIPAddress', [])
+    if (!answer.ok) throw new RouterError(answer)
+    return answer.fields.NewExternalIPAddress || null
+  }
+
+  return {
+    gatewayAt,
+    knownHere,
+    search,
+    listen,
+    find,
+    mapping,
+    remove,
+    open,
+    externalAddress,
+  }
 }
 
 module.exports = {LISTEN_MS, RouterError, createRouterNet, httpRequest}

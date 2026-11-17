@@ -12,12 +12,14 @@ const {
   inboundPeersSince,
   ipfsAddressPort,
   isLocalNetworkHost,
+  isPublicIPv4,
   mappingOwner,
   parseDeviceName,
   parseGateway,
   parseSoap,
   parseSsdp,
   portMapping,
+  publicAddrFor,
   soapEnvelope,
   upkeepAction,
 } = require('./router-port')
@@ -469,5 +471,71 @@ describe('inboundPeersSince', () => {
         Date.UTC(2027, 0, 1, 1)
       )
     ).toBe(2)
+  })
+})
+
+describe('the announced address', () => {
+  it('takes public IPv4 addresses only', () => {
+    for (const ip of [
+      '82.123.115.203',
+      '1.1.1.1',
+      '100.63.255.255',
+      '100.128.0.1',
+      '172.15.0.1',
+      '172.32.0.1',
+      '8.8.8.8',
+      '198.17.0.1',
+      '192.0.1.1',
+      '203.0.114.1',
+      '198.51.101.1',
+      '192.0.0.64',
+      '192.0.0.70',
+      '223.255.255.255',
+    ])
+      expect(isPublicIPv4(ip)).toBe(true)
+    for (const ip of [
+      '192.168.1.1',
+      '10.0.0.1',
+      '172.16.0.1',
+      '172.31.255.255',
+      '100.64.0.1',
+      '100.127.255.255',
+      '127.0.0.1',
+      '169.254.1.1',
+      '0.0.0.0',
+      '224.0.0.1',
+      '255.255.255.255',
+      '256.1.1.1',
+      '1.2.3',
+      '1.2.3.4.5',
+      '2a01:cb04::1',
+      '',
+      null,
+      undefined,
+      ' 82.123.115.203',
+      '198.18.0.1',
+      '198.19.255.1',
+      '192.0.2.1',
+      '192.0.0.1',
+      '198.51.100.1',
+      '203.0.113.5',
+      '08.8.8.8',
+      '1.02.3.4',
+      '192.0.0.63',
+      '192.88.99.1',
+      '240.0.0.1',
+    ])
+      expect(isPublicIPv4(ip)).toBe(false)
+  })
+
+  it('builds the multiaddr of the opened port, or none', () => {
+    expect(publicAddrFor('82.123.115.203', 50506)).toBe(
+      '/ip4/82.123.115.203/tcp/50506'
+    )
+    expect(publicAddrFor('100.64.1.2', 50506)).toBeNull()
+    expect(publicAddrFor('82.123.115.203', 0)).toBeNull()
+    expect(publicAddrFor('82.123.115.203', 70000)).toBeNull()
+    expect(publicAddrFor('82.123.115.203', '50506')).toBeNull()
+    expect(publicAddrFor(null, 50506)).toBeNull()
   })
 })

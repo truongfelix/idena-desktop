@@ -70,7 +70,7 @@ whole data folder before switching between builds, and never run two apps on the
 
 ## Build from source
 
-You need Node.js 24.22.1 with npm 11.16, Go 1.26.10, a C compiler and Git. Build on the system you package for.
+You need Node.js 24.22.1 with npm 11.16, Go 1.26.11, a C compiler and Git. Build on the system you package for.
 
 ```bash
 npm ci
