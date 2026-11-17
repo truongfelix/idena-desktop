@@ -635,6 +635,49 @@ describe('a Social run', () => {
     )
   })
 
+  test('an author refused on kept facts is read again before its post is passed over (B-286)', async () => {
+    const agent = start({
+      readPosts: {
+        level: 'alone',
+        window: 'count',
+        count: 50,
+        who: {states: ['Human']},
+      },
+      like: {level: 'alone', limit: 5},
+    })
+    // Kept from an earlier run: Ann was a Newbie; read again, she is Human.
+    const d = {
+      ...deps(),
+      readAuthors: jest.fn(async (addresses, needs, options = {}) =>
+        Object.fromEntries(
+          addresses.map((a) => [
+            a,
+            {state: a === ANN && !options.again ? 'Newbie' : 'Human'},
+          ])
+        )
+      ),
+    }
+    // The model likes Ann's post, as a run that reads it labels it.
+    const [ann] = [
+      ...socialDigest(
+        state(),
+        {
+          reads: agent.reads,
+          who: {posts: agent.actions.readPosts.who},
+          facts: {[ANN]: {state: 'Human'}, [BOB]: {state: 'Human'}},
+        },
+        {point: null, scanned: HEAD}
+      ).labels,
+    ].find(([, item]) => item.node?.id === 30)
+    answer = JSON.stringify({actions: [{do: 'like', to: ann}]})
+    await runSocialAgent(agent, state(), d)
+    expect(d.readAuthors).toHaveBeenCalledTimes(2)
+    expect(d.readAuthors.mock.calls[1][0]).toEqual([ANN])
+    expect(d.readAuthors.mock.calls[1][2]).toEqual({again: true})
+    // Read after all: the like of her post is done.
+    expect(d.sent.map((item) => item.action)).toEqual(['like'])
+  })
+
   test('once per author (B-281): a second like for the same author is not done, in the run or within the day', async () => {
     const agent = start({
       readPosts: {level: 'alone', window: 'count', count: 50},
