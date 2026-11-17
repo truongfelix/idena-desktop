@@ -157,9 +157,10 @@ describe('what a run reads of the posts that tag it', () => {
     expect(lines.slice(1)).toEqual([
       `  the thread's first post, by 0xca70…0003: "Which wallet do you use?"`,
       `  @bob, answering 0xca70…0003: "A long answer ${'x'.repeat(186)}…"`,
-      `  you, answering 0xca70…0003: "The desktop app"`,
+      `  @jokebot, answering 0xca70…0003: "The desktop app"`,
     ])
-    expect(digest.text).not.toContain('lock')
+    expect(digest.text).not.toContain('Blocked words')
+    expect(digest.text).not.toContain('Answering the blocked one')
     expect(digest.text).not.toContain('after the tag')
     // The thread has no labels: the agent can act on the tag alone.
     expect([...digest.labels.keys()]).toEqual(['p1'])
@@ -197,7 +198,28 @@ describe('what a run reads of the posts that tag it', () => {
     ])
   })
 
-  test('two tags in one thread: the thread is shown once, under the first', () => {
+  test('a tag answering a blocked author quotes the reply it is filed under instead', () => {
+    const DAN = '0xda70000000000000000000000000000000000004'
+    const feed3 = [
+      node(70, CAT, 'The root', 9890, [
+        node(71, BOB, 'a reply', 9891, [
+          answering(71, node(72, DAN, 'Blocked words', 9900)),
+          answering(72, node(73, ANN, '@jokebot is that so?', 9910)),
+        ]),
+      ]),
+    ]
+    const digest = socialDigest(
+      social({feed: feed3, blocked: new Set([DAN])}),
+      {reads: {...reads, posts: {window: 'off'}, notifications: false}},
+      {point: 9800, scanned: HEAD}
+    )
+    expect(digest.text).toMatch(
+      /answering @bob \("a reply"\): "@jokebot is that so\?"/u
+    )
+    expect(digest.text).not.toContain('Blocked words')
+  })
+
+  test('two tags in one thread: each with the first post, the replies shown once', () => {
     const feed2 = [
       node(70, CAT, 'The root', 9890, [
         node(71, BOB, 'a reply', 9891, [
@@ -212,11 +234,11 @@ describe('what a run reads of the posts that tag it', () => {
       {point: 9800, scanned: HEAD}
     )
     expect(digest.tagsShown).toBe(2)
-    expect(digest.text.split("the thread's first post")).toHaveLength(2)
-    // The second tag's thread holds the first tag, the one thing the first did not show.
+    expect(digest.text.split("the thread's first post")).toHaveLength(3)
+    // The second tag's thread holds the first post and the first tag, the one reply the first did not show.
     const lines = digest.text.split('Posts that tag you:')[1].trim().split('\n')
-    expect(lines).toHaveLength(4)
-    expect(lines[3]).toBe('  @ann, answering @bob: "@jokebot first question"')
+    expect(lines).toHaveLength(5)
+    expect(lines[4]).toBe('  @ann, answering @bob: "@jokebot first question"')
   })
 
   test('past the questions left today: passed over for good, the point goes past them', () => {

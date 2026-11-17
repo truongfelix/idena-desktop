@@ -1,5 +1,5 @@
 import {LIKE, topicOf} from '../../social/contract'
-import {postTargets} from '../../social/feed'
+import {idKey, postTargets} from '../../social/feed'
 import {shortAddress} from '../../social/people'
 import {validTipAmount} from '../../social/calls'
 import {passes} from '../criteria'
@@ -20,8 +20,8 @@ export const OWN_POSTS_SHOWN = 10
 export const MESSAGES_SHOWN = 5
 export const MAX_TEXT = 500
 /**
- * The thread a tag sits in (B-290, owner 2026-11-17): besides the post it answers, the thread's first post and the
- * replies nearest before it, at most this many lines, each text cut shorter than a post's.
+ * The thread a tag sits in (B-290, owner 2026-11-17): besides the post it answers, the thread's first post, then the
+ * replies before it, the tag's own branch first, at most this many lines, each text cut shorter than a post's.
  */
 export const MAX_THREAD = 8
 export const MAX_THREAD_TEXT = 200
@@ -332,18 +332,20 @@ export function socialDigest(
   // answers them, a post a tag before it in this run already showed, what came after the tag. No label: the agent
   // answers the tag, never these. The feed files every comment under its reply; what each one answers is its replyTo.
   const shownInThread = new Set()
-  const whoSaid = (address) =>
-    address === me ? line('you', {}, 'you') : name(address)
   const threadText = (call) =>
     shownText(call.message, call.hasMedia, words, MAX_THREAD_TEXT)
   const threadOf = (item) => {
     const tree = walk([item.post])
-    const byId = new Map(tree.map(({node}) => [node.id, node]))
+    const byId = new Map(tree.map(({node}) => [idKey(node.id), node]))
+    // What a post answers, as the Social screen's comment tree reads it (feed.js commentTree): its replyTo when that
+    // is another post of this thread, else the one it is filed under.
     const answeredBy = ({node, parent}) => {
-      const to = String(node.call.replyTo || '')
-      return (/^[0-9]+$/u.test(to) && byId.get(Number(to))) || parent
+      const to = byId.get(idKey(node.call.replyTo))
+      return to && to !== node ? to : parent
     }
-    const answered = answeredBy(item)
+    // The tag's own line quotes what it answers; never a blocked author's text (the one it is filed under then).
+    const target = answeredBy(item)
+    const answered = isBlocked(target.call.author) ? item.parent : target
     const branch = item.parent === item.post ? item.node : item.parent
     const inBranch = ({node, parent}) => node === branch || parent === branch
     const earlier = tree
@@ -362,16 +364,17 @@ export function socialDigest(
     const first = earlier.find(({node}) => node === item.post)
     const replies = earlier.filter(({node}) => node !== item.post)
     const room = MAX_THREAD - (first ? 1 : 0)
-    const ownBranch = replies.filter(inBranch).slice(-room)
+    const ownBranch = room > 0 ? replies.filter(inBranch).slice(-room) : []
     const left = room - ownBranch.length
     const others =
       left > 0 ? replies.filter((one) => !inBranch(one)).slice(-left) : []
     const kept = [...(first ? [first] : []), ...ownBranch, ...others].sort(
       (a, b) => chainOrder(a.node.call, b.node.call)
     )
-    kept.forEach(({node}) => shownInThread.add(node.id))
+    // The first post is shown with each thread; the replies once a run.
+    ownBranch.concat(others).forEach(({node}) => shownInThread.add(node.id))
     const thread = kept.map(({node, to}) => {
-      const author = whoSaid(node.call.author)
+      const author = name(node.call.author)
       const text = threadText(node.call)
       if (node === item.post)
         return line(
@@ -379,7 +382,7 @@ export function socialDigest(
           {author, text},
           `  the thread's first post, by ${author}: "${text}"`
         )
-      const answering = whoSaid(to.call.author)
+      const answering = name(to.call.author)
       return line(
         'thread reply',
         {author, to: answering, text},
