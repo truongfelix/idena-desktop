@@ -35,6 +35,31 @@ export function feedAddresses(feed) {
   return addresses
 }
 
+/** The longest pause before the feed's profiles are read again after a failed read. */
+const PROFILES_RETRY_MAX_MS = 30 * 1000
+
+/**
+ * The query of the feed's profiles (useProfiles) for a sorted list of lowercase addresses; `read` reads them. A
+ * failed read is tried again until the node answers, after a pause that doubles up to PROFILES_RETRY_MAX_MS: a node
+ * that just started answers only bcn_ calls for its first seconds, and a feed left without its profiles showed no
+ * names and no pictures until the window was focused again.
+ */
+export function feedProfilesQuery(
+  list,
+  read = (addresses) => readProfiles(socialRpcSettled, addresses)
+) {
+  return {
+    queryKey: ['profiles', list.join(',')],
+    queryFn: () => read(list),
+    enabled: profilesEnabled && list.length > 0,
+    staleTime: PROFILE_STALE_MS,
+    keepPreviousData: true,
+    retry: true,
+    retryDelay: (failures) =>
+      Math.min(1000 * 2 ** failures, PROFILES_RETRY_MAX_MS),
+  }
+}
+
 /**
  * The profiles (readProfiles) of `addresses`, by lowercase address (`profiles`; {} before the first read, or without
  * a profiles contract), and whether they are being read (`reading`: a new address keeps the previous profiles until
@@ -48,16 +73,7 @@ export function useProfiles(addresses) {
       ].sort(),
     [addresses]
   )
-  const {data, isFetching} = useQuery(
-    ['profiles', list.join(',')],
-    () => readProfiles(socialRpcSettled, list),
-    {
-      enabled: profilesEnabled && list.length > 0,
-      staleTime: PROFILE_STALE_MS,
-      keepPreviousData: true,
-      retry: 1,
-    }
-  )
+  const {data, isFetching} = useQuery(feedProfilesQuery(list))
   return {profiles: data || {}, reading: isFetching}
 }
 
