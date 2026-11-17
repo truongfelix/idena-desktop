@@ -2312,7 +2312,7 @@
   "Pictures made, protection next": "Images faites, protection à venir",
   "Ready, evaluation next": "Prêt, évaluation à venir",
   "Evaluation passed, sending next": "Évaluation réussie, envoi à venir",
-  "Failed after its rewrites, left to you": "Refusé après ses réécritures, il vous revient",
+  "Failed its evaluation, left to you": "Évaluation échouée, il vous revient",
   "Rewrites so far: {{n}}": "Réécritures jusqu'ici : {{n}}",
   "Protect and shuffle the flip first: it is evaluated as it would be sent.": "Protégez et mélangez d'abord le flip : il est évalué tel qu'il serait envoyé.",
   "This draft waits in To approve.": "Ce brouillon attend dans À approuver.",

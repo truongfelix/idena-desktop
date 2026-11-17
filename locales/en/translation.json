@@ -2312,7 +2312,7 @@
   "Pictures made, protection next": "Pictures made, protection next",
   "Ready, evaluation next": "Ready, evaluation next",
   "Evaluation passed, sending next": "Evaluation passed, sending next",
-  "Failed after its rewrites, left to you": "Failed after its rewrites, left to you",
+  "Failed its evaluation, left to you": "Failed its evaluation, left to you",
   "Rewrites so far: {{n}}": "Rewrites so far: {{n}}",
   "Protect and shuffle the flip first: it is evaluated as it would be sent.": "Protect and shuffle the flip first: it is evaluated as it would be sent.",
   "This draft waits in To approve.": "This draft waits in To approve.",

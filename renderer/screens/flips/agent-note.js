@@ -27,7 +27,7 @@ export function stepText(step, t) {
     case 'sending':
       return t('Evaluation passed, sending next')
     case 'left':
-      return t('Failed after its rewrites, left to you')
+      return t('Failed its evaluation, left to you')
     default:
       return ''
   }

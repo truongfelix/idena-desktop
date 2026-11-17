@@ -34,7 +34,7 @@ describe("a draft card's agent lines", () => {
     expect(
       statusLines({step: 'left', verdict: failed, rewrites: 2}, t)
     ).toEqual([
-      {text: 'Failed after its rewrites, left to you', bad: true},
+      {text: 'Failed its evaluation, left to you', bad: true},
       {text: "Fails: the story's order was not found", bad: true},
       {text: 'Rewrites so far: 2', bad: false},
     ])
