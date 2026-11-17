@@ -17,6 +17,22 @@ function getFlip(id) {
   return readFlips().find((draft) => draft.id === id)
 }
 
+/**
+ * What changes when an agent or the editor touches the flip, without its pictures (B-284: the Flips list watches
+ * each draft with it): its type, when it changed, the agents' marks. Null when it is gone.
+ */
+function getFlipStamp(id) {
+  const flip = getFlip(id)
+  if (!flip) return null
+  const {type, modifiedAt, createdAt, agentFlip, agentVerdict} = flip
+  return {
+    type,
+    modifiedAt: modifiedAt || createdAt || null,
+    agentFlip: agentFlip || null,
+    agentVerdict: agentVerdict || null,
+  }
+}
+
 function saveFlips(flips) {
   store.set(keyName, flips).write()
 }
@@ -63,6 +79,7 @@ function clear() {
 module.exports = {
   getFlips,
   getFlip,
+  getFlipStamp,
   saveFlips,
   addDraft,
   updateDraft,

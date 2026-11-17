@@ -69,4 +69,32 @@ describe('flip store', () => {
 
     expect(flips.getFlips()).toEqual([])
   })
+
+  it("gives a flip's marks without its pictures", () => {
+    flips.saveFlips([
+      {
+        id: 'one',
+        type: 'Draft',
+        createdAt: 'c',
+        modifiedAt: 'm',
+        images: ['big'],
+        protectedImages: ['big'],
+        agentFlip: {by: 'a', stage: 'story'},
+      },
+      {id: 'two', type: 'Published', createdAt: 'c'},
+    ])
+    expect(flips.getFlipStamp('one')).toEqual({
+      type: 'Draft',
+      modifiedAt: 'm',
+      agentFlip: {by: 'a', stage: 'story'},
+      agentVerdict: null,
+    })
+    expect(flips.getFlipStamp('two')).toEqual({
+      type: 'Published',
+      modifiedAt: 'c',
+      agentFlip: null,
+      agentVerdict: null,
+    })
+    expect(flips.getFlipStamp('none')).toBeNull()
+  })
 })

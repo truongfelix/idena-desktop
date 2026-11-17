@@ -29,6 +29,21 @@ export const STAGES = ['story', 'pictures', 'drafted', 'submitted']
 export const STORY_PICTURES = 3
 export const MAX_STORY_PICTURES = 4
 
+/**
+ * How many times a draft the judge failed is written again, story and pictures, in the same draft (B-284, owner
+ * 2026-11-17): the number the person set on Write flip stories, 2 without one.
+ */
+export const DEFAULT_REWRITES = 2
+export function rewritesAllowed(agent) {
+  const row = agent && agent.actions && agent.actions.flipStory
+  const n = row ? row.rewrites : undefined
+  return Number.isInteger(n) && n >= 0 ? n : DEFAULT_REWRITES
+}
+
+/** How many times the draft was written again already. */
+export const rewritesOf = (flip) =>
+  (flip && flip.agentFlip && Number(flip.agentFlip.rewrites)) || 0
+
 /** The Flips steps the agent holds (not Off), in the run's order. */
 export const heldFlipSteps = (agent) =>
   FLIP_STEPS.filter(
@@ -149,8 +164,11 @@ export function judgedFail(flip) {
   )
 }
 
-/** Whether the person declined this step on the flip as it is now (Submit, Delete): it is not proposed again. */
-const declinedNow = (flip, step) =>
+/**
+ * Whether the person declined this step on the flip as it is now (Submit, Delete, a story written again): it is not
+ * proposed again.
+ */
+export const declinedNow = (flip, step) =>
   Boolean(
     flip.agentFlip &&
       flip.agentFlip.declined &&
@@ -166,8 +184,9 @@ const atStage = (flip, stage) =>
  * - flipDraft: an agent's draft with its pictures;
  * - flipJudge: any draft protected and shuffled (the person's too) without a verdict on it as it is;
  * - flipSubmit: an agent's draft the judge passed as it is;
- * - flipDelete: an agent's draft the judge failed as it is.
- * Write the story makes new drafts (freePairs), it takes none.
+ * - flipDelete: an agent's draft the judge failed as it is;
+ * - flipRewrite (Write the story's second part, B-284): the same drafts, to be written again in place.
+ * Write the story also makes new drafts (freePairs).
  */
 export function draftsAt(step, flips, {sent = [], judgeSent = false} = {}) {
   const list = (Array.isArray(flips) ? flips : [])
@@ -206,6 +225,13 @@ export function draftsAt(step, flips, {sent = [], judgeSent = false} = {}) {
           atStage(flip, 'drafted') &&
           judgedFail(flip) &&
           !declinedNow(flip, step)
+      )
+    case 'flipRewrite':
+      return list.filter(
+        (flip) =>
+          atStage(flip, 'drafted') &&
+          judgedFail(flip) &&
+          !declinedNow(flip, 'flipStory')
       )
     // B-277: a sent flip the judge failed as it is, the person's or an agent's; not one the person declined.
     case 'flipDeleteSent':
@@ -379,6 +405,15 @@ export function declinedChange(step, flip) {
   const keep = {...mark, waiting: null}
   switch (step) {
     case 'flipStory':
+      // A new story for a failed draft (B-284): the draft stays as it was, and is not written again as it is.
+      if (mark.proposed)
+        return {
+          agentFlip: {
+            ...keep,
+            proposed: null,
+            declined: {...(mark.declined || {}), [step]: contentsKey(flip)},
+          },
+        }
       return {remove: true}
     case 'flipPictures':
       return {
@@ -455,4 +490,31 @@ export function orphans(flips, pendingIds) {
     if (sent && !live.has(sent.id)) out.push({flip, step: 'flipDeleteSent'})
   })
   return out
+}
+
+/**
+ * Where a draft is with the agents, for the Flips list (B-284): null for a flip no agent touched. `step`: what it
+ * waits for ('approval': an item of To approve; 'pictures', 'protection', 'evaluation', 'sending' for an agent's
+ * draft; 'rewrite': failed, a new story may come; 'left': failed after its rewrites, left to the person; null for the
+ * person's own draft). `verdict`: the judge's on the flip as it is, else null. `rewrites`: times written again.
+ */
+export function draftStatus(flip) {
+  if (!flip || flip.type !== FlipType.Draft) return null
+  const verdict = currentVerdict(flip)
+  const settled = verdict && !verdict.waiting && !verdict.declined
+  if (!isAgentDraft(flip))
+    return verdict
+      ? {step: verdict.waiting ? 'approval' : null, verdict, rewrites: 0}
+      : null
+  const rewrites = rewritesOf(flip)
+  let step
+  if (waitingOf(flip) || (verdict && verdict.waiting)) step = 'approval'
+  else if (flip.agentFlip.stage === 'story') step = 'pictures'
+  else if (flip.agentFlip.stage === 'pictures') step = 'protection'
+  // A verdict the person declined is not asked again for the flip as it is: no step to wait for.
+  else if (verdict && verdict.declined) step = null
+  else if (!settled) step = 'evaluation'
+  else if (verdict.pass) step = 'sending'
+  else step = flip.agentFlip.gaveUp === contentsKey(flip) ? 'left' : 'rewrite'
+  return {step, verdict, rewrites}
 }

@@ -538,6 +538,7 @@ describe('agent profiles', () => {
         level: 'alone',
         limit: null,
         picturesPerDay: 6,
+        rewrites: 2,
       })
       // A build before B-269 kept no pictures a day: none.
       const older = normalizeAgent({
@@ -579,5 +580,33 @@ describe('agent profiles', () => {
       store.write({agents: [{name: 'A'}]})
       expect(fs.readdirSync(dir)).toEqual(['agents.json'])
     })
+  })
+})
+
+// B-284: how many times a draft that failed its evaluation is written again, kept on Write flip stories.
+describe('the rewrites of a failed draft', () => {
+  const rewrites = (row) =>
+    normalizeAgent({actions: {flipStory: {level: 'alone', ...row}}}).actions
+      .flipStory.rewrites
+
+  test('2 for an agent saved without it, the number the person set else', () => {
+    expect(rewrites({})).toBe(2)
+    expect(rewrites({rewrites: 0})).toBe(0)
+    expect(rewrites({rewrites: 5})).toBe(5)
+  })
+
+  test('a number it cannot be reads as 2, a huge one as 10', () => {
+    expect(rewrites({rewrites: -1})).toBe(2)
+    expect(rewrites({rewrites: 1.5})).toBe(2)
+    expect(rewrites({rewrites: '3'})).toBe(2)
+    expect(rewrites({rewrites: null})).toBe(2)
+    expect(rewrites({rewrites: 500})).toBe(10)
+  })
+
+  test('only Write flip stories holds it', () => {
+    const {actions} = normalizeAgent({
+      actions: {flipJudge: {level: 'alone', rewrites: 4}},
+    })
+    expect('rewrites' in actions.flipJudge).toBe(false)
   })
 })

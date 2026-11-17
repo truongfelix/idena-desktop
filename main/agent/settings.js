@@ -51,8 +51,9 @@ const ACTIONS = {
   // a day in a run (null: none). Write the story: a flip's story and image prompts (the flip editor, B-236), and in a
   // run a new draft for a keyword pair without a flip.
   // `picturesPerDay`: Make the pictures' own, copied here for a build before B-258, whose stories draw within it
-  // (profiles.js); this build never reads it.
-  flipStory: {level: 'off', limit: null, picturesPerDay: null},
+  // (profiles.js); this build never reads it. `rewrites` (B-284): how many times a draft the judge failed is written
+  // again in place, story and pictures (a whole number from 0).
+  flipStory: {level: 'off', limit: null, picturesPerDay: null, rewrites: 2},
   // Make the pictures (B-236's Make the images, its own right since B-258): `picturesPerDay` (B-269) the most pictures
   // its service draws a day (each one is billed); null: no limit.
   flipPictures: {level: 'off', limit: null, picturesPerDay: null},
@@ -125,6 +126,14 @@ function normalizeTipAmount(value, fallback) {
   return number >= 1 ? number : fallback
 }
 
+/** The most rewrites of a failed draft (B-284): a whole number from 0 to MAX_REWRITES, else `fallback`. */
+const MAX_REWRITES = 10
+function normalizeRewrites(value, fallback) {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0)
+    return fallback
+  return Math.min(value, MAX_REWRITES)
+}
+
 function normalizeLimit(value, fallback) {
   if (value === null) return null
   const number = Number(value)
@@ -179,6 +188,9 @@ function normalizeSettings(input) {
                   : fallback[field],
               ])
           ),
+          ...('rewrites' in fallback
+            ? {rewrites: normalizeRewrites(row.rewrites, fallback.rewrites)}
+            : {}),
         },
       ]
     })
@@ -239,6 +251,7 @@ module.exports = {
   normalizeEffort,
   normalizeLimit,
   normalizeMaxTokens,
+  normalizeRewrites,
   normalizeSettings,
   normalizeTipAmount,
 }

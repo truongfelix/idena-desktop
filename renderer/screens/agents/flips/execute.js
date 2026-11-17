@@ -13,6 +13,7 @@ import {
 import {IMAGE_SOURCES} from '../../flips/image-search-machine'
 import {asFrame} from '../flip-story'
 import {declinedChange, judgedFail, judgedPass, waitingItem} from './drafts'
+import {rewrittenDraft} from './run'
 
 // The app's side of a Flips run (B-258): the flip store, the drawing, the editor's own protect and publish code,
 // and what To approve's Approve and Decline do to a draft waiting on them. Each acts on the draft as it is when
@@ -267,7 +268,21 @@ export function flipsExecutors(t) {
     return keywordsOf(flip)
   }
   return {
-    flipStory: approved('flipStory', release),
+    // A new draft's story; or a new story for a draft the judge failed (B-284), written into it now.
+    flipStory: approved('flipStory', (flip) => {
+      const {proposed} = flip.agentFlip
+      if (!proposed) return release(flip)
+      if (!judgedFail(flip))
+        throw new Error('the draft changed since the judge failed it')
+      store().updateDraft(
+        rewrittenDraft(flip, {
+          ...proposed,
+          at: new Date().toISOString(),
+          random: Math.random,
+        })
+      )
+      return keywordsOf(flip)
+    }),
     flipPictures: approved('flipPictures', release),
     flipDraft: approved('flipDraft', release),
     // A draft's verdict, or a sent flip's (B-277).

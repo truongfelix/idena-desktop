@@ -3,12 +3,14 @@ import {areEqual, areEqualExceptOne} from '../../../shared/utils/arr'
 import {
   contentsKey,
   declinedChange,
+  draftStatus,
   draftsAt,
   freePairs,
   heldFlipSteps,
   judgeQuestion,
   judgedPass,
   orphans,
+  rewritesAllowed,
   shuffledOrder,
   storyForPictures,
   verdictOf,
@@ -360,5 +362,110 @@ describe('sent flips', () => {
     expect(
       draftsAt('flipDeleteSent', [passed(draft('drafted'), {pass: false})], ctx)
     ).toEqual([])
+  })
+})
+
+// B-284: what the Flips list says of a draft, and a failed draft's rewrites.
+describe('a draft in the Flips list', () => {
+  const base = {
+    id: 'f',
+    type: FlipType.Draft,
+    keywordPairId: 2,
+    originalOrder: [0, 3, 1, 2],
+    order: [2, 1, 3, 0],
+    protectedImages: ['a', 'b', 'c', 'd'],
+  }
+  const withVerdict = (flip, verdict) => ({
+    ...flip,
+    agentVerdict: {
+      contents: contentsKey(flip),
+      waiting: null,
+      declined: false,
+      ...verdict,
+    },
+  })
+  const agents = (mark = {}) => ({
+    ...base,
+    agentFlip: {by: 'a1', stage: 'drafted', waiting: null, ...mark},
+  })
+
+  test('a flip no agent touched has nothing to say', () => {
+    expect(draftStatus(base)).toBeNull()
+    expect(draftStatus({...agents(), type: FlipType.Published})).toBeNull()
+    expect(draftStatus(null)).toBeNull()
+  })
+
+  test("the person's own draft says its verdict, and only while the flip is as judged", () => {
+    const judged = withVerdict(base, {pass: false})
+    expect(draftStatus(judged)).toMatchObject({
+      step: null,
+      verdict: {pass: false},
+    })
+    expect(draftStatus({...judged, order: [1, 2, 0, 3]})).toBeNull()
+  })
+
+  test("an agent's draft says the step it waits for", () => {
+    const step = (flip) => draftStatus(flip).step
+    expect(step(agents({stage: 'story'}))).toBe('pictures')
+    expect(step(agents({stage: 'pictures'}))).toBe('protection')
+    expect(step(agents())).toBe('evaluation')
+    expect(step(withVerdict(agents(), {pass: true}))).toBe('sending')
+    expect(step(withVerdict(agents(), {pass: false}))).toBe('rewrite')
+    expect(step(agents({waiting: {step: 'flipDraft', id: 'i'}}))).toBe(
+      'approval'
+    )
+    expect(step(withVerdict(agents(), {pass: true, waiting: 'i'}))).toBe(
+      'approval'
+    )
+  })
+
+  test('a verdict the person declined is not said to be coming', () => {
+    const declined = withVerdict(agents(), {pass: false, declined: true})
+    expect(draftStatus(declined).step).toBeNull()
+  })
+
+  test('a failed draft left after its rewrites says so, with their number', () => {
+    const failed = withVerdict(agents({rewrites: 2}), {pass: false})
+    const left = {
+      ...failed,
+      agentFlip: {...failed.agentFlip, gaveUp: contentsKey(failed)},
+    }
+    expect(draftStatus(left)).toMatchObject({step: 'left', rewrites: 2})
+    expect(draftStatus(failed)).toMatchObject({step: 'rewrite', rewrites: 2})
+  })
+
+  test('the rewrites allowed: the number set on Write flip stories, 2 without one', () => {
+    const agent = (row) => ({actions: {flipStory: row}})
+    expect(rewritesAllowed(agent({level: 'alone'}))).toBe(2)
+    expect(rewritesAllowed(agent({level: 'alone', rewrites: 0}))).toBe(0)
+    expect(rewritesAllowed(agent({level: 'alone', rewrites: 4}))).toBe(4)
+    expect(rewritesAllowed({actions: {}})).toBe(2)
+  })
+
+  test('a failed draft is taken to be written again, but not one whose new story the person declined', () => {
+    const failed = withVerdict(agents(), {pass: false})
+    expect(draftsAt('flipRewrite', [failed])).toHaveLength(1)
+    expect(
+      draftsAt('flipRewrite', [withVerdict(agents(), {pass: true})])
+    ).toHaveLength(0)
+    const proposed = {
+      ...failed,
+      agentFlip: {
+        ...failed.agentFlip,
+        waiting: {step: 'flipStory', id: 'i'},
+        proposed: {story: {}, pictures: 3, by: 'a1'},
+      },
+    }
+    expect(draftsAt('flipRewrite', [proposed])).toHaveLength(0)
+    // Declined: the draft stays, as it was, and is not proposed again.
+    const change = declinedChange('flipStory', proposed)
+    expect(change.remove).toBeUndefined()
+    const after = {...proposed, ...change}
+    expect(after.agentFlip).toMatchObject({waiting: null, proposed: null})
+    expect(draftsAt('flipRewrite', [after])).toHaveLength(0)
+    // A new draft's declined story still removes the draft.
+    expect(declinedChange('flipStory', agents({stage: 'story'}))).toEqual({
+      remove: true,
+    })
   })
 })

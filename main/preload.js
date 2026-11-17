@@ -87,6 +87,7 @@ expose(
   exposeMethods(flips, [
     'getFlips',
     'getFlip',
+    'getFlipStamp',
     'saveFlips',
     'addDraft',
     'updateDraft',

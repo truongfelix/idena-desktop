@@ -241,3 +241,71 @@ describe('Delete a sent flip', () => {
     expect(global.flipStore.getFlip('s').agentVerdict.waiting).toBeNull()
   })
 })
+
+// B-284: a new story for a draft the judge failed, approved in To approve.
+describe('A story written again in To approve', () => {
+  afterEach(() => {
+    delete global.flipStore
+  })
+  const story = {
+    words: ['cat', 'tree'],
+    stories: [{title: 'New', story: 'S', prompts: ['p1', 'p2', 'p3', 'p4']}],
+  }
+  const proposedDraft = () => {
+    const flip = failedDraft()
+    return {
+      ...flip,
+      images: ['i0', 'i1', 'i2', null],
+      scenes: ['frames of the old pictures'],
+      agentFlip: {
+        ...flip.agentFlip,
+        waiting: {step: 'flipStory', id: 'item'},
+        proposed: {story, pictures: 4, by: 'a1'},
+      },
+    }
+  }
+  const storyItem = {id: 'item', action: 'flipStory', target: {flipId: 'f'}}
+
+  test('approved, the draft takes the new story and loses its pictures and its verdict', async () => {
+    useStore([proposedDraft()])
+    await flipsExecutors(t).flipStory(storyItem)
+    const flip = global.flipStore.getFlip('f')
+    expect(flip.story).toBe(story)
+    expect(flip.images).toEqual([null, null, null, null])
+    expect(flip.protectedImages).toEqual([null, null, null, null])
+    expect(flip.agentVerdict).toBeNull()
+    expect(flip.scenes).toBeNull()
+    expect(flip.adversarialImageId).toBe(-1)
+    expect(flip.keywords.words).toHaveLength(2)
+    expect(flip.agentFlip).toMatchObject({
+      stage: 'story',
+      waiting: null,
+      rewrites: 1,
+      lastFail: {pass: false},
+    })
+    expect(flip.agentFlip.proposed).toBeUndefined()
+  })
+
+  test('a draft reworked since the judge failed it keeps its story', async () => {
+    useStore([{...proposedDraft(), order: [1, 2, 0, 3]}])
+    await expect(flipsExecutors(t).flipStory(storyItem)).rejects.toThrow(
+      'the draft changed since the judge failed it'
+    )
+    expect(global.flipStore.getFlip('f').images).toEqual([
+      'i0',
+      'i1',
+      'i2',
+      null,
+    ])
+  })
+
+  test('declined, the draft stays as it was', async () => {
+    useStore([proposedDraft()])
+    await flipsDecliners().flipStory(storyItem)
+    const flip = global.flipStore.getFlip('f')
+    expect(flip.type).toBe(FlipType.Draft)
+    expect(flip.images).toEqual(['i0', 'i1', 'i2', null])
+    expect(flip.agentFlip.proposed).toBeNull()
+    expect(global.flipStore.deleteDraft).not.toHaveBeenCalled()
+  })
+})

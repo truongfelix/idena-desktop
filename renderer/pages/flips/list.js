@@ -33,6 +33,8 @@ import {
   FlipOverlayText,
 } from '../../screens/flips/components'
 import {formatKeywords} from '../../screens/flips/utils'
+import {judgeAgentOf} from '../../screens/flips/agent-note'
+import {useAgents} from '../../screens/agents/use-agents'
 import {
   IconLink,
   FloatDebug,
@@ -90,6 +92,8 @@ export default function FlipListPage() {
   } = useIdentityState()
 
   const [selectedFlip, setSelectedFlip] = React.useState()
+  // The agent a draft's Evaluate asks (B-284); none: the cards have no Evaluate.
+  const judge = judgeAgentOf(useAgents().list)
 
   const canSubmitFlips = [
     IdentityStatus.Verified,
@@ -290,6 +294,7 @@ export default function FlipListPage() {
               <FlipCard
                 key={flip.id}
                 flipService={flip.ref}
+                judge={judge}
                 onDelete={() => {
                   if (
                     flip.type === FlipType.Published &&
