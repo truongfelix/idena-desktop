@@ -2318,5 +2318,6 @@
   "This draft waits in To approve.": "This draft waits in To approve.",
   "The draft changed meanwhile: evaluate it again.": "The draft changed meanwhile: evaluate it again.",
   "Evaluating...": "Evaluating...",
-  "Evaluate": "Evaluate"
+  "Evaluate": "Evaluate",
+  "Changed since this list opened: open it again.": "Changed since this list opened: open it again."
 }

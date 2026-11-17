@@ -256,6 +256,7 @@ describe('A story written again in To approve', () => {
     return {
       ...flip,
       images: ['i0', 'i1', 'i2', null],
+      scenes: ['frames of the old pictures'],
       agentFlip: {
         ...flip.agentFlip,
         waiting: {step: 'flipStory', id: 'item'},
@@ -273,6 +274,7 @@ describe('A story written again in To approve', () => {
     expect(flip.images).toEqual([null, null, null, null])
     expect(flip.protectedImages).toEqual([null, null, null, null])
     expect(flip.agentVerdict).toBeNull()
+    expect(flip.scenes).toBeNull()
     expect(flip.adversarialImageId).toBe(-1)
     expect(flip.keywords.words).toHaveLength(2)
     expect(flip.agentFlip).toMatchObject({

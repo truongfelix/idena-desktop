@@ -2318,5 +2318,6 @@
   "This draft waits in To approve.": "Ce brouillon attend dans À approuver.",
   "The draft changed meanwhile: evaluate it again.": "Le brouillon a changé entre-temps : évaluez-le à nouveau.",
   "Evaluating...": "Évaluation...",
-  "Evaluate": "Évaluer"
+  "Evaluate": "Évaluer",
+  "Changed since this list opened: open it again.": "Modifié depuis l'ouverture de cette liste : rouvrez-la."
 }

@@ -419,6 +419,11 @@ describe('a draft in the Flips list', () => {
     )
   })
 
+  test('a verdict the person declined is not said to be coming', () => {
+    const declined = withVerdict(agents(), {pass: false, declined: true})
+    expect(draftStatus(declined).step).toBeNull()
+  })
+
   test('a failed draft left after its rewrites says so, with their number', () => {
     const failed = withVerdict(agents({rewrites: 2}), {pass: false})
     const left = {

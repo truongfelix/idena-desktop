@@ -255,6 +255,8 @@ export function rewrittenDraft(flip, {story, pictures, by, at, random}) {
   })
   return {
     ...fields,
+    // The editable frames of the old pictures go with them.
+    scenes: null,
     agentVerdict: null,
     agentFlip: {
       ...agentFlip,
@@ -430,7 +432,10 @@ export async function evaluateDraft(agent, flipId, deps) {
   )
     throw new Error('waiting')
   const verdict = await judgement(agent, flip, deps)
-  if (!sameDraft(deps.store.getFlip(flipId), flip)) throw new Error('changed')
+  const now = deps.store.getFlip(flipId)
+  if (!sameDraft(now, flip)) throw new Error('changed')
+  // A run's verdict put in To approve meanwhile stays: its item waits on it.
+  if (now.agentVerdict && now.agentVerdict.waiting) throw new Error('waiting')
   deps.store.updateDraft({id: flip.id, agentVerdict: verdict})
   await deps
     .call('didAction', {
@@ -447,14 +452,16 @@ export async function evaluateDraft(agent, flipId, deps) {
 
 const STEPS = {
   /**
-   * Write the story: a failed draft written again (rewriteFailed), then a new draft for each free keyword pair, while
-   * there are flips left to make.
+   * Write the story: a new draft for each free keyword pair, while there are flips left to make, then a failed draft
+   * written again (rewriteFailed). Both count in the step's actions a day.
    */
-  async flipStory(agent, ctx, deps, count) {
+  async flipStory(agent, ctx, deps, count, pass = 0) {
     if (!canMakeFlips(ctx.identity, ctx.epoch)) return
-    if ((await rewriteFailed(agent, deps, count)) === 'stop') return
+    // The new drafts first, as before B-284, and once a run: a later pass only writes failed drafts again.
     // eslint-disable-next-line no-restricted-syntax
-    for (const pair of freePairs(ctx.identity, deps.store.getFlips())) {
+    for (const pair of pass === 0
+      ? freePairs(ctx.identity, deps.store.getFlips())
+      : []) {
       let words
       // eslint-disable-next-line no-await-in-loop
       const next = await act(agent, 'flipStory', deps, count, {
@@ -512,6 +519,7 @@ const STEPS = {
       })
       if (next === 'stop') return
     }
+    await rewriteFailed(agent, deps, count)
   },
 
   /** Make the pictures: the story's pictures drawn into the free slots, in the story's order. */
@@ -744,7 +752,7 @@ export async function runFlipsAgent(agent, ctx, deps) {
     const before = count.alone
     // eslint-disable-next-line no-restricted-syntax
     // eslint-disable-next-line no-await-in-loop
-    for (const step of held) await STEPS[step](agent, ctx, deps, count)
+    for (const step of held) await STEPS[step](agent, ctx, deps, count, pass)
     if (
       count.alone === before ||
       !draftsAt('flipRewrite', deps.store.getFlips()).some(

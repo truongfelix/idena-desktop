@@ -1,5 +1,5 @@
 import {FlipType} from '../../../shared/types'
-import {contentsKey} from './drafts'
+import {contentsKey, draftsAt} from './drafts'
 import {evaluateDraft, runFlipsAgent} from './run'
 
 // A Flips run (B-258) against a fake flip store and a fake agent channel: the main process's checks are pending.js's,
@@ -745,6 +745,28 @@ describe('a failed evaluation', () => {
     )
   })
 
+  test('the new drafts come first in the stories of the day, and once a run', async () => {
+    // A failed draft on another keyword pair: its verdict is about it as it is.
+    const onPair9 = {...failed(), keywordPairId: 9}
+    onPair9.agentVerdict = {
+      ...onPair9.agentVerdict,
+      contents: contentsKey(onPair9),
+    }
+    expect(draftsAt('flipRewrite', [onPair9])).toHaveLength(1)
+    const {agent, deps, store} = setup({
+      levels: {flipStory: 'alone'},
+      limits: {flipStory: 1},
+      flips: [onPair9],
+      answer: () => null,
+      agentId: 'rewrites-6',
+    })
+    await runFlipsAgent(agent, {identity, epoch}, deps)
+    // The day's one story went to the free keyword pair; the failed draft waits.
+    expect(store.getFlip('new').keywordPairId).toBe(4)
+    expect(store.getFlip('f').agentFlip.rewrites).toBeUndefined()
+    expect(deps.ipc).toHaveBeenCalledTimes(1)
+  })
+
   test('a failed draft judged again meanwhile is not written over', async () => {
     const {agent, deps, store} = setup({
       levels: {flipStory: 'alone'},
@@ -827,5 +849,26 @@ describe('Evaluate asked for a draft', () => {
     await expect(evaluateDraft(agent, 'waits', deps)).rejects.toThrow('waiting')
     await expect(evaluateDraft(agent, 'none', deps)).rejects.toThrow('gone')
     expect(deps.ipc).not.toHaveBeenCalled()
+  })
+
+  test('a verdict a run put in To approve while the model answered is not written over', async () => {
+    const {agent, deps, store} = setup({
+      levels: {flipJudge: 'ask'},
+      flips: [draft()],
+      answer: () => null,
+      agentId: 'evaluates-3',
+    })
+    deps.ipc.mockImplementation(async (command, data) => {
+      store.updateDraft({
+        id: 'mine',
+        agentVerdict: {pass: false, waiting: 'item7'},
+      })
+      return rightAnswer([0, 3, 1, 2])(data.flip)
+    })
+    await expect(evaluateDraft(agent, 'mine', deps)).rejects.toThrow('waiting')
+    expect(store.getFlip('mine').agentVerdict).toEqual({
+      pass: false,
+      waiting: 'item7',
+    })
   })
 })

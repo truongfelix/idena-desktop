@@ -1,4 +1,9 @@
-import {evaluateErrorText, judgeAgentOf, statusLines} from './agent-note'
+import {
+  changedSince,
+  evaluateErrorText,
+  judgeAgentOf,
+  statusLines,
+} from './agent-note'
 
 // B-284: the lines a draft's card shows of the agents' work.
 
@@ -44,6 +49,20 @@ describe("a draft card's agent lines", () => {
         t
       )
     ).toEqual([{text: 'Waits in To approve', bad: false}])
+  })
+})
+
+describe('a draft changed under the open list', () => {
+  const stamp = {type: 'draft', modifiedAt: 'm1'}
+
+  test('the same draft as loaded is not changed', () => {
+    expect(changedSince(stamp, 'm1')).toBe(false)
+  })
+
+  test('written again, sent or gone: changed', () => {
+    expect(changedSince({...stamp, modifiedAt: 'm2'}, 'm1')).toBe(true)
+    expect(changedSince({...stamp, type: 'publishing'}, 'm1')).toBe(true)
+    expect(changedSince(null, 'm1')).toBe(true)
   })
 })
 

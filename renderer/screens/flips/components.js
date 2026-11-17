@@ -138,7 +138,13 @@ export function FlipCard({flipService, onDelete, judge = null}) {
   const isEditable = [FlipType.Draft, FlipType.Invalid].includes(type)
   const isDeletable = [FlipType.Published, FlipType.Draft].includes(type)
   // What the agents did with the draft (B-284), and its evaluation asked here (`judge`: the agent that judges).
-  const agentStatus = useDraftStatus(id, type === FlipType.Draft)
+  // `isStale`: an agent changed the stored draft since the list loaded it: this card's Submit and Delete would act
+  // on the old one, so they are not offered (Edit opens the stored draft).
+  const {status: agentStatus, changed: isStale} = useDraftStatus(
+    id,
+    type === FlipType.Draft,
+    current.context.modifiedAt || createdAt || null
+  )
   const {evaluate, busy: isEvaluating} = useEvaluate(judge, id)
   const canEvaluate = type === FlipType.Draft && Boolean(judge)
 
@@ -186,11 +192,11 @@ export function FlipCard({flipService, onDelete, judge = null}) {
             <FlipCardSubtitle>
               {new Date(modifiedAt).toLocaleString()}
             </FlipCardSubtitle>
-            <DraftAgentNote status={agentStatus} />
+            <DraftAgentNote status={agentStatus} changed={isStale} />
           </Box>
           {isActionable && (
             <FlipCardMenu>
-              {isSubmittable && (
+              {isSubmittable && !isStale && (
                 <FlipCardMenuItem onClick={() => send({type: 'PUBLISH', id})}>
                   <HStack spacing="2">
                     <FlipCardMenuItemIcon icon={UploadIcon} />
@@ -232,7 +238,7 @@ export function FlipCard({flipService, onDelete, judge = null}) {
                 <MenuDivider color="gray.300" my={2} width={rem(145)} />
               )}
 
-              {isDeletable && (
+              {isDeletable && !isStale && (
                 <FlipCardMenuItem onClick={onDelete}>
                   <HStack spacing="2">
                     <FlipCardMenuItemIcon icon={DeleteIcon} color="red.500" />

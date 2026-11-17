@@ -2,6 +2,7 @@
 import * as React from 'react'
 import {Stack, Text} from '@chakra-ui/react'
 import {useTranslation} from 'react-i18next'
+import {FlipType} from '../../shared/types'
 import {draftStatus} from '../agents/flips/drafts'
 import {evaluateDraft} from '../agents/flips/run'
 import {flipsDeps, verdictText} from '../agents/flips/execute'
@@ -62,32 +63,63 @@ export function judgeAgentOf(list) {
   )
 }
 
+/** Whether the stored flip is no longer the draft the list loaded (`seenAt`: its modifiedAt then). */
+export const changedSince = (stamp, seenAt) =>
+  !stamp || stamp.type !== FlipType.Draft || stamp.modifiedAt !== seenAt
+
 /**
- * The draft's status with the agents, read from the flip store now and every few seconds (an agent's run changes it
- * while the list is open). `watch`: only a draft is read.
+ * The draft's status with the agents, from the flip store now and every few seconds (an agent's run changes it while
+ * the list is open): its small marks are watched (getFlipStamp), the whole flip read only when they change. `watch`:
+ * only a draft is read. `seenAt`: the draft's modifiedAt as the list loaded it. Returns {status, changed}: `changed`
+ * when the stored flip is no longer that draft (written again, sent, deleted by an agent): the card's pictures and
+ * its Submit would be the old ones.
  */
-export function useDraftStatus(id, watch) {
-  const [state, setState] = React.useState({key: 'null', status: null})
+export function useDraftStatus(id, watch, seenAt) {
+  const [state, setState] = React.useState({
+    key: '',
+    status: null,
+    changed: false,
+  })
   React.useEffect(() => {
-    if (!watch || !global.flipStore) {
-      setState({key: 'null', status: null})
+    const store = global.flipStore
+    if (!watch || !store || !store.getFlipStamp) {
+      setState({key: '', status: null, changed: false})
       return undefined
     }
     const read = () => {
-      const status = draftStatus(global.flipStore.getFlip(id))
-      const key = JSON.stringify(status)
-      setState((before) => (before.key === key ? before : {key, status}))
+      const stamp = store.getFlipStamp(id)
+      const key = JSON.stringify(stamp)
+      setState((before) =>
+        before.key === key
+          ? before
+          : {
+              key,
+              status: draftStatus(store.getFlip(id)),
+              changed: changedSince(stamp, seenAt),
+            }
+      )
     }
     read()
     const timer = setInterval(read, POLL_MS)
     return () => clearInterval(timer)
-  }, [id, watch])
-  return state.status
+  }, [id, watch, seenAt])
+  return state
 }
 
-export function DraftAgentNote({status}) {
+export function DraftAgentNote({status, changed = false}) {
   const {t} = useTranslation()
-  const lines = statusLines(status, t)
+  const lines = statusLines(status, t).concat(
+    changed
+      ? [
+          {
+            text: t('Changed since this list opened: open it again.', {
+              nsSeparator: '!!',
+            }),
+            bad: false,
+          },
+        ]
+      : []
+  )
   if (!lines.length) return null
   return (
     <Stack spacing={0} mt={1} data-agent-note>

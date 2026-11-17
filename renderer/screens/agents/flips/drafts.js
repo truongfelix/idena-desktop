@@ -511,6 +511,8 @@ export function draftStatus(flip) {
   if (waitingOf(flip) || (verdict && verdict.waiting)) step = 'approval'
   else if (flip.agentFlip.stage === 'story') step = 'pictures'
   else if (flip.agentFlip.stage === 'pictures') step = 'protection'
+  // A verdict the person declined is not asked again for the flip as it is: no step to wait for.
+  else if (verdict && verdict.declined) step = null
   else if (!settled) step = 'evaluation'
   else if (verdict.pass) step = 'sending'
   else step = flip.agentFlip.gaveUp === contentsKey(flip) ? 'left' : 'rewrite'
