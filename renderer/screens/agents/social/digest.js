@@ -59,10 +59,9 @@ function walk(feed) {
   return out
 }
 
-/** Whether call `a` came before call `b` on the chain (its block, then its place in the block). */
-const cameBefore = (a, b) =>
-  a.height < b.height ||
-  (a.height === b.height && (a.index || 0) < (b.index || 0))
+/** Two calls in chain order: their block, then their place in it (as the Social feed sorts). */
+const chainOrder = (a, b) =>
+  a.height - b.height || (a.index || 0) - (b.index || 0)
 
 /**
  * Where a run's reading ends: the scanned block, or before the block of the first item left out; when an item of that
@@ -327,56 +326,67 @@ export function socialDigest(
     labels.set(id, {kind: 'person', others: [address]})
     return id
   }
-  // The thread a tag in an answer sits in (B-290): the thread's first post and the replies before the tag, nearest
-  // first kept, every author whatever their state (Whose picks the tags, not their context), the blocked ones and
-  // likes left out. No label: the agent answers the tag, never these. The post the tag answers is in its line.
+  // The thread a tag in an answer sits in (B-290): the thread's first post and the replies before the tag, the tag's
+  // own branch first (the reply it sits under and its comments), then the other replies, nearest the tag kept; every
+  // author whatever their state (Whose picks the tags, not their context). Left out: the blocked authors and what
+  // answers them, a post a tag before it in this run already showed, what came after the tag. No label: the agent
+  // answers the tag, never these. The feed files every comment under its reply; what each one answers is its replyTo.
+  const shownInThread = new Set()
   const whoSaid = (address) =>
     address === me ? line('you', {}, 'you') : name(address)
   const threadText = (call) =>
     shownText(call.message, call.hasMedia, words, MAX_THREAD_TEXT)
-  const threadLines = (item) => {
-    const earlier = walk([item.post]).filter(
-      ({node}) =>
-        node !== item.node &&
-        node !== item.parent &&
-        node.call.message !== LIKE &&
-        !isBlocked(node.call.author) &&
-        cameBefore(node.call, item.node.call)
-    )
+  const threadOf = (item) => {
+    const tree = walk([item.post])
+    const byId = new Map(tree.map(({node}) => [node.id, node]))
+    const answeredBy = ({node, parent}) => {
+      const to = String(node.call.replyTo || '')
+      return (/^[0-9]+$/u.test(to) && byId.get(Number(to))) || parent
+    }
+    const answered = answeredBy(item)
+    const branch = item.parent === item.post ? item.node : item.parent
+    const inBranch = ({node, parent}) => node === branch || parent === branch
+    const earlier = tree
+      .map((entry) => ({...entry, to: entry.parent && answeredBy(entry)}))
+      .filter(
+        ({node, to}) =>
+          typeof node.id === 'number' &&
+          node !== item.node &&
+          node !== answered &&
+          !shownInThread.has(node.id) &&
+          !isBlocked(node.call.author) &&
+          !(to && isBlocked(to.call.author)) &&
+          chainOrder(node.call, item.node.call) < 0
+      )
+      .sort((a, b) => chainOrder(a.node.call, b.node.call))
     const first = earlier.find(({node}) => node === item.post)
-    const replies = earlier
-      .filter(({node}) => node !== item.post)
-      .sort((a, b) => (cameBefore(a.node.call, b.node.call) ? -1 : 1))
-      .slice(-(MAX_THREAD - (first ? 1 : 0)))
-    return [
-      ...(first
-        ? [
-            line(
-              'thread post',
-              {
-                author: whoSaid(first.node.call.author),
-                text: threadText(first.node.call),
-              },
-              `  the thread's first post, by ${whoSaid(
-                first.node.call.author
-              )}: "${threadText(first.node.call)}"`
-            ),
-          ]
-        : []),
-      ...replies.map(({node, parent}) =>
-        line(
-          'thread reply',
-          {
-            author: whoSaid(node.call.author),
-            to: whoSaid(parent.call.author),
-            text: threadText(node.call),
-          },
-          `  ${whoSaid(node.call.author)}, answering ${whoSaid(
-            parent.call.author
-          )}: "${threadText(node.call)}"`
+    const replies = earlier.filter(({node}) => node !== item.post)
+    const room = MAX_THREAD - (first ? 1 : 0)
+    const ownBranch = replies.filter(inBranch).slice(-room)
+    const left = room - ownBranch.length
+    const others =
+      left > 0 ? replies.filter((one) => !inBranch(one)).slice(-left) : []
+    const kept = [...(first ? [first] : []), ...ownBranch, ...others].sort(
+      (a, b) => chainOrder(a.node.call, b.node.call)
+    )
+    kept.forEach(({node}) => shownInThread.add(node.id))
+    const thread = kept.map(({node, to}) => {
+      const author = whoSaid(node.call.author)
+      const text = threadText(node.call)
+      if (node === item.post)
+        return line(
+          'thread post',
+          {author, text},
+          `  the thread's first post, by ${author}: "${text}"`
         )
-      ),
-    ]
+      const answering = whoSaid(to.call.author)
+      return line(
+        'thread reply',
+        {author, to: answering, text},
+        `  ${author}, answering ${answering}: "${text}"`
+      )
+    })
+    return {answered, thread}
   }
   // Its own last posts, whatever the point (no label: nothing to act on); only when it is given that read (B-262).
   const own = reads?.own
@@ -426,18 +436,16 @@ export function socialDigest(
       const author = name(item.node.call.author)
       const said = shown(item.node.call.message, item.node.call.hasMedia)
       if (item.parent) {
-        const to = name(item.parent.call.author)
-        const parent = shown(
-          item.parent.call.message,
-          item.parent.call.hasMedia
-        )
+        const {answered, thread} = threadOf(item)
+        const to = name(answered.call.author)
+        const parent = shown(answered.call.message, answered.call.hasMedia)
         text = [
           line(
             'tag in an answer',
             {label: id, author, to, parent, text: said},
             `${id} by ${author}, answering ${to} ("${parent}"): "${said}"`
           ),
-          ...threadLines(item),
+          ...thread,
         ].join('\n')
       } else
         text = line(

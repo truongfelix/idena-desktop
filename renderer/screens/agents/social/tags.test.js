@@ -4,7 +4,6 @@ import path from 'path'
 import fs from 'fs-extra'
 import {tagName, tags, tagsLeftOf} from './tags'
 import {MAX_THREAD, socialDigest} from './digest'
-import {LIKE} from '../../social/contract'
 import {eventPending} from './events'
 import {runSocialAgent} from './run'
 import {eventsRead} from '../runner'
@@ -100,6 +99,13 @@ describe('what a run reads of the posts that tag it', () => {
     expect(answers).not.toContain('@jokebot')
   })
 
+  // The feed's shape (feed.js socialFeed): a post, its replies, and under each reply all its comments, a comment that
+  // answers another comment included; what each answers is its call's replyTo.
+  const answering = (target, item) => {
+    item.call.replyTo = String(target)
+    return item
+  }
+
   test('a tag deep in a thread comes with the thread: its first post and the replies before it, every author (B-290)', () => {
     const DAN = '0xda70000000000000000000000000000000000004'
     const EVE = '0xe7e0000000000000000000000000000000000005'
@@ -119,14 +125,13 @@ describe('what a run reads of the posts that tag it', () => {
     const thread = (tagger) => [
       node(60, CAT, 'Which wallet do you use?', 9900, [
         node(61, BOB, `A long answer ${'x'.repeat(400)}`, 9910, [
-          node(62, DAN, 'Blocked words', 9915),
-          node(63, ANN, 'I agree with Bob', 9920, [
-            node(64, tagger, '@jokebot is Bob right?', 9940),
-          ]),
-          node(65, EVE, 'A reply after the tag', 9945),
+          answering(61, node(62, DAN, 'Blocked words', 9915)),
+          answering(61, node(63, ANN, 'I agree with Bob', 9920)),
+          answering(62, node(68, EVE, 'Answering the blocked one', 9922)),
+          answering(63, node(64, tagger, '@jokebot is Bob right?', 9940)),
+          answering(61, node(65, EVE, 'A reply after the tag', 9945)),
         ]),
         node(66, ME, 'The desktop app', 9925),
-        node(67, EVE, LIKE, 9930),
       ]),
     ]
     const run = (tagger) =>
@@ -142,9 +147,9 @@ describe('what a run reads of the posts that tag it', () => {
     const digest = run(ANN)
     expect(digest.tagsShown).toBe(1)
     const section = digest.text.split('Posts that tag you:')[1]
-    // The tag's own line holds the post it answers (Ann's); under it the thread, oldest first: the first post (by an
-    // identity outside Whose), Bob's (a Candidate, cut shorter than a post), its own reply; never the blocked one,
-    // the like, nor what came after the tag.
+    // The tag's own line holds the comment it answers (Ann's, filed under Bob's reply); under it the thread, oldest
+    // first: the first post (by an identity outside Whose), Bob's reply (a Candidate, cut shorter than a post), its own
+    // reply; never the blocked one or what answers it, nor what came after the tag.
     const lines = section.trim().split('\n')
     expect(lines[0]).toMatch(
       /^p\d by @ann, answering @ann \("I agree with Bob"\): "@jokebot is Bob right\?"$/u
@@ -154,7 +159,7 @@ describe('what a run reads of the posts that tag it', () => {
       `  @bob, answering 0xca70…0003: "A long answer ${'x'.repeat(186)}…"`,
       `  you, answering 0xca70…0003: "The desktop app"`,
     ])
-    expect(digest.text).not.toContain('Blocked words')
+    expect(digest.text).not.toContain('lock')
     expect(digest.text).not.toContain('after the tag')
     // The thread has no labels: the agent can act on the tag alone.
     expect([...digest.labels.keys()]).toEqual(['p1'])
@@ -164,15 +169,17 @@ describe('what a run reads of the posts that tag it', () => {
     expect(outside.text).not.toContain('Which wallet')
   })
 
-  test('a thread longer than the bound: the first post, then the replies nearest the tag', () => {
+  test("a thread longer than the bound: the first post, the tag's own branch, then the replies nearest the tag", () => {
     const replies = Array.from({length: 12}, (_, i) =>
       node(80 + i, BOB, `reply ${i}`, 9900 + i)
     )
-    const tag = node(99, ANN, '@jokebot sum it up', 9950)
     const long = [
       node(70, CAT, 'The root', 9890, [
+        node(71, BOB, 'the reply it is under', 9891, [
+          answering(71, node(72, CAT, 'branch comment', 9892)),
+          answering(71, node(99, ANN, '@jokebot sum it up', 9950)),
+        ]),
         ...replies,
-        node(98, BOB, 'the last reply', 9940, [tag]),
       ]),
     ]
     const digest = socialDigest(
@@ -181,11 +188,35 @@ describe('what a run reads of the posts that tag it', () => {
       {point: 9800, scanned: HEAD}
     )
     const lines = digest.text.split('Posts that tag you:')[1].trim().split('\n')
+    expect(lines[0]).toContain('answering @bob ("the reply it is under")')
     expect(lines).toHaveLength(1 + MAX_THREAD)
     expect(lines[1]).toContain("the thread's first post")
-    expect(lines.slice(2).map((one) => one.split('"')[1])).toEqual(
-      [5, 6, 7, 8, 9, 10, 11].map((i) => `reply ${i}`)
+    expect(lines.slice(2).map((one) => one.split('"')[1])).toEqual([
+      'branch comment',
+      ...[6, 7, 8, 9, 10, 11].map((i) => `reply ${i}`),
+    ])
+  })
+
+  test('two tags in one thread: the thread is shown once, under the first', () => {
+    const feed2 = [
+      node(70, CAT, 'The root', 9890, [
+        node(71, BOB, 'a reply', 9891, [
+          answering(71, node(72, ANN, '@jokebot first question', 9900)),
+          answering(71, node(73, BOB, '@jokebot second question', 9910)),
+        ]),
+      ]),
+    ]
+    const digest = socialDigest(
+      social({feed: feed2}),
+      {reads: {...reads, posts: {window: 'off'}, notifications: false}},
+      {point: 9800, scanned: HEAD}
     )
+    expect(digest.tagsShown).toBe(2)
+    expect(digest.text.split("the thread's first post")).toHaveLength(2)
+    // The second tag's thread holds the first tag, the one thing the first did not show.
+    const lines = digest.text.split('Posts that tag you:')[1].trim().split('\n')
+    expect(lines).toHaveLength(4)
+    expect(lines[3]).toBe('  @ann, answering @bob: "@jokebot first question"')
   })
 
   test('past the questions left today: passed over for good, the point goes past them', () => {
