@@ -12,8 +12,12 @@ import {wordFilter} from '../social/hiding'
 // and its Trust (the profiles contract), only when a criterion needs them. An author that could not be read passes no
 // criterion: the agent never acts on what it could not check.
 
-/** How long an author read is kept: its state, stake and Trust change at most a few times an epoch. */
-export const AUTHOR_TTL_MS = 30 * 60 * 1000
+/**
+ * How long an author read is kept: a minute, enough for the reads of one run and of runs that follow at once (a
+ * burst of posts that tag it). Not longer (B-286): what a rule passes over is never read by a later run, so a post
+ * must not be refused on what its author was half an hour before (an account vouched for, or named, since).
+ */
+export const AUTHOR_TTL_MS = 60 * 1000
 /** The most authors whose Trust one run reads (each is several contract reads). */
 export const MAX_TRUST_READS = 100
 

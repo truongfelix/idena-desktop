@@ -131,13 +131,13 @@ describe("the authors' facts", () => {
     await readAuthors([A], needs, {
       settled,
       call: jest.fn(),
-      now: 1000 + 29 * 60 * 1000,
+      now: 1000 + 59 * 1000,
     })
     expect(settled).toHaveBeenCalledTimes(1)
     await readAuthors([A], needs, {
       settled,
       call: jest.fn(),
-      now: 1000 + 31 * 60 * 1000,
+      now: 1000 + 61 * 1000,
     })
     expect(settled).toHaveBeenCalledTimes(2)
   })
