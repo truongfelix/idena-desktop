@@ -8,6 +8,7 @@ const {
   ipfsAddressPort,
   leaseSeconds,
   mappingOwner,
+  publicAddrFor,
   upkeepAction,
 } = require('./router-port')
 
@@ -28,7 +29,7 @@ const FREE_PORT_KEEP_MS = 60 * 1000
 const UPKEEP_INTERVAL_MS = 5 * 60 * 1000
 
 /**
- * `file` gives the file's path; `net` talks to the router (main/router-net.js); `nodeRpc(method)` asks the
+ * `file` gives the file's path; `net` talks to the router (main/router-net.js); `nodeRpc(method, params)` asks the
  * built-in node (throws when it does not answer); `configuredPort()` is the IPFS port the node was started
  * with; `nodeLogTail()` is the end of the node's log.
  */
@@ -47,6 +48,9 @@ function createRouterPortService({
   let failure = null
   let actionError = null
   let queue = Promise.resolve()
+  // Whether the node announces an address the app gave it (`announce`), and the announcement's last failure.
+  let announcedByApp = false
+  let announceFailure = null
 
   function load() {
     let json = {}
@@ -113,6 +117,69 @@ function createRouterPortService({
     } catch {
       return null
     }
+  }
+
+  /**
+   * Has the node announce the opening (net_setPublicAddrs): the router's public address with the opened port while
+   * the app's opening is on `found` (the router of this network, or null), until its end, for the port the node
+   * listens on, and the router still forwards it to this computer's address now; nothing otherwise. Without it the network learns
+   * the opened port only when libp2p takes the node as reachable, measured at 46 and 51 min after an opening. A
+   * node without the call (older) or not answering is left alone; a failure is logged, never the row's error.
+   */
+  async function announce(found) {
+    // Nothing to announce, and nothing the app announced to clear: the node is not asked (nor anything it got
+    // otherwise, a node config file, cleared).
+    if (!load().opening && !announcedByApp) return
+    let announced
+    try {
+      announced = await nodeRpc('net_publicAddrs')
+    } catch {
+      return
+    }
+    let want = []
+    try {
+      const {opening} = load()
+      if (
+        opening &&
+        found &&
+        opening.gateway.udn === found.udn &&
+        now() < opening.endMs &&
+        (await livePort()) === opening.port
+      ) {
+        const {mapping, pcIp} = await net.mapping(found, opening.port)
+        // Only a forwarding to this computer's address now: one to its previous address reaches nobody here.
+        if (mappingOwner(mapping, pcIp, opening) === 'pc') {
+          const addr = publicAddrFor(
+            await net.externalAddress(found),
+            opening.port
+          )
+          if (addr) want = [addr]
+        }
+      }
+    } catch (error) {
+      announceFailed(error)
+      return
+    }
+    const have = Array.isArray(announced) ? announced : []
+    if (have.length === want.length && have.every((a, i) => a === want[i])) {
+      announceFailure = null
+      return
+    }
+    try {
+      await nodeRpc('net_setPublicAddrs', [want])
+      announcedByApp = want.length > 0
+      announceFailure = null
+      logger.info('router port announced', {addrs: want})
+    } catch (error) {
+      announceFailed(error)
+    }
+  }
+
+  /** Logs a failure of the announcement once, until it changes or one succeeds: a router may never answer it. */
+  function announceFailed(error) {
+    if (String(error) === announceFailure) return
+    announceFailure = String(error)
+    logger.warn('router port announcement failed', announceFailure)
   }
 
   /** The routers found before, the opening's first, each once (each one not on this network costs a timeout). */
@@ -312,6 +379,7 @@ function createRouterPortService({
         port,
         until: new Date(endMs).toISOString(),
       })
+      await announce(found)
     })
   }
 
@@ -327,6 +395,7 @@ function createRouterPortService({
       }
       save({opening: null})
       logger.info('router port closed', {port})
+      await announce(found)
     })
   }
 
@@ -338,74 +407,80 @@ function createRouterPortService({
    */
   function upkeep() {
     return exclusive(async () => {
-      const {opening} = load()
-      if (!opening) return 'nothing'
-      const here = await net.gatewayAt(
-        opening.gateway.location,
-        opening.gateway.udn
-      )
-      if (!here) return 'nothing'
-      const nodePort = await livePort()
-      const nowMs = now()
-      // While the node does not run, no peer can come: only the user's end is kept.
-      if (nodePort == null && nowMs < opening.endMs) return 'nothing'
-      const {mapping, pcIp} = await net.mapping(here, opening.port)
-      const action = upkeepAction({
-        opening,
-        mapping,
-        pcIp,
-        nodePort,
-        nowMs,
-        validationRuns: await validationRuns(),
-        inboundSinceChange: inboundSince(opening),
-      })
-      const lease = leaseSeconds(opening, nowMs)
-      const owned = ['pc', 'pc-before'].includes(
-        mappingOwner(mapping, pcIp, opening)
-      )
-      const changed = {gateway: here, client: pcIp, changedAtMs: nowMs}
-      switch (action) {
-        case 'close':
-          if (owned) await net.remove(here, opening.port)
-          save({opening: null})
-          break
-        case 'forget':
-          save({opening: null})
-          break
-        case 'move': {
-          if (owned) await net.remove(here, opening.port)
-          const target = await net.mapping(here, nodePort)
-          // A port another device holds stays its own: the row then says so, and offers a free one.
-          if (mappingOwner(target.mapping, pcIp, opening) !== 'other') {
-            await net.open(
-              here,
-              nodePort,
-              pcIp,
-              lease,
-              target.mapping?.client === pcIp
-            )
+      // This network's router when it is the opening's: the announcement follows it after every run, also a failed one.
+      let here = null
+      try {
+        const {opening} = load()
+        if (!opening) return 'nothing'
+        here = await net.gatewayAt(
+          opening.gateway.location,
+          opening.gateway.udn
+        )
+        if (!here) return 'nothing'
+        const nodePort = await livePort()
+        const nowMs = now()
+        // While the node does not run, no peer can come: only the user's end is kept.
+        if (nodePort == null && nowMs < opening.endMs) return 'nothing'
+        const {mapping, pcIp} = await net.mapping(here, opening.port)
+        const action = upkeepAction({
+          opening,
+          mapping,
+          pcIp,
+          nodePort,
+          nowMs,
+          validationRuns: await validationRuns(),
+          inboundSinceChange: inboundSince(opening),
+        })
+        const lease = leaseSeconds(opening, nowMs)
+        const owned = ['pc', 'pc-before'].includes(
+          mappingOwner(mapping, pcIp, opening)
+        )
+        const changed = {gateway: here, client: pcIp, changedAtMs: nowMs}
+        switch (action) {
+          case 'close':
+            if (owned) await net.remove(here, opening.port)
+            save({opening: null})
+            break
+          case 'forget':
+            save({opening: null})
+            break
+          case 'move': {
+            if (owned) await net.remove(here, opening.port)
+            const target = await net.mapping(here, nodePort)
+            // A port another device holds stays its own: the row then says so, and offers a free one.
+            if (mappingOwner(target.mapping, pcIp, opening) !== 'other') {
+              await net.open(
+                here,
+                nodePort,
+                pcIp,
+                lease,
+                target.mapping?.client === pcIp
+              )
+            }
+            save({
+              opening: {...opening, ...changed, port: nodePort, retried: false},
+            })
+            break
           }
-          save({
-            opening: {...opening, ...changed, port: nodePort, retried: false},
-          })
-          break
+          case 'open':
+            await net.open(here, opening.port, pcIp, lease, mapping != null)
+            save({opening: {...opening, ...changed, retried: false}})
+            break
+          case 'renew':
+            await net.open(here, opening.port, pcIp, lease, true)
+            save({opening: {...opening, ...changed}})
+            break
+          case 'retry':
+            await net.open(here, opening.port, pcIp, lease, true)
+            save({opening: {...opening, ...changed, retried: true}})
+            break
+          default:
         }
-        case 'open':
-          await net.open(here, opening.port, pcIp, lease, mapping != null)
-          save({opening: {...opening, ...changed, retried: false}})
-          break
-        case 'renew':
-          await net.open(here, opening.port, pcIp, lease, true)
-          save({opening: {...opening, ...changed}})
-          break
-        case 'retry':
-          await net.open(here, opening.port, pcIp, lease, true)
-          save({opening: {...opening, ...changed, retried: true}})
-          break
-        default:
+        if (action !== 'nothing') logger.info('router port upkeep', {action})
+        return action
+      } finally {
+        await announce(here)
       }
-      if (action !== 'nothing') logger.info('router port upkeep', {action})
-      return action
     })
   }
 

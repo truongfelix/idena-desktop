@@ -27,6 +27,12 @@ import {useEpochState} from '../shared/providers/epoch-context'
 import {useTimingState} from '../shared/providers/timing-context'
 import {useChainState} from '../shared/providers/chain-context'
 import {useAutoCloseValidationToast} from '../screens/validation/hooks/use-validation-toast'
+import {
+  timeLeftText,
+  useAnswersTx,
+  useNodeConnection,
+  validationAlert,
+} from '../screens/validation/connection'
 
 export default function ValidationPage() {
   const epoch = useEpochState()
@@ -118,6 +124,22 @@ function ValidationSession({
     longSessionDuration,
   })
 
+  // The answers go out through the node: with no peer, or a head that does not move, they reach no one (B-244).
+  const {lost: connectionLost} = useNodeConnection()
+  const shortAnswersTx = useAnswersTx(
+    state.context.submitShortAnswersHash,
+    state.context.submitShortAnswersAt
+  )
+  const validationEnd =
+    validationStart + (shortSessionDuration + longSessionDuration) * 1000
+  const alert = validationAlert({
+    offline,
+    syncing,
+    connectionLost,
+    shortAnswersTx,
+    inLongSession: state.matches('longSession'),
+  })
+
   return (
     <ValidationScreen
       state={state}
@@ -129,14 +151,32 @@ function ValidationSession({
       onCloseExceededTooltip={onCloseExceededTooltip}
       agent={agent}
     >
-      {syncing && (
+      {alert === 'syncing' && (
         <SynchronizingValidationAlert>
           {t('Synchronizing...')}
         </SynchronizingValidationAlert>
       )}
 
-      {offline && (
+      {alert === 'offline' && (
         <OfflineValidationAlert>{t('Offline')}</OfflineValidationAlert>
+      )}
+
+      {alert === 'noConnection' && (
+        <OfflineValidationAlert>
+          {t(
+            'Your node has no connection: your answers cannot reach the network',
+            {nsSeparator: '|'}
+          )}
+        </OfflineValidationAlert>
+      )}
+
+      {alert === 'shortLate' && (
+        <SynchronizingValidationAlert>
+          {`${t(
+            'Your short answers are not in a block yet: keep the app open and connected',
+            {nsSeparator: '|'}
+          )} (${timeLeftText(t, validationEnd, Date.now())})`}
+        </SynchronizingValidationAlert>
       )}
 
       {state.matches('validationFailed') && (

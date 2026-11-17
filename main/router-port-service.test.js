@@ -17,7 +17,12 @@ const NOW = Date.UTC(2026, 9, 8, 20)
 
 /** A router in memory: its forwardings by port, and whether it answers. */
 function routerInMemory() {
-  const router = {mappings: new Map(), answers: true, calls: []}
+  const router = {
+    mappings: new Map(),
+    answers: true,
+    calls: [],
+    external: '82.123.115.203',
+  }
   let resolveFind
   const net = {
     router,
@@ -47,6 +52,10 @@ function routerInMemory() {
       if (!router.answers) throw new Error('the router did not answer in time')
       return {mapping: router.mappings.get(port) || null, pcIp: net.pcIp}
     }),
+    externalAddress: jest.fn(async () => {
+      if (!router.answers) throw new Error('the router did not answer in time')
+      return router.external
+    }),
     remove: jest.fn(async (gateway, port) => {
       router.calls.push(['remove', port])
       router.mappings.delete(port)
@@ -70,20 +79,45 @@ function routerInMemory() {
 function setup({net = routerInMemory(), dir} = {}) {
   const folder = dir || fs.mkdtempSync(path.join(os.tmpdir(), 'router-port-'))
   const file = path.join(folder, 'router-port.json')
-  const node = {port: 50506, period: 'None', answers: true, log: ''}
+  // `announces`: the node has net_publicAddrs / net_setPublicAddrs (B-248); `publicAddrs`: what it announces.
+  const node = {
+    port: 50506,
+    period: 'None',
+    answers: true,
+    log: '',
+    announces: true,
+    publicAddrs: [],
+    setCalls: [],
+    queries: 0,
+  }
   let clock = NOW
+  const logger = {info: jest.fn(), warn: jest.fn()}
   const service = createRouterPortService({
     file: () => file,
     net,
-    async nodeRpc(method) {
+    async nodeRpc(method, params) {
       if (!node.answers) throw new Error('connect ECONNREFUSED')
       if (method === 'net_ipfsAddress')
         return `/ip4/0.0.0.0/tcp/${node.port}/ipfs/QmX`
+      if (method === 'net_publicAddrs' || method === 'net_setPublicAddrs') {
+        if (!node.announces)
+          throw new Error(
+            `the method ${method} does not exist/is not available`
+          )
+        if (method === 'net_publicAddrs') {
+          node.queries += 1
+          return node.publicAddrs
+        }
+        const [addrs] = params
+        node.setCalls.push(addrs)
+        node.publicAddrs = addrs
+        return null
+      }
       return {currentPeriod: node.period}
     },
     configuredPort: () => 50506,
     nodeLogTail: () => node.log,
-    logger: {info: jest.fn(), warn: jest.fn()},
+    logger,
     now: () => clock,
   })
   const saved = () => JSON.parse(fs.readFileSync(file, 'utf8'))
@@ -91,6 +125,7 @@ function setup({net = routerInMemory(), dir} = {}) {
     service,
     net,
     node,
+    logger,
     folder,
     file,
     saved,
@@ -502,4 +537,133 @@ it('reads a broken file as empty', async () => {
   )
   expect(await env.service.status()).toEqual({state: 'idle'})
   expect(await env.service.upkeep()).toBe('nothing')
+})
+
+describe('the announcement (B-248)', () => {
+  const ADDR = '/ip4/82.123.115.203/tcp/50506'
+
+  it("announces the opened port on the router's public address, and clears it at Close", async () => {
+    const env = await found()
+    await env.service.open({endMs: NOW + 6 * HOUR})
+    expect(env.node.publicAddrs).toEqual([ADDR])
+    expect(env.logger.info).toHaveBeenCalledWith('router port announced', {
+      addrs: [ADDR],
+    })
+    await env.service.close()
+    expect(env.node.publicAddrs).toEqual([])
+    expect(env.node.setCalls).toEqual([[ADDR], []])
+  })
+
+  it('announces it again after the node restarted, once', async () => {
+    const env = await found()
+    await env.service.open({endMs: NOW + 6 * HOUR})
+    env.node.publicAddrs = []
+    await env.service.upkeep()
+    expect(env.node.publicAddrs).toEqual([ADDR])
+    await env.service.upkeep()
+    expect(env.node.setCalls).toEqual([[ADDR], [ADDR]])
+  })
+
+  it('follows a new public address of the router', async () => {
+    const env = await found()
+    await env.service.open({endMs: NOW + 6 * HOUR})
+    env.net.router.external = '82.123.115.204'
+    await env.service.upkeep()
+    expect(env.node.publicAddrs).toEqual(['/ip4/82.123.115.204/tcp/50506'])
+  })
+
+  it('announces nothing when the router has no public address', async () => {
+    const env = await found()
+    env.net.router.external = '100.64.1.2'
+    await env.service.open({endMs: NOW + 6 * HOUR})
+    expect(env.node.setCalls).toEqual([])
+    env.net.router.external = null
+    await env.service.upkeep()
+    expect(env.node.setCalls).toEqual([])
+  })
+
+  it('clears it on another network, and when the port goes to another device', async () => {
+    const away = await found()
+    await away.service.open({endMs: NOW + 6 * HOUR})
+    away.net.router.answers = false
+    expect(await away.service.upkeep()).toBe('nothing')
+    expect(away.node.publicAddrs).toEqual([])
+
+    const taken = await found()
+    await taken.service.open({endMs: NOW + 6 * HOUR})
+    taken.net.router.mappings.set(50506, {
+      client: '192.168.1.99',
+      description: 'another app',
+      enabled: true,
+      leaseSeconds: 0,
+    })
+    expect(await taken.service.upkeep()).toBe('nothing')
+    expect(taken.node.publicAddrs).toEqual([])
+  })
+
+  it('clears it when the opening ends', async () => {
+    const env = await found()
+    await env.service.open({endMs: NOW + HOUR})
+    env.advance(HOUR)
+    expect(await env.service.upkeep()).toBe('close')
+    expect(env.node.publicAddrs).toEqual([])
+  })
+
+  it('leaves an older node alone, and never fails the opening', async () => {
+    const older = await found()
+    older.node.announces = false
+    expect(await older.service.open({endMs: NOW + 6 * HOUR})).toMatchObject({
+      owner: 'pc',
+      error: null,
+    })
+    expect(older.node.setCalls).toEqual([])
+
+    const failing = await found()
+    failing.net.externalAddress.mockRejectedValue(
+      new Error('501 Not Implemented')
+    )
+    expect(await failing.service.open({endMs: NOW + 6 * HOUR})).toMatchObject({
+      owner: 'pc',
+      error: null,
+    })
+    expect(failing.node.setCalls).toEqual([])
+    expect(failing.logger.warn).toHaveBeenCalledWith(
+      'router port announcement failed',
+      'Error: 501 Not Implemented'
+    )
+    await failing.service.upkeep()
+    await failing.service.upkeep()
+    expect(
+      failing.logger.warn.mock.calls.filter(
+        ([message]) => message === 'router port announcement failed'
+      )
+    ).toHaveLength(1)
+  })
+
+  it('asks the node nothing when no port was opened, and leaves what it got otherwise', async () => {
+    const env = setup()
+    env.node.publicAddrs = ['/ip4/1.2.3.4/tcp/50506']
+    expect(await env.service.upkeep()).toBe('nothing')
+    expect(env.node.queries).toBe(0)
+    expect(env.node.publicAddrs).toEqual(['/ip4/1.2.3.4/tcp/50506'])
+  })
+
+  it("announces no forwarding to this computer's previous address", async () => {
+    const env = await found()
+    await env.service.open({endMs: NOW + 6 * HOUR})
+    expect(env.node.publicAddrs).toEqual([ADDR])
+    env.net.pcIp = '192.168.1.21'
+    env.net.open.mockRejectedValue(new Error('the router refused (501)'))
+    await expect(env.service.upkeep()).rejects.toThrow('the router refused')
+    expect(env.node.publicAddrs).toEqual([])
+  })
+
+  it('clears what it announced after the opening is gone, also when the upkeep fails', async () => {
+    const env = await found()
+    await env.service.open({endMs: NOW + 6 * HOUR})
+    env.net.router.mappings.clear()
+    env.net.open.mockRejectedValue(new Error('the router refused (501)'))
+    await expect(env.service.upkeep()).rejects.toThrow('the router refused')
+    expect(env.node.publicAddrs).toEqual([])
+  })
 })

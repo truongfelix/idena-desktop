@@ -161,17 +161,20 @@ const nodeProcess = createNodeProcess({
 // The built-in node's RPC port, API key and IPFS port from its last start: the router port asks the node.
 let nodeConnection = null
 
-/** The built-in node's answer to `method` (no parameters). */
-async function nodeRpc(method) {
+/** The built-in node's answer to `method` with `params`. */
+async function nodeRpc(method, params = []) {
   if (!nodeConnection) throw new Error('the node has not started')
   const {data} = await axios.post(
     `http://localhost:${nodeConnection.rpcPort}`,
-    {method, params: [], id: 1, key: nodeConnection.apiKey},
+    {method, params, id: 1, key: nodeConnection.apiKey},
     {timeout: 5000}
   )
   if (data?.error) throw new Error(data.error.message)
   return data?.result
 }
+
+/** When the router port's upkeep first runs after a node start: the node answers its net_ calls by then. */
+const ROUTER_UPKEEP_AFTER_START_MS = 60 * 1000
 
 // The node's port on the router, opened by the user in the Advanced settings (main/router-port-service.js).
 const routerPort = createRouterPortService({
@@ -878,6 +881,15 @@ ipcMain.on(NODE_COMMAND, async (event, command, data) => {
         })
         .then(({child, started}) => {
           if (started) nodeWatchdog.started()
+          // A node started anew announces nothing: the router port's upkeep gives it the opening once it answers,
+          // rather than at the next 5-minute run.
+          setTimeout(() => {
+            routerPort
+              .upkeep()
+              .catch((e) =>
+                logger.warn('router port upkeep failed', e.toString())
+              )
+          }, ROUTER_UPKEEP_AFTER_START_MS)
           logger.info(
             started
               ? `node started, PID: ${child.pid}`
