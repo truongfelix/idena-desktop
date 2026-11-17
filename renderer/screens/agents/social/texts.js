@@ -13,6 +13,8 @@ export const LINE_NAMES = [
   'answer',
   'tag',
   'tag in an answer',
+  'thread post',
+  'thread reply',
   'post',
   'post with one like',
   'post with likes',

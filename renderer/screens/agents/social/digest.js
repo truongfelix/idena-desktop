@@ -19,6 +19,12 @@ export const MAX_TIPS = 30
 export const OWN_POSTS_SHOWN = 10
 export const MESSAGES_SHOWN = 5
 export const MAX_TEXT = 500
+/**
+ * The thread a tag sits in (B-290, owner 2026-11-17): besides the post it answers, the thread's first post and the
+ * replies nearest before it, at most this many lines, each text cut shorter than a post's.
+ */
+export const MAX_THREAD = 8
+export const MAX_THREAD_TEXT = 200
 /** A first run reads about the last day of blocks (20 s each). */
 export const FIRST_RUN_BLOCKS = 4320
 
@@ -26,18 +32,23 @@ export const FIRST_RUN_BLOCKS = 4320
  * A text as the model reads it: on one quote, cut, a text on IPFS or a picture only named. `words`: the agent's own
  * words for those two (B-285), `onIpfs` and `withFile`.
  */
-export function shownText(message, hasMedia = false, words = {}) {
+export function shownText(
+  message,
+  hasMedia = false,
+  words = {},
+  max = MAX_TEXT
+) {
   const value = String(message || '')
   const text = value.startsWith('ipfs://')
     ? words.onIpfs ?? '[a text stored on IPFS, not read]'
     : value.replace(/\s+/gu, ' ').trim()
-  const cut = text.length > MAX_TEXT ? `${text.slice(0, MAX_TEXT)}…` : text
+  const cut = text.length > max ? `${text.slice(0, max)}…` : text
   return hasMedia
     ? `${cut} ${words.withFile ?? '[with a picture or a file]'}`.trim()
     : cut
 }
 
-/** Every node of the feed under `node`, with the post it is in. */
+/** Every node of the feed under `node`, with the post it is in and the node it answers. */
 function walk(feed) {
   const out = []
   const visit = (node, post, parent) => {
@@ -47,6 +58,11 @@ function walk(feed) {
   feed.forEach((post) => visit(post, post, null))
   return out
 }
+
+/** Whether call `a` came before call `b` on the chain (its block, then its place in the block). */
+const cameBefore = (a, b) =>
+  a.height < b.height ||
+  (a.height === b.height && (a.index || 0) < (b.index || 0))
 
 /**
  * Where a run's reading ends: the scanned block, or before the block of the first item left out; when an item of that
@@ -311,6 +327,57 @@ export function socialDigest(
     labels.set(id, {kind: 'person', others: [address]})
     return id
   }
+  // The thread a tag in an answer sits in (B-290): the thread's first post and the replies before the tag, nearest
+  // first kept, every author whatever their state (Whose picks the tags, not their context), the blocked ones and
+  // likes left out. No label: the agent answers the tag, never these. The post the tag answers is in its line.
+  const whoSaid = (address) =>
+    address === me ? line('you', {}, 'you') : name(address)
+  const threadText = (call) =>
+    shownText(call.message, call.hasMedia, words, MAX_THREAD_TEXT)
+  const threadLines = (item) => {
+    const earlier = walk([item.post]).filter(
+      ({node}) =>
+        node !== item.node &&
+        node !== item.parent &&
+        node.call.message !== LIKE &&
+        !isBlocked(node.call.author) &&
+        cameBefore(node.call, item.node.call)
+    )
+    const first = earlier.find(({node}) => node === item.post)
+    const replies = earlier
+      .filter(({node}) => node !== item.post)
+      .sort((a, b) => (cameBefore(a.node.call, b.node.call) ? -1 : 1))
+      .slice(-(MAX_THREAD - (first ? 1 : 0)))
+    return [
+      ...(first
+        ? [
+            line(
+              'thread post',
+              {
+                author: whoSaid(first.node.call.author),
+                text: threadText(first.node.call),
+              },
+              `  the thread's first post, by ${whoSaid(
+                first.node.call.author
+              )}: "${threadText(first.node.call)}"`
+            ),
+          ]
+        : []),
+      ...replies.map(({node, parent}) =>
+        line(
+          'thread reply',
+          {
+            author: whoSaid(node.call.author),
+            to: whoSaid(parent.call.author),
+            text: threadText(node.call),
+          },
+          `  ${whoSaid(node.call.author)}, answering ${whoSaid(
+            parent.call.author
+          )}: "${threadText(node.call)}"`
+        )
+      ),
+    ]
+  }
   // Its own last posts, whatever the point (no label: nothing to act on); only when it is given that read (B-262).
   const own = reads?.own
     ? feed
@@ -364,11 +431,14 @@ export function socialDigest(
           item.parent.call.message,
           item.parent.call.hasMedia
         )
-        text = line(
-          'tag in an answer',
-          {label: id, author, to, parent, text: said},
-          `${id} by ${author}, answering ${to} ("${parent}"): "${said}"`
-        )
+        text = [
+          line(
+            'tag in an answer',
+            {label: id, author, to, parent, text: said},
+            `${id} by ${author}, answering ${to} ("${parent}"): "${said}"`
+          ),
+          ...threadLines(item),
+        ].join('\n')
       } else
         text = line(
           'tag',

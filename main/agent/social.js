@@ -84,6 +84,9 @@ const DIGEST_LINES = {
   tag: '{{label}} by {{author}}: "{{text}}"',
   'tag in an answer':
     '{{label}} by {{author}}, answering {{to}} ("{{parent}}"): "{{text}}"',
+  // The thread a tag in an answer sits in (B-290), under its line: no label, the agent answers the tag only.
+  'thread post': '  the thread\'s first post, by {{author}}: "{{text}}"',
+  'thread reply': '  {{author}}, answering {{to}}: "{{text}}"',
   post: '{{label}} by {{author}}: "{{text}}"',
   'post with one like': '{{label}} by {{author}} (1 like): "{{text}}"',
   'post with likes': '{{label}} by {{author}} ({{likes}} likes): "{{text}}"',
