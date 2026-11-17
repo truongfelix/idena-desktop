@@ -3,7 +3,7 @@
 // shows its two keywords, and why it should be reported: one or more of the nine report reasons of the validation
 // screen, each with the model's confidence; a flip is reported when one reason reaches that reason's threshold.
 
-const {fillPart} = require('./app-parts')
+const {fillPart, fillSlots} = require('./app-parts')
 
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024
 /** A rule break the model is this sure of, even below its threshold, keeps a flip from being marked best. */
@@ -142,17 +142,84 @@ function checkFlip(flip) {
   return {images, orders, words}
 }
 
-/** The question: its text (flipSystem), its parts: the keywords, then the left story's four pictures, then the right one's. */
+/**
+ * The question's words around the keywords and the pictures, with a slot for each (B-285): what an unlocked text
+ * starts from, for a flip with keywords (the long session, a draft judged) and for one without (the short session).
+ * `{{left}}` and `{{right}}` are where each order's four pictures go.
+ */
+const ORDERS = [
+  'LEFT order, pictures 1 to 4:',
+  '{{left}}',
+  'RIGHT order, pictures 1 to 4:',
+  '{{right}}',
+  'Your JSON answer:',
+]
+const QUESTION = ['Keywords: {{keywords}}.', ...ORDERS].join('\n')
+const QUESTION_SHORT = [
+  'No keywords: leave "keywords" null and "reasons" empty.',
+  ...ORDERS,
+].join('\n')
+const PICTURES = /(\{\{(?:left|right)\}\})/u
+
+/**
+ * An agent's own question (B-285) as the parts sent: its text cut where the pictures go, then each piece's slots
+ * filled (never before: a keyword's description holding "{{left}}" stays words). Each order's pictures go at its
+ * first slot; an order the text has no slot for goes at the end, the left one first.
+ */
+function customParts(template, keywords, pictures) {
+  const parts = []
+  const placed = new Set()
+  const text = (piece) => {
+    const filled = fillSlots(piece, {keywords}, {drop: false}).replace(
+      /^\n+|\n+$/gu,
+      ''
+    )
+    if (filled.trim()) parts.push({type: 'text', text: filled})
+  }
+  String(template)
+    .split(PICTURES)
+    .forEach((piece) => {
+      const side = {'{{left}}': 0, '{{right}}': 1}[piece]
+      if (side === undefined) text(piece)
+      else if (!placed.has(side)) {
+        placed.add(side)
+        parts.push(...pictures[side])
+      }
+    })
+  ;[0, 1].forEach((side) => {
+    if (!placed.has(side)) parts.push(...pictures[side])
+  })
+  return parts
+}
+
+/**
+ * The question: its text (flipSystem), its parts: the keywords, then the left story's four pictures, then the right
+ * one's. `texts`: the agent's own words for the question (B-285), `flipQuestion` with keywords, `flipQuestionShort`
+ * without.
+ */
 function flipQuestion(
   {images, orders, words},
   instructions = '',
-  custom = null
+  custom = null,
+  texts = null
 ) {
+  const named = words
+    .map(({name, desc}) => (desc ? `${name} (${desc})` : name))
+    .join(', ')
+  const own =
+    texts && (words.length ? texts.flipQuestion : texts.flipQuestionShort)
+  if (own)
+    return {
+      system: flipSystem(instructions, custom),
+      parts: customParts(
+        own,
+        named,
+        orders.map((order) => order.map((i) => ({type: 'image', ...images[i]})))
+      ),
+    }
   const parts = []
   const keywords = words.length
-    ? `Keywords: ${words
-        .map(({name, desc}) => (desc ? `${name} (${desc})` : name))
-        .join(', ')}.`
+    ? `Keywords: ${named}.`
     : 'No keywords: leave "keywords" null and "reasons" empty.'
   parts.push({type: 'text', text: keywords})
   ;['LEFT', 'RIGHT'].forEach((side, s) => {
@@ -282,6 +349,8 @@ module.exports = {
   FLIP_SUGGESTION,
   FLIP_FORMAT: FORMAT,
   FLIP_MEANING: MEANING,
+  FLIP_QUESTION: QUESTION,
+  FLIP_QUESTION_SHORT: QUESTION_SHORT,
   checkFlip,
   firstJsonObject,
   flipQuestion,

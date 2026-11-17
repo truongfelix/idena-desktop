@@ -180,7 +180,7 @@ function createAgent({
       agentId !== undefined
         ? file.agents.find((one) => one.id === agentId)
         : validationAgent(file)
-    return (agent && agent.appParts && agent.appParts.validation) || null
+    return (agent && agent.appParts) || null
   }
 
   /** One flip to the model, the answer read. Throws the provider's error. */
@@ -193,7 +193,13 @@ function createAgent({
     part = null
   ) => {
     const checked = checkFlip(flip)
-    const {system, parts} = flipQuestion(checked, instructions, part)
+    // `part`: the agent's own texts (B-282 the system text, B-285 the question's words), or null.
+    const {system, parts} = flipQuestion(
+      checked,
+      instructions,
+      (part && part.validation) || null,
+      part
+    )
     const controller = new AbortController()
     running.add(controller)
     try {
@@ -236,7 +242,7 @@ function createAgent({
           effort: agent.effort,
         },
         instructions: agent.instructions,
-        part: (agent.appParts && agent.appParts.validation) || null,
+        part: agent.appParts || null,
       }
     const answerer = validationAgent(file)
     const reporter = reportAgent(file)
@@ -516,7 +522,8 @@ function createAgent({
           socialSystem(
             held,
             agent.instructions,
-            (agent.appParts && agent.appParts.social) || null
+            (agent.appParts && agent.appParts.social) || null,
+            (agent.appParts && agent.appParts.socialActions) || null
           ),
           [
             {
@@ -564,7 +571,10 @@ function createAgent({
         })
         throw new Error(`the agent may not do it (${check.reason})`)
       }
-      const question = storyQuestion({words, idea, parts, notThese})
+      const question = storyQuestion(
+        {words, idea, parts, notThese},
+        (agent.appParts && agent.appParts.storyQuestion) || null
+      )
       const system = storySystem(
         agent.instructions,
         (agent.appParts && agent.appParts.flipStory) || null
@@ -656,6 +666,7 @@ function createAgent({
             timeoutMs: clampTimeout(timeoutMs),
             signal: controller.signal,
             mediaTypeOf: mediaType,
+            texts: agent.appParts || null,
           }
         )
         log({
@@ -706,7 +717,7 @@ function createAgent({
           timeoutMs,
           writing,
           agent.instructions,
-          (agent.appParts && agent.appParts.validation) || null
+          agent.appParts || null
         )
       } catch (error) {
         log({

@@ -1,16 +1,24 @@
 // What the app adds to the Instructions for each action (B-268, owner 2026-11-16), as the agent's page shows it in the
 // action's ⓘ, and the suggested Instructions it offers: the texts are built by the same functions that send them.
 
-const {storyQuestion, storySystem} = require('./stories')
-const {FLIP_SUGGESTION, flipQuestion, flipSystem} = require('./flips')
+const {STORY_QUESTION, storyQuestion, storySystem} = require('./stories')
+const {
+  FLIP_QUESTION,
+  FLIP_QUESTION_SHORT,
+  FLIP_SUGGESTION,
+  flipQuestion,
+  flipSystem,
+} = require('./flips')
 const {
   SOCIAL_ACTIONS,
   SOCIAL_SUGGESTION,
   socialHeld,
   socialSystem,
   socialTemplate,
+  socialTexts,
 } = require('./social')
-const {INSTRUCTIONS_SLOT} = require('./app-parts')
+const {IMAGE_PROMPT, IMAGE_SIZE} = require('./providers')
+const {AREAS, INSTRUCTIONS_SLOT, maxLength} = require('./app-parts')
 
 /**
  * The owner's story template of 2026-11-13 and 2026-11-15 (four panels), as a suggestion for the Instructions: its
@@ -91,9 +99,24 @@ function flipExample() {
  */
 const DEFAULT_PARTS = Object.freeze({
   flipStory: storySystem(INSTRUCTIONS_SLOT),
+  storyQuestion: STORY_QUESTION,
+  imagePrompt: IMAGE_PROMPT,
+  imageSize: IMAGE_SIZE,
   validation: flipSystem(INSTRUCTIONS_SLOT),
+  flipQuestion: FLIP_QUESTION,
+  flipQuestionShort: FLIP_QUESTION_SHORT,
   social: socialTemplate(),
+  ...socialTexts(),
 })
+/** Each area's texts in the page's order, each with its longest length (app-parts.js). */
+const PART_AREAS = Object.freeze(
+  Object.fromEntries(
+    Object.entries(AREAS).map(([area, names]) => [
+      area,
+      names.map((name) => ({name, maxLength: maxLength(name)})),
+    ])
+  )
+)
 const defaultParts = () => DEFAULT_PARTS
 
 /**
@@ -124,6 +147,7 @@ function appTexts({held = SOCIAL_ACTIONS} = {}) {
       social: SOCIAL_SUGGESTION,
     },
     parts: {...DEFAULT_PARTS},
+    areas: PART_AREAS,
   }
 }
 

@@ -5,7 +5,7 @@
 // whatever the Instructions say, it is the one the app reads.
 
 const {firstJsonObject} = require('./flips')
-const {fillPart} = require('./app-parts')
+const {fillPart, fillSlots} = require('./app-parts')
 
 const MAX_KEYWORD_LENGTH = 200
 const MAX_IDEA_LENGTH = 2000
@@ -67,10 +67,32 @@ function checkParts(parts) {
 }
 
 /**
+ * The question's words around its data, with a slot for each (B-285): what an unlocked text starts from. Filled, it
+ * is the question below; `asked` is "the story", "the image prompts" or both, `before` one title a line.
+ */
+const QUESTION = [
+  "The flip's two keywords:",
+  '1. {{keyword1}}',
+  '2. {{keyword2}}',
+  '',
+  'The idea of the person for this story:',
+  '{{idea}}',
+  '',
+  'Asked: {{asked}}.',
+  '',
+  'Stories given before, not to give again:',
+  '{{before}}',
+].join('\n')
+
+/**
  * The question: the flip's keywords (a description cut, never refused: a long community one must not stop the story),
  * the person's idea for this story, the parts asked and the titles of the stories given before ("Try another story").
+ * `custom`: the agent's own words for it (B-285), its slots filled with the same data.
  */
-function storyQuestion({words, idea = '', parts, notThese = []} = {}) {
+function storyQuestion(
+  {words, idea = '', parts, notThese = []} = {},
+  custom = null
+) {
   checkWords(words)
   const asked = checkParts(parts)
   const keyword = ({name, desc}) => {
@@ -83,15 +105,28 @@ function storyQuestion({words, idea = '', parts, notThese = []} = {}) {
     .filter((title) => typeof title === 'string' && title.trim())
     .slice(-MAX_NOT_THESE)
     .map((title) => title.trim().slice(0, MAX_FIELD))
+  const what = asked
+    .map((part) => (part === 'story' ? 'the story' : 'the image prompts'))
+    .join(' and ')
+  if (custom)
+    return fillSlots(
+      custom,
+      {
+        keyword1: keyword(words[0]),
+        keyword2: keyword(words[1]),
+        idea: own,
+        asked: what,
+        before: before.map((title) => `- ${title}`).join('\n'),
+      },
+      {required: ['keyword1', 'keyword2']}
+    )
   return [
     "The flip's two keywords:",
     `1. ${keyword(words[0])}`,
     `2. ${keyword(words[1])}`,
     ...(own ? ['', 'The idea of the person for this story:', own] : []),
     '',
-    `Asked: ${asked
-      .map((part) => (part === 'story' ? 'the story' : 'the image prompts'))
-      .join(' and ')}.`,
+    `Asked: ${what}.`,
     ...(before.length
       ? [
           '',
@@ -141,6 +176,7 @@ module.exports = {
   FORMAT,
   MAX_PROMPTS,
   PARTS,
+  STORY_QUESTION: QUESTION,
   readStories,
   storyQuestion,
   storySystem,
