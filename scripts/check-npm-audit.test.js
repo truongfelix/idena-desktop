@@ -132,7 +132,7 @@ describe('npm audit with dated exceptions', () => {
     const exceptions = readExceptions(
       path.join(__dirname, 'npm-audit-exceptions.json')
     )
-    expect(exceptions).toEqual([])
+    expect(exceptions.map(({package: name}) => name)).toEqual(['picomatch'])
   })
 
   it('rejects an exception without a reason or a date', () => {

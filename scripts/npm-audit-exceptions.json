@@ -1,1 +1,8 @@
-[]
+[
+  {
+    "id": "GHSA-fc5q-39xc-vjpf",
+    "package": "picomatch",
+    "reason": "No fixed version: the advisory covers every release up to 4.0.7, the latest. Only the test and build tools use it here (jest through micromatch, anymatch and jest-util at 2.3.2; node-gyp's tinyglobby at 4.0.4), on the repository's own patterns; the app's production dependencies hold none (npm audit --omit=dev). Holds while the latest picomatch is still in the vulnerable range.",
+    "expires": "2026-12-17"
+  }
+]
