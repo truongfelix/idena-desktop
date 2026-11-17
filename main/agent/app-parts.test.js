@@ -7,6 +7,7 @@ const {
   ACTIONS_SLOT,
   INSTRUCTIONS_SLOT,
   MAX_PART_LENGTH,
+  PARTS,
   fillPart,
   normalizeParts,
 } = require('./app-parts')
@@ -30,7 +31,7 @@ const flip = {
 describe('the default parts', () => {
   test('each with its slots filled is what the app sends without a change', () => {
     const parts = defaultParts()
-    expect(Object.keys(parts)).toEqual(['flipStory', 'validation', 'social'])
+    expect(Object.keys(parts).sort()).toEqual([...PARTS].sort())
     expect(fillPart(parts.flipStory, {instructions: 'Be brief.'})).toBe(
       storySystem('Be brief.')
     )

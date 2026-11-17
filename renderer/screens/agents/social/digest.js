@@ -4,6 +4,7 @@ import {shortAddress} from '../../social/people'
 import {validTipAmount} from '../../social/calls'
 import {passes} from '../criteria'
 import {tagName, tags} from './tags'
+import {LINE_NAMES, fillSlots, namedLines} from './texts'
 
 // What an agent reads on Idena Social when it runs (B-239): what came after its read point (a block height), and
 // only what its actions need. Each item gets a label (p1, c1) that its answer names; the app keeps what each label
@@ -21,14 +22,19 @@ export const MAX_TEXT = 500
 /** A first run reads about the last day of blocks (20 s each). */
 export const FIRST_RUN_BLOCKS = 4320
 
-/** A text as the model reads it: on one quote, cut, a text on IPFS or a picture only named. */
-export function shownText(message, hasMedia = false) {
+/**
+ * A text as the model reads it: on one quote, cut, a text on IPFS or a picture only named. `words`: the agent's own
+ * words for those two (B-285), `onIpfs` and `withFile`.
+ */
+export function shownText(message, hasMedia = false, words = {}) {
   const value = String(message || '')
   const text = value.startsWith('ipfs://')
-    ? '[a text stored on IPFS, not read]'
+    ? words.onIpfs ?? '[a text stored on IPFS, not read]'
     : value.replace(/\s+/gu, ' ').trim()
   const cut = text.length > MAX_TEXT ? `${text.slice(0, MAX_TEXT)}…` : text
-  return hasMedia ? `${cut} [with a picture or a file]`.trim() : cut
+  return hasMedia
+    ? `${cut} ${words.withFile ?? '[with a picture or a file]'}`.trim()
+    : cut
 }
 
 /** Every node of the feed under `node`, with the post it is in. */
@@ -72,6 +78,8 @@ const DAY_S = 24 * 60 * 60
  * past it are passed over for good (`tagsPassed`), never shown to a later run; `tagsShown` counts those it reads.
  * The new posts (B-281): at most `reads.posts.perRun` a run with the window of a day, and `postsLeft` (its posts left
  * today); `postsShown` counts those it reads.
+ * `texts`: the agent's own words for what it reads (B-285, main/agent/social.js): `socialDigest` the layout,
+ * `socialLines` the line of each item; an agent that changed none reads the app's, written here as before.
  */
 export function socialDigest(
   social,
@@ -82,10 +90,23 @@ export function socialDigest(
     collect = null,
     tagsLeft = Infinity,
     postsLeft = Infinity,
+    texts = null,
   },
   {point, scanned, now = Date.now()}
 ) {
   const {feed = [], me, names = {}, conversations = [], blocked} = social
+  // Its own lines, by name: one it holds is filled with the item's data, the others are the app's (`fallback`).
+  const ownLines =
+    texts && texts.socialLines ? namedLines(texts.socialLines, LINE_NAMES) : {}
+  const line = (kind, values, fallback) =>
+    kind in ownLines
+      ? fillSlots(ownLines[kind], values, {drop: false})
+      : fallback
+  const words = {
+    onIpfs: ownLines['text on IPFS'],
+    withFile: ownLines['with a file'],
+  }
+  const shown = (message, hasMedia) => shownText(message, hasMedia, words)
   // Whose it reads (B-266): each read's criteria (`who`: posts, notifications, messages) on the authors' `facts`
   // (criteria.js readAuthors). `collect` (a Set): the authors of what is new go in it, nothing is left out (the run
   // reads them first).
@@ -299,7 +320,10 @@ export function socialDigest(
           typeof reads.ownCount === 'number' ? reads.ownCount : OWN_POSTS_SHOWN
         )
         .reverse()
-        .map(({call}) => `- "${shownText(call.message, call.hasMedia)}"`)
+        .map(({call}) => {
+          const text = shown(call.message, call.hasMedia)
+          return line('own post', {text}, `- "${text}"`)
+        })
     : []
   let {length} = own.join('\n')
   let leftOut = null
@@ -322,60 +346,87 @@ export function socialDigest(
     if (item.kind === 'answer') {
       const yours = label(item.parent, item.post)
       const id = label(item.node, item.post)
-      text = `${id} by ${name(
-        item.node.call.author
-      )}, answering your ${yours} ("${shownText(
-        item.parent.call.message,
-        item.parent.call.hasMedia
-      )}"): "${shownText(item.node.call.message, item.node.call.hasMedia)}"`
+      const author = name(item.node.call.author)
+      const parent = shown(item.parent.call.message, item.parent.call.hasMedia)
+      const said = shown(item.node.call.message, item.node.call.hasMedia)
+      text = line(
+        'answer',
+        {label: id, author, yours, parent, text: said},
+        `${id} by ${author}, answering your ${yours} ("${parent}"): "${said}"`
+      )
     } else if (item.kind === 'tag') {
       const id = label(item.node, item.post)
-      const answering = item.parent
-        ? `, answering ${name(item.parent.call.author)} ("${shownText(
-            item.parent.call.message,
-            item.parent.call.hasMedia
-          )}")`
-        : ''
-      text = `${id} by ${name(item.node.call.author)}${answering}: "${shownText(
-        item.node.call.message,
-        item.node.call.hasMedia
-      )}"`
+      const author = name(item.node.call.author)
+      const said = shown(item.node.call.message, item.node.call.hasMedia)
+      if (item.parent) {
+        const to = name(item.parent.call.author)
+        const parent = shown(
+          item.parent.call.message,
+          item.parent.call.hasMedia
+        )
+        text = line(
+          'tag in an answer',
+          {label: id, author, to, parent, text: said},
+          `${id} by ${author}, answering ${to} ("${parent}"): "${said}"`
+        )
+      } else
+        text = line(
+          'tag',
+          {label: id, author, text: said},
+          `${id} by ${author}: "${said}"`
+        )
     } else if (item.kind === 'post') {
       const id = label(item.node, item.node)
       const likes = item.node.likeCalls.length
-      text = `${id} by ${name(item.node.call.author)}${
-        likes ? ` (${likes} like${likes > 1 ? 's' : ''})` : ''
-      }: "${shownText(item.node.call.message, item.node.call.hasMedia)}"`
+      const author = name(item.node.call.author)
+      const said = shown(item.node.call.message, item.node.call.hasMedia)
+      let kind = 'post'
+      if (likes === 1) kind = 'post with one like'
+      else if (likes > 1) kind = 'post with likes'
+      text = line(
+        kind,
+        {label: id, author, likes, text: said},
+        `${id} by ${author}${
+          likes ? ` (${likes} like${likes > 1 ? 's' : ''})` : ''
+        }: "${said}"`
+      )
     } else if (item.kind === 'like') {
       const id = personLabel(item.from)
-      text = `${id} ${name(item.from)} liked "${shownText(
-        item.node.call.message,
-        item.node.call.hasMedia
-      )}"`
+      const author = name(item.from)
+      const said = shown(item.node.call.message, item.node.call.hasMedia)
+      text = line(
+        'like',
+        {label: id, author, text: said},
+        `${id} ${author} liked "${said}"`
+      )
     } else if (item.kind === 'tip') {
       const id = personLabel(item.tip.from)
       const amount = validTipAmount(item.tip)
-      text = `${id} ${name(
-        item.tip.from
-      )} tipped you ${amount} iDNA for "${shownText(
-        item.node.call.message,
-        item.node.call.hasMedia
-      )}"`
+      const author = name(item.tip.from)
+      const said = shown(item.node.call.message, item.node.call.hasMedia)
+      text = line(
+        'tip',
+        {label: id, author, amount, text: said},
+        `${id} ${author} tipped you ${amount} iDNA for "${said}"`
+      )
     } else {
       chats += 1
       const id = `c${chats}`
       const {conversation} = item
       labels.set(id, {kind: 'chat', conversation, others: conversation.others})
+      const other = name(conversation.others[0])
       text = [
-        `${id} with ${name(conversation.others[0])}:`,
-        ...conversation.messages
-          .slice(-MESSAGES_SHOWN)
-          .map(
-            (message) =>
-              `  ${
-                message.from === me ? 'you' : name(message.from)
-              }: "${shownText(message.text, message.hasMedia)}"`
-          ),
+        line(
+          'conversation',
+          {label: id, author: other},
+          `${id} with ${other}:`
+        ),
+        ...conversation.messages.slice(-MESSAGES_SHOWN).map((message) => {
+          const author =
+            message.from === me ? line('you', {}, 'you') : name(message.from)
+          const said = shown(message.text, message.hasMedia)
+          return line('message', {author, text: said}, `  ${author}: "${said}"`)
+        }),
       ].join('\n')
     }
     if (length + text.length + 1 > MAX_DIGEST) {
@@ -408,12 +459,38 @@ export function socialDigest(
   const ownText = own.length
     ? `Your last posts, the newest last:\n${own.join('\n')}\n\n`
     : ''
+  const nothing = line('nothing new', {}, 'Nothing new since your last run.')
+  const since = line('new', {}, 'Since your last run:')
+  // A kind the agent's layout has no slot for goes at its end: what a run counts as read is always shown.
+  const digest =
+    texts && texts.socialDigest
+      ? fillSlots(
+          texts.socialDigest,
+          {
+            ownPosts: own.join('\n'),
+            sinceLastRun: empty ? nothing : since,
+            tips: lines.tip.join('\n'),
+            likes: lines.like.join('\n'),
+            answers: lines.answer.join('\n'),
+            tags: lines.tag.join('\n'),
+            posts: lines.post.join('\n'),
+            messages: lines.chat.join('\n'),
+          },
+          {
+            required: [
+              'ownPosts',
+              'tips',
+              'likes',
+              'answers',
+              'tags',
+              'posts',
+              'messages',
+            ],
+          }
+        )
+      : `${ownText}${empty ? nothing : `${since}\n\n${sections.join('\n\n')}`}`
   return {
-    text: `${ownText}${
-      empty
-        ? 'Nothing new since your last run.'
-        : `Since your last run:\n\n${sections.join('\n\n')}`
-    }`,
+    text: digest,
     labels,
     empty,
     readTo: readUpTo(leftOut, lastHeight, from, scanned),

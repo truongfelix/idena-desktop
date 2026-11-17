@@ -8,7 +8,7 @@ describe("an agent's own parts", () => {
   const defaults = defaultParts()
 
   test('the areas are the main process’s', () => {
-    expect(PART_AREAS).toEqual(main.PARTS)
+    expect(PART_AREAS).toEqual(Object.keys(main.AREAS))
   })
 
   test('a changed text is kept for its area alone; the default, an empty text or null takes it out', () => {

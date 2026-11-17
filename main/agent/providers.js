@@ -1,4 +1,5 @@
 const axios = require('axios')
+const {fillSlots} = require('./app-parts')
 
 // The agent's calls to its model: an OpenAI-compatible chat server (on this computer, as Ollama, LM Studio or
 // llama.cpp serve, or a hosted service) or the Anthropic Messages API. One request per question, no redirects
@@ -265,9 +266,29 @@ async function ask(
 
 /**
  * The request for one picture (B-236): an OpenAI-compatible images endpoint, on the agent's own service and key, with
- * its image model. The Anthropic API draws no pictures.
+ * its image model. The Anthropic API draws no pictures. `texts`: the agent's own words for it (B-285): `imagePrompt`
+ * around the prompt (its slot `{{prompt}}`; without one the prompt goes at its end), `imageSize` the size asked.
  */
-function buildImageRequest({provider, address, imageModel, key}, prompt) {
+const IMAGE_PROMPT = '{{prompt}}'
+const IMAGE_SIZE = '1024x1024'
+
+/** The prompt as sent: in the agent's own words when it has some, the prompt cut to the room they leave. */
+function imagePrompt(prompt, own) {
+  const asked = String(prompt || '')
+  if (!own) return asked.slice(0, MAX_IMAGE_PROMPT)
+  const fill = (value) =>
+    fillSlots(own, {prompt: value}, {required: ['prompt'], drop: false})
+  // The words alone, and the two line breaks before a prompt that has no slot.
+  const room =
+    MAX_IMAGE_PROMPT - fill('').length - (own.includes('{{prompt}}') ? 0 : 2)
+  return fill(asked.slice(0, Math.max(0, room))).slice(0, MAX_IMAGE_PROMPT)
+}
+
+function buildImageRequest(
+  {provider, address, imageModel, key},
+  prompt,
+  texts = null
+) {
   if (provider === 'anthropic')
     throw new Error('this service draws no pictures')
   const base = checkAddress(provider, address)
@@ -280,9 +301,9 @@ function buildImageRequest({provider, address, imageModel, key}, prompt) {
     headers,
     body: {
       model: imageModel,
-      prompt: String(prompt || '').slice(0, MAX_IMAGE_PROMPT),
+      prompt: imagePrompt(prompt, texts && texts.imagePrompt),
       n: 1,
-      size: '1024x1024',
+      size: (texts && texts.imageSize && texts.imageSize.trim()) || IMAGE_SIZE,
     },
   }
 }
@@ -294,9 +315,9 @@ function buildImageRequest({provider, address, imageModel, key}, prompt) {
 async function drawImage(
   config,
   prompt,
-  {timeoutMs, signal, request = axios.request, mediaTypeOf} = {}
+  {timeoutMs, signal, request = axios.request, mediaTypeOf, texts} = {}
 ) {
-  const {url, headers, body} = buildImageRequest(config, prompt)
+  const {url, headers, body} = buildImageRequest(config, prompt, texts)
   let response
   try {
     response = await request({
@@ -332,6 +353,8 @@ async function drawImage(
 }
 
 module.exports = {
+  IMAGE_PROMPT,
+  IMAGE_SIZE,
   ask,
   buildImageRequest,
   buildRequest,

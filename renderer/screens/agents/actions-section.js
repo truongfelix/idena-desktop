@@ -171,7 +171,12 @@ export function ActionsSection({agent, agents, catalog, onChange}) {
                       row={rowOf(agent, entry)}
                       sent={texts && texts.sent[entry.id]}
                       changed={Boolean(
-                        agent.appParts && agent.appParts[partOf(entry.id)]
+                        agent.appParts &&
+                          texts &&
+                          texts.areas &&
+                          (texts.areas[partOf(entry.id)] || []).some(
+                            ({name}) => name in agent.appParts
+                          )
                       )}
                       holder={holder ? heldText(entry.id, holder, t) : null}
                       // Make the pictures needs a service that draws (B-258): the row says so.

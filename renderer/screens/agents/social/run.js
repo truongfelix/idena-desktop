@@ -146,7 +146,14 @@ export async function runSocialAgent(agent, social, deps) {
   }
   const digest = socialDigest(
     social,
-    {reads: agent.reads, who, facts, tagsLeft, postsLeft},
+    {
+      reads: agent.reads,
+      who,
+      facts,
+      tagsLeft,
+      postsLeft,
+      texts: agent.appParts || null,
+    },
     {point, scanned}
   )
   // The posts that tag it past its questions of the day: never read, named in Activity once the point passed them.
