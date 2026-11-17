@@ -1,5 +1,5 @@
 import {QueryClient, QueryObserver} from 'react-query'
-import {feedProfilesQuery} from './profile-hooks'
+import {feedProfilesQuery, profilesReading} from './profile-hooks'
 
 /** How long a node that just started answers only bcn_ calls (B-216's node log: 16 s). */
 const START_WINDOW_MS = 16 * 1000
@@ -56,13 +56,29 @@ describe('feedProfilesQuery', () => {
     stop()
   })
 
+  it('says it reads the profiles until a read failed, then while it is tried again no more', async () => {
+    const read = startingNode(Date.now() + START_WINDOW_MS)
+    const {latest, stop} = watch(client, feedProfilesQuery(['0xa'], read))
+
+    expect(profilesReading(latest())).toBe(true)
+    await jest.advanceTimersByTimeAsync(500)
+    expect(read).toHaveBeenCalledTimes(1)
+    expect(latest().isFetching).toBe(true)
+    expect(profilesReading(latest())).toBe(false)
+
+    await jest.advanceTimersByTimeAsync(START_WINDOW_MS + 60 * 1000)
+    expect(latest().data).toBeTruthy()
+    expect(profilesReading(latest())).toBe(false)
+    stop()
+  })
+
   it('waits longer between reads while the node does not answer, at most 30 s', async () => {
     const read = startingNode(Infinity)
     const {stop} = watch(client, feedProfilesQuery(['0xa'], read))
 
     await jest.advanceTimersByTimeAsync(10 * 60 * 1000)
 
-    // 2, 4, 8, 16 then 30 s: about 23 reads in 10 minutes, never one a second.
+    // 1, 2, 4, 8, 16 then 30 s (react-query's pause): about 24 reads in 10 minutes, never one a second.
     expect(read.mock.calls.length).toBeGreaterThan(15)
     expect(read.mock.calls.length).toBeLessThan(30)
     stop()
