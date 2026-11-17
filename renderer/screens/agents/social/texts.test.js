@@ -94,6 +94,9 @@ describe('the renderer fills a text as the main process does', () => {
       expect(fillSlots(text, values, {drop: false})).toBe(
         main.fillSlots(text, values, {drop: false})
       )
+      expect(fillSlots('No slot.', values, {required: ['a', 'b']})).toBe(
+        main.fillSlots('No slot.', values, {required: ['a', 'b']})
+      )
     })
     expect(LINE_NAMES).toEqual(Object.keys(DIGEST_LINES))
     const lines = main.namedText(DIGEST_LINES)
@@ -147,9 +150,17 @@ describe('what a run reads, in the agent’s own words', () => {
     // A line it did not write its own for: the app's.
     expect(text).toContain('(2 likes): "Liked twice"')
     expect(text).toContain('@bob tipped you 2 iDNA for "Good morning Idena')
-    // A kind the layout has no slot for is not sent.
-    expect(text).not.toContain('Good morning to you!')
+    // A kind the layout has no slot for goes at the end: what the run counts as read is shown.
+    expect(text).toContain('"Good morning to you!"')
+    expect(text.indexOf('Good morning to you!')).toBeGreaterThan(
+      text.indexOf('tipped you')
+    )
     expect(labels.size).toBeGreaterThan(0)
+  })
+
+  test('a name left empty keeps the app’s line: the item is never an empty line', () => {
+    const plain = digest(null)
+    expect(digest({socialLines: 'tip:\nanswer: \nlike:'}).text).toBe(plain.text)
   })
 
   test('a post holding a slot of its own stays words', () => {
@@ -172,6 +183,10 @@ describe('what a run reads, in the agent’s own words', () => {
     )
     expect(text).toBe(
       'Mine:\n- "Good morning Idena [with a picture or a file]"\n\nAll quiet.'
+    )
+    // A layout without the slot of its own posts: they go at the end.
+    expect(digest({socialDigest: '{{sinceLastRun}}'}, HEAD).text).toBe(
+      'Nothing new since your last run.\n\n- "Good morning Idena [with a picture or a file]"'
     )
   })
 })

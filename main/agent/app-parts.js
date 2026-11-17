@@ -100,7 +100,8 @@ function fillSlots(template, values = {}, {required = [], drop = true} = {}) {
 /**
  * A text of named lines, "name: the line" (B-285: Social's action lines, the lines of what a run reads), read: the
  * line of each name in `names` that the text holds, the first one. One space after the colon is the separator; what
- * follows is the line as written, its own leading spaces kept. A name the text lacks is absent: the app's line stays.
+ * follows is the line as written, its own leading spaces kept. A name the text lacks, or with nothing after it, is
+ * absent: the app's line stays.
  */
 function namedLines(text, names) {
   const lines = {}
@@ -112,6 +113,8 @@ function namedLines(text, names) {
       const name = line.slice(0, at).trim()
       if (!names.includes(name) || name in lines) return
       const rest = line.slice(at + 1)
+      // A name with nothing after it is no line of its own: the app's stays.
+      if (!rest.trim()) return
       lines[name] = rest.startsWith(' ') ? rest.slice(1) : rest
     })
   return lines

@@ -272,6 +272,18 @@ async function ask(
 const IMAGE_PROMPT = '{{prompt}}'
 const IMAGE_SIZE = '1024x1024'
 
+/** The prompt as sent: in the agent's own words when it has some, the prompt cut to the room they leave. */
+function imagePrompt(prompt, own) {
+  const asked = String(prompt || '')
+  if (!own) return asked.slice(0, MAX_IMAGE_PROMPT)
+  const fill = (value) =>
+    fillSlots(own, {prompt: value}, {required: ['prompt'], drop: false})
+  // The words alone, and the two line breaks before a prompt that has no slot.
+  const room =
+    MAX_IMAGE_PROMPT - fill('').length - (own.includes('{{prompt}}') ? 0 : 2)
+  return fill(asked.slice(0, Math.max(0, room))).slice(0, MAX_IMAGE_PROMPT)
+}
+
 function buildImageRequest(
   {provider, address, imageModel, key},
   prompt,
@@ -289,14 +301,7 @@ function buildImageRequest(
     headers,
     body: {
       model: imageModel,
-      prompt: (texts && texts.imagePrompt
-        ? fillSlots(
-            texts.imagePrompt,
-            {prompt: String(prompt || '')},
-            {required: ['prompt'], drop: false}
-          )
-        : String(prompt || '')
-      ).slice(0, MAX_IMAGE_PROMPT),
+      prompt: imagePrompt(prompt, texts && texts.imagePrompt),
       n: 1,
       size: (texts && texts.imageSize && texts.imageSize.trim()) || IMAGE_SIZE,
     },

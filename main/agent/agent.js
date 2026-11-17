@@ -172,7 +172,8 @@ function createAgent({
         : validationAgent(file)
     return agent ? agent.instructions : ''
   }
-  // Its own part for the validation's question, when it changed it (B-282), the same way.
+  // Its own texts (B-282 the validation's system text, B-285 the question's words), when it changed some, the same
+  // way: the whole of its parts, which flipQuestion reads by name.
   const validationPartOf = (agentId) => {
     if (!profiles) return null
     const file = profiles.read()

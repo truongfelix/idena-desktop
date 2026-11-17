@@ -164,7 +164,8 @@ const PICTURES = /(\{\{(?:left|right)\}\})/u
 /**
  * An agent's own question (B-285) as the parts sent: its text cut where the pictures go, then each piece's slots
  * filled (never before: a keyword's description holding "{{left}}" stays words). Each order's pictures go at its
- * first slot; an order the text has no slot for goes at the end, the left one first.
+ * first slot; an order the text has no slot for goes at the end, the left one first, after the keywords when the
+ * text has no slot for them either: an edit never drops the question's data.
  */
 function customParts(template, keywords, pictures) {
   const parts = []
@@ -186,6 +187,8 @@ function customParts(template, keywords, pictures) {
         parts.push(...pictures[side])
       }
     })
+  if (keywords && !String(template).includes('{{keywords}}'))
+    parts.push({type: 'text', text: keywords})
   ;[0, 1].forEach((side) => {
     if (!placed.has(side)) parts.push(...pictures[side])
   })

@@ -86,19 +86,19 @@ function useTextNames(areaName) {
         'The size asked of the service, in the words the service takes.'
       ),
       flipQuestion: t(
-        'The keywords, then where the four pictures of each order go. Pictures without their slot go at the end.'
+        'The keywords, then where the four pictures of each order go. Keywords or pictures without their slot go at the end.'
       ),
       flipQuestionShort: t(
         'Where the four pictures of each order go. Pictures without their slot go at the end.'
       ),
       socialActions: t(
-        'One line for each action, after its name. The app lists the lines of the actions the agent holds; a name you take out keeps the app’s line.'
+        'One line for each action, after its name. The app lists the lines of the actions the agent holds; a name you take out or leave empty keeps the app’s line.'
       ),
       socialDigest: t(
-        'Each slot holds the lines of one kind. A paragraph with nothing to fill it is left out.'
+        'Each slot holds the lines of one kind. A paragraph with nothing to fill it is left out; a kind without its slot goes at the end.'
       ),
       socialLines: t(
-        'One line for each name; a name you take out keeps the app’s line. The slots hold the label the answer names, who wrote it, its text, the text it answers, and for a tip or likes, how many.'
+        'One line for each name; a name you take out or leave empty keeps the app’s line. The slots hold the label the answer names, who wrote it, its text, the text it answers, and for a tip or likes, how many.'
       ),
       [areaName]: null,
     },
@@ -297,6 +297,16 @@ export function AppPartSection({agent, onChange}) {
           <Flex>
             <SecondaryButton onClick={() => setAsking(true)}>
               {t('Unlock to edit')}
+            </SecondaryButton>
+          </Flex>
+        )}
+        {/* Unlocked and nothing changed: the way back, without leaving the page. */}
+        {isOpen && !isChanged && (
+          <Flex>
+            <SecondaryButton
+              onClick={() => setUnlocked((now) => ({...now, [area]: false}))}
+            >
+              {t('Lock again')}
             </SecondaryButton>
           </Flex>
         )}

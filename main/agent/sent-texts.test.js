@@ -67,6 +67,31 @@ describe('a text with slots', () => {
     expect(namedLines(namedText(ACTION_LINES), SOCIAL_ACTIONS)).toEqual(
       ACTION_LINES
     )
+    // A name with nothing after it is no line: the app's stays, never an empty one.
+    expect(namedLines('a:\nb:   ', ['a', 'b'])).toEqual({})
+    expect(socialSystem(['reply'], '', null, 'reply:')).toBe(
+      socialSystem(['reply'], '')
+    )
+  })
+
+  test('the picture prompt is cut to the room the agent’s words leave, never the words', () => {
+    const config = {
+      provider: 'openai',
+      address: 'https://images.example/v1',
+      imageModel: 'img-1',
+      key: 'sk-x',
+    }
+    const long = 'p'.repeat(4000)
+    const after = buildImageRequest(config, long, {
+      imagePrompt: '{{prompt}}\n\nStyle: flat colours.',
+    }).body.prompt
+    expect(after).toHaveLength(4000)
+    expect(after.endsWith('\n\nStyle: flat colours.')).toBe(true)
+    const noSlot = buildImageRequest(config, long, {
+      imagePrompt: 'Style: flat colours.',
+    }).body.prompt
+    expect(noSlot).toHaveLength(4000)
+    expect(noSlot.startsWith('Style: flat colours.\n\npppp')).toBe(true)
   })
 
   test('a shorter text is cut at its own longest', () => {
@@ -149,6 +174,18 @@ describe('an edited flip question', () => {
     // The right order first, as written: its pictures are the right order's.
     expect(parts[1].mediaType).toBe('image/jpeg')
     expect(parts[6].mediaType).toBe('image/png')
+  })
+
+  test('keywords without their slot go at the end, before pictures without theirs', () => {
+    const {parts} = flipQuestion(checkFlip(flip()), '', null, {
+      flipQuestion: 'Which order tells a story?',
+    })
+    expect(parts.map((part) => part.type)).toEqual([
+      'text',
+      'text',
+      ...Array(8).fill('image'),
+    ])
+    expect(parts[1].text).toBe('kite (a toy that flies), storm')
   })
 
   test('pictures without their slot go at the end, the left order first', () => {

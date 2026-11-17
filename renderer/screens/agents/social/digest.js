@@ -461,18 +461,33 @@ export function socialDigest(
     : ''
   const nothing = line('nothing new', {}, 'Nothing new since your last run.')
   const since = line('new', {}, 'Since your last run:')
+  // A kind the agent's layout has no slot for goes at its end: what a run counts as read is always shown.
   const digest =
     texts && texts.socialDigest
-      ? fillSlots(texts.socialDigest, {
-          ownPosts: own.join('\n'),
-          sinceLastRun: empty ? nothing : since,
-          tips: lines.tip.join('\n'),
-          likes: lines.like.join('\n'),
-          answers: lines.answer.join('\n'),
-          tags: lines.tag.join('\n'),
-          posts: lines.post.join('\n'),
-          messages: lines.chat.join('\n'),
-        })
+      ? fillSlots(
+          texts.socialDigest,
+          {
+            ownPosts: own.join('\n'),
+            sinceLastRun: empty ? nothing : since,
+            tips: lines.tip.join('\n'),
+            likes: lines.like.join('\n'),
+            answers: lines.answer.join('\n'),
+            tags: lines.tag.join('\n'),
+            posts: lines.post.join('\n'),
+            messages: lines.chat.join('\n'),
+          },
+          {
+            required: [
+              'ownPosts',
+              'tips',
+              'likes',
+              'answers',
+              'tags',
+              'posts',
+              'messages',
+            ],
+          }
+        )
       : `${ownText}${empty ? nothing : `${since}\n\n${sections.join('\n\n')}`}`
   return {
     text: digest,
