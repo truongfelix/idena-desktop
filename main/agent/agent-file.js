@@ -32,6 +32,8 @@ function exportAgent(agent) {
       ...(agent.internet && agent.internet.mode !== 'off'
         ? {internet: agent.internet}
         : {}),
+      // What it does with the pictures of the posts it reads (B-293): an older build ignores it.
+      ...(agent.postPictures ? {postPictures: agent.postPictures} : {}),
       actions: agent.actions,
       reads: agent.reads,
       events: agent.events,
@@ -107,10 +109,14 @@ function readAgentFile(text, agents = []) {
       actions,
       reads: normalizeAgent({...read, actions}).reads,
       internet: {...read.internet, mode: 'off'},
+      // Its pictures (B-293) shown only to an Anthropic model: another may read text only, the person chooses.
+      postPictures: read.provider === 'anthropic' ? read.postPictures : 'say',
     },
     asked,
     dropped,
     addressLeft,
+    // What the file asked of the internet (B-296), shown before the import: null for Off.
+    askedInternet: read.internet.mode === 'off' ? null : read.internet.mode,
   }
 }
 

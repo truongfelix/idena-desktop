@@ -249,7 +249,7 @@ export function actionCatalog(t) {
       kind: 'read',
       label: t('Read the posts that tag it'),
       info: t(
-        'The posts, replies and comments anywhere on Social that hold @ and its profile name, with the post each one answers. At most the number a day you set (a day in UTC), first come first served: those past it are never read. Without a profile name, nothing tags it.',
+        'The posts, replies and comments anywhere on Social that hold @ and its profile name, with the thread each one is in: its first post and the replies before it, whoever wrote them. At most the number a day you set (a day in UTC), first come first served: those past it are never read. Without a profile name, nothing tags it.',
         {nsSeparator: '!!'}
       ),
       reads: [],

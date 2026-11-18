@@ -40,6 +40,7 @@ import {actionCatalog} from './catalog'
 import {useAgents} from './use-agents'
 import {InstructionsSection, ScheduleSection, useDraft} from './page-sections'
 import {RunNow} from './run-now'
+import {ReadAgain} from './read-again'
 
 function NameField({value, onSave}) {
   const {t} = useTranslation()
@@ -162,6 +163,7 @@ export function AgentPage({id}) {
         </Flex>
         <Flex gap={3} align="center">
           <RunNow agent={agent} paused={list.paused} onDone={refreshActivity} />
+          <ReadAgain agent={agent} onDone={refreshActivity} />
           <SecondaryButton
             onClick={() =>
               run(() => saveAgentFile(id)).then(() => refreshActivity())

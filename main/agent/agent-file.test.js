@@ -74,6 +74,8 @@ describe('an agent as a file', () => {
       provider: 'anthropic',
       address: 'https://api.anthropic.com',
       model: 'claude-sonnet-5-5',
+      // B-293: an Anthropic model is shown the pictures of the posts.
+      postPictures: 'send',
       // A joke agent saved before reads were actions: its tips and its own posts, as it read them (B-262).
       actions: {
         post: {level: 'alone', limit: 1, spendPerDay: null},

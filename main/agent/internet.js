@@ -154,6 +154,13 @@ function searchesOf(data) {
   return Number.isInteger(n) && n > 0 ? n : 0
 }
 
+/** The pages an Anthropic answer opened (B-296, web fetch: no charge but their tokens), 0 when it says none. */
+function pagesOf(data) {
+  const count = data && data.usage && data.usage.server_tool_use
+  const n = count && count.web_fetch_requests
+  return Number.isInteger(n) && n > 0 ? n : 0
+}
+
 module.exports = {
   MAX_PER_ANSWER,
   MAX_SITES,
@@ -164,6 +171,7 @@ module.exports = {
   noSearchReason,
   normalizeInternet,
   normalizeSite,
+  pagesOf,
   searchesLeft,
   searchesOf,
 }

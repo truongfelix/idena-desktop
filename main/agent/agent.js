@@ -29,6 +29,53 @@ const MAX_INPUT_TEXT = 20000
 const MAX_ANSWER_TEXT = 4000
 // A run's plan on Idena Social: several actions, each with a text of a post's length.
 const MAX_PLAN_TEXT = 12000
+// The pictures of the posts a run reads (B-293, renderer/screens/agents/social/digest.js MAX_PICTURES), each one as
+// the renderer drew it: JPEG (or another type the models read), base64, below the Anthropic API's 5 MB a picture (counted on the base64).
+const MAX_PICTURES = 20
+const PICTURE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+const MAX_PICTURE_DATA = 5 * 1024 * 1024
+const PICTURE_ID = /^img[0-9]{1,3}$/u
+// All of a run's pictures, well below the API's request size (32 MB): those past it are left out.
+const MAX_PICTURES_DATA = 20 * 1024 * 1024
+
+/**
+ * The parts of a Social run's question (B-293): its text, then each picture after its name ("img1:"), when the agent
+ * sends them. A picture that is not one the models read, too large or misnamed, is left out; its name then stays in
+ * the text without a picture after it.
+ */
+function socialParts(agent, input, pictures) {
+  const parts = [
+    {type: 'text', text: String(input || '').slice(0, MAX_INPUT_TEXT)},
+  ]
+  if (agent.postPictures !== 'send' || !Array.isArray(pictures)) return parts
+  const seen = new Set()
+  let total = 0
+  pictures
+    .filter(
+      (one) =>
+        one &&
+        typeof one.id === 'string' &&
+        PICTURE_ID.test(one.id) &&
+        PICTURE_TYPES.includes(one.mediaType) &&
+        typeof one.data === 'string' &&
+        one.data.length > 0 &&
+        one.data.length <= MAX_PICTURE_DATA &&
+        /^[A-Za-z0-9+/]+={0,2}$/u.test(one.data)
+    )
+    .filter((one) => !seen.has(one.id) && seen.add(one.id))
+    .slice(0, MAX_PICTURES)
+    .filter((one) => {
+      total += one.data.length
+      return total <= MAX_PICTURES_DATA
+    })
+    .forEach((one) => {
+      parts.push(
+        {type: 'text', text: `${one.id}:`},
+        {type: 'image', mediaType: one.mediaType, data: one.data}
+      )
+    })
+  return parts
+}
 const PLAN_MAX_TOKENS = 4096
 // Stories with 12 prompts of up to 120 words and each story in words (B-268): about 4,000 tokens; room for more.
 const STORY_MAX_TOKENS = 8192
@@ -503,7 +550,7 @@ function createAgent({
      * Social actions it holds (not Off). Returns the model's answer, a plan the app reads and checks action by action
      * (each one then goes through propose).
      */
-    async planSocial({agentId, input, why, timeoutMs} = {}) {
+    async planSocial({agentId, input, pictures, why, timeoutMs} = {}) {
       if (!profiles) throw new Error('no agents')
       const file = profiles.read()
       const agent = file.agents.find((one) => one.id === agentId)
@@ -534,6 +581,7 @@ function createAgent({
         (agent.appParts && agent.appParts.socialActions) || null
       )
       let searched = 0
+      let opened = 0
       const controller = new AbortController()
       writing.add(controller)
       try {
@@ -542,12 +590,7 @@ function createAgent({
           searches
             ? `${system}\n\n${internetLine(agent.internet, searches)}`
             : system,
-          [
-            {
-              type: 'text',
-              text: String(input || '').slice(0, MAX_INPUT_TEXT),
-            },
-          ],
+          socialParts(agent, input, pictures),
           {
             timeoutMs: clampTimeout(timeoutMs),
             signal: controller.signal,
@@ -557,6 +600,9 @@ function createAgent({
             onSearches: (n) => {
               searched += n
               pending.addSearches(agentId, n)
+            },
+            onPages: (n) => {
+              opened += n
             },
           }
         )
@@ -571,12 +617,19 @@ function createAgent({
         throw error
       } finally {
         // Its searches named in Activity, also when the run failed after them (each one was billed, B-274).
-        if (searched)
+        // The pages it opened too (B-296), beside them.
+        if (searched || opened)
           log({
             agentId,
             action: 'webSearch',
             decision: 'alone',
-            detail: `${searched} ${searched === 1 ? 'search' : 'searches'}`,
+            detail: [
+              searched &&
+                `${searched} ${searched === 1 ? 'search' : 'searches'}`,
+              opened && `${opened} ${opened === 1 ? 'page' : 'pages'} opened`,
+            ]
+              .filter(Boolean)
+              .join(', '),
           })
         writing.delete(controller)
       }
@@ -858,4 +911,4 @@ function createAgent({
   }
 }
 
-module.exports = {createAgent, clampTimeout}
+module.exports = {createAgent, clampTimeout, socialParts}

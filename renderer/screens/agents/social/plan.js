@@ -1,4 +1,5 @@
 import {LIKE} from '../../social/contract'
+import {idKey} from '../../social/feed'
 
 // An agent's answer on Idena Social read as a list of actions (B-239): only the actions it holds, only on the labels
 // the digest gave, each text a post's length. Whatever else the answer holds is dropped, with the reason: the model
@@ -46,6 +47,7 @@ export function readPlan(answer, digest, held, me, done = {}) {
   const dropped = []
   const seen = new Set()
   const liked = done.liked || new Set()
+  const tipped = done.tipped || new Set()
   const answered = done.answered || new Set()
   value.actions.forEach((raw) => {
     const row = raw && typeof raw === 'object' ? raw : {}
@@ -85,10 +87,12 @@ export function readPlan(answer, digest, held, me, done = {}) {
     if (item.kind !== 'post') return drop('not a post')
     if (item.author === me) return drop('its own post')
     if (action === 'reply' && !item.target) return drop('cannot be answered')
-    if (action === 'reply' && answered.has(item.node.id))
+    if (action === 'reply' && answered.has(idKey(item.node.id)))
       return drop('answered already')
     if (action === 'like' && liked.has(item.node.id))
       return drop('liked already')
+    if (action === 'tip' && tipped.has(idKey(item.node.id)))
+      return drop('tipped already')
     seen.add(key)
     actions.push({action, label, item, text: action === 'reply' ? text : ''})
     return undefined
@@ -96,16 +100,25 @@ export function readPlan(answer, digest, held, me, done = {}) {
   return {actions, dropped}
 }
 
-/** What the account already did on each post: {liked, answered}, sets of post ids (from the feed). */
+/**
+ * What the account already did on each post: {liked, answered}, sets of post ids (from the feed); `answered` holds
+ * them as idKey reads them. A post answered has a reply of its own under it, or a comment of its own that answers it
+ * (B-295: the feed files every comment under its reply, what it answers is its replyTo).
+ */
 export function doneOnFeed(feed, me) {
   const liked = new Set()
   const answered = new Set()
+  // Tipped by it (B-295): a second tip is iDNA, refused as a second like is.
+  const tipped = new Set()
   const visit = (node) => {
     if (node.likeCalls.some((call) => call.author === me)) liked.add(node.id)
+    if (node.tips.some((tip) => tip.from === me)) tipped.add(idKey(node.id))
     if (node.replies.some((reply) => reply.call.author === me))
-      answered.add(node.id)
+      answered.add(idKey(node.id))
+    if (node.call.author === me && node.call.replyTo)
+      answered.add(idKey(node.call.replyTo))
     node.replies.forEach(visit)
   }
   feed.forEach(visit)
-  return {liked, answered}
+  return {liked, answered, tipped}
 }

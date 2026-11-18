@@ -5,6 +5,8 @@ import {mostCost} from './execute'
 import {tagsLeftOf} from './tags'
 import {actionRules} from './rules'
 import {shortAddress} from '../../social/people'
+import {loadPictures} from './pictures'
+import {idKey} from '../../social/feed'
 
 // One run of an agent on Idena Social (B-239, B-240): the app reads what came since its read point (digest.js), the
 // model answers with the actions it wants (planSocial in the main process: the app's frame and its Instructions),
@@ -144,16 +146,51 @@ export async function runSocialAgent(agent, social, deps) {
     // Without a reader, nothing is known of anyone: no criterion that needs it passes.
     facts = deps.readAuthors ? await deps.readAuthors([...authors], needs) : {}
   }
+  // What it did already (B-295): its replies, likes and tips on the feed, and those waiting in To approve; read
+  // again (its point moved back), a post is not answered twice, nor liked or tipped twice (readPlan), and a
+  // conversation whose answer waits is not read again.
+  const waitingNow = ((await call('pending')) || []).filter(
+    (item) => item.agentId === agent.id
+  )
+  const already = doneOnFeed(social.feed || [], social.me)
+  const {answered} = already
+  waitingNow.forEach(({action, target}) => {
+    if (!target) return
+    if (action === 'message' && Array.isArray(target.others))
+      target.others.forEach((one) =>
+        answered.add(`chat:${String(one).toLowerCase()}`)
+      )
+    if (target.postId === undefined) return
+    if (action === 'reply') answered.add(idKey(target.postId))
+    if (action === 'like') already.liked.add(target.postId)
+    if (action === 'tip') already.tipped.add(idKey(target.postId))
+  })
+  const options = {
+    reads: agent.reads,
+    answeredIds: answered,
+    who,
+    facts,
+    tagsLeft,
+    postsLeft,
+    texts: agent.appParts || null,
+  }
+  // The pictures of the posts it reads (B-293), when its model is shown them: those the digest would name, loaded
+  // first; only those loaded are named (the others keep the placeholder), within MAX_PICTURES.
+  let loaded = null
+  if (agent.postPictures === 'send' && typeof deps.loadPicture === 'function') {
+    const wanted = new Map()
+    socialDigest(
+      social,
+      {...options, pictures: {collect: wanted}},
+      {point, scanned}
+    )
+    loaded = wanted.size
+      ? await loadPictures(wanted, deps.loadPicture)
+      : new Map()
+  }
   const digest = socialDigest(
     social,
-    {
-      reads: agent.reads,
-      who,
-      facts,
-      tagsLeft,
-      postsLeft,
-      texts: agent.appParts || null,
-    },
+    {...options, pictures: loaded ? {have: new Set(loaded.keys())} : null},
     {point, scanned}
   )
   // The posts that tag it past its questions of the day: never read, named in Activity once the point passed them.
@@ -194,18 +231,16 @@ export async function runSocialAgent(agent, social, deps) {
     await tellPostsPassed()
     return {result: 'nothing new', detail: ''}
   }
+  const pictures = loaded
+    ? digest.pictures.map(({id, media}) => ({id, ...loaded.get(media)}))
+    : []
   const {answer} = await call('planSocial', {
     agentId: agent.id,
     input: digest.text,
+    ...(pictures.length ? {pictures} : {}),
     why: deps.why,
   })
-  const plan = readPlan(
-    answer,
-    digest,
-    held,
-    social.me,
-    doneOnFeed(social.feed || [], social.me)
-  )
+  const plan = readPlan(answer, digest, held, social.me, already)
   const log = (action, fields) =>
     call('didAction', {agentId: agent.id, action, ...fields})
   // Read: the point moves before any action, so a run stopped midway (the app closed, the window reloaded) never
@@ -230,13 +265,11 @@ export async function runSocialAgent(agent, social, deps) {
   const count = {alone: 0, ask: 0, skipped: 0, failed: 0}
   // Once per author, and a message only to who wrote first (B-281).
   // What earlier runs left in To approve counts for its author too.
-  const waiting = ((await call('pending')) || [])
-    .filter((item) => item.agentId === agent.id)
-    .map(({action, target}) => {
-      if (target && Array.isArray(target.others))
-        return {action, whom: target.others}
-      return {action, whom: target && target.author ? [target.author] : []}
-    })
+  const waiting = waitingNow.map(({action, target}) => {
+    if (target && Array.isArray(target.others))
+      return {action, whom: target.others}
+    return {action, whom: target && target.author ? [target.author] : []}
+  })
   const noted = (await call('actsDone', {agentId: agent.id})) || []
   const rules = actionRules(agent.actions, social, scanned, waiting, noted)
   const names = social.names || {}

@@ -259,6 +259,11 @@ function normalizeActions(value) {
   )
 }
 
+/** What a run does with the pictures of the posts it reads (B-293). */
+const POST_PICTURES = ['send', 'say']
+const defaultPostPictures = (provider) =>
+  provider === 'anthropic' ? 'send' : 'say'
+
 /** One agent, each field checked, a broken one replaced by its default; `id` given when the saved one is not one. */
 function normalizeAgent(input, {id = newAgentId} = {}) {
   const value = input && typeof input === 'object' ? input : {}
@@ -325,6 +330,11 @@ function normalizeAgent(input, {id = newAgentId} = {}) {
     effort: normalizeEffort(value.effort),
     // Its access to the internet (B-294): Off for an agent saved before.
     internet: normalizeInternet(value.internet),
+    // The pictures of the posts it reads (B-293): 'send' (shown to the model) or 'say' (only named). Saved before,
+    // or not set: sent to an Anthropic model (they all read pictures), named for another (it may read text only).
+    postPictures: POST_PICTURES.includes(value.postPictures)
+      ? value.postPictures
+      : defaultPostPictures(provider),
     reportThresholds,
     // Its actions read with the Flips area's steps (B-258): see withFlipPictures.
     flipSteps: true,

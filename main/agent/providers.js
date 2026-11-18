@@ -1,6 +1,6 @@
 const axios = require('axios')
 const {fillSlots} = require('./app-parts')
-const {searchesOf} = require('./internet')
+const {pagesOf, searchesOf} = require('./internet')
 
 // The agent's calls to its model: an OpenAI-compatible chat server (on this computer, as Ollama, LM Studio or
 // llama.cpp serve, or a hosted service) or the Anthropic Messages API. One request per question, no redirects
@@ -245,7 +245,7 @@ function providerError(error) {
  * One question to the model: a system text and the user's parts (text, or image with mediaType and base64 data).
  * Resolves with the reply's text. `timeoutMs` ends it, as does `signal`. `tools`: an Anthropic request's internet
  * tools (B-294); `onSearches(n)` is told the searches each request of the answer made (each one is billed), also
- * when a later one fails.
+ * when a later one fails; `onPages(n)` the pages they opened (B-296).
  */
 async function ask(
   config,
@@ -257,6 +257,7 @@ async function ask(
     maxTokens,
     tools,
     onSearches = () => {},
+    onPages = () => {},
     request = axios.request,
   } = {}
 ) {
@@ -290,7 +291,10 @@ async function ask(
     }
   }
   let response = await send(body)
-  if (config.provider === 'anthropic') onSearches(searchesOf(response.data))
+  if (config.provider === 'anthropic') {
+    onSearches(searchesOf(response.data))
+    onPages(pagesOf(response.data))
+  }
   // A turn the service paused in its tools' loop goes on when its answer so far (every paused part, in order) is
   // sent back as it came.
   let turn = []
@@ -311,6 +315,7 @@ async function ask(
     // eslint-disable-next-line no-await-in-loop
     response = await send({...body, messages})
     onSearches(searchesOf(response.data))
+    onPages(pagesOf(response.data))
   }
   const problem = stopProblem(config.provider, response.data)
   if (problem)
