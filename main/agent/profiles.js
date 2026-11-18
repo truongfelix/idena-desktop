@@ -3,6 +3,7 @@ const fs = require('fs-extra')
 const {criteriaField} = require('./criteria')
 const {normalizeParts} = require('./app-parts')
 const {defaultParts} = require('./app-texts')
+const {normalizeInternet} = require('./internet')
 const {
   ACTIONS,
   LEVELS,
@@ -322,6 +323,8 @@ function normalizeAgent(input, {id = newAgentId} = {}) {
     // The model's longest answer (null: the app's choice for each task) and its effort ('': the model's default).
     maxTokens: normalizeMaxTokens(value.maxTokens),
     effort: normalizeEffort(value.effort),
+    // Its access to the internet (B-294): Off for an agent saved before.
+    internet: normalizeInternet(value.internet),
     reportThresholds,
     // Its actions read with the Flips area's steps (B-258): see withFlipPictures.
     flipSteps: true,

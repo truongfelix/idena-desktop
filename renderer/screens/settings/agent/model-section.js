@@ -11,6 +11,7 @@ import {
 } from '../../../shared/components/components'
 import {SettingsSection} from '../components'
 import {REPORT_REASONS} from '../../validation/practice'
+import {InternetFields} from './internet-fields'
 
 /** The largest longest answer kept (main/agent/settings.js MAX_ANSWER_TOKENS). */
 const MAX_ANSWER_TOKENS = 128000
@@ -347,6 +348,9 @@ export function ModelSection({
         </SimpleGrid>
         {'effort' in settings && (
           <AnswerFields settings={settings} onChange={onChange} />
+        )}
+        {'internet' in settings && (
+          <InternetFields settings={settings} onChange={onChange} />
         )}
         {settings.provider !== 'anthropic' &&
           settings.actions &&

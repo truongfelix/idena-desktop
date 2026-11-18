@@ -64,6 +64,13 @@ describe('agent profiles', () => {
       budgetPerDay: null,
       maxTokens: null,
       effort: '',
+      internet: {
+        mode: 'off',
+        sites: 'block',
+        list: [],
+        perAnswer: 3,
+        perDay: 15,
+      },
       reportThresholds: REPORT_THRESHOLDS,
       // Reads nothing and runs on no event until the person says so (B-255).
       reads: {

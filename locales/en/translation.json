@@ -2328,5 +2328,17 @@
   "Your node has no connection: your answers cannot reach the network": "Your node has no connection: your answers cannot reach the network",
   "Your short answers are not in a block yet: keep the app open and connected": "Your short answers are not in a block yet: keep the app open and connected",
   "Your answers are not in a block yet: keep the app open and connected": "Your answers are not in a block yet: keep the app open and connected",
-  "Your answers were sent to your node": "Your answers were sent to your node"
+  "Your answers were sent to your node": "Your answers were sent to your node",
+  "No web search: {{detail}}": "No web search: {{detail}}",
+  "Searched the web: {{detail}}": "Searched the web: {{detail}}",
+  "Internet": "Internet",
+  "Search the web": "Search the web",
+  "Search the web and open pages": "Search the web and open pages",
+  "The internet works only with the Anthropic API: this service is sent no web tools, and the agent answers without them.": "The internet works only with the Anthropic API: this service is sent no web tools, and the agent answers without them.",
+  "Searches in one answer": "Searches in one answer",
+  "Searches a day": "Searches a day",
+  "Sites": "Sites",
+  "Every site but these": "Every site but these",
+  "Only these sites": "Only these sites",
+  "The searches run at Anthropic, not from this computer: what the agent searches for is sent there. Each search is billed by Anthropic (10 USD per 1,000 searches), and what the agent reads on the web is billed as input. One site per line, as example.com or example.com/blog; an empty list: every site.": "The searches run at Anthropic, not from this computer: what the agent searches for is sent there. Each search is billed by Anthropic (10 USD per 1,000 searches), and what the agent reads on the web is billed as input. One site per line, as example.com or example.com/blog; an empty list: every site."
 }

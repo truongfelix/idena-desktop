@@ -28,6 +28,10 @@ function exportAgent(agent) {
       ...(agent.imageModel ? {imageModel: agent.imageModel} : {}),
       ...(agent.maxTokens ? {maxTokens: agent.maxTokens} : {}),
       ...(agent.effort ? {effort: agent.effort} : {}),
+      // Its internet (B-294), when it is not Off: an older build ignores it, and imports the agent without it.
+      ...(agent.internet && agent.internet.mode !== 'off'
+        ? {internet: agent.internet}
+        : {}),
       actions: agent.actions,
       reads: agent.reads,
       events: agent.events,
@@ -95,9 +99,15 @@ function readAgentFile(text, agents = []) {
   const actions = Object.fromEntries(
     Object.entries(asked).map(([name, row]) => [name, {...row, level: 'off'}])
   )
-  // Its reads follow its actions, Off as imported (B-262).
+  // Its reads follow its actions, Off as imported (B-262). Its internet comes in Off too (B-294), its sites and limits
+  // kept: the person turns it on, as the actions.
   return {
-    agent: {...read, actions, reads: normalizeAgent({...read, actions}).reads},
+    agent: {
+      ...read,
+      actions,
+      reads: normalizeAgent({...read, actions}).reads,
+      internet: {...read.internet, mode: 'off'},
+    },
     asked,
     dropped,
     addressLeft,
