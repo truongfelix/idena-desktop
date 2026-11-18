@@ -23,7 +23,7 @@ const textDecoder = new TextDecoder()
 export function PostText({message, lines}) {
   const {t} = useTranslation()
   const cid = ipfsCid(message)
-  const {data, isLoading, isError, refetch} = useIpfsContent(cid)
+  const {data, isLoading, isError, isFetching, refetch} = useIpfsContent(cid)
   if (cid) {
     if (isLoading)
       return (
@@ -42,6 +42,7 @@ export function PostText({message, lines}) {
           <Button
             variant="link"
             size="sm"
+            isLoading={isFetching}
             onClick={(e) => {
               e.stopPropagation()
               refetch()
@@ -168,7 +169,7 @@ function MediaElement({src, type, maxH, bytes}) {
 
 function IpfsMedia({cid, type, maxH}) {
   const {t} = useTranslation()
-  const {data, isLoading, isError, refetch} = useIpfsContent(cid)
+  const {data, isLoading, isError, isFetching, refetch} = useIpfsContent(cid)
   const url = React.useMemo(
     () => (data ? URL.createObjectURL(new Blob([data], {type})) : null),
     [data, type]
@@ -194,6 +195,7 @@ function IpfsMedia({cid, type, maxH}) {
         <Button
           variant="link"
           size="sm"
+          isLoading={isFetching}
           onClick={(e) => {
             e.stopPropagation()
             refetch()
