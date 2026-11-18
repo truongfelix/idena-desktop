@@ -264,14 +264,19 @@ async function ask(
     maxTokens,
     tools: config.provider === 'anthropic' ? tools : undefined,
   })
+  // One deadline for the whole answer, its resumed requests included.
+  const deadline = timeoutMs ? Date.now() + timeoutMs : null
   const send = async (data) => {
+    const left = deadline === null ? timeoutMs : deadline - Date.now()
+    if (deadline !== null && left <= 0)
+      throw new Error('no answer before the deadline')
     try {
       return await request({
         method: 'post',
         url,
         headers,
         data,
-        timeout: timeoutMs,
+        timeout: left,
         signal,
         maxRedirects: 0,
         maxContentLength: MAX_REPLY_BYTES,
@@ -285,7 +290,9 @@ async function ask(
   }
   let response = await send(body)
   if (config.provider === 'anthropic') onSearches(searchesOf(response.data))
-  // A turn the service paused in its tools' loop goes on when its answer so far is sent back as it came.
+  // A turn the service paused in its tools' loop goes on when its answer so far (every paused part, in order) is
+  // sent back as it came.
+  let turn = []
   for (
     let resumes = 0;
     config.provider === 'anthropic' &&
@@ -295,10 +302,11 @@ async function ask(
   ) {
     if (resumes >= MAX_RESUMES)
       throw new Error('the model searched too long without an answer')
-    const messages = [
-      ...body.messages,
-      {role: 'assistant', content: response.data.content},
+    turn = [
+      ...turn,
+      ...(Array.isArray(response.data.content) ? response.data.content : []),
     ]
+    const messages = [...body.messages, {role: 'assistant', content: turn}]
     // eslint-disable-next-line no-await-in-loop
     response = await send({...body, messages})
     onSearches(searchesOf(response.data))
@@ -306,7 +314,20 @@ async function ask(
   const problem = stopProblem(config.provider, response.data)
   if (problem)
     throw stopError(problem, body.max_tokens || body.max_completion_tokens)
-  return replyText(config.provider, response.data)
+  return replyText(
+    config.provider,
+    turn.length
+      ? {
+          ...response.data,
+          content: [
+            ...turn,
+            ...(Array.isArray(response.data.content)
+              ? response.data.content
+              : []),
+          ],
+        }
+      : response.data
+  )
 }
 
 /**

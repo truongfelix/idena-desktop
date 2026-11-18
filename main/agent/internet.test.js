@@ -4,6 +4,7 @@ const fs = require('fs-extra')
 const {
   internetLine,
   internetTools,
+  noSearchReason,
   normalizeInternet,
   normalizeSite,
   searchesLeft,
@@ -337,6 +338,28 @@ describe('the Social run with internet', () => {
     )
   })
 
+  test('a run that fails after its searches still names them in Activity', async () => {
+    model.mockImplementationOnce(async (_c, _s, _p, {onSearches}) => {
+      onSearches(2)
+      throw new Error('the model answered HTTP 529')
+    })
+    const agent = start([agentOf({mode: 'search', perAnswer: 3, perDay: 5})])
+    await expect(
+      agent.handle('planSocial', {agentId: ID, input: 'x'})
+    ).rejects.toThrow('529')
+    const lines = await agent.handle('activity', {agentId: ID})
+    expect(lines).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({action: 'social', decision: 'failed'}),
+        expect.objectContaining({
+          action: 'webSearch',
+          decision: 'alone',
+          detail: '2 searches',
+        }),
+      ])
+    )
+  })
+
   test('another service: no tools, Activity says why', async () => {
     const agent = start([agentOf({mode: 'search'}, 'openai')])
     await agent.handle('planSocial', {agentId: ID, input: 'x'})
@@ -370,7 +393,11 @@ describe('the agent file with internet', () => {
     })
     const text = exportAgent(on)
     expect(JSON.parse(text).internet).toEqual(on.internet)
-    expect(readAgentFile(text).agent.internet).toEqual(on.internet)
+    // Read back Off, as the actions: its sites and limits kept for the person to turn it on.
+    expect(readAgentFile(text).agent.internet).toEqual({
+      ...on.internet,
+      mode: 'off',
+    })
     const off = normalizeAgent({
       name: 'Quiet',
       provider: 'anthropic',
@@ -378,5 +405,84 @@ describe('the agent file with internet', () => {
     })
     expect(JSON.parse(exportAgent(off))).not.toHaveProperty('internet')
     expect(readAgentFile(exportAgent(off)).agent.internet.mode).toBe('off')
+  })
+})
+
+describe('the review fixes (B-294)', () => {
+  const config = {
+    provider: 'anthropic',
+    address: 'https://api.anthropic.com',
+    model: 'claude-x',
+    key: 'sk-ant-secret',
+  }
+  const q = [{type: 'text', text: 'q'}]
+
+  test('a turn paused twice is sent back with both parts, in order, and its answer read over all of them', async () => {
+    const a = [
+      {type: 'server_tool_use', id: 's1', name: 'web_search', input: {}},
+    ]
+    const b = [
+      {type: 'web_search_tool_result', tool_use_id: 's1', content: []},
+      {type: 'server_tool_use', id: 's2', name: 'web_search', input: {}},
+    ]
+    const request = jest
+      .fn()
+      .mockResolvedValueOnce({data: {stop_reason: 'pause_turn', content: a}})
+      .mockResolvedValueOnce({data: {stop_reason: 'pause_turn', content: b}})
+      .mockResolvedValueOnce({
+        data: {
+          stop_reason: 'end_turn',
+          content: [
+            {type: 'web_search_tool_result', tool_use_id: 's2', content: []},
+            {type: 'text', text: 'done'},
+          ],
+        },
+      })
+    await expect(ask(config, 's', q, {request})).resolves.toBe('done')
+    expect(request.mock.calls[2][0].data.messages[1]).toEqual({
+      role: 'assistant',
+      content: [...a, ...b],
+    })
+  })
+
+  test('one deadline for the whole answer: a resume gets what is left of it, none past it', async () => {
+    let now = 1000
+    const spy = jest.spyOn(Date, 'now').mockImplementation(() => now)
+    try {
+      const request = jest.fn().mockImplementation(async () => {
+        now += 40000
+        return {data: {stop_reason: 'pause_turn', content: []}}
+      })
+      await expect(
+        ask(config, 's', q, {timeoutMs: 60000, request})
+      ).rejects.toThrow('no answer before the deadline')
+      expect(request.mock.calls.map(([r]) => r.timeout)).toEqual([60000, 20000])
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  test('Only these sites with no site kept: no search at all, and the reason', () => {
+    const agent = {
+      provider: 'anthropic',
+      internet: {mode: 'search', sites: 'allow', list: ['not a site']},
+    }
+    expect(searchesLeft(agent, 0)).toBe(0)
+    expect(noSearchReason(agent, 0)).toBe('no site allowed')
+    expect(
+      noSearchReason({provider: 'anthropic', internet: {mode: 'off'}}, 0)
+    ).toBe('off')
+    expect(
+      noSearchReason({provider: 'anthropic', internet: {mode: 'search'}}, 0)
+    ).toBe(null)
+  })
+
+  test('the sources go in the reply, inside the one JSON object', () => {
+    expect(internetLine({mode: 'search'}, 2)).toContain(
+      "the reply's own text with the links"
+    )
+    expect(internetLine({mode: 'search'}, 2)).toContain(
+      'one JSON object and nothing else'
+    )
   })
 })

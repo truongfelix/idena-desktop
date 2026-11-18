@@ -7,7 +7,12 @@ const {checkFlip, flipQuestion, mediaType, readFlipAnswer} = require('./flips')
 const {readStories, storyQuestion, storySystem} = require('./stories')
 const {appTexts} = require('./app-texts')
 const {socialHeld, socialSystem} = require('./social')
-const {internetLine, internetTools, searchesLeft} = require('./internet')
+const {
+  internetLine,
+  internetTools,
+  noSearchReason,
+  searchesLeft,
+} = require('./internet')
 const providers = require('./providers')
 
 // The agent part of the main process: the renderer's one way to the agent (the "agent" channel). It keeps the
@@ -517,17 +522,11 @@ function createAgent({
       // What started the run, before its question (B-274): every question billed is named in Activity.
       if (RUN_KINDS.includes(why)) log({agentId, action: 'run', decision: why})
       // Its internet (B-294): the searches left in this answer, within its searches a day; none, no tools.
-      const searches = searchesLeft(agent, pending.searchesToday(agentId))
-      if (agent.internet && agent.internet.mode !== 'off' && !searches)
-        log({
-          agentId,
-          action: 'webSearch',
-          decision: 'off',
-          detail:
-            agent.provider === 'anthropic'
-              ? 'searches a day reached'
-              : 'only with the Anthropic API',
-        })
+      const today = pending.searchesToday(agentId)
+      const searches = searchesLeft(agent, today)
+      const noSearch = noSearchReason(agent, today)
+      if (noSearch && noSearch !== 'off')
+        log({agentId, action: 'webSearch', decision: 'off', detail: noSearch})
       const system = socialSystem(
         held,
         agent.instructions,
@@ -561,13 +560,6 @@ function createAgent({
             },
           }
         )
-        if (searched)
-          log({
-            agentId,
-            action: 'webSearch',
-            decision: 'alone',
-            detail: `${searched} ${searched === 1 ? 'search' : 'searches'}`,
-          })
         return {held, answer: String(answer || '').slice(0, MAX_PLAN_TEXT)}
       } catch (error) {
         log({
@@ -578,6 +570,14 @@ function createAgent({
         })
         throw error
       } finally {
+        // Its searches named in Activity, also when the run failed after them (each one was billed, B-274).
+        if (searched)
+          log({
+            agentId,
+            action: 'webSearch',
+            decision: 'alone',
+            detail: `${searched} ${searched === 1 ? 'search' : 'searches'}`,
+          })
         writing.delete(controller)
       }
     },
