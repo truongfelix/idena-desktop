@@ -106,6 +106,8 @@ function noSearchReason(agent, today) {
 function internetTools(internet, searches) {
   const value = normalizeInternet(internet)
   if (value.mode === 'off' || !searches) return []
+  // Only these sites with none kept: no tools, never every site.
+  if (value.sites === 'allow' && !value.list.length) return []
   const sites = value.list.length
     ? {
         [value.sites === 'allow' ? 'allowed_domains' : 'blocked_domains']:

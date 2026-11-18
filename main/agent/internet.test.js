@@ -445,6 +445,17 @@ describe('the review fixes (B-294)', () => {
     })
   })
 
+  test('a run stopped by the app reads as stopped, also when its deadline passed', async () => {
+    const controller = new AbortController()
+    const request = jest.fn().mockImplementation(async () => {
+      controller.abort()
+      return {data: {stop_reason: 'pause_turn', content: []}}
+    })
+    await expect(
+      ask(config, 's', q, {timeoutMs: 1, signal: controller.signal, request})
+    ).rejects.toThrow('stopped')
+  })
+
   test('one deadline for the whole answer: a resume gets what is left of it, none past it', async () => {
     let now = 1000
     const spy = jest.spyOn(Date, 'now').mockImplementation(() => now)
@@ -469,6 +480,7 @@ describe('the review fixes (B-294)', () => {
     }
     expect(searchesLeft(agent, 0)).toBe(0)
     expect(noSearchReason(agent, 0)).toBe('no site allowed')
+    expect(internetTools(agent.internet, 3)).toEqual([])
     expect(
       noSearchReason({provider: 'anthropic', internet: {mode: 'off'}}, 0)
     ).toBe('off')

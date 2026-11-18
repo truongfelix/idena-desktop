@@ -268,6 +268,7 @@ async function ask(
   const deadline = timeoutMs ? Date.now() + timeoutMs : null
   const send = async (data) => {
     const left = deadline === null ? timeoutMs : deadline - Date.now()
+    if (signal && signal.aborted) throw new Error('stopped')
     if (deadline !== null && left <= 0)
       throw new Error('no answer before the deadline')
     try {
