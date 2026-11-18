@@ -1,5 +1,5 @@
 import {
-  ERROR_RETRY_MS,
+  STARTING_RETRY_MS,
   MAX_IPFS_READS,
   MISSING_RETRY_MS,
   limitedRunner,
@@ -70,13 +70,11 @@ function loadAsInWindow() {
       ...require('react-query'),
       // eslint-disable-next-line global-require
       ...require('./hooks'),
-      // eslint-disable-next-line global-require
-      node: require('./node'),
     }
   })
   return loaded
 }
-const {QueryClient, QueryObserver, ipfsContentQuery, node} = loadAsInWindow()
+const {QueryClient, QueryObserver, ipfsContentQuery} = loadAsInWindow()
 
 /** Watches a query as useQuery does; `latest()` is the last result seen. */
 function watch(client, query) {
@@ -99,47 +97,24 @@ describe('ipfsContentQuery', () => {
     jest.useRealTimers()
   })
 
-  it('does not send a queued read whose view is gone', async () => {
-    const held = []
-    node.socialRpc.mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          held.push(() => resolve('0x01'))
-        })
-    )
-    const cids = Array.from({length: MAX_IPFS_READS + 1}, (_, i) => `q${i}`)
-    const views = cids.map((cid) => watch(client, ipfsContentQuery(cid)))
-    await jest.advanceTimersByTimeAsync(100)
-    expect(node.socialRpc).toHaveBeenCalledTimes(MAX_IPFS_READS)
-
-    views[MAX_IPFS_READS].stop()
-    held.forEach((release) => release())
-    await jest.advanceTimersByTimeAsync(100)
-
-    expect(node.socialRpc).toHaveBeenCalledTimes(MAX_IPFS_READS)
-    expect(node.socialRpc.mock.calls.map((call) => call[1][0])).not.toContain(
-      cids[MAX_IPFS_READS]
-    )
-    expect(views[0].latest().data).toEqual(new Uint8Array([1]))
-    views.slice(0, MAX_IPFS_READS).forEach(({stop}) => stop())
-    node.socialRpc.mockReset()
-  })
-
-  it('asks again soon after a node that is starting refused the read', async () => {
-    let started = false
+  it('keeps loading while a node that is starting refuses the read, then shows it', async () => {
+    let refusals = 3
     const read = jest.fn(async () => {
-      if (!started)
+      if (refusals > 0) {
+        refusals -= 1
         throw new Error('the method ipfs_get does not exist/is not available')
+      }
       return '0x0102'
     })
     const {latest, stop} = watch(client, ipfsContentQuery('bafy4', read))
 
-    await jest.advanceTimersByTimeAsync(1000)
-    expect(latest().isError).toBe(true)
-
-    started = true
-    await jest.advanceTimersByTimeAsync(ERROR_RETRY_MS)
+    await jest.advanceTimersByTimeAsync(STARTING_RETRY_MS + 1000)
     expect(read).toHaveBeenCalledTimes(2)
+    expect(latest().isLoading).toBe(true)
+    expect(latest().isError).toBe(false)
+
+    await jest.advanceTimersByTimeAsync(3 * STARTING_RETRY_MS)
+    expect(read).toHaveBeenCalledTimes(4)
     expect(latest().data).toEqual(new Uint8Array([1, 2]))
     stop()
   })

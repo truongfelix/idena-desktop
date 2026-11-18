@@ -19,8 +19,9 @@ export function useSocialIdentity(address) {
 export const MAX_IPFS_READS = 4
 /** Content no node had is asked again after this pause (B-288): it may turn up later. */
 export const MISSING_RETRY_MS = 10 * 60 * 1000
-/** A read that failed (the node starting or stopped) is asked again after this pause. */
-export const ERROR_RETRY_MS = 30 * 1000
+/** A node that is starting refuses ipfs_get for some seconds: the read is tried again this often, this many times. */
+export const STARTING_RETRY_MS = 5 * 1000
+export const STARTING_RETRIES = 6
 /** How long the app waits for one ipfs_get once it is sent: the node gives up first. */
 const IPFS_TIMEOUT = 130 * 1000
 
@@ -49,26 +50,20 @@ export function limitedRunner(limit) {
 
 const ipfsReads = limitedRunner(MAX_IPFS_READS)
 
-/**
- * One ipfs_get through the node, in the window's queue of IPFS reads. A read whose view is gone by its turn
- * (`signal` aborted: react-query cancels a query no view watches) is not sent.
- */
-const readIpfs = (cid, signal) =>
-  ipfsReads(() => {
-    if (signal && signal.aborted) throw new Error('not read: no longer shown')
-    return socialRpc('ipfs_get', [cid], IPFS_TIMEOUT)
-  })
+/** One ipfs_get through the node, in the window's queue of IPFS reads. */
+const readIpfs = (cid) =>
+  ipfsReads(() => socialRpc('ipfs_get', [cid], IPFS_TIMEOUT))
 
-/** The query of an "ipfs://" reference's content; `read(cid, signal)` answers the node's hex (readIpfs). */
+/** The query of an "ipfs://" reference's content; `read(cid)` answers the node's hex (readIpfs). */
 export function ipfsContentQuery(cid, read = readIpfs) {
   return {
     queryKey: ['social-ipfs', cid],
-    queryFn: async ({signal}) => {
+    queryFn: async () => {
       let hex
       try {
-        hex = await read(cid, signal)
+        hex = await read(cid)
       } catch (fetchError) {
-        // A node that is starting refuses ipfs_get as any method but bcn_: an error, asked again soon.
+        // A node that is starting refuses ipfs_get as any method but bcn_: tried again (retry), not "missing".
         if (isMissingMethod(fetchError)) throw fetchError
         // The node names IPFS when no peer has the content ("timeout while reading data from ipfs").
         if (/ipfs/i.test(String(fetchError?.message))) return null
@@ -83,12 +78,12 @@ export function ipfsContentQuery(cid, read = readIpfs) {
     },
     enabled: Boolean(cid),
     staleTime: Infinity,
-    retry: false,
-    // Found, it never changes (a CID names its content); missing or failed, asked again while it is on screen.
-    refetchInterval: (data, query) => {
-      if (query && query.state.status === 'error') return ERROR_RETRY_MS
-      return data === null ? MISSING_RETRY_MS : false
-    },
+    // The view keeps "Loading…" while a starting node's refusal is tried again; any other error is shown at once.
+    retry: (failures, error) =>
+      isMissingMethod(error) && failures < STARTING_RETRIES,
+    retryDelay: STARTING_RETRY_MS,
+    // Found, it never changes (a CID names its content); missing, asked again while it is on screen.
+    refetchInterval: (data) => (data === null ? MISSING_RETRY_MS : false),
   }
 }
 
