@@ -146,20 +146,24 @@ export async function runSocialAgent(agent, social, deps) {
     // Without a reader, nothing is known of anyone: no criterion that needs it passes.
     facts = deps.readAuthors ? await deps.readAuthors([...authors], needs) : {}
   }
-  // What it answered already (B-295): its replies on the feed, and those waiting in To approve; a post read again
-  // (its point moved back) is then not answered twice.
+  // What it did already (B-295): its replies, likes and tips on the feed, and those waiting in To approve; read
+  // again (its point moved back), a post is not answered twice, nor liked or tipped twice (readPlan), and a
+  // conversation whose answer waits is not read again.
   const waitingNow = ((await call('pending')) || []).filter(
     (item) => item.agentId === agent.id
   )
-  const {answered, tipped} = doneOnFeed(social.feed || [], social.me)
-  tipped.forEach((id) => answered.add(id))
+  const already = doneOnFeed(social.feed || [], social.me)
+  const {answered} = already
   waitingNow.forEach(({action, target}) => {
-    if (
-      (action === 'reply' || action === 'tip') &&
-      target &&
-      target.postId !== undefined
-    )
-      answered.add(idKey(target.postId))
+    if (!target) return
+    if (action === 'message' && Array.isArray(target.others))
+      target.others.forEach((one) =>
+        answered.add(`chat:${String(one).toLowerCase()}`)
+      )
+    if (target.postId === undefined) return
+    if (action === 'reply') answered.add(idKey(target.postId))
+    if (action === 'like') already.liked.add(target.postId)
+    if (action === 'tip') already.tipped.add(idKey(target.postId))
   })
   const options = {
     reads: agent.reads,
@@ -236,13 +240,7 @@ export async function runSocialAgent(agent, social, deps) {
     ...(pictures.length ? {pictures} : {}),
     why: deps.why,
   })
-  const plan = readPlan(
-    answer,
-    digest,
-    held,
-    social.me,
-    doneOnFeed(social.feed || [], social.me)
-  )
+  const plan = readPlan(answer, digest, held, social.me, already)
   const log = (action, fields) =>
     call('didAction', {agentId: agent.id, action, ...fields})
   // Read: the point moves before any action, so a run stopped midway (the app closed, the window reloaded) never

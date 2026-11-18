@@ -3,7 +3,7 @@ import os from 'os'
 import path from 'path'
 import fs from 'fs-extra'
 import {socialDigest} from './digest'
-import {doneOnFeed} from './plan'
+import {doneOnFeed, readPlan} from './plan'
 import {runSocialAgent} from './run'
 import {hoursOf} from '../read-again'
 
@@ -117,12 +117,12 @@ describe('what it answered already is not read again (B-295)', () => {
     ).toBe(3)
   })
 
-  test('a post it tipped is not read again; a conversation counts only after its own last message', () => {
+  test('a post it tipped is read, a second tip refused; a conversation counts only after its own last message', () => {
     const tipped = node(40, ANN, 'Tipped already', 9700)
     tipped.tips = [{from: ME, height: 9710, postId: 40}]
     const feed = [tipped, node(41, ANN, 'Not tipped', 9705)]
-    const {answered, tipped: ids} = doneOnFeed(feed, ME)
-    ids.forEach((id) => answered.add(id))
+    const done = doneOnFeed(feed, ME)
+    const {answered} = done
     const chat = (messages) => ({
       key: `${ME}-${BOB}`,
       others: [BOB],
@@ -146,8 +146,22 @@ describe('what it answered already is not read again (B-295)', () => {
       {point: 9000, scanned: HEAD}
     )
     expect(digest.text).toContain('Not tipped')
-    expect(digest.text).not.toContain('Tipped already')
+    expect(digest.text).toContain('Tipped already')
     expect(digest.text).not.toContain('Hello?')
+    const label = [...digest.labels.entries()].find(
+      ([, item]) => item.node && item.node.id === 40
+    )[0]
+    const plan = readPlan(
+      JSON.stringify({actions: [{do: 'tip', to: label}]}),
+      digest,
+      ['tip'],
+      ME,
+      done
+    )
+    expect(plan.actions).toEqual([])
+    expect(plan.dropped.map(({reason}) => reason)).toEqual([
+      `tip ${label}: tipped already`,
+    ])
     // A message after its own: new.
     const again = socialDigest(
       {
@@ -164,6 +178,18 @@ describe('what it answered already is not read again (B-295)', () => {
       {point: 9000, scanned: HEAD}
     )
     expect(again.text).toContain('And now?')
+    // Its answer to Bob waits in To approve: the conversation is not read.
+    const waiting = socialDigest(
+      {
+        ...social([]),
+        conversations: [
+          chat([{from: BOB, text: 'And now?', height: 9660, index: 0}]),
+        ],
+      },
+      {reads: {messages: true}, answeredIds: new Set([`chat:${BOB}`])},
+      {point: 9000, scanned: HEAD}
+    )
+    expect(waiting.text).not.toContain('And now?')
   })
 
   describe('a run read again', () => {

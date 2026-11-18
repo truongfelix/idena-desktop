@@ -266,6 +266,16 @@ describe('the question of a run with pictures (B-293)', () => {
       {type: 'text', text: 'img4:'},
       {type: 'image', mediaType: 'image/webp', data: 'QUJD'},
     ])
+    // At most 20 MB of pictures a run (the API refuses a larger request): those past it are left out.
+    const big = 'A'.repeat(4 * 1024 * 1024)
+    const many = Array.from({length: 6}, (_, i) => ({
+      id: `img${i + 1}`,
+      mediaType: 'image/jpeg',
+      data: big,
+    }))
+    expect(
+      socialParts(agent, 'the posts', many).filter(({type}) => type === 'image')
+    ).toHaveLength(5)
     // Only named: no picture, whatever the window sent.
     expect(
       socialParts({postPictures: 'say'}, 'the posts', [{id: 'img1', ...jpeg}])

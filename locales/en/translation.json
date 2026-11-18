@@ -2352,5 +2352,6 @@
   "It asks for the internet": "It asks for the internet",
   "Asked for: {{what}}. It starts Off: turn it on yourself in its Connection, on the agent page.": "Asked for: {{what}}. It starts Off: turn it on yourself in its Connection, on the agent page.",
   "It is running now. Try again when its run ends.": "It is running now. Try again when its run ends.",
-  "Its next run reads again from {{hours}} h ago.": "Its next run reads again from {{hours}} h ago."
+  "Its next run reads again from {{hours}} h ago.": "Its next run reads again from {{hours}} h ago.",
+  "It never ran: its first run reads the last day anyway.": "It never ran: its first run reads the last day anyway."
 }

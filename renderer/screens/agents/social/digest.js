@@ -195,8 +195,8 @@ export function socialDigest(
     Boolean(tagged) &&
     node.call.author !== me &&
     tags(node.call.message, tagged)
-  // What it answered already (B-295, `answeredIds`: idKey ids, its replies and tips on the feed, and those waiting in
-  // To approve):
+  // What it answered already (B-295, `answeredIds`: idKey ids, its replies on the feed and those waiting in To
+  // approve; "chat:<address>" a conversation whose answer waits there):
   // never read again as an answer, a tag or a new post, whatever its read point (read again, it would answer twice).
   const isAnswered = (node) =>
     Boolean(answeredIds && answeredIds.has(idKey(node.id)))
@@ -309,7 +309,14 @@ export function socialDigest(
         conversation.group ||
         conversation.others.length !== 1 ||
         conversation.others[0] === me ||
-        isBlocked(conversation.others[0])
+        isBlocked(conversation.others[0]) ||
+        // Its answer waits in To approve (B-295).
+        Boolean(
+          answeredIds &&
+            answeredIds.has(
+              `chat:${String(conversation.others[0]).toLowerCase()}`
+            )
+        )
       )
         return
       // Only what came after its own last message (B-295): read again, a conversation it answered is not new.

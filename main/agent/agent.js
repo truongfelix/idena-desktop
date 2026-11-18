@@ -35,6 +35,8 @@ const MAX_PICTURES = 20
 const PICTURE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
 const MAX_PICTURE_DATA = 5 * 1024 * 1024
 const PICTURE_ID = /^img[0-9]{1,3}$/u
+// All of a run's pictures, well below the API's request size (32 MB): those past it are left out.
+const MAX_PICTURES_DATA = 20 * 1024 * 1024
 
 /**
  * The parts of a Social run's question (B-293): its text, then each picture after its name ("img1:"), when the agent
@@ -47,6 +49,7 @@ function socialParts(agent, input, pictures) {
   ]
   if (agent.postPictures !== 'send' || !Array.isArray(pictures)) return parts
   const seen = new Set()
+  let total = 0
   pictures
     .filter(
       (one) =>
@@ -61,6 +64,10 @@ function socialParts(agent, input, pictures) {
     )
     .filter((one) => !seen.has(one.id) && seen.add(one.id))
     .slice(0, MAX_PICTURES)
+    .filter((one) => {
+      total += one.data.length
+      return total <= MAX_PICTURES_DATA
+    })
     .forEach((one) => {
       parts.push(
         {type: 'text', text: `${one.id}:`},

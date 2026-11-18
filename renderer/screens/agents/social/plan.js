@@ -47,6 +47,7 @@ export function readPlan(answer, digest, held, me, done = {}) {
   const dropped = []
   const seen = new Set()
   const liked = done.liked || new Set()
+  const tipped = done.tipped || new Set()
   const answered = done.answered || new Set()
   value.actions.forEach((raw) => {
     const row = raw && typeof raw === 'object' ? raw : {}
@@ -90,6 +91,8 @@ export function readPlan(answer, digest, held, me, done = {}) {
       return drop('answered already')
     if (action === 'like' && liked.has(item.node.id))
       return drop('liked already')
+    if (action === 'tip' && tipped.has(idKey(item.node.id)))
+      return drop('tipped already')
     seen.add(key)
     actions.push({action, label, item, text: action === 'reply' ? text : ''})
     return undefined
@@ -105,7 +108,7 @@ export function readPlan(answer, digest, held, me, done = {}) {
 export function doneOnFeed(feed, me) {
   const liked = new Set()
   const answered = new Set()
-  // Tipped by it (B-295): never read again either (a second tip is iDNA).
+  // Tipped by it (B-295): a second tip is iDNA, refused as a second like is.
   const tipped = new Set()
   const visit = (node) => {
     if (node.likeCalls.some((call) => call.author === me)) liked.add(node.id)

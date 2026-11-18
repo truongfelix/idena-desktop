@@ -93,14 +93,23 @@ export function ReadAgain({agent, onDone}) {
                 return
               }
               try {
-                await readAgain(agent.id, hours, scannedHeight(social))
+                const point = await readAgain(
+                  agent.id,
+                  hours,
+                  scannedHeight(social)
+                )
                 setIsOpen(false)
                 toast({
                   title: t('Read again'),
-                  description: t(
-                    'Its next run reads again from {{hours}} h ago.',
-                    {hours}
-                  ),
+                  description:
+                    point === null
+                      ? t(
+                          'It never ran: its first run reads the last day anyway.',
+                          {nsSeparator: '!!'}
+                        )
+                      : t('Its next run reads again from {{hours}} h ago.', {
+                          hours,
+                        }),
                 })
                 onDone()
               } catch (failure) {

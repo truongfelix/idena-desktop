@@ -2352,5 +2352,6 @@
   "It asks for the internet": "Il demande l'accès à internet",
   "Asked for: {{what}}. It starts Off: turn it on yourself in its Connection, on the agent page.": "Demandé : {{what}}. Il commence désactivé : activez-le vous-même dans sa Connexion, sur la page de l'agent.",
   "It is running now. Try again when its run ends.": "Il est en cours. Réessayez à la fin de son passage.",
-  "Its next run reads again from {{hours}} h ago.": "Son prochain passage relit depuis {{hours}} h."
+  "Its next run reads again from {{hours}} h ago.": "Son prochain passage relit depuis {{hours}} h.",
+  "It never ran: its first run reads the last day anyway.": "Il n'a jamais tourné : son premier passage lit de toute façon le dernier jour."
 }
