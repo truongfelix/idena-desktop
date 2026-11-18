@@ -22,6 +22,7 @@ import {
 } from './social/run'
 import {EVENT_MIN_MS, eventPending, eventReadBy} from './social/events'
 import {tagsLeftOf} from './social/tags'
+import {loadPicture} from './social/pictures'
 import {
   prepareSocialAction,
   sendSocialAction,
@@ -223,6 +224,9 @@ function runSocial(agent, social, t, why) {
     agent: agentCall,
     prepare: (item) => prepareSocialAction(item, state),
     send: (pending) => sendSocialAction(pending),
+    // The pictures of the posts it reads (B-293), through the app's own node.
+    loadPicture: (media, mediaType) =>
+      loadPicture(media, mediaType, {rpc: socialRpc}),
     readAuthors: (addresses, needs) =>
       readAuthors(addresses, needs, {
         settled: socialRpcSettled,

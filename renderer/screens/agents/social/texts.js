@@ -23,6 +23,7 @@ export const LINE_NAMES = [
   'you',
   'text on IPFS',
   'with a file',
+  'with a picture',
 ]
 
 /**

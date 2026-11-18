@@ -55,6 +55,10 @@ function readCounts(value, field) {
   )
 }
 
+/** Read again (B-295): at most a day back, in hours of blocks (20 s each). */
+const MAX_READ_AGAIN_HOURS = 24
+const BLOCKS_PER_HOUR = 180
+
 const ADDRESS = /^0x[0-9a-f]{40}$/u
 /** A week of blocks (20 s each), and the most acts kept for one agent. */
 const ACTS_KEPT_BLOCKS = 7 * 4320
@@ -134,6 +138,29 @@ function createReadPoints({file = null, logger = null, now = Date.now} = {}) {
         if (!ID_PATTERN.test(agentId)) throw new Error('no agent named')
         if (!isHeight(height)) throw new Error('not a block height')
         if (!(points[agentId] >= height)) {
+          points = {...points, [agentId]: height}
+          save()
+        }
+        return points[agentId]
+      },
+      /**
+       * Read again the last `hours` (B-295, at most MAX_READ_AGAIN_HOURS): the point goes back to that many hours of
+       * blocks before `head` (the block the Social scan read), never forward. What it answered already is skipped by
+       * the run (digest.js), and what it reads counts in its day as usual.
+       */
+      readAgain(data) {
+        const {agentId, hours, head} = data || {}
+        if (!ID_PATTERN.test(agentId)) throw new Error('no agent named')
+        if (
+          !Number.isInteger(hours) ||
+          hours < 1 ||
+          hours > MAX_READ_AGAIN_HOURS
+        )
+          throw new Error('not a number of hours')
+        if (!isHeight(head)) throw new Error('not a block height')
+        const height = Math.max(0, head - hours * BLOCKS_PER_HOUR)
+        const has = Object.prototype.hasOwnProperty.call(points, agentId)
+        if (!has || points[agentId] > height) {
           points = {...points, [agentId]: height}
           save()
         }

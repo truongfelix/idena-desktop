@@ -53,7 +53,7 @@ function askedLine(row, t) {
 function ImportDialog({preview, onCancel, onAdd, isAdding, error}) {
   const {t} = useTranslation()
   const [showInstructions, setShowInstructions] = React.useState(false)
-  const {agent, asked, dropped, addressLeft, hasKey} = preview
+  const {agent, asked, dropped, addressLeft, hasKey, askedInternet} = preview
   const fact = (label, value) => (
     <Flex gap={4}>
       <Text color="muted" w={28} flexShrink={0}>
@@ -183,6 +183,23 @@ function ImportDialog({preview, onCancel, onAdd, isAdding, error}) {
               </Text>
             )}
           </Stack>
+          {askedInternet && (
+            <Stack spacing={1}>
+              <Text fontWeight={600}>{t('It asks for the internet')}</Text>
+              <Text fontSize="sm" color="muted">
+                {t(
+                  'Asked for: {{what}}. It starts Off: turn it on yourself in its Connection, on the agent page.',
+                  {
+                    what:
+                      askedInternet === 'pages'
+                        ? t('Search the web and open pages')
+                        : t('Search the web'),
+                    nsSeparator: '!!',
+                  }
+                )}
+              </Text>
+            </Stack>
+          )}
           {error && <ErrorAlert>{error}</ErrorAlert>}
         </Stack>
       </DialogBody>

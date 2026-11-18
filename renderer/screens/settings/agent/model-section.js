@@ -142,6 +142,36 @@ function AnswerFields({settings, onChange}) {
   )
 }
 
+/**
+ * What a Social run does with the pictures of the posts it reads (B-293): shows them to the model, or only names
+ * them (a model that reads text only).
+ */
+function PostPicturesField({settings, onChange}) {
+  const {t} = useTranslation()
+  return (
+    <Stack spacing={2}>
+      <FormControlWithLabel label={t('Pictures in posts')}>
+        <Select
+          value={settings.postPictures === 'say' ? 'say' : 'send'}
+          onChange={(e) => {
+            const postPictures = e.target.value
+            onChange((s) => ({...s, postPictures}))
+          }}
+        >
+          <option value="send">{t('Shown to the model')}</option>
+          <option value="say">{t('Only named')}</option>
+        </Select>
+      </FormControlWithLabel>
+      <Text color="muted" fontSize="sm">
+        {t(
+          'Shown: the pictures of the posts it reads on Social go to the model with them, at most 20 a run, each one billed as input. Only named: for a model that reads text only, a post says it holds a picture.',
+          {nsSeparator: '!!'}
+        )}
+      </Text>
+    </Stack>
+  )
+}
+
 function KeyField({status, onSetKey, onClearKey}) {
   const {t} = useTranslation()
   const [key, setKey] = React.useState('')
@@ -319,6 +349,10 @@ export function ModelSection({
                   provider: id,
                   address: '',
                   ...('effort' in s ? {effort: ''} : {}),
+                  // Its pictures too (B-293): an Anthropic model reads them, another may not.
+                  ...('postPictures' in s
+                    ? {postPictures: id === 'anthropic' ? 'send' : 'say'}
+                    : {}),
                 }))
               }
             >
@@ -351,6 +385,9 @@ export function ModelSection({
         )}
         {'internet' in settings && (
           <InternetFields settings={settings} onChange={onChange} />
+        )}
+        {'postPictures' in settings && (
+          <PostPicturesField settings={settings} onChange={onChange} />
         )}
         {settings.provider !== 'anthropic' &&
           settings.actions &&

@@ -129,15 +129,14 @@ function createAgentCommands({profiles, key, log, onChange = () => {}}) {
       /** What an agent file holds, as it would be added (readAgentFile), and whether its service has a key here. */
       previewAgent(data) {
         const {agents} = profiles.read()
-        const {agent, asked, dropped, addressLeft} = readAgentFile(
-          data && data.text,
-          agents
-        )
+        const {agent, asked, dropped, addressLeft, askedInternet} =
+          readAgentFile(data && data.text, agents)
         return {
           agent,
           asked,
           dropped,
           addressLeft,
+          askedInternet,
           hasKey: key.has(destination(agent)),
         }
       },

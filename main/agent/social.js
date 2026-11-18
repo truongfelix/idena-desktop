@@ -95,6 +95,8 @@ const DIGEST_LINES = {
   you: 'you',
   'text on IPFS': '[a text stored on IPFS, not read]',
   'with a file': '[with a picture or a file]',
+  // A picture the model is shown (B-293): its name, the picture itself follows the text.
+  'with a picture': '[with the picture {{picture}}]',
 }
 
 /** The three Social texts of B-285 as an unlocked text starts from them. */

@@ -58,6 +58,8 @@ describe('agent profiles', () => {
       address: DEFAULT_ADDRESSES.local,
       model: '',
       imageModel: '',
+      // B-293: a model that is not Anthropic's only names the pictures.
+      postPictures: 'say',
       instructions: '',
       actions: {},
       schedule: {kind: 'manual', time: '09:00'},

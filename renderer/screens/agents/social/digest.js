@@ -27,6 +27,21 @@ export const MAX_THREAD = 8
 export const MAX_THREAD_TEXT = 200
 /** A first run reads about the last day of blocks (20 s each). */
 export const FIRST_RUN_BLOCKS = 4320
+/**
+ * The most pictures a run sends with what it reads (B-293): each one costs input tokens (about 1,000 at 1024 px), and
+ * MAX_DIGEST bounds only the text. Past them, a post's picture is only named, as before.
+ */
+export const MAX_PICTURES = 20
+
+/**
+ * Whether a post's media is a picture the model can be shown (B-293): an image type, inline or on IPFS. A moving one
+ * goes as its first frame; a vector image (SVG) is not drawn, a video or a sound is no picture.
+ */
+export function isPicture(call) {
+  if (!call || !call.hasMedia || !call.media) return false
+  const type = String(call.mediaType || '').toLowerCase()
+  return type.startsWith('image/') && !type.startsWith('image/svg')
+}
 
 /**
  * A text as the model reads it: on one quote, cut, a text on IPFS or a picture only named. `words`: the agent's own
@@ -103,6 +118,8 @@ export function socialDigest(
     who = {},
     facts = {},
     collect = null,
+    pictures = null,
+    answeredIds = null,
     tagsLeft = Infinity,
     postsLeft = Infinity,
     texts = null,
@@ -122,6 +139,31 @@ export function socialDigest(
     withFile: ownLines['with a file'],
   }
   const shown = (message, hasMedia) => shownText(message, hasMedia, words)
+  // The pictures it is shown (B-293), each named img1, img2… in the text: `pictures.collect` (a Map) gathers those
+  // it would show, with their type (the run loads them); `pictures.have` (a Set) holds those loaded, the only ones
+  // named. Its own posts and the posts a like or a tip is for (its own too) keep the placeholder. A picture shown
+  // twice keeps its name.
+  const picked = new Map()
+  const pictureId = (call) => {
+    if (!pictures || !isPicture(call)) return null
+    if (picked.has(call.media)) return picked.get(call.media).id
+    if (pictures.have && !pictures.have.has(call.media)) return null
+    if (picked.size >= MAX_PICTURES) return null
+    const id = `img${picked.size + 1}`
+    picked.set(call.media, {id, mediaType: call.mediaType})
+    return id
+  }
+  const withPicture = (call, max = MAX_TEXT) => {
+    const id = pictureId(call)
+    if (!id) return shownText(call.message, call.hasMedia, words, max)
+    const text = shownText(call.message, false, words, max)
+    const named = line(
+      'with a picture',
+      {picture: id},
+      `[with the picture ${id}]`
+    )
+    return `${text} ${named}`.trim()
+  }
   // Whose it reads (B-266): each read's criteria (`who`: posts, notifications, messages) on the authors' `facts`
   // (criteria.js readAuthors). `collect` (a Set): the authors of what is new go in it, nothing is left out (the run
   // reads them first).
@@ -153,6 +195,10 @@ export function socialDigest(
     Boolean(tagged) &&
     node.call.author !== me &&
     tags(node.call.message, tagged)
+  // What it answered already (B-295, `answeredIds`: idKey ids, its replies on the feed and those waiting in To approve):
+  // never read again as an answer, a tag or a new post, whatever its read point (read again, it would answer twice).
+  const isAnswered = (node) =>
+    Boolean(answeredIds && answeredIds.has(idKey(node.id)))
 
   // Every new item, each with the block that makes it new.
   const candidates = []
@@ -170,6 +216,7 @@ export function socialDigest(
           isNew(node.call) &&
           node.call.message !== LIKE &&
           !isTag(node) &&
+          !isAnswered(node) &&
           readsFrom('notifications', node.call.author, node.call.message)
       )
       .forEach((one) =>
@@ -216,6 +263,7 @@ export function socialDigest(
         !isBlocked(call.author) &&
         isNew(call) &&
         !isTag({call}) &&
+        !isAnswered({id}) &&
         readsFrom('posts', call.author, call.message, topicOf(call.channel))
     )
     // The feed is newest first: the last day's posts, or the last N.
@@ -245,6 +293,7 @@ export function socialDigest(
         ({node}) =>
           typeof node.id === 'number' &&
           isTag(node) &&
+          !isAnswered(node) &&
           !isBlocked(node.call.author) &&
           isNew(node.call) &&
           readsFrom('tags', node.call.author, node.call.message)
@@ -332,8 +381,7 @@ export function socialDigest(
   // answers them, a post a tag before it in this run already showed, what came after the tag. No label: the agent
   // answers the tag, never these. The feed files every comment under its reply; what each one answers is its replyTo.
   const shownInThread = new Set()
-  const threadText = (call) =>
-    shownText(call.message, call.hasMedia, words, MAX_THREAD_TEXT)
+  const threadText = (call) => withPicture(call, MAX_THREAD_TEXT)
   const threadOf = (item) => {
     const tree = walk([item.post])
     const byId = new Map(tree.map(({node}) => [idKey(node.id), node]))
@@ -421,6 +469,7 @@ export function socialDigest(
       break
     }
     const before = new Map(labels)
+    const picturesBefore = new Map(picked)
     const kept = {posts, chats, people}
     let text
     if (item.kind === 'answer') {
@@ -428,7 +477,7 @@ export function socialDigest(
       const id = label(item.node, item.post)
       const author = name(item.node.call.author)
       const parent = shown(item.parent.call.message, item.parent.call.hasMedia)
-      const said = shown(item.node.call.message, item.node.call.hasMedia)
+      const said = withPicture(item.node.call)
       text = line(
         'answer',
         {label: id, author, yours, parent, text: said},
@@ -437,11 +486,11 @@ export function socialDigest(
     } else if (item.kind === 'tag') {
       const id = label(item.node, item.post)
       const author = name(item.node.call.author)
-      const said = shown(item.node.call.message, item.node.call.hasMedia)
+      const said = withPicture(item.node.call)
       if (item.parent) {
         const {answered, thread} = threadOf(item)
         const to = name(answered.call.author)
-        const parent = shown(answered.call.message, answered.call.hasMedia)
+        const parent = withPicture(answered.call)
         text = [
           line(
             'tag in an answer',
@@ -460,7 +509,7 @@ export function socialDigest(
       const id = label(item.node, item.node)
       const likes = item.node.likeCalls.length
       const author = name(item.node.call.author)
-      const said = shown(item.node.call.message, item.node.call.hasMedia)
+      const said = withPicture(item.node.call)
       let kind = 'post'
       if (likes === 1) kind = 'post with one like'
       else if (likes > 1) kind = 'post with likes'
@@ -514,6 +563,9 @@ export function socialDigest(
       // Not shown: its labels go, so the model cannot name it.
       labels.clear()
       before.forEach((value, key) => labels.set(key, value))
+      // Nor its pictures.
+      picked.clear()
+      picturesBefore.forEach((value, key) => picked.set(key, value))
       posts = kept.posts
       chats = kept.chats
       people = kept.people
@@ -537,6 +589,10 @@ export function socialDigest(
     .filter(([, list]) => list.length)
     .map(([title, list]) => [title, ...list].join('\n'))
   const empty = sections.length === 0
+  if (pictures && pictures.collect)
+    picked.forEach(({mediaType}, media) =>
+      pictures.collect.set(media, mediaType)
+    )
   const ownText = own.length
     ? `Your last posts, the newest last:\n${own.join('\n')}\n\n`
     : ''
@@ -575,6 +631,8 @@ export function socialDigest(
     labels,
     empty,
     readTo: readUpTo(leftOut, lastHeight, from, scanned),
+    // The pictures named in the text, in their order: [{id, media}] (the run sends those it loaded).
+    pictures: [...picked.entries()].map(([media, {id}]) => ({id, media})),
     postsPassed,
     tagsShown: counts.tag,
     postsShown: counts.post,

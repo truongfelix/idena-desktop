@@ -2340,5 +2340,16 @@
   "Sites": "Sites",
   "Every site but these": "Tous les sites sauf ceux-ci",
   "Only these sites": "Seulement ces sites",
-  "The searches run at Anthropic, not from this computer: what the agent searches for is sent there. Each search is billed by Anthropic (10 USD per 1,000 searches), and what the agent reads on the web is billed as input. One site per line, as example.com or example.com/blog; an empty list: every site.": "Les recherches se font chez Anthropic, pas depuis cet ordinateur : ce que l'agent cherche y est envoyé. Chaque recherche est facturée par Anthropic (10 USD pour 1 000 recherches), et ce que l'agent lit sur le web est facturé comme entrée. Un site par ligne, comme example.com ou example.com/blog ; une liste vide : tous les sites."
+  "The searches run at Anthropic, not from this computer: what the agent searches for is sent there. Each search is billed by Anthropic (10 USD per 1,000 searches), and what the agent reads on the web is billed as input. One site per line, as example.com or example.com/blog; an empty list: every site.": "Les recherches se font chez Anthropic, pas depuis cet ordinateur : ce que l'agent cherche y est envoyé. Chaque recherche est facturée par Anthropic (10 USD pour 1 000 recherches), et ce que l'agent lit sur le web est facturé comme entrée. Un site par ligne, comme example.com ou example.com/blog ; une liste vide : tous les sites.",
+  "Shown to the model": "Montrées au modèle",
+  "Only named": "Seulement signalées",
+  "Shown: the pictures of the posts it reads on Social go to the model with them, at most 20 a run, each one billed as input. Only named: for a model that reads text only, a post says it holds a picture.": "Montrées : les images des publications qu'il lit sur Social sont envoyées au modèle avec elles, au plus 20 par passage, chacune facturée en entrée. Seulement signalées : pour un modèle qui ne lit que du texte, la publication indique qu'elle contient une image.",
+  "Read again…": "Relire…",
+  "Read again the last hours": "Relire les dernières heures",
+  "Its next run reads again what came on Social in the last hours you choose, within what it reads and its numbers of the day. What it already answered is skipped.": "Son prochain passage relit ce qui est arrivé sur Social pendant les dernières heures choisies, dans les limites de ce qu'il lit et de ses nombres du jour. Ce à quoi il a déjà répondu est ignoré.",
+  "Hours, from 1 to 24": "Heures, de 1 à 24",
+  "Read again": "Relire",
+  "Its next run reads again the last {{hours}} hours.": "Son prochain passage relit les {{hours}} dernières heures.",
+  "It asks for the internet": "Il demande l'accès à internet",
+  "Asked for: {{what}}. It starts Off: turn it on yourself in its Connection, on the agent page.": "Demandé : {{what}}. Il commence désactivé : activez-le vous-même dans sa Connexion, sur la page de l'agent."
 }

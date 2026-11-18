@@ -32,6 +32,8 @@ function exportAgent(agent) {
       ...(agent.internet && agent.internet.mode !== 'off'
         ? {internet: agent.internet}
         : {}),
+      // What it does with the pictures of the posts it reads (B-293): an older build ignores it.
+      ...(agent.postPictures ? {postPictures: agent.postPictures} : {}),
       actions: agent.actions,
       reads: agent.reads,
       events: agent.events,
@@ -111,6 +113,8 @@ function readAgentFile(text, agents = []) {
     asked,
     dropped,
     addressLeft,
+    // What the file asked of the internet (B-296), shown before the import: null for Off.
+    askedInternet: read.internet.mode === 'off' ? null : read.internet.mode,
   }
 }
 
