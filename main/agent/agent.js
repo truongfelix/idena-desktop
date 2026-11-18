@@ -7,6 +7,7 @@ const {checkFlip, flipQuestion, mediaType, readFlipAnswer} = require('./flips')
 const {readStories, storyQuestion, storySystem} = require('./stories')
 const {appTexts} = require('./app-texts')
 const {socialHeld, socialSystem} = require('./social')
+const {internetLine, internetTools, searchesLeft} = require('./internet')
 const providers = require('./providers')
 
 // The agent part of the main process: the renderer's one way to the agent (the "agent" channel). It keeps the
@@ -515,17 +516,33 @@ function createAgent({
       }
       // What started the run, before its question (B-274): every question billed is named in Activity.
       if (RUN_KINDS.includes(why)) log({agentId, action: 'run', decision: why})
+      // Its internet (B-294): the searches left in this answer, within its searches a day; none, no tools.
+      const searches = searchesLeft(agent, pending.searchesToday(agentId))
+      if (agent.internet && agent.internet.mode !== 'off' && !searches)
+        log({
+          agentId,
+          action: 'webSearch',
+          decision: 'off',
+          detail:
+            agent.provider === 'anthropic'
+              ? 'searches a day reached'
+              : 'only with the Anthropic API',
+        })
+      const system = socialSystem(
+        held,
+        agent.instructions,
+        (agent.appParts && agent.appParts.social) || null,
+        (agent.appParts && agent.appParts.socialActions) || null
+      )
+      let searched = 0
       const controller = new AbortController()
       writing.add(controller)
       try {
         const answer = await ask(
           connection(agent),
-          socialSystem(
-            held,
-            agent.instructions,
-            (agent.appParts && agent.appParts.social) || null,
-            (agent.appParts && agent.appParts.socialActions) || null
-          ),
+          searches
+            ? `${system}\n\n${internetLine(agent.internet, searches)}`
+            : system,
           [
             {
               type: 'text',
@@ -536,8 +553,21 @@ function createAgent({
             timeoutMs: clampTimeout(timeoutMs),
             signal: controller.signal,
             maxTokens: PLAN_MAX_TOKENS,
+            tools: internetTools(agent.internet, searches),
+            // Counted as each request comes back: a failure after a search keeps it counted (it was billed).
+            onSearches: (n) => {
+              searched += n
+              pending.addSearches(agentId, n)
+            },
           }
         )
+        if (searched)
+          log({
+            agentId,
+            action: 'webSearch',
+            decision: 'alone',
+            detail: `${searched} ${searched === 1 ? 'search' : 'searches'}`,
+          })
         return {held, answer: String(answer || '').slice(0, MAX_PLAN_TEXT)}
       } catch (error) {
         log({

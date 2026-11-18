@@ -1,5 +1,6 @@
 const axios = require('axios')
 const {fillSlots} = require('./app-parts')
+const {searchesOf} = require('./internet')
 
 // The agent's calls to its model: an OpenAI-compatible chat server (on this computer, as Ollama, LM Studio or
 // llama.cpp serve, or a hosted service) or the Anthropic Messages API. One request per question, no redirects
@@ -17,6 +18,8 @@ const MAX_REPLY_BYTES = 1024 * 1024
 const MAX_IMAGE_REPLY_BYTES = 25 * 1024 * 1024
 const MAX_IMAGE_PROMPT = 4000
 const MAX_ERROR_TEXT = 200
+/** How many times a turn the service paused (its tools' loop, B-294) is sent again to go on. */
+const MAX_RESUMES = 3
 
 const LOOPBACK_HOSTS = new Set(['localhost', '[::1]'])
 
@@ -90,11 +93,13 @@ function openAiBody(model, system, parts) {
   }
 }
 
-function anthropicBody(model, system, parts, maxTokens, effort) {
+function anthropicBody(model, system, parts, maxTokens, effort, tools) {
   return {
     model,
     max_tokens: maxTokens || ANTHROPIC_MAX_TOKENS,
     ...(effort ? {output_config: {effort}} : {}),
+    // Its internet tools (B-294), only when it may search.
+    ...(tools && tools.length ? {tools} : {}),
     system,
     messages: [
       {
@@ -119,7 +124,15 @@ function anthropicBody(model, system, parts, maxTokens, effort) {
 /** The text of a reply, whichever shape the server gave it. */
 function replyText(provider, data) {
   if (provider === 'anthropic') {
-    const blocks = Array.isArray(data && data.content) ? data.content : []
+    const all = Array.isArray(data && data.content) ? data.content : []
+    // After a search (B-294), only what follows its last result: the words before it ("Let me look that up") are no
+    // part of the answer, whose format the app reads.
+    const last = all.reduce(
+      (at, block, i) =>
+        block && /_tool_result$/u.test(String(block.type)) ? i : at,
+      -1
+    )
+    const blocks = all.slice(last + 1)
     return blocks
       .filter((block) => block && block.type === 'text')
       .map((block) => block.text)
@@ -144,7 +157,7 @@ function buildRequest(
   {provider, address, model, key, maxTokens: agentMaxTokens, effort},
   system,
   parts,
-  {maxTokens} = {}
+  {maxTokens, tools} = {}
 ) {
   const base = checkAddress(provider, address)
   if (!model) throw new Error('no model chosen')
@@ -162,7 +175,8 @@ function buildRequest(
         system,
         parts,
         agentMaxTokens || maxTokens,
-        effort
+        effort,
+        tools
       ),
     }
   }
@@ -229,34 +243,65 @@ function providerError(error) {
 
 /**
  * One question to the model: a system text and the user's parts (text, or image with mediaType and base64 data).
- * Resolves with the reply's text. `timeoutMs` ends it, as does `signal`.
+ * Resolves with the reply's text. `timeoutMs` ends it, as does `signal`. `tools`: an Anthropic request's internet
+ * tools (B-294); `onSearches(n)` is told the searches each request of the answer made (each one is billed), also
+ * when a later one fails.
  */
 async function ask(
   config,
   system,
   parts,
-  {timeoutMs, signal, maxTokens, request = axios.request} = {}
+  {
+    timeoutMs,
+    signal,
+    maxTokens,
+    tools,
+    onSearches = () => {},
+    request = axios.request,
+  } = {}
 ) {
   const {url, headers, body} = buildRequest(config, system, parts, {
     maxTokens,
+    tools: config.provider === 'anthropic' ? tools : undefined,
   })
-  let response
-  try {
-    response = await request({
-      method: 'post',
-      url,
-      headers,
-      data: body,
-      timeout: timeoutMs,
-      signal,
-      maxRedirects: 0,
-      maxContentLength: MAX_REPLY_BYTES,
-      responseType: 'json',
-    })
-  } catch (error) {
-    // Stopped by the app (the agent paused, the test stopped): not the model's fault, nor a deadline.
-    if (signal && signal.aborted) throw new Error('stopped')
-    throw providerError(error)
+  const send = async (data) => {
+    try {
+      return await request({
+        method: 'post',
+        url,
+        headers,
+        data,
+        timeout: timeoutMs,
+        signal,
+        maxRedirects: 0,
+        maxContentLength: MAX_REPLY_BYTES,
+        responseType: 'json',
+      })
+    } catch (error) {
+      // Stopped by the app (the agent paused, the test stopped): not the model's fault, nor a deadline.
+      if (signal && signal.aborted) throw new Error('stopped')
+      throw providerError(error)
+    }
+  }
+  let response = await send(body)
+  if (config.provider === 'anthropic') onSearches(searchesOf(response.data))
+  // A turn the service paused in its tools' loop goes on when its answer so far is sent back as it came.
+  for (
+    let resumes = 0;
+    config.provider === 'anthropic' &&
+    response.data &&
+    response.data.stop_reason === 'pause_turn';
+    resumes += 1
+  ) {
+    if (resumes >= MAX_RESUMES)
+      throw new Error('the model searched too long without an answer')
+    const messages = [
+      ...body.messages,
+      {role: 'assistant', content: response.data.content},
+    ]
+    // eslint-disable-next-line no-await-in-loop
+    response = await send({...body, messages})
+    onSearches(searchesOf(response.data))
   }
   const problem = stopProblem(config.provider, response.data)
   if (problem)

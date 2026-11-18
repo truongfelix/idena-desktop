@@ -66,6 +66,11 @@ export function activityText({action, decision, detail}, t) {
             nsSeparator: '!!',
           })
         : t('Drew a story picture')
+    // Its internet (B-294): the searches an answer made, or why it could not search.
+    case 'webSearch':
+      return decision === 'off'
+        ? t('No web search: {{detail}}', {detail, nsSeparator: '!!'})
+        : t('Searched the web: {{detail}}', {detail, nsSeparator: '!!'})
     case 'key':
       return decision === 'removed' ? t('Key removed') : t('Key saved')
     // What started a Social run (B-274).

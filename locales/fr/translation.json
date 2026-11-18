@@ -2328,5 +2328,17 @@
   "Your node has no connection: your answers cannot reach the network": "Votre nœud n'a aucune connexion : vos réponses ne peuvent pas atteindre le réseau",
   "Your short answers are not in a block yet: keep the app open and connected": "Vos réponses courtes ne sont pas encore dans un bloc : gardez l'application ouverte et connectée",
   "Your answers are not in a block yet: keep the app open and connected": "Vos réponses ne sont pas encore dans un bloc : gardez l'application ouverte et connectée",
-  "Your answers were sent to your node": "Vos réponses ont été transmises à votre nœud"
+  "Your answers were sent to your node": "Vos réponses ont été transmises à votre nœud",
+  "No web search: {{detail}}": "Pas de recherche sur le web : {{detail}}",
+  "Searched the web: {{detail}}": "A cherché sur le web : {{detail}}",
+  "Internet": "Internet",
+  "Search the web": "Chercher sur le web",
+  "Search the web and open pages": "Chercher sur le web et ouvrir les pages",
+  "The internet works only with the Anthropic API: this service is sent no web tools, and the agent answers without them.": "Internet ne fonctionne qu'avec l'API Anthropic : ce service ne reçoit aucun outil web, et l'agent répond sans eux.",
+  "Searches in one answer": "Recherches par réponse",
+  "Searches a day": "Recherches par jour",
+  "Sites": "Sites",
+  "Every site but these": "Tous les sites sauf ceux-ci",
+  "Only these sites": "Seulement ces sites",
+  "The searches run at Anthropic, not from this computer: what the agent searches for is sent there. Each search is billed by Anthropic (10 USD per 1,000 searches), and what the agent reads on the web is billed as input. One site per line, as example.com or example.com/blog; an empty list: every site.": "Les recherches se font chez Anthropic, pas depuis cet ordinateur : ce que l'agent cherche y est envoyé. Chaque recherche est facturée par Anthropic (10 USD pour 1 000 recherches), et ce que l'agent lit sur le web est facturé comme entrée. Un site par ligne, comme example.com ou example.com/blog ; une liste vide : tous les sites."
 }

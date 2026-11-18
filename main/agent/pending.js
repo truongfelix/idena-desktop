@@ -109,7 +109,7 @@ function readItem(value) {
 
 /**
  * The day's tally saved with the list, or an empty one; another day's starts again: {day, spent (by agent), done (by
- * agent and action; 'flipImage' counts the pictures drawn), spentBy (by agent and action, B-269), before (a tally a
+ * agent and action; 'flipImage' counts the pictures drawn, 'webSearch' the web searches, B-294), spentBy (by agent and action, B-269), before (a tally a
  * build before B-269 began: each action counts all the agent spent)}.
  */
 function readTally(saved, day) {
@@ -550,6 +550,14 @@ function createPending({
     /** One more picture asked of its service today (`n` -1: one given back, never billed). */
     addPicture(agentId, n = 1) {
       addTally(agentId, 'flipImage', {n})
+      save()
+    },
+    /** The web searches its service made today (B-294), each one billed, kept with the day's tally as the pictures. */
+    searchesToday: (agentId) => doneToday(agentId, 'webSearch'),
+    /** `n` more web searches made today. */
+    addSearches(agentId, n) {
+      if (!n) return
+      addTally(agentId, 'webSearch', {n})
       save()
     },
     /**
