@@ -51,10 +51,10 @@ describe('the point read again (B-295)', () => {
     expect(commands.readAgain({agentId: ID, hours: 2, head: 10000})).toBe(9640)
     // A later point than the one it has: kept.
     expect(commands.readAgain({agentId: ID, hours: 1, head: 10000})).toBe(9640)
-    // Never run yet: it reads from there.
+    // Never run yet: its first run reads a day already, nothing changes.
     expect(
       commands.readAgain({agentId: 'eeeeeeeeeeeeeeee', hours: 24, head: 3000})
-    ).toBe(0)
+    ).toBeNull()
     expect(() =>
       commands.readAgain({agentId: ID, hours: 25, head: 10000})
     ).toThrow('not a number of hours')
@@ -115,6 +115,55 @@ describe('what it answered already is not read again (B-295)', () => {
         {point: 9000, scanned: HEAD}
       ).tagsShown
     ).toBe(3)
+  })
+
+  test('a post it tipped is not read again; a conversation counts only after its own last message', () => {
+    const tipped = node(40, ANN, 'Tipped already', 9700)
+    tipped.tips = [{from: ME, height: 9710, postId: 40}]
+    const feed = [tipped, node(41, ANN, 'Not tipped', 9705)]
+    const {answered, tipped: ids} = doneOnFeed(feed, ME)
+    ids.forEach((id) => answered.add(id))
+    const chat = (messages) => ({
+      key: `${ME}-${BOB}`,
+      others: [BOB],
+      isGroup: false,
+      messages,
+    })
+    const digest = socialDigest(
+      {
+        ...social(feed),
+        conversations: [
+          chat([
+            {from: BOB, text: 'Hello?', height: 9600, index: 0},
+            {from: ME, text: 'Hello Bob', height: 9650, index: 0},
+          ]),
+        ],
+      },
+      {
+        reads: {posts: {window: 'count', count: 50}, messages: true},
+        answeredIds: answered,
+      },
+      {point: 9000, scanned: HEAD}
+    )
+    expect(digest.text).toContain('Not tipped')
+    expect(digest.text).not.toContain('Tipped already')
+    expect(digest.text).not.toContain('Hello?')
+    // A message after its own: new.
+    const again = socialDigest(
+      {
+        ...social([]),
+        conversations: [
+          chat([
+            {from: BOB, text: 'Hello?', height: 9600, index: 0},
+            {from: ME, text: 'Hello Bob', height: 9650, index: 0},
+            {from: BOB, text: 'And now?', height: 9660, index: 0},
+          ]),
+        ],
+      },
+      {reads: {messages: true}},
+      {point: 9000, scanned: HEAD}
+    )
+    expect(again.text).toContain('And now?')
   })
 
   describe('a run read again', () => {

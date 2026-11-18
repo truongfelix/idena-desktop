@@ -105,8 +105,11 @@ export function readPlan(answer, digest, held, me, done = {}) {
 export function doneOnFeed(feed, me) {
   const liked = new Set()
   const answered = new Set()
+  // Tipped by it (B-295): never read again either (a second tip is iDNA).
+  const tipped = new Set()
   const visit = (node) => {
     if (node.likeCalls.some((call) => call.author === me)) liked.add(node.id)
+    if (node.tips.some((tip) => tip.from === me)) tipped.add(idKey(node.id))
     if (node.replies.some((reply) => reply.call.author === me))
       answered.add(idKey(node.id))
     if (node.call.author === me && node.call.replyTo)
@@ -114,5 +117,5 @@ export function doneOnFeed(feed, me) {
     node.replies.forEach(visit)
   }
   feed.forEach(visit)
-  return {liked, answered}
+  return {liked, answered, tipped}
 }

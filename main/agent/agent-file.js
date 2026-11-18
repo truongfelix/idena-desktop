@@ -109,6 +109,8 @@ function readAgentFile(text, agents = []) {
       actions,
       reads: normalizeAgent({...read, actions}).reads,
       internet: {...read.internet, mode: 'off'},
+      // Its pictures (B-293) shown only to an Anthropic model: another may read text only, the person chooses.
+      postPictures: read.provider === 'anthropic' ? read.postPictures : 'say',
     },
     asked,
     dropped,

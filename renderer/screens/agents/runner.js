@@ -68,6 +68,8 @@ export function afterEventRun(fails, day, result) {
 }
 // The agents running now: one run at a time each, the scheduled run and Run now alike.
 const running = new Set()
+/** Whether a run of the agent `id` goes on now (B-295: Read again waits for its end, which saves its read point). */
+export const isRunning = (id) => running.has(id)
 
 const agentCall = (command, data) =>
   global.ipcRenderer.invoke('agent', command, data)

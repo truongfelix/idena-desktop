@@ -151,9 +151,14 @@ export async function runSocialAgent(agent, social, deps) {
   const waitingNow = ((await call('pending')) || []).filter(
     (item) => item.agentId === agent.id
   )
-  const {answered} = doneOnFeed(social.feed || [], social.me)
+  const {answered, tipped} = doneOnFeed(social.feed || [], social.me)
+  tipped.forEach((id) => answered.add(id))
   waitingNow.forEach(({action, target}) => {
-    if (action === 'reply' && target && target.postId !== undefined)
+    if (
+      (action === 'reply' || action === 'tip') &&
+      target &&
+      target.postId !== undefined
+    )
       answered.add(idKey(target.postId))
   })
   const options = {

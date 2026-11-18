@@ -2349,7 +2349,8 @@
   "Its next run reads again what came on Social in the last hours you choose, within what it reads and its numbers of the day. What it already answered is skipped.": "Son prochain passage relit ce qui est arrivé sur Social pendant les dernières heures choisies, dans les limites de ce qu'il lit et de ses nombres du jour. Ce à quoi il a déjà répondu est ignoré.",
   "Hours, from 1 to 24": "Heures, de 1 à 24",
   "Read again": "Relire",
-  "Its next run reads again the last {{hours}} hours.": "Son prochain passage relit les {{hours}} dernières heures.",
   "It asks for the internet": "Il demande l'accès à internet",
-  "Asked for: {{what}}. It starts Off: turn it on yourself in its Connection, on the agent page.": "Demandé : {{what}}. Il commence désactivé : activez-le vous-même dans sa Connexion, sur la page de l'agent."
+  "Asked for: {{what}}. It starts Off: turn it on yourself in its Connection, on the agent page.": "Demandé : {{what}}. Il commence désactivé : activez-le vous-même dans sa Connexion, sur la page de l'agent.",
+  "It is running now. Try again when its run ends.": "Il est en cours. Réessayez à la fin de son passage.",
+  "Its next run reads again from {{hours}} h ago.": "Son prochain passage relit depuis {{hours}} h."
 }

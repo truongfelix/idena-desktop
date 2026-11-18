@@ -167,6 +167,18 @@ describe('the pictures a run names (B-293)', () => {
     expect(digest.text).toContain('[with the picture img3]')
   })
 
+  test('a tag answering its own picture post: its own picture is not sent', () => {
+    const tag = node(61, ANN, '@minitel what is this?', 9990, picture('T'))
+    const own = node(60, ME, 'My picture', 9980, picture('MINE'), [tag])
+    const wanted = new Map()
+    socialDigest(
+      state([own]),
+      {reads: {tags: {perDay: 5}}, pictures: {collect: wanted}},
+      {point: 9000, scanned: HEAD}
+    )
+    expect([...wanted.keys()]).toEqual(['T'])
+  })
+
   test('its own posts keep the placeholder: only what others posted is shown', () => {
     const feed = [node(50, ME, 'My own picture', 9990, picture('MINE'))]
     const wanted = new Map()
@@ -407,5 +419,19 @@ describe('the setting (B-293)', () => {
     const text = exportAgent(agent)
     expect(JSON.parse(text).postPictures).toBe('say')
     expect(readAgentFile(text, []).agent.postPictures).toBe('say')
+  })
+
+  test('imported for another service than Anthropic: only named, whatever the file says', () => {
+    const [agent] = saved([
+      {
+        id: 'aaaaaaaaaaaaaaaa',
+        name: 'A',
+        provider: 'local',
+        model: 'm',
+        postPictures: 'send',
+      },
+    ])
+    expect(agent.postPictures).toBe('send')
+    expect(readAgentFile(exportAgent(agent), []).agent.postPictures).toBe('say')
   })
 })

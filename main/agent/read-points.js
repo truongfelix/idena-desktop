@@ -159,8 +159,9 @@ function createReadPoints({file = null, logger = null, now = Date.now} = {}) {
           throw new Error('not a number of hours')
         if (!isHeight(head)) throw new Error('not a block height')
         const height = Math.max(0, head - hours * BLOCKS_PER_HOUR)
-        const has = Object.prototype.hasOwnProperty.call(points, agentId)
-        if (!has || points[agentId] > height) {
+        // Never run: its first run reads a day already, nothing to read again.
+        if (!Object.prototype.hasOwnProperty.call(points, agentId)) return null
+        if (points[agentId] > height) {
           points = {...points, [agentId]: height}
           save()
         }

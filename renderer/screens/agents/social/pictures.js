@@ -10,7 +10,7 @@ export const PICTURE_SIDE = 1024
 /** The largest picture read. */
 export const MAX_PICTURE_SOURCE = 20 * 1000 * 1000
 /** How long the node may look for a picture on IPFS, and how many are read at once. */
-export const PICTURE_TIMEOUT_MS = 30 * 1000
+export const PICTURE_TIMEOUT_MS = 15 * 1000
 const AT_ONCE = 4
 const QUALITY = 0.85
 

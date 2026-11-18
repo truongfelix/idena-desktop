@@ -30,10 +30,10 @@ const MAX_ANSWER_TEXT = 4000
 // A run's plan on Idena Social: several actions, each with a text of a post's length.
 const MAX_PLAN_TEXT = 12000
 // The pictures of the posts a run reads (B-293, renderer/screens/agents/social/digest.js MAX_PICTURES), each one as
-// the renderer drew it: JPEG (or another type the models read), base64, below the Anthropic API's 5 MB a picture.
+// the renderer drew it: JPEG (or another type the models read), base64, below the Anthropic API's 5 MB a picture (counted on the base64).
 const MAX_PICTURES = 20
 const PICTURE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
-const MAX_PICTURE_DATA = Math.floor((5 * 1024 * 1024 * 4) / 3)
+const MAX_PICTURE_DATA = 5 * 1024 * 1024
 const PICTURE_ID = /^img[0-9]{1,3}$/u
 
 /**
@@ -59,10 +59,9 @@ function socialParts(agent, input, pictures) {
         one.data.length <= MAX_PICTURE_DATA &&
         /^[A-Za-z0-9+/]+={0,2}$/u.test(one.data)
     )
+    .filter((one) => !seen.has(one.id) && seen.add(one.id))
     .slice(0, MAX_PICTURES)
     .forEach((one) => {
-      if (seen.has(one.id)) return
-      seen.add(one.id)
       parts.push(
         {type: 'text', text: `${one.id}:`},
         {type: 'image', mediaType: one.mediaType, data: one.data}

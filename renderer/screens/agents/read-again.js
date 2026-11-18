@@ -13,7 +13,7 @@ import {PrimaryButton, SecondaryButton} from '../../shared/components/button'
 import {useSuccessToast} from '../../shared/hooks/use-toast'
 import {useSocial} from '../social/provider'
 import {agentErrorText} from '../settings/agent/api'
-import {isSocialAgent, socialReady} from './runner'
+import {isRunning, isSocialAgent, socialReady} from './runner'
 import {scannedHeight} from './social/run'
 
 // Read again the last N hours (B-295), in the agent page's header: the agent's read point goes back N hours of
@@ -87,13 +87,18 @@ export function ReadAgain({agent, onDone}) {
           <PrimaryButton
             isDisabled={hours === null}
             onClick={async () => {
+              // A run going on saves its point at its end, past this one: wait for it.
+              if (isRunning(agent.id)) {
+                setError(t('It is running now. Try again when its run ends.'))
+                return
+              }
               try {
                 await readAgain(agent.id, hours, scannedHeight(social))
                 setIsOpen(false)
                 toast({
-                  title: t('Read again…'),
+                  title: t('Read again'),
                   description: t(
-                    'Its next run reads again the last {{hours}} hours.',
+                    'Its next run reads again from {{hours}} h ago.',
                     {hours}
                   ),
                 })

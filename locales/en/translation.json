@@ -2349,7 +2349,8 @@
   "Its next run reads again what came on Social in the last hours you choose, within what it reads and its numbers of the day. What it already answered is skipped.": "Its next run reads again what came on Social in the last hours you choose, within what it reads and its numbers of the day. What it already answered is skipped.",
   "Hours, from 1 to 24": "Hours, from 1 to 24",
   "Read again": "Read again",
-  "Its next run reads again the last {{hours}} hours.": "Its next run reads again the last {{hours}} hours.",
   "It asks for the internet": "It asks for the internet",
-  "Asked for: {{what}}. It starts Off: turn it on yourself in its Connection, on the agent page.": "Asked for: {{what}}. It starts Off: turn it on yourself in its Connection, on the agent page."
+  "Asked for: {{what}}. It starts Off: turn it on yourself in its Connection, on the agent page.": "Asked for: {{what}}. It starts Off: turn it on yourself in its Connection, on the agent page.",
+  "It is running now. Try again when its run ends.": "It is running now. Try again when its run ends.",
+  "Its next run reads again from {{hours}} h ago.": "Its next run reads again from {{hours}} h ago."
 }

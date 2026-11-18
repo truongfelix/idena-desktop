@@ -145,7 +145,7 @@ export function socialDigest(
   // twice keeps its name.
   const picked = new Map()
   const pictureId = (call) => {
-    if (!pictures || !isPicture(call)) return null
+    if (!pictures || !isPicture(call) || call.author === me) return null
     if (picked.has(call.media)) return picked.get(call.media).id
     if (pictures.have && !pictures.have.has(call.media)) return null
     if (picked.size >= MAX_PICTURES) return null
@@ -195,7 +195,8 @@ export function socialDigest(
     Boolean(tagged) &&
     node.call.author !== me &&
     tags(node.call.message, tagged)
-  // What it answered already (B-295, `answeredIds`: idKey ids, its replies on the feed and those waiting in To approve):
+  // What it answered already (B-295, `answeredIds`: idKey ids, its replies and tips on the feed, and those waiting in
+  // To approve):
   // never read again as an answer, a tag or a new post, whatever its read point (read again, it would answer twice).
   const isAnswered = (node) =>
     Boolean(answeredIds && answeredIds.has(idKey(node.id)))
@@ -311,8 +312,13 @@ export function socialDigest(
         isBlocked(conversation.others[0])
       )
         return
+      // Only what came after its own last message (B-295): read again, a conversation it answered is not new.
+      const lastOwn = conversation.messages.reduce(
+        (at, message, i) => (message.from === me ? i : at),
+        -1
+      )
       const fresh = conversation.messages.filter(
-        (message) => message.from !== me && isNew(message)
+        (message, i) => i > lastOwn && message.from !== me && isNew(message)
       )
       if (
         fresh.length &&
