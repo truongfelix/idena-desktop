@@ -29,6 +29,11 @@ describe('isMiningNow', () => {
     await expect(
       isMiningNow(() => Promise.reject(new Error('refused')))
     ).resolves.toBe(false)
+    await expect(
+      isMiningNow(() => {
+        throw new Error('no settings')
+      })
+    ).resolves.toBe(false)
   })
 
   it('stops waiting for a slow node before the main process quits on its own', async () => {

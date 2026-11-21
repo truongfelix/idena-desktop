@@ -21,7 +21,7 @@ const sendConfirmQuit = () => global.ipcRenderer.send('confirm-quit')
 
 // Well under the main process's wait for an answer (main/quit-request.js): a node that does not answer in time is
 // a node with nothing to ask about, as one that fails.
-export const MINING_CHECK_TIMEOUT_MS = 5 * 1000
+export const MINING_CHECK_TIMEOUT_MS = 10 * 1000
 
 export function isMiningNow(
   fetchIdentity = () => callRpc('dna_identity'),
@@ -29,7 +29,9 @@ export function isMiningNow(
 ) {
   let timer
   return Promise.race([
-    fetchIdentity().then(({online}) => Boolean(online)),
+    Promise.resolve()
+      .then(fetchIdentity)
+      .then(({online}) => Boolean(online)),
     new Promise((resolve) => {
       timer = setTimeout(() => resolve(false), timeoutMs)
     }),

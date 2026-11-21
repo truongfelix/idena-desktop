@@ -448,10 +448,6 @@ export const createValidationMachine = ({
                           },
                         },
                         submitting: {
-                          // A node call that never settles ends with the validation too.
-                          after: {
-                            VALIDATION_END: '#validation.validationFailed',
-                          },
                           invoke: {
                             // eslint-disable-next-line no-shadow
                             src: ({shortFlips, epoch}) =>
@@ -977,10 +973,6 @@ export const createValidationMachine = ({
                       entry: log(),
                       states: {
                         submitting: {
-                          // A node call that never settles ends with the validation too.
-                          after: {
-                            VALIDATION_END: '#validation.validationFailed',
-                          },
                           invoke: {
                             // eslint-disable-next-line no-shadow
                             src: ({longFlips, bestFlipHashes, epoch}) =>
