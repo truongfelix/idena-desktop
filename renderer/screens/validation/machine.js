@@ -449,6 +449,10 @@ export const createValidationMachine = ({
                           },
                         },
                         submitting: {
+                          // A node call that never returns stops with the validation too.
+                          after: {
+                            VALIDATION_END: '#validation.submitStopped',
+                          },
                           invoke: {
                             // eslint-disable-next-line no-shadow
                             src: ({shortFlips, epoch}) =>
@@ -975,6 +979,10 @@ export const createValidationMachine = ({
                       entry: log(),
                       states: {
                         submitting: {
+                          // A node call that never returns stops with the validation too.
+                          after: {
+                            VALIDATION_END: '#validation.submitStopped',
+                          },
                           invoke: {
                             // eslint-disable-next-line no-shadow
                             src: ({longFlips, bestFlipHashes, epoch}) =>

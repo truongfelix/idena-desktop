@@ -11,6 +11,13 @@ function createQuitRequest({
   clearTimer = clearTimeout,
 }) {
   let timer = null
+  let quitting = false
+
+  const quitOnce = (reason) => {
+    if (quitting) return
+    quitting = true
+    quit(reason)
+  }
 
   const stopWaiting = () => {
     if (timer) clearTimer(timer)
@@ -20,11 +27,12 @@ function createQuitRequest({
   return {
     // Asks the page; quits when no answer comes in time.
     request() {
+      if (quitting) return
       stopWaiting()
       ask()
       timer = setTimer(() => {
         timer = null
-        quit('no answer from the page')
+        quitOnce('no answer from the page')
       }, timeoutMs)
     },
     // The page shows the question: no timeout.
@@ -32,7 +40,7 @@ function createQuitRequest({
     // The page says quit.
     confirmed() {
       stopWaiting()
-      quit('confirmed')
+      quitOnce('confirmed')
     },
   }
 }

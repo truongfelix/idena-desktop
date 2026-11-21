@@ -43,10 +43,10 @@ describe('isMiningNow', () => {
     ).resolves.toBe(false)
   })
 
-  it('stops waiting for a slow node before the main process quits on its own', async () => {
+  it('asks when a slow node does not answer before the main process quits on its own', async () => {
     const answer = isMiningNow(() => new Promise(() => {}))
     jest.advanceTimersByTime(MINING_CHECK_TIMEOUT_MS)
-    await expect(answer).resolves.toBe(false)
+    await expect(answer).resolves.toBe(true)
   })
 })
 

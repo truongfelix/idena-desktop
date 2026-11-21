@@ -43,8 +43,8 @@ export function useQuitQuestionOpen() {
   )
 }
 
-// Well under the main process's wait for an answer (main/quit-request.js): a node that does not answer in time is
-// a node with nothing to ask about, as one that fails.
+// Under the main process's wait for an answer (main/quit-request.js): a node that does not answer in time may
+// mine, so the question is asked; a node that fails has nothing to ask about.
 export const MINING_CHECK_TIMEOUT_MS = 10 * 1000
 
 export function isMiningNow(
@@ -57,7 +57,7 @@ export function isMiningNow(
       .then(fetchIdentity)
       .then(({online}) => Boolean(online)),
     new Promise((resolve) => {
-      timer = setTimeout(() => resolve(false), timeoutMs)
+      timer = setTimeout(() => resolve(true), timeoutMs)
     }),
   ])
     .catch(() => false)

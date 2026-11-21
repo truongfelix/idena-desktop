@@ -42,6 +42,16 @@ describe('createQuitRequest', () => {
     expect(quit).not.toHaveBeenCalled()
   })
 
+  it('quits once, though the page answers after the timeout', () => {
+    const {quit, request} = setup()
+    request.request()
+    jest.advanceTimersByTime(QUIT_ANSWER_TIMEOUT_MS)
+    request.confirmed()
+    request.request()
+    jest.advanceTimersByTime(QUIT_ANSWER_TIMEOUT_MS)
+    expect(quit).toHaveBeenCalledTimes(1)
+  })
+
   it('counts the time again from a second quit', () => {
     const {ask, quit, request} = setup()
     request.request()
