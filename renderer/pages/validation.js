@@ -14,10 +14,7 @@ import {
   SynchronizingValidationAlert,
   OfflineValidationAlert,
 } from '../screens/validation/components'
-import {
-  ValidationScreen,
-  leavesFailedSubmit,
-} from '../screens/validation/screen'
+import {ValidationScreen} from '../screens/validation/screen'
 import {useEpochState} from '../shared/providers/epoch-context'
 import {useTimingState} from '../shared/providers/timing-context'
 import {useChainState} from '../shared/providers/chain-context'
@@ -102,11 +99,11 @@ function ValidationSession({
     persistValidationState(state)
   }, [state])
 
-  const currentPeriod = useEpochState()?.currentPeriod
-  const leaves = leavesFailedSubmit(state, currentPeriod)
+  // A submit stopped at the end of the validation (machine.js submitStopped): My Idena shows the results.
+  const isSubmitStopped = state.matches('submitStopped')
   useEffect(() => {
-    if (leaves) router.push('/home')
-  }, [leaves, router])
+    if (isSubmitStopped) router.push('/home')
+  }, [isSubmitStopped, router])
 
   const {syncing, offline} = useChainState()
 

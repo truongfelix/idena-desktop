@@ -45,7 +45,7 @@ import {
   ReviewShortSessionDialog,
 } from './components'
 import {rem} from '../../shared/theme'
-import {AnswerType, EpochPeriod, RelevanceType} from '../../shared/types'
+import {AnswerType, RelevanceType} from '../../shared/types'
 import {InfoButton, PrimaryButton} from '../../shared/components/button'
 import {FloatDebug, Tooltip} from '../../shared/components/components'
 import {useQuitQuestionOpen} from '../../shared/components/confirm-quit'
@@ -535,12 +535,6 @@ function isSubmitting(state) {
     'longSession.solve.answer.finishFlips',
     'longSession.solve.answer.submitLongSession',
   ].some(state.matches)
-}
-
-// A submit still failing once the ceremony is over (the node refuses it: wrong period) retries for nothing: the
-// page leaves for My Idena, which shows the validation's outcome.
-export function leavesFailedSubmit(state, currentPeriod) {
-  return isSubmitFailed(state) && currentPeriod === EpochPeriod.None
 }
 
 export function showsSubmitFailed(state, isQuitQuestionOpen) {

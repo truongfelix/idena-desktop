@@ -49,16 +49,15 @@ export function isDuplicateTx(error) {
 }
 
 // Whether the node refuses the answers because a transaction of the same kind from this identity is already in a
-// block (`duplicated tx`) or will be in the next (`multiple ceremony transaction … in executable queue`; one in the
-// pending queue may never be mined, so its submit is retried): sent before by this app, whose reply
+// block (`duplicated tx`) or waits in the node's pool (`multiple ceremony transaction`: a retry gets the same answer
+// while it is there): sent before by this app, whose reply
 // never came, or by another app holding the same key. No retry can change it. The node still sends its own short
 // answers (idena-go's short answers broadcast loop), which do not match another app's hash: the screens warn.
 export function isAnswersAlreadySent(error) {
   const message = String(error?.message ?? error)
   return (
     message.includes('duplicated tx') ||
-    (message.includes('multiple ceremony transaction') &&
-      message.includes('executable queue'))
+    message.includes('multiple ceremony transaction')
   )
 }
 
@@ -509,6 +508,11 @@ export const createValidationMachine = ({
                             RETRY_SUBMIT: {
                               target: 'submitting',
                             },
+                          },
+                          // The retries end with the validation, on the clock (a node that no longer answers
+                          // tells no period either).
+                          after: {
+                            VALIDATION_END: '#validation.submitStopped',
                           },
                         },
                       },
@@ -1039,6 +1043,11 @@ export const createValidationMachine = ({
                               target: 'submitting',
                             },
                           },
+                          // The retries end with the validation, on the clock (a node that no longer answers
+                          // tells no period either).
+                          after: {
+                            VALIDATION_END: '#validation.submitStopped',
+                          },
                         },
                       },
                     },
@@ -1072,6 +1081,15 @@ export const createValidationMachine = ({
           entry: log(
             (context, event) => ({context, event}),
             'VALIDATION FAILED'
+          ),
+        },
+        // A submit still failing at the end of the validation: nothing is said of the answers (a block may hold an
+        // earlier attempt); the page leaves for My Idena, which shows the results.
+        submitStopped: {
+          type: 'final',
+          entry: log(
+            (context, event) => ({context, event}),
+            'SUBMIT STOPPED AT THE END OF THE VALIDATION'
           ),
         },
         validationSucceeded: {
@@ -1124,6 +1142,11 @@ export const createValidationMachine = ({
               global.env?.FINALIZE_FLIPS ?? 90
             ),
             5
+          ) * 1000,
+        VALIDATION_END: (context) =>
+          adjustDurationInSeconds(
+            context.validationStart,
+            context.shortSessionDuration + context.longSessionDuration
           ) * 1000,
         // eslint-disable-next-line no-shadow
         SHORT_SESSION_AUTO_SUBMIT: ({validationStart, shortSessionDuration}) =>
