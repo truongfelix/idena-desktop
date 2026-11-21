@@ -19,6 +19,30 @@ import {useFailToast} from '../hooks/use-toast'
 
 const sendConfirmQuit = () => global.ipcRenderer.send('confirm-quit')
 
+// Whether "Are you sure you want to exit?" is on screen, for the pages whose own dialogs would take its place: the
+// validation's Submit failed dialog opens again at each retry and takes the focus (Enter would press its Retry).
+let quitQuestionOpen = false
+const quitQuestionListeners = new Set()
+
+export function setQuitQuestionOpen(isOpen) {
+  if (quitQuestionOpen === isOpen) return
+  quitQuestionOpen = isOpen
+  quitQuestionListeners.forEach((listener) => listener())
+}
+
+function subscribeQuitQuestion(listener) {
+  quitQuestionListeners.add(listener)
+  return () => quitQuestionListeners.delete(listener)
+}
+
+export function useQuitQuestionOpen() {
+  return React.useSyncExternalStore(
+    subscribeQuitQuestion,
+    () => quitQuestionOpen,
+    () => quitQuestionOpen
+  )
+}
+
 // Well under the main process's wait for an answer (main/quit-request.js): a node that does not answer in time is
 // a node with nothing to ask about, as one that fails.
 export const MINING_CHECK_TIMEOUT_MS = 10 * 1000
@@ -48,6 +72,12 @@ export function ConfirmQuit() {
   const {loading, offline, syncing} = useChainState()
   const {runInternalNode} = useSettingsState()
   const {onOpen, ...disclosure} = useDisclosure()
+  const {isOpen} = disclosure
+
+  React.useEffect(() => {
+    setQuitQuestionOpen(isOpen)
+    return () => setQuitQuestionOpen(false)
+  }, [isOpen])
   const failToast = useFailToast()
 
   const isReady = !loading && !offline && !syncing

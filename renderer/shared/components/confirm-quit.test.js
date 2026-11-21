@@ -1,4 +1,11 @@
-import {MINING_CHECK_TIMEOUT_MS, isMiningNow} from './confirm-quit'
+import React from 'react'
+import {renderToString} from 'react-dom/server'
+import {
+  MINING_CHECK_TIMEOUT_MS,
+  isMiningNow,
+  setQuitQuestionOpen,
+  useQuitQuestionOpen,
+} from './confirm-quit'
 
 jest.mock('../utils/utils', () => ({callRpc: jest.fn()}))
 jest.mock('../providers/chain-context', () => ({useChainState: jest.fn()}))
@@ -40,5 +47,27 @@ describe('isMiningNow', () => {
     const answer = isMiningNow(() => new Promise(() => {}))
     jest.advanceTimersByTime(MINING_CHECK_TIMEOUT_MS)
     await expect(answer).resolves.toBe(false)
+  })
+})
+
+describe('useQuitQuestionOpen', () => {
+  function readsOpen() {
+    let result
+    function Probe() {
+      result = useQuitQuestionOpen()
+      return null
+    }
+    renderToString(<Probe />)
+    return result
+  }
+
+  afterEach(() => setQuitQuestionOpen(false))
+
+  it('says whether the quit question shows', () => {
+    expect(readsOpen()).toBe(false)
+    setQuitQuestionOpen(true)
+    expect(readsOpen()).toBe(true)
+    setQuitQuestionOpen(false)
+    expect(readsOpen()).toBe(false)
   })
 })
