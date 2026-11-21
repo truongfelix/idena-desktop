@@ -160,7 +160,7 @@ function ValidationSession({
         state.context.shortAnswersAlreadySent && (
           <SynchronizingValidationAlert>
             {t(
-              'Answers for this identity were already sent, by this app earlier or by another app with the same key. Only the first answers sent count.'
+              'Answers for this identity were already sent, by this app earlier or by another app with the same key. Validating one identity in two apps at once can make the validation fail.'
             )}
           </SynchronizingValidationAlert>
         )}

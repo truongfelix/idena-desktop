@@ -19,6 +19,25 @@ import {useFailToast} from '../hooks/use-toast'
 
 const sendConfirmQuit = () => global.ipcRenderer.send('confirm-quit')
 
+// Well under the main process's wait for an answer (main/quit-request.js): a node that does not answer in time is
+// a node with nothing to ask about, as one that fails.
+export const MINING_CHECK_TIMEOUT_MS = 5 * 1000
+
+export function isMiningNow(
+  fetchIdentity = () => callRpc('dna_identity'),
+  timeoutMs = MINING_CHECK_TIMEOUT_MS
+) {
+  let timer
+  return Promise.race([
+    fetchIdentity().then(({online}) => Boolean(online)),
+    new Promise((resolve) => {
+      timer = setTimeout(() => resolve(false), timeoutMs)
+    }),
+  ])
+    .catch(() => false)
+    .finally(() => clearTimeout(timer))
+}
+
 /**
  * Answers the main process's quit request on every page (it was only in Layout, so Quit did nothing on the
  * validation pages): quits at once, unless the built-in node mines, then asks first.
@@ -34,16 +53,11 @@ export function ConfirmQuit() {
   React.useEffect(() => {
     const handleRequestQuit = async () => {
       if (isReady && runInternalNode) {
-        try {
-          const {online} = await callRpc('dna_identity')
-          if (online) {
-            // The main process quits on its own when the page does not answer: the person decides now.
-            global.ipcRenderer.send('confirm-quit-asked')
-            onOpen()
-            return
-          }
-        } catch {
-          // The node does not answer: nothing to ask about.
+        if (await isMiningNow()) {
+          // The main process quits on its own when the page does not answer: the person decides now.
+          global.ipcRenderer.send('confirm-quit-asked')
+          onOpen()
+          return
         }
       }
       sendConfirmQuit()

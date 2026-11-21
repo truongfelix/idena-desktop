@@ -344,6 +344,32 @@ describe('a practice through the validation machine', () => {
     expect(submitLong).toHaveBeenCalledTimes(calls)
   })
 
+  it('ends a submit whose node call never returns with the validation', async () => {
+    const practice = createPractice(sample)
+    const service = startPractice(practice, {
+      ...practiceNodeCalls(practice),
+      submitShortAnswers: () => new Promise(() => {}),
+    })
+
+    await advance(3000)
+    for (const {hash, answer} of practice.short)
+      service.send({type: 'ANSWER', hash, option: answer})
+    service.send('SUBMIT')
+    await settle()
+    expect(
+      service.state.matches(
+        'shortSession.solve.answer.submitShortSession.submitting'
+      )
+    ).toBe(true)
+
+    await advance(
+      (PRACTICE_SHORT_SESSION_DURATION +
+        practice.long.length * PRACTICE_LONG_SESSION_DURATION_PER_FLIP) *
+        1000
+    )
+    expect(service.state.matches('validationFailed')).toBe(true)
+  })
+
   it('fails when the short session ends with too few answers', async () => {
     const practice = createPractice(sample)
     const service = startPractice(practice)

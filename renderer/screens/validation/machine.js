@@ -50,7 +50,8 @@ export function isDuplicateTx(error) {
 
 // Whether the node refuses the answers because a transaction of the same kind from this identity is already in a
 // block (`duplicated tx`) or waits for one (`multiple ceremony transaction`): sent before by this app, whose reply
-// never came, or by another app holding the same key. No retry can change it, and the first answers sent count.
+// never came, or by another app holding the same key. No retry can change it. The node still sends its own short
+// answers (idena-go's short answers broadcast loop), which do not match another app's hash: the screens warn.
 export function isAnswersAlreadySent(error) {
   const message = String(error?.message ?? error)
   return (
@@ -447,6 +448,10 @@ export const createValidationMachine = ({
                           },
                         },
                         submitting: {
+                          // A node call that never settles ends with the validation too.
+                          after: {
+                            VALIDATION_END: '#validation.validationFailed',
+                          },
                           invoke: {
                             // eslint-disable-next-line no-shadow
                             src: ({shortFlips, epoch}) =>
@@ -972,6 +977,10 @@ export const createValidationMachine = ({
                       entry: log(),
                       states: {
                         submitting: {
+                          // A node call that never settles ends with the validation too.
+                          after: {
+                            VALIDATION_END: '#validation.validationFailed',
+                          },
                           invoke: {
                             // eslint-disable-next-line no-shadow
                             src: ({longFlips, bestFlipHashes, epoch}) =>
@@ -1130,11 +1139,10 @@ export const createValidationMachine = ({
             ),
             5
           ) * 1000,
-        // eslint-disable-next-line no-shadow
-        VALIDATION_END: ({validationStart}) =>
+        VALIDATION_END: (context) =>
           adjustDurationInSeconds(
-            validationStart,
-            shortSessionDuration + longSessionDuration
+            context.validationStart,
+            context.shortSessionDuration + context.longSessionDuration
           ) * 1000,
         // eslint-disable-next-line no-shadow
         SHORT_SESSION_AUTO_SUBMIT: ({validationStart, shortSessionDuration}) =>
