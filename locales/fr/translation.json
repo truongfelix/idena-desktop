@@ -1826,5 +1826,6 @@
   "Your node has no connection: your answers cannot reach the network": "Votre nœud n'a aucune connexion : vos réponses ne peuvent pas atteindre le réseau",
   "Your short answers are not in a block yet: keep the app open and connected": "Vos réponses courtes ne sont pas encore dans un bloc : gardez l'application ouverte et connectée",
   "Your answers are not in a block yet: keep the app open and connected": "Vos réponses ne sont pas encore dans un bloc : gardez l'application ouverte et connectée",
-  "Your answers were sent to your node": "Vos réponses ont été transmises à votre nœud"
+  "Your answers were sent to your node": "Vos réponses ont été transmises à votre nœud",
+  "Answers for this identity were already sent, by this app earlier or by another app with the same key. Validating one identity in two apps at once can make the validation fail.": "Les réponses de cette identité ont déjà été envoyées, par cette application plus tôt ou par une autre application avec la même clé. Valider une identité dans deux applications à la fois peut faire échouer la validation."
 }

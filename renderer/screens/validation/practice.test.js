@@ -255,6 +255,123 @@ describe('a practice through the validation machine', () => {
     expect(service.state.matches('validationSucceeded')).toBe(true)
   })
 
+  it('moves on and says so when the node refuses the answers as already sent', async () => {
+    // Answers of this identity sent first by another app: waiting for a block, then in one (idena-go's mempool
+    // and validateCeremonyTx).
+    const practice = createPractice(sample)
+    const submitLong = jest.fn(() => Promise.reject(new Error('duplicated tx')))
+    const service = startPractice(practice, {
+      ...practiceNodeCalls(practice),
+      submitShortAnswers: () =>
+        Promise.reject(
+          new Error('multiple ceremony transaction [type=5] in pending queue')
+        ),
+      submitLongAnswers: submitLong,
+    })
+
+    await advance(3000)
+    for (const {hash, answer} of practice.short)
+      service.send({type: 'ANSWER', hash, option: answer})
+    service.send('SUBMIT')
+    await settle()
+    expect(service.state.matches('longSession')).toBe(true)
+    expect(service.state.context.shortAnswersAlreadySent).toBe(true)
+    expect(service.state.context.longAnswersAlreadySent).toBe(false)
+
+    await advance(12000)
+    service.send('START_LONG_SESSION')
+    for (const {hash, answer} of practice.long)
+      service.send({type: 'ANSWER', hash, option: answer})
+    service.send('FINISH_FLIPS')
+    service.send('START_KEYWORDS_QUALIFICATION')
+    for (const {hash} of practice.long)
+      service.send({type: 'APPROVE_WORDS', hash})
+    service.send('SUBMIT')
+    service.send('SUBMIT')
+    await settle()
+    expect(service.state.matches('validationSucceeded')).toBe(true)
+    expect(service.state.context.longAnswersAlreadySent).toBe(true)
+    expect(submitLong).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops retrying a failed submit at the end of the validation, saying nothing of the answers', async () => {
+    const practice = createPractice(sample)
+    const submitLong = jest.fn(() =>
+      Promise.reject(new Error('cannot reach the node'))
+    )
+    const service = startPractice(practice, {
+      ...practiceNodeCalls(practice),
+      submitLongAnswers: submitLong,
+    })
+
+    await advance(3000)
+    for (const {hash, answer} of practice.short)
+      service.send({type: 'ANSWER', hash, option: answer})
+    service.send('SUBMIT')
+    await settle()
+    await advance(12000)
+    service.send('START_LONG_SESSION')
+    for (const {hash, answer} of practice.long)
+      service.send({type: 'ANSWER', hash, option: answer})
+    service.send('FINISH_FLIPS')
+    service.send('START_KEYWORDS_QUALIFICATION')
+    for (const {hash} of practice.long)
+      service.send({type: 'APPROVE_WORDS', hash})
+    service.send('SUBMIT')
+    service.send('SUBMIT')
+    await settle()
+    expect(
+      service.state.matches('longSession.solve.answer.submitLongSession.fail')
+    ).toBe(true)
+
+    // The screen's Retry, as its dialog presses it every 5 s, until the end of the validation.
+    const longSessionDuration =
+      practice.long.length * PRACTICE_LONG_SESSION_DURATION_PER_FLIP
+    for (
+      let elapsed = 0;
+      elapsed < (PRACTICE_SHORT_SESSION_DURATION + longSessionDuration) * 1000;
+      elapsed += 5000
+    ) {
+      service.send('RETRY_SUBMIT')
+      // eslint-disable-next-line no-await-in-loop
+      await advance(5000)
+    }
+
+    // A final state: My Idena then shows the results (shouldExpectValidationResults reads `done`).
+    expect(service.state.matches('submitStopped')).toBe(true)
+    expect(service.state.done).toBe(true)
+    const calls = submitLong.mock.calls.length
+    service.send('RETRY_SUBMIT')
+    await advance(10000)
+    expect(submitLong).toHaveBeenCalledTimes(calls)
+  })
+
+  it('stops a submit whose node call never returns at the end of the validation', async () => {
+    const practice = createPractice(sample)
+    const service = startPractice(practice, {
+      ...practiceNodeCalls(practice),
+      submitShortAnswers: () => new Promise(() => {}),
+    })
+
+    await advance(3000)
+    for (const {hash, answer} of practice.short)
+      service.send({type: 'ANSWER', hash, option: answer})
+    service.send('SUBMIT')
+    await settle()
+    expect(
+      service.state.matches(
+        'shortSession.solve.answer.submitShortSession.submitting'
+      )
+    ).toBe(true)
+
+    await advance(
+      (PRACTICE_SHORT_SESSION_DURATION +
+        practice.long.length * PRACTICE_LONG_SESSION_DURATION_PER_FLIP) *
+        1000
+    )
+    expect(service.state.matches('submitStopped')).toBe(true)
+  })
+
   it('fails when the short session ends with too few answers', async () => {
     const practice = createPractice(sample)
     const service = startPractice(practice)

@@ -128,6 +128,8 @@ export function persistedLongAnswersTx(validationState, epoch) {
   return {
     hash: context?.submitLongAnswersHash ?? null,
     sentAt: context?.submitLongAnswersAt ?? null,
+    // The node refused them as already sent (machine.js isAnswersAlreadySent).
+    alreadySent: context?.longAnswersAlreadySent === true,
   }
 }
 

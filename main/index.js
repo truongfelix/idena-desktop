@@ -96,6 +96,7 @@ const {
 const NodeUpdater = require('./node-updater')
 const {createNodeProcess} = require('./node-process')
 const {createAppBadge} = require('./app-badge')
+const {createQuitRequest} = require('./quit-request')
 const {createNodeReports} = require('./node-reports')
 const {READ_INTERVAL_MS} = require('./node-watch')
 const {createNodeWatchdog} = require('./node-watchdog')
@@ -703,6 +704,15 @@ app.on('will-finish-launching', () => {
 
 let didConfirmQuit = false
 
+const quitRequest = createQuitRequest({
+  ask: () => sendMainWindowMsg('confirm-quit'),
+  quit: (reason) => {
+    logger.info('quit:', reason)
+    didConfirmQuit = true
+    app.quit()
+  },
+})
+
 // A window that can answer the quit confirmation (asked only when the node mines: renderer ConfirmQuit).
 const canConfirmQuit = () =>
   Boolean(mainWindow) &&
@@ -720,7 +730,7 @@ app.on('before-quit', (e) => {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.forceClose = true
   } else {
     e.preventDefault()
-    sendMainWindowMsg('confirm-quit')
+    quitRequest.request()
   }
 })
 
@@ -741,8 +751,13 @@ app.on('will-quit', (e) => {
 
 ipcMain.on('confirm-quit', (event) => {
   if (!acceptIpcSender(event)) return
-  didConfirmQuit = true
-  app.quit()
+  quitRequest.confirmed()
+})
+
+// The page shows "Are you sure you want to exit?": the person decides, no timeout.
+ipcMain.on('confirm-quit-asked', (event) => {
+  if (!acceptIpcSender(event)) return
+  quitRequest.asked()
 })
 
 app.on('activate', showMainWindow)

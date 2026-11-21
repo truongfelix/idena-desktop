@@ -1826,5 +1826,6 @@
   "Your node has no connection: your answers cannot reach the network": "Your node has no connection: your answers cannot reach the network",
   "Your short answers are not in a block yet: keep the app open and connected": "Your short answers are not in a block yet: keep the app open and connected",
   "Your answers are not in a block yet: keep the app open and connected": "Your answers are not in a block yet: keep the app open and connected",
-  "Your answers were sent to your node": "Your answers were sent to your node"
+  "Your answers were sent to your node": "Your answers were sent to your node",
+  "Answers for this identity were already sent, by this app earlier or by another app with the same key. Validating one identity in two apps at once can make the validation fail.": "Answers for this identity were already sent, by this app earlier or by another app with the same key. Validating one identity in two apps at once can make the validation fail."
 }

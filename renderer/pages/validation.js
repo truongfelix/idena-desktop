@@ -99,6 +99,12 @@ function ValidationSession({
     persistValidationState(state)
   }, [state])
 
+  // A submit stopped at the end of the validation (machine.js submitStopped): My Idena shows the results.
+  const isSubmitStopped = state.matches('submitStopped')
+  useEffect(() => {
+    if (isSubmitStopped) router.push('/home')
+  }, [isSubmitStopped, router])
+
   const {syncing, offline} = useChainState()
 
   // The answers go out through the node: with no peer, or a head that does not move, they reach no one (B-244).
@@ -154,6 +160,16 @@ function ValidationSession({
           )} (${timeLeftText(t, validationEnd, Date.now())})`}
         </SynchronizingValidationAlert>
       )}
+
+      {!alert &&
+        state.matches('longSession') &&
+        state.context.shortAnswersAlreadySent && (
+          <SynchronizingValidationAlert>
+            {t(
+              'Answers for this identity were already sent, by this app earlier or by another app with the same key. Validating one identity in two apps at once can make the validation fail.'
+            )}
+          </SynchronizingValidationAlert>
+        )}
 
       {state.matches('validationFailed') && (
         <ValidationFailedDialog isOpen onSubmit={() => router.push('/home')} />
