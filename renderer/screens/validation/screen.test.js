@@ -1,4 +1,5 @@
-import {showsSubmitFailed} from './screen'
+import {EpochPeriod} from '../../shared/types'
+import {leavesFailedSubmit, showsSubmitFailed} from './screen'
 
 const stateIn = (value) => ({matches: (path) => path === value})
 
@@ -23,6 +24,26 @@ describe('showsSubmitFailed', () => {
         stateIn('longSession.solve.answer.submitLongSession.fail'),
         true
       )
+    ).toBe(false)
+  })
+})
+
+describe('leavesFailedSubmit', () => {
+  const failed = stateIn('longSession.solve.answer.submitLongSession.fail')
+
+  it('leaves a submit still failing once the ceremony is over', () => {
+    expect(leavesFailedSubmit(failed, EpochPeriod.None)).toBe(true)
+  })
+
+  it('stays during the ceremony, and on a submit that did not fail', () => {
+    for (const period of [
+      EpochPeriod.ShortSession,
+      EpochPeriod.LongSession,
+      EpochPeriod.AfterLongSession,
+    ])
+      expect(leavesFailedSubmit(failed, period)).toBe(false)
+    expect(
+      leavesFailedSubmit(stateIn('validationSucceeded'), EpochPeriod.None)
     ).toBe(false)
   })
 })

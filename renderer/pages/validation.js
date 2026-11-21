@@ -14,7 +14,10 @@ import {
   SynchronizingValidationAlert,
   OfflineValidationAlert,
 } from '../screens/validation/components'
-import {ValidationScreen} from '../screens/validation/screen'
+import {
+  ValidationScreen,
+  leavesFailedSubmit,
+} from '../screens/validation/screen'
 import {useEpochState} from '../shared/providers/epoch-context'
 import {useTimingState} from '../shared/providers/timing-context'
 import {useChainState} from '../shared/providers/chain-context'
@@ -98,6 +101,12 @@ function ValidationSession({
   useEffect(() => {
     persistValidationState(state)
   }, [state])
+
+  const currentPeriod = useEpochState()?.currentPeriod
+  const leaves = leavesFailedSubmit(state, currentPeriod)
+  useEffect(() => {
+    if (leaves) router.push('/home')
+  }, [leaves, router])
 
   const {syncing, offline} = useChainState()
 
