@@ -3,6 +3,7 @@ import {renderToString} from 'react-dom/server'
 import {
   MINING_CHECK_TIMEOUT_MS,
   isMiningNow,
+  withTimeout,
   setQuitQuestionOpen,
   useQuitQuestionOpen,
 } from './confirm-quit'
@@ -69,5 +70,17 @@ describe('useQuitQuestionOpen', () => {
     expect(readsOpen()).toBe(true)
     setQuitQuestionOpen(false)
     expect(readsOpen()).toBe(false)
+  })
+})
+
+describe('withTimeout', () => {
+  it('fails with the message when the node does not answer in time', async () => {
+    const call = withTimeout(new Promise(() => {}), 1000, 'no answer')
+    jest.advanceTimersByTime(1000)
+    await expect(call).rejects.toThrow('no answer')
+  })
+
+  it('keeps the answer that comes in time', async () => {
+    await expect(withTimeout(Promise.resolve(7), 1000, 'no')).resolves.toBe(7)
   })
 })

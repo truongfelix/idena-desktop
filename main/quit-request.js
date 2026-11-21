@@ -1,5 +1,5 @@
-// A quit waits for the page's answer: the page asks first while the built-in node mines (renderer ConfirmQuit).
-// A page that never answers (a hung window, a node call that never returns) must not hold the quit for good: the
+// A quit waits for the page's answer: the page asks first while the built-in node mines, or may (it does not answer
+// in time: renderer ConfirmQuit). A page that never answers (a hung window) must not hold the quit for good: the
 // app quits after a timeout, unless the page says it shows the question (the person then decides).
 const QUIT_ANSWER_TIMEOUT_MS = 15 * 1000
 

@@ -47,6 +47,17 @@ export function useQuitQuestionOpen() {
 // mine, so the question is asked; a node that fails has nothing to ask about.
 export const MINING_CHECK_TIMEOUT_MS = 10 * 1000
 
+// A node call with a time limit: a node that does not answer leaves the question's buttons working.
+export function withTimeout(promise, timeoutMs, message) {
+  let timer
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(message)), timeoutMs)
+    }),
+  ]).finally(() => clearTimeout(timer))
+}
+
 export function isMiningNow(
   fetchIdentity = () => callRpc('dna_identity'),
   timeoutMs = MINING_CHECK_TIMEOUT_MS
@@ -66,7 +77,7 @@ export function isMiningNow(
 
 /**
  * Answers the main process's quit request on every page (it was only in Layout, so Quit did nothing on the
- * validation pages): quits at once, unless the built-in node mines, then asks first.
+ * validation pages): quits at once, unless the built-in node mines or does not answer in time, then asks first.
  */
 export function ConfirmQuit() {
   const {loading, offline, syncing} = useChainState()
@@ -144,7 +155,11 @@ function ConfirmQuitDialog({onClose, onError, ...props}) {
               ref={stopMiningAndQuitRef}
               onClick={async () => {
                 try {
-                  await callRpc('dna_becomeOffline', {})
+                  await withTimeout(
+                    callRpc('dna_becomeOffline', {}),
+                    MINING_CHECK_TIMEOUT_MS,
+                    t('The node does not answer')
+                  )
                   sendConfirmQuit()
                 } catch (error) {
                   onError(error?.message)

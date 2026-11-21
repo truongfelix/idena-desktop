@@ -1151,6 +1151,7 @@ export const createValidationMachine = ({
             ),
             5
           ) * 1000,
+        // No minimum, unlike the delays above: each retry enters `fail` again and would restart it for good.
         VALIDATION_END: (context) =>
           adjustDurationInSeconds(
             context.validationStart,
