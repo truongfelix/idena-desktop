@@ -48,6 +48,17 @@ export function isDuplicateTx(error) {
   )
 }
 
+// Whether the node refuses the answers because a transaction of the same kind from this identity is already in a
+// block (`duplicated tx`) or waits for one (`multiple ceremony transaction`): sent before by this app, whose reply
+// never came, or by another app holding the same key. No retry can change it, and the first answers sent count.
+export function isAnswersAlreadySent(error) {
+  const message = String(error?.message ?? error)
+  return (
+    message.includes('duplicated tx') ||
+    message.includes('multiple ceremony transaction')
+  )
+}
+
 export const createValidationMachine = ({
   epoch,
   validationStart,
@@ -80,6 +91,9 @@ export const createValidationMachine = ({
         submitLongAnswersAt: null,
         submitShortAnswersHash: null,
         submitShortAnswersAt: null,
+        // The node refused the answers as already sent (isAnswersAlreadySent): the screens say so.
+        shortAnswersAlreadySent: false,
+        longAnswersAlreadySent: false,
       },
       states: {
         shortSession: {
@@ -462,6 +476,17 @@ export const createValidationMachine = ({
                                 cond: (_, {data}) => isDuplicateTx(data),
                               },
                               {
+                                target: '#validation.longSession',
+                                cond: (_, {data}) => isAnswersAlreadySent(data),
+                                actions: [
+                                  assign({shortAnswersAlreadySent: true}),
+                                  log(
+                                    (context, event) => ({context, event}),
+                                    'Short answers already sent'
+                                  ),
+                                ],
+                              },
+                              {
                                 target: 'fail',
                                 actions: [
                                   assign({
@@ -481,6 +506,10 @@ export const createValidationMachine = ({
                             RETRY_SUBMIT: {
                               target: 'submitting',
                             },
+                          },
+                          // The retries end with the validation.
+                          after: {
+                            VALIDATION_END: '#validation.validationFailed',
                           },
                         },
                       },
@@ -980,6 +1009,17 @@ export const createValidationMachine = ({
                                 cond: (_, {data}) => isDuplicateTx(data),
                               },
                               {
+                                target: '#validation.validationSucceeded',
+                                cond: (_, {data}) => isAnswersAlreadySent(data),
+                                actions: [
+                                  assign({longAnswersAlreadySent: true}),
+                                  log(
+                                    (context, event) => ({context, event}),
+                                    'Long answers already sent'
+                                  ),
+                                ],
+                              },
+                              {
                                 target: 'fail',
                                 actions: [
                                   assign({
@@ -999,6 +1039,10 @@ export const createValidationMachine = ({
                             RETRY_SUBMIT: {
                               target: 'submitting',
                             },
+                          },
+                          // The retries end with the validation.
+                          after: {
+                            VALIDATION_END: '#validation.validationFailed',
                           },
                         },
                       },
@@ -1085,6 +1129,12 @@ export const createValidationMachine = ({
               global.env?.FINALIZE_FLIPS ?? 90
             ),
             5
+          ) * 1000,
+        // eslint-disable-next-line no-shadow
+        VALIDATION_END: ({validationStart}) =>
+          adjustDurationInSeconds(
+            validationStart,
+            shortSessionDuration + longSessionDuration
           ) * 1000,
         // eslint-disable-next-line no-shadow
         SHORT_SESSION_AUTO_SUBMIT: ({validationStart, shortSessionDuration}) =>

@@ -155,6 +155,16 @@ function ValidationSession({
         </SynchronizingValidationAlert>
       )}
 
+      {!alert &&
+        state.matches('longSession') &&
+        state.context.shortAnswersAlreadySent && (
+          <SynchronizingValidationAlert>
+            {t(
+              'Answers for this identity were already sent, by this app earlier or by another app with the same key. Only the first answers sent count.'
+            )}
+          </SynchronizingValidationAlert>
+        )}
+
       {state.matches('validationFailed') && (
         <ValidationFailedDialog isOpen onSubmit={() => router.push('/home')} />
       )}

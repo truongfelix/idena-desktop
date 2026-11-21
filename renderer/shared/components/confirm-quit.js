@@ -37,6 +37,8 @@ export function ConfirmQuit() {
         try {
           const {online} = await callRpc('dna_identity')
           if (online) {
+            // The main process quits on its own when the page does not answer: the person decides now.
+            global.ipcRenderer.send('confirm-quit-asked')
             onOpen()
             return
           }
@@ -65,8 +67,11 @@ function ConfirmQuitDialog({onClose, onError, ...props}) {
       onClose={onClose}
       {...props}
     >
-      <AlertDialogOverlay bg="xblack.080" />
+      {/* Above every other dialog: a validation dialog that opens again (Submit failed retries every 5 s) would
+      cover it, and the quit would wait for an answer no one can give. */}
+      <AlertDialogOverlay bg="xblack.080" zIndex="popover" />
       <AlertDialogContent
+        containerProps={{zIndex: 'popover'}}
         bg="surface"
         color="brandGray.500"
         fontSize="md"
