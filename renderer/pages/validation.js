@@ -5,10 +5,7 @@ import {useRouter} from 'next/router'
 import {useTranslation} from 'react-i18next'
 import {useDisclosure} from '@chakra-ui/react'
 import {createValidationMachine} from '../screens/validation/machine'
-import {
-  persistValidationState,
-  loadValidationState,
-} from '../screens/validation/utils'
+import {loadValidationState} from '../screens/validation/utils'
 import {
   ValidationFailedDialog,
   SynchronizingValidationAlert,
@@ -19,6 +16,7 @@ import {useEpochState} from '../shared/providers/epoch-context'
 import {useTimingState} from '../shared/providers/timing-context'
 import {useChainState} from '../shared/providers/chain-context'
 import {useAutoCloseValidationToast} from '../screens/validation/hooks/use-validation-toast'
+import {useValidationSave} from '../screens/validation/hooks/use-validation-save'
 import {
   timeLeftText,
   useAnswersTx,
@@ -95,9 +93,8 @@ function ValidationSession({
       : (...args) => global.logger.debug(...args),
   })
 
-  useEffect(() => {
-    persistValidationState(state)
-  }, [state])
+  // Saved at once when the validation moves on (a session, a submit), else at most once a second (B-303).
+  useValidationSave(state)
 
   // A submit stopped at the end of the validation (machine.js submitStopped): My Idena shows the results.
   const isSubmitStopped = state.matches('submitStopped')
