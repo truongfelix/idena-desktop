@@ -30,7 +30,6 @@ import {
   isSettled,
   nextWakeAt,
 } from './autopilot'
-import {WINDOW_COMMAND} from '../../../../main/channels'
 
 // The longest the agent's clock sleeps (B-302).
 const WAKE_MAX_MS = 10 * 1000
@@ -184,14 +183,6 @@ export function useAgentValidation({
     lateNow.current = null
     stopAgentSolve().catch(() => {})
   }, [phase, session])
-
-  // While an agent acts, the window's timers keep their time when it is hidden or minimized (B-302).
-  React.useEffect(() => {
-    if (!active) return undefined
-    global.ipcRenderer?.send(WINDOW_COMMAND, 'agent-awake', {on: true})
-    return () =>
-      global.ipcRenderer?.send(WINDOW_COMMAND, 'agent-awake', {on: false})
-  }, [active])
 
   // A long flip loaded without its keywords is asked without them after KEYWORDS_WAIT_MS, from when it loaded.
   flips.forEach((flip) => {
