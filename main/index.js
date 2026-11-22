@@ -103,6 +103,7 @@ const {
 const NodeUpdater = require('./node-updater')
 const {createNodeProcess} = require('./node-process')
 const {createAppBadge} = require('./app-badge')
+const {createAgentAwake} = require('./agent-awake')
 const {createNodeReports} = require('./node-reports')
 const {READ_INTERVAL_MS} = require('./node-watch')
 const {createNodeWatchdog} = require('./node-watchdog')
@@ -119,6 +120,8 @@ const {
 refuseBrotli(axios)
 
 let mainWindow
+// The validation agent's request to keep the window's timers awake (main/agent-awake.js), made with the window.
+let agentAwake = null
 let didCreateMainWindow = false
 let nodeDownloadPromise = null
 let tray
@@ -390,11 +393,13 @@ const createMainWindow = () => {
 
   installNavigationGuards(mainWindow)
   // A reload or a crash ends what the page was doing: an approved agent action waits again (B-243).
-  mainWindow.webContents.on('did-finish-load', () => {
-    agent.windowLoaded()
-    // A validation agent's timers kept awake end with the page that asked for it (B-302).
-    mainWindow.webContents.setBackgroundThrottling(true)
-  })
+  mainWindow.webContents.on('did-finish-load', () => agent.windowLoaded())
+  // A validation agent's timers kept awake end with the page that asked for it (B-302): reset when a load starts, so
+  // a request the new page sends early is kept.
+  agentAwake = createAgentAwake((throttled) =>
+    mainWindow.webContents.setBackgroundThrottling(throttled)
+  )
+  mainWindow.webContents.on('did-start-loading', () => agentAwake.reset())
 
   if (isE2ESmoke) {
     mainWindow.webContents.once('preload-error', (_event, preloadPath, error) =>
@@ -723,7 +728,7 @@ ipcMain.on(WINDOW_COMMAND, (event, command, data) => {
     // An agent acts in the validation (B-302): the window's timers keep their time while it is hidden or minimized,
     // so Autopilot answers and submits on time; back to the default when it stops.
     case 'agent-awake': {
-      event.sender.setBackgroundThrottling(!data?.on)
+      agentAwake?.set(data?.source, Boolean(data?.on))
       break
     }
     default:
