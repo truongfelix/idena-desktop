@@ -2353,5 +2353,6 @@
   "Asked for: {{what}}. It starts Off: turn it on yourself in its Connection, on the agent page.": "Asked for: {{what}}. It starts Off: turn it on yourself in its Connection, on the agent page.",
   "It is running now. Try again when its run ends.": "It is running now. Try again when its run ends.",
   "Its next run reads again from {{hours}} h ago.": "Its next run reads again from {{hours}} h ago.",
-  "It never ran: its first run reads the last day anyway.": "It never ran: its first run reads the last day anyway."
+  "It never ran: its first run reads the last day anyway.": "It never ran: its first run reads the last day anyway.",
+  "Answers for this identity were already sent, by this app earlier or by another app with the same key. Validating one identity in two apps at once can make the validation fail.": "Answers for this identity were already sent, by this app earlier or by another app with the same key. Validating one identity in two apps at once can make the validation fail."
 }

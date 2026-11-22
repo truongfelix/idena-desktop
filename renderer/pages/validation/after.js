@@ -141,7 +141,11 @@ export default function AfterValidationPage() {
                   {status === 'pending' &&
                     t('Please wait. Your answers are being submitted...')}
                   {status === 'sent' &&
-                    t('Your answers were sent to your node')}
+                    (longAnswers.alreadySent
+                      ? t(
+                          'Answers for this identity were already sent, by this app earlier or by another app with the same key. Validating one identity in two apps at once can make the validation fail.'
+                        )
+                      : t('Your answers were sent to your node'))}
                 </Text>
               )}
             </Stack>
