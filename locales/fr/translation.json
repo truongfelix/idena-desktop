@@ -2353,5 +2353,6 @@
   "Asked for: {{what}}. It starts Off: turn it on yourself in its Connection, on the agent page.": "Demandé : {{what}}. Il commence désactivé : activez-le vous-même dans sa Connexion, sur la page de l'agent.",
   "It is running now. Try again when its run ends.": "Il est en cours. Réessayez à la fin de son passage.",
   "Its next run reads again from {{hours}} h ago.": "Son prochain passage relit depuis {{hours}} h.",
-  "It never ran: its first run reads the last day anyway.": "Il n'a jamais tourné : son premier passage lit de toute façon le dernier jour."
+  "It never ran: its first run reads the last day anyway.": "Il n'a jamais tourné : son premier passage lit de toute façon le dernier jour.",
+  "Answers for this identity were already sent, by this app earlier or by another app with the same key. Validating one identity in two apps at once can make the validation fail.": "Les réponses de cette identité ont déjà été envoyées, par cette application plus tôt ou par une autre application avec la même clé. Valider une identité dans deux applications à la fois peut faire échouer la validation."
 }

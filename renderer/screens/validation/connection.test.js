@@ -140,17 +140,30 @@ describe('persistedLongAnswersTx', () => {
     expect(persistedLongAnswersTx(restored, 7)).toEqual({
       hash: '0xlong',
       sentAt: 42,
+      alreadySent: false,
     })
     // A validation saved in an earlier epoch is not this ceremony's.
     expect(persistedLongAnswersTx(restored, 8)).toEqual({
       hash: null,
       sentAt: null,
+      alreadySent: false,
     })
     expect(persistedLongAnswersTx(undefined, 7)).toEqual({
       hash: null,
       sentAt: null,
+      alreadySent: false,
     })
     service.stop()
+  })
+
+  it('says when the node refused the long answers as already sent', () => {
+    const context = {epoch: 7, longAnswersAlreadySent: true}
+    expect(persistedLongAnswersTx({context}, 7)).toEqual({
+      hash: null,
+      sentAt: null,
+      alreadySent: true,
+    })
+    expect(persistedLongAnswersTx({context}, 8).alreadySent).toBe(false)
   })
 })
 

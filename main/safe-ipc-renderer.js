@@ -11,6 +11,7 @@ const SEND_CHANNELS = new Set([
   NODE_COMMAND,
   WINDOW_COMMAND,
   'confirm-quit',
+  'confirm-quit-asked',
   'DNA_LINK_HANDLED',
   'app-badge',
   'reload',

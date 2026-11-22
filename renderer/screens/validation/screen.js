@@ -50,6 +50,7 @@ import {SubmitCountdown} from './agent/submit-countdown'
 import {AnswerType, RelevanceType} from '../../shared/types'
 import {InfoButton, PrimaryButton} from '../../shared/components/button'
 import {FloatDebug, Tooltip} from '../../shared/components/components'
+import {useQuitQuestionOpen} from '../../shared/components/confirm-quit'
 import {
   FullscreenIcon,
   HollowStarIcon,
@@ -74,6 +75,8 @@ export function ValidationScreen({
   children,
 }) {
   const {t} = useTranslation()
+
+  const isQuitQuestionOpen = useQuitQuestionOpen()
 
   const {
     isOpen: isReportDialogOpen,
@@ -552,7 +555,8 @@ export function ValidationScreen({
             onClick={() => send({type: 'NEXT'})}
           />
         )}
-      {isSubmitFailed(state) && (
+      {/* Hidden while the quit question shows: it would retry, open again over it and take the focus. */}
+      {showsSubmitFailed(state, isQuitQuestionOpen) && (
         <SubmitFailedDialog isOpen onSubmit={() => send('RETRY_SUBMIT')} />
       )}
 
@@ -693,6 +697,10 @@ function isSubmitting(state) {
     'longSession.solve.answer.finishFlips',
     'longSession.solve.answer.submitLongSession',
   ].some(state.matches)
+}
+
+export function showsSubmitFailed(state, isQuitQuestionOpen) {
+  return isSubmitFailed(state) && !isQuitQuestionOpen
 }
 
 function isSubmitFailed(state) {
