@@ -1,5 +1,5 @@
 import {AnswerType} from '../../../shared/types'
-import {pickedSide} from './picks'
+import {END_MARGIN_MS, MIN_FLIP_MS, pickedSide} from './picks'
 
 // Autopilot through the whole validation (owner 2026-11-12): every flip shown gets an answer (the model's pick, a
 // random side when the model could not answer in time), and the agent submits both sessions itself. Each submit
@@ -126,4 +126,39 @@ export function autopilotPlan({
     default:
       return none
   }
+}
+
+/**
+ * When the agent must look at the clock again (ms), or null: the first of its deadlines still to come after `now`
+ * (B-302: the screen is drawn again at these moments only, never each second). `asks`: the agent asks flips in this
+ * session (the moment no time is left for a question, and in the long session each loaded flip's wait for its
+ * keywords, from `seen`, its hash -> when it loaded); `autopilot`: Autopilot acts at a step (the latest submit, the
+ * countdown's end, `retryAt`: the next try of a failed submit).
+ */
+export function nextWakeAt({
+  now,
+  end,
+  isShort,
+  asks = false,
+  autopilot = false,
+  flips = [],
+  seen = new Map(),
+  countdownEnd = null,
+  retryAt = null,
+}) {
+  const times = []
+  // The first moment the hook's `outOfTime` holds (its test is strict).
+  if (asks || autopilot) times.push(end - END_MARGIN_MS - MIN_FLIP_MS + 1)
+  if (asks && !isShort)
+    flips.forEach((flip) => {
+      if (flip.decoded && !flip.words?.length && seen.has(flip.hash))
+        times.push(seen.get(flip.hash) + KEYWORDS_WAIT_MS)
+    })
+  if (autopilot) {
+    times.push(end - SUBMIT_GUARD_MS[isShort ? 'short' : 'long'])
+    if (countdownEnd) times.push(countdownEnd)
+    if (retryAt) times.push(retryAt)
+  }
+  const ahead = times.filter((at) => Number.isFinite(at) && at > now)
+  return ahead.length ? Math.min(...ahead) : null
 }

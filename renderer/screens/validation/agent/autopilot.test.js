@@ -1,10 +1,15 @@
 import {AnswerType} from '../../../shared/types'
 import {
+  KEYWORDS_WAIT_MS,
   SUBMIT_COUNTDOWN_MS,
+  SUBMIT_GUARD_MS,
   autopilotPlan,
   fallbackAnswers,
   isSettled,
+  nextWakeAt,
 } from './autopilot'
+import {END_MARGIN_MS, MIN_FLIP_MS} from './picks'
+import {secondsLeft} from './submit-countdown'
 
 const flip = (hash, more = {}) => ({
   hash,
@@ -194,5 +199,67 @@ describe('Autopilot through the validation', () => {
     expect(
       autopilotPlan({...at, step: 'shortConfirm', didSubmit: true}).events
     ).toEqual([{type: 'SUBMIT'}])
+  })
+})
+
+describe("The agent's clock wakes at its deadlines only (B-302)", () => {
+  const end = 1_000_000
+  // The first moment no time is left: the hook's test is strict.
+  const outOfTimeAt = end - END_MARGIN_MS - MIN_FLIP_MS + 1
+
+  it('wakes for nothing when no agent acts', () => {
+    expect(nextWakeAt({now: 0, end, isShort: true})).toBeNull()
+  })
+
+  it('wakes when no time is left for a question', () => {
+    expect(nextWakeAt({now: 0, end, isShort: true, asks: true})).toBe(
+      outOfTimeAt
+    )
+    expect(
+      nextWakeAt({now: outOfTimeAt, end, isShort: true, asks: true})
+    ).toBeNull()
+  })
+
+  it("wakes when a long flip's wait for its keywords ends, not for a flip that has them", () => {
+    const seen = new Map([
+      ['a', 100],
+      ['b', 50],
+      ['c', 10],
+    ])
+    const flips = [
+      flip('a'),
+      flip('b', {words: [{name: 'x', desc: 'y'}]}),
+      flip('c', {decoded: false}),
+    ]
+    const at = {end, isShort: false, asks: true, flips, seen}
+    expect(nextWakeAt({...at, now: 200})).toBe(100 + KEYWORDS_WAIT_MS)
+    // The short session waits for no keywords.
+    expect(nextWakeAt({...at, isShort: true, now: 200})).toBe(outOfTimeAt)
+    // Its wait over: the next deadline.
+    expect(nextWakeAt({...at, now: 100 + KEYWORDS_WAIT_MS})).toBe(outOfTimeAt)
+  })
+
+  it("wakes Autopilot at its countdown's end, its latest submit and its next try, the first of them", () => {
+    const at = {end, isShort: false, autopilot: true}
+    const guardAt = end - SUBMIT_GUARD_MS.long
+    expect(nextWakeAt({...at, now: 0})).toBe(guardAt)
+    expect(nextWakeAt({...at, now: 0, countdownEnd: 30_000})).toBe(30_000)
+    expect(
+      nextWakeAt({...at, now: 0, countdownEnd: 30_000, retryAt: 5_000})
+    ).toBe(5_000)
+    expect(nextWakeAt({...at, isShort: true, now: 0})).toBe(
+      Math.min(end - SUBMIT_GUARD_MS.short, outOfTimeAt)
+    )
+    // Past every deadline: no wake.
+    expect(nextWakeAt({...at, now: end})).toBeNull()
+  })
+})
+
+describe('The seconds before Autopilot submits', () => {
+  it('counts whole seconds up, never below zero', () => {
+    expect(secondsLeft(30_000, 0)).toBe(30)
+    expect(secondsLeft(30_000, 100)).toBe(30)
+    expect(secondsLeft(30_000, 29_001)).toBe(1)
+    expect(secondsLeft(30_000, 31_000)).toBe(0)
   })
 })

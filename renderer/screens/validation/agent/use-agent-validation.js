@@ -28,7 +28,12 @@ import {
   SUBMIT_GUARD_MS,
   autopilotPlan,
   isSettled,
+  nextWakeAt,
 } from './autopilot'
+import {WINDOW_COMMAND} from '../../../../main/channels'
+
+// The longest the agent's clock sleeps (B-302).
+const WAKE_MAX_MS = 10 * 1000
 
 // A picture shown from a blob URL, read back as JPEG base64: the app's content policy refuses fetch() of blob URLs,
 // an <img> loads them.
@@ -82,7 +87,7 @@ export function agentMode(settings) {
  * 'keywords' | null (not solving), `step` the validation's step for Autopilot (screen.js autopilotStep).
  * Returns null when the agent is off, else its mode ('suggest' | 'autopilot'), whether it is paused, pause() and
  * resume() (a person supervises: pauses, corrects, resumes), its picks by hash, takeRest() (Suggest: an answer for
- * every flip left that has a pick), Autopilot's countdown before a submit (seconds, or null) and noAnswer, why
+ * every flip left that has a pick), when Autopilot submits (countdownEnd, ms, or null) and noAnswer, why
  * the model's last answer failed ({reason}, or null).
  */
 export function useAgentValidation({
@@ -180,44 +185,18 @@ export function useAgentValidation({
     stopAgentSolve().catch(() => {})
   }, [phase, session])
 
-  // The clock, only when time matters: Autopilot's countdown, latest submit and retries (a failed submit has no
-  // phase), and a long flip waiting for its keywords.
-  const waitsForWords =
-    !isShort && flips.some((flip) => flip.decoded && !flip.words?.length)
-  const needsClock =
-    active &&
-    ((mode === 'autopilot' && Boolean(step)) ||
-      (Boolean(phase) && waitsForWords))
+  // While the agent acts here (a practice too), the window's timers stay awake when it is hidden (B-302); the app's
+  // root asks the same for the ceremony (awake.js).
   React.useEffect(() => {
-    if (!needsClock) return undefined
-    const timer = setInterval(() => setNow(Date.now()), 1000)
-    return () => clearInterval(timer)
-  }, [needsClock])
-
-  // Without the clock, one tick when the session has no time left for a question: `outOfTime` settles the flips.
-  React.useEffect(() => {
-    if (!active || !phase || needsClock) return undefined
-    const wait =
-      sessionEnd({
-        isShort,
-        validationStart,
-        shortSessionDuration,
-        longSessionDuration,
-      }) -
-      END_MARGIN_MS -
-      MIN_FLIP_MS -
-      Date.now()
-    const timer = setTimeout(() => setNow(Date.now()), Math.max(0, wait) + 50)
-    return () => clearTimeout(timer)
-  }, [
-    active,
-    phase,
-    needsClock,
-    isShort,
-    validationStart,
-    shortSessionDuration,
-    longSessionDuration,
-  ])
+    if (!active) return undefined
+    const ask = (on) =>
+      global.ipcRenderer?.send(WINDOW_COMMAND, 'agent-awake', {
+        on,
+        source: 'screen',
+      })
+    ask(true)
+    return () => ask(false)
+  }, [active])
 
   // A long flip loaded without its keywords is asked without them after KEYWORDS_WAIT_MS, from when it loaded.
   flips.forEach((flip) => {
@@ -508,11 +487,8 @@ export function useAgentValidation({
       if (event.type === 'SUBMIT') submitted.current = session
       send(event)
     })
-    if (plan.countdownEnd !== countdownEnd) {
+    if (plan.countdownEnd !== countdownEnd)
       setCountdown({step, end: plan.countdownEnd})
-      // The countdown shown from the time it was set from.
-      setNow(at)
-    }
   }, [
     mode,
     active,
@@ -529,6 +505,40 @@ export function useAgentValidation({
     lateAsking,
   ])
 
+  // The clock (B-302): one timer to the next deadline, set again after each render; the screen is drawn again
+  // then, never each second. Runs after Autopilot's step above, which moves the submit's retries.
+  const autopilotActs = mode === 'autopilot' && active && Boolean(step)
+  const failedStep = step === 'shortFail' || step === 'longFail'
+  React.useEffect(() => {
+    // Read here: Autopilot's step above has just moved them.
+    const submitTries = retries.current
+    const wakeAt = nextWakeAt({
+      now: Date.now(),
+      end,
+      isShort,
+      asks: active && Boolean(phase),
+      autopilot: autopilotActs,
+      flips,
+      seen: seen.current,
+      countdownEnd,
+      retryAt:
+        autopilotActs &&
+        failedStep &&
+        submitTries.step === step &&
+        submitTries.count < MAX_SUBMIT_RETRIES
+          ? submitTries.at + RETRY_SUBMIT_MS
+          : null,
+    })
+    if (wakeAt === null) return undefined
+    // At most WAKE_MAX_MS: a timer counts no time while the PC sleeps, nor a change of its clock; a deadline missed
+    // so is seen within that time.
+    const timer = setTimeout(
+      () => setNow(Date.now()),
+      Math.min(WAKE_MAX_MS, Math.max(0, wakeAt - Date.now()))
+    )
+    return () => clearTimeout(timer)
+  })
+
   if (!mode) return null
   const toTake = answersToTake(flips, picks)
   return {
@@ -539,10 +549,8 @@ export function useAgentValidation({
     // The agent's last answer failed: {reason}, or null; not while paused, nor in the keywords check (nothing is
     // asked there).
     noAnswer: active && phase !== 'keywords' ? noAnswer : null,
-    countdown:
-      mode === 'autopilot' && active && countdownEnd
-        ? Math.max(0, Math.ceil((countdownEnd - now) / 1000))
-        : null,
+    // When Autopilot submits (ms), or null: the screen's countdown ticks on its own (B-302).
+    countdownEnd: mode === 'autopilot' && active ? countdownEnd : null,
     // The pause is the agent's everywhere (the menu card shows it too); here it stops the agent at once.
     // The pause of every agent (the Agents page has it too), not a write of one agent's settings.
     pause: () => {
