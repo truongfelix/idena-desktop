@@ -222,9 +222,15 @@ describe('agent provider calls', () => {
     const request = jest.fn().mockResolvedValue({
       data: {content: [{type: 'text', text: 'ok'}]},
     })
-    await expect(
-      ask(config, 's', parts, {timeoutMs: 5000, request})
-    ).resolves.toBe('ok')
+    // The clock stands still: a loaded PC lets milliseconds pass before the request is built (B-304).
+    const now = jest.spyOn(Date, 'now').mockReturnValue(1_000_000)
+    try {
+      await expect(
+        ask(config, 's', parts, {timeoutMs: 5000, request})
+      ).resolves.toBe('ok')
+    } finally {
+      now.mockRestore()
+    }
     expect(request.mock.calls[0][0]).toMatchObject({
       maxRedirects: 0,
       timeout: 5000,
