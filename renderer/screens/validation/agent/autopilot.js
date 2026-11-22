@@ -147,7 +147,8 @@ export function nextWakeAt({
   retryAt = null,
 }) {
   const times = []
-  if (asks || autopilot) times.push(end - END_MARGIN_MS - MIN_FLIP_MS)
+  // The first moment the hook's `outOfTime` holds (its test is strict).
+  if (asks || autopilot) times.push(end - END_MARGIN_MS - MIN_FLIP_MS + 1)
   if (asks && !isShort)
     flips.forEach((flip) => {
       if (flip.decoded && !flip.words?.length && seen.has(flip.hash))

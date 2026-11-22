@@ -32,6 +32,9 @@ import {
 } from './autopilot'
 import {WINDOW_COMMAND} from '../../../../main/channels'
 
+// The longest the agent's clock sleeps (B-302).
+const WAKE_MAX_MS = 10 * 1000
+
 // A picture shown from a blob URL, read back as JPEG base64: the app's content policy refuses fetch() of blob URLs,
 // an <img> loads them.
 function base64Of(url) {
@@ -522,9 +525,11 @@ export function useAgentValidation({
           : null,
     })
     if (wakeAt === null) return undefined
+    // At most WAKE_MAX_MS: a timer counts no time while the PC sleeps, nor a change of its clock; a deadline missed
+    // so is seen within that time.
     const timer = setTimeout(
       () => setNow(Date.now()),
-      Math.max(0, wakeAt - Date.now())
+      Math.min(WAKE_MAX_MS, Math.max(0, wakeAt - Date.now()))
     )
     return () => clearTimeout(timer)
   })

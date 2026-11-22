@@ -204,7 +204,8 @@ describe('Autopilot through the validation', () => {
 
 describe("The agent's clock wakes at its deadlines only (B-302)", () => {
   const end = 1_000_000
-  const outOfTimeAt = end - END_MARGIN_MS - MIN_FLIP_MS
+  // The first moment no time is left: the hook's test is strict.
+  const outOfTimeAt = end - END_MARGIN_MS - MIN_FLIP_MS + 1
 
   it('wakes for nothing when no agent acts', () => {
     expect(nextWakeAt({now: 0, end, isShort: true})).toBeNull()
