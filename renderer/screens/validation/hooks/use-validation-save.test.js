@@ -27,12 +27,16 @@ describe('Where the validation stands (B-303)', () => {
 })
 
 describe('The validation state saved at most once a second (B-303)', () => {
-  function setup() {
+  function setup({saveMs = 0} = {}) {
     let clock = 0
     const timers = []
     const saved = []
     const saver = createSaver({
-      save: (state) => saved.push(state),
+      save: (state) => {
+        saved.push(state)
+        // The disk's time: the thread waits for it.
+        clock += saveMs
+      },
       now: () => clock,
       setTimer: (fn, ms) => {
         const timer = {fn, at: clock + ms}
@@ -45,51 +49,69 @@ describe('The validation state saved at most once a second (B-303)', () => {
       },
     })
     const advance = (ms) => {
-      clock += ms
-      timers
-        .filter((timer) => timer.at <= clock)
-        .forEach((timer) => {
-          timers.splice(timers.indexOf(timer), 1)
-          timer.fn()
-        })
+      const until = clock + ms
+      for (;;) {
+        const due = timers
+          .filter((timer) => timer.at <= until)
+          .sort((a, b) => a.at - b.at)[0]
+        if (!due) break
+        timers.splice(timers.indexOf(due), 1)
+        clock = Math.max(clock, due.at)
+        due.fn()
+      }
+      clock = Math.max(clock, until)
     }
     return {saver, saved, advance}
   }
 
-  it('saves the first change at once, then the last of a burst one interval later', () => {
+  it('never saves at the moment of a change: the last of a burst, then one interval after', () => {
     const {saver, saved, advance} = setup()
     saver.push('a')
-    expect(saved).toEqual(['a'])
     saver.push('b')
+    expect(saved).toEqual([])
+    advance(0)
+    expect(saved).toEqual(['b'])
     saver.push('c')
     saver.push('d')
+    expect(saved).toEqual(['b'])
+    advance(SAVE_INTERVAL_MS - 1)
+    expect(saved).toEqual(['b'])
+    advance(1)
+    expect(saved).toEqual(['b', 'd'])
+    advance(SAVE_INTERVAL_MS * 3)
+    expect(saved).toEqual(['b', 'd'])
+  })
+
+  it('counts the interval from the end of a slow save: a change after it waits', () => {
+    const {saver, saved, advance} = setup({saveMs: 3000})
+    saver.push('a')
+    advance(0)
+    expect(saved).toEqual(['a'])
+    // Long after the save began, right after it ended: the change is not written at the tap.
+    saver.push('b')
     expect(saved).toEqual(['a'])
     advance(SAVE_INTERVAL_MS - 1)
     expect(saved).toEqual(['a'])
     advance(1)
-    expect(saved).toEqual(['a', 'd'])
-    advance(SAVE_INTERVAL_MS * 3)
-    expect(saved).toEqual(['a', 'd'])
+    expect(saved).toEqual(['a', 'b'])
   })
 
   it('saves an urgent change at once, the one waiting with it', () => {
     const {saver, saved, advance} = setup()
     saver.push('a')
-    saver.push('b')
     saver.push('submitting', true)
-    expect(saved).toEqual(['a', 'submitting'])
+    expect(saved).toEqual(['submitting'])
     advance(SAVE_INTERVAL_MS * 2)
-    expect(saved).toEqual(['a', 'submitting'])
+    expect(saved).toEqual(['submitting'])
   })
 
   it('writes what waits on flush, and nothing twice', () => {
     const {saver, saved, advance} = setup()
     saver.push('a')
-    saver.push('b')
     saver.flush()
-    expect(saved).toEqual(['a', 'b'])
+    expect(saved).toEqual(['a'])
     saver.flush()
     advance(SAVE_INTERVAL_MS * 2)
-    expect(saved).toEqual(['a', 'b'])
+    expect(saved).toEqual(['a'])
   })
 })
