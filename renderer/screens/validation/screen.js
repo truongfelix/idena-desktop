@@ -46,6 +46,7 @@ import {
 } from './components'
 import {rem} from '../../shared/theme'
 import {AGENT_COLORS, pickedSide} from './agent/picks'
+import {SubmitCountdown} from './agent/submit-countdown'
 import {AnswerType, RelevanceType} from '../../shared/types'
 import {InfoButton, PrimaryButton} from '../../shared/components/button'
 import {FloatDebug, Tooltip} from '../../shared/components/components'
@@ -449,13 +450,17 @@ export function ValidationScreen({
               {t("Take the agent's picks for the rest")}
             </Button>
           )}
-          {agent?.countdown !== null && agent?.countdown !== undefined && (
+          {Boolean(agent?.countdownEnd) && (
             <Flex align="center" gap={3}>
-              <Text color={agentColor} fontWeight={500}>
-                {t('The agent submits the answers in {{seconds}} s', {
-                  seconds: agent.countdown,
-                })}
-              </Text>
+              <SubmitCountdown end={agent.countdownEnd}>
+                {(seconds) => (
+                  <Text color={agentColor} fontWeight={500}>
+                    {t('The agent submits the answers in {{seconds}} s', {
+                      seconds,
+                    })}
+                  </Text>
+                )}
+              </SubmitCountdown>
               <Button
                 variant="outline"
                 size="sm"

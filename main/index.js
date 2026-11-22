@@ -716,6 +716,12 @@ ipcMain.on(WINDOW_COMMAND, (event, command, data) => {
       nativeTheme.themeSource = themeSource(data?.source)
       break
     }
+    // An agent acts in the validation (B-302): the window's timers keep their time while it is hidden or minimized,
+    // so Autopilot answers and submits on time; back to the default when it stops.
+    case 'agent-awake': {
+      event.sender.setBackgroundThrottling(!data?.on)
+      break
+    }
     default:
   }
 })
