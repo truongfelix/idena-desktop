@@ -3,7 +3,8 @@ import {idKey} from './feed'
 import {activeBan, normalHex} from './moderation'
 
 // What Community moderation hides in the feed, by the idena.social website's rules (docs/moderation.md, "What gets
-// hidden"): a post made while its author is banned is never shown; a post made before the ban, or hidden one by one,
+// hidden"): a post made while its author is banned is not shown while the ban lasts (an unban or its end shows it
+// again, as the website); a post made before the ban, or hidden one by one,
 // stays as a placeholder (no text, no media, no author, no actions) while a reply or comment under it is still shown,
 // and leaves otherwise. Likes are never hidden (a "like" with media is no like). Tips and likes keep counting.
 

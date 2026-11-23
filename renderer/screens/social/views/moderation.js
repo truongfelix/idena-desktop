@@ -226,10 +226,13 @@ function ReviewPosts({address, now, openProfile, openThread, act, onBack}) {
         <SecondaryButton
           size="sm"
           isDisabled={chosen.size === 0}
-          onClick={() => {
-            act({action: 'hidePosts', hashes: [...chosen]})
-            setChosen(new Set())
-          }}
+          onClick={() =>
+            act({
+              action: 'hidePosts',
+              hashes: [...chosen],
+              onSent: () => setChosen(new Set()),
+            })
+          }
         >
           {t('Hide {{count}} posts…', {count: chosen.size})}
         </SecondaryButton>

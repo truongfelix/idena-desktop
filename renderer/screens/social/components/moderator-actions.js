@@ -79,6 +79,7 @@ export function ModeratorDialog({
   hash = null,
   hashes = null,
   onClose,
+  onSent = null,
 }) {
   const {t} = useTranslation()
   const {names, sending} = useSocial()
@@ -216,6 +217,7 @@ export function ModeratorDialog({
             sending.prepareModeration(action, call, {
               detail: reason.trim() || null,
             })
+            onSent?.()
             onClose()
           }}
         >
@@ -243,7 +245,12 @@ export function ModeratePanel({address}) {
   const vouchers = vouchersOf(state, address)
   const reporters = new Set(
     state.reports
-      .filter((r) => r.kind === 'address' && r.target === address)
+      .filter(
+        (r) =>
+          r.kind === 'address' &&
+          r.target === address &&
+          !activeBan(state, r.reporter, epoch)
+      )
       .map((r) => r.reporter)
   )
   const iVouch = vouchers.includes(me)

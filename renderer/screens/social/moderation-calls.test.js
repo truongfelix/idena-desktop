@@ -12,6 +12,7 @@ import {
   withSizedCallbacks,
 } from './moderation-calls'
 import {a, b, c} from './test-helpers'
+import {moderationKey} from './sending'
 
 const banned = (state, address, extra = {}) => {
   state.bans.set(address, {
@@ -134,5 +135,26 @@ describe('a moderator', () => {
       state.vouchers.set(`0x${String(i).repeat(40)}`, new Set([a]))
     expect(canVouchMore(state, a)).toBe(false)
     expect(canVouchMore(state, b)).toBe(true)
+  })
+})
+
+describe('a moderation action waiting for its block', () => {
+  it('is keyed by its target, whatever its reason or gas', () => {
+    const ban = ModerationCall.ban(a, 1, 'Spam')
+    expect(moderationKey(ModerationCall.ban(a, 4, 'Scam'))).toBe(
+      moderationKey(ban)
+    )
+    expect(moderationKey(withSizedCallbacks(ban, {actionResult: {}}))).toBe(
+      moderationKey(ban)
+    )
+    expect(moderationKey(ModerationCall.ban(b, 1, 'Spam'))).not.toBe(
+      moderationKey(ban)
+    )
+    expect(moderationKey(ModerationCall.unban(a, ''))).not.toBe(
+      moderationKey(ban)
+    )
+    expect(moderationKey(ModerationCall.hidePosts(['0x02', '0x01'], 'x'))).toBe(
+      moderationKey(ModerationCall.hidePosts(['0x01', '0x02'], 'y'))
+    )
   })
 })

@@ -123,12 +123,8 @@ export function ReportDialog({
   const call = hash
     ? ModerationCall.reportPost(hash, reason.trim())
     : ModerationCall.report(address, reason.trim())
-  // One report per target waits at a time, whatever its reason.
-  const inFlight = sending.inFlight.some(
-    (item) =>
-      item.key.startsWith(`${call.contract.toLowerCase()}:${call.method}:`) &&
-      item.key.includes(String(target).toLowerCase())
-  )
+  // One report per target waits at a time, whatever its reason (moderationKey).
+  const inFlight = sending.isInFlight(call)
   return (
     <Dialog
       title={

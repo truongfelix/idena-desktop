@@ -3,6 +3,8 @@ import {useTranslation} from 'react-i18next'
 import {Box, Text} from '@chakra-ui/react'
 import {SmallText} from '../../../shared/components/components'
 import {replyCount} from '../feed'
+import {displayName} from '../people'
+import {useSocial} from '../provider'
 import {MUTED} from './theme'
 
 /**
@@ -35,6 +37,7 @@ export function ModeratedAnswers({node}) {
  */
 export function BanBanner({ban, onProfile}) {
   const {t} = useTranslation()
+  const {names} = useSocial()
   const until = ban.permanent
     ? t('Banned permanently by the community moderators')
     : t('Banned until epoch {{epoch}} by the community moderators', {
@@ -51,7 +54,7 @@ export function BanBanner({ban, onProfile}) {
         onClick={() => onProfile?.(ban.moderator)}
       >
         {t('Banned by {{moderator}}: write to them to ask for a review.', {
-          moderator: ban.moderator,
+          moderator: displayName(ban.moderator, names),
           nsSeparator: '|',
         })}
       </SmallText>

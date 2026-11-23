@@ -1,5 +1,5 @@
 import React from 'react'
-import {emptyModeration, replay} from './moderation'
+import {MODERATION_FIRST_BLOCK, emptyModeration, replay} from './moderation'
 import {emptyModerationCache, syncModeration} from './moderation-sync'
 import {socialRpc} from './node'
 import {loadModerationCache, saveModerationCache} from './storage'
@@ -115,7 +115,10 @@ export function useModeration({enabled, ready, call = socialRpc}) {
     () => (enabled && cache ? replay(cache.events) : NOTHING),
     [cache, enabled]
   )
-  const loading = enabled && (!loaded || (ready && !synced))
+  // The feed waits only for a first read (no decisions saved yet), as the website's at most a few seconds: with a
+  // saved read, its decisions apply at once and the sync brings the new ones.
+  const firstRead = !loaded || cache.high < MODERATION_FIRST_BLOCK
+  const loading = enabled && (!loaded || (ready && !synced && firstRead))
   const high = cache?.high ?? null
   const refresh = React.useCallback(() => setNudge((n) => n + 1), [])
   // Every event read, in chain order: the moderators' log.

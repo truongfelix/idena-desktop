@@ -119,6 +119,26 @@ const PROFILE_KINDS = new Set([
 ])
 
 /**
+ * The key of a moderation call among the actions waiting: its method and its target (the address, the post, or the
+ * posts), not its reason or gas: a second ban of the same account waits for the first, whatever its reason.
+ */
+export function moderationKey({contract = '', method, argument}) {
+  let arg = {}
+  try {
+    arg = JSON.parse(argument || '{}')
+  } catch {
+    arg = {}
+  }
+  const target =
+    arg.address ||
+    arg.hash ||
+    (Array.isArray(arg.hashes) ? [...arg.hashes].sort().join(',') : '')
+  return `${String(contract).toLowerCase()}:${method}:${String(
+    target
+  ).toLowerCase()}`
+}
+
+/**
  * The kinds of action written to the moderation contract (prepareModeration, moderation-calls.js): one at a time per
  * target, and the contract read again once one is in a block.
  */
@@ -603,10 +623,11 @@ export function useSocialSending({
     setConfirm(null)
     if (!pending) return
     const what = whatOf[pending.kind]
-    const key =
-      PROFILE_KINDS.has(pending.kind) || MODERATION_KINDS.has(pending.kind)
-        ? actionKey(pending.socialCall)
-        : null
+    let key = null
+    if (MODERATION_KINDS.has(pending.kind))
+      key = moderationKey(pending.socialCall)
+    else if (PROFILE_KINDS.has(pending.kind))
+      key = actionKey(pending.socialCall)
     if (key !== null && inFlight.some((item) => item.key === key)) {
       refused(pending.kind, new Error(t('it already waits for its block')))
       return
@@ -713,7 +734,9 @@ export function useSocialSending({
   )
 
   const isInFlight = (call) =>
-    inFlight.some((item) => item.key === actionKey(call))
+    inFlight.some(
+      (item) => item.key === actionKey(call) || item.key === moderationKey(call)
+    )
 
   return {
     canAct: ready && !busy,

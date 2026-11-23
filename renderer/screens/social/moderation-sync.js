@@ -17,7 +17,8 @@ export const MODERATION_RANGE = 50000
 export const emptyModerationCache = () => ({
   contract: MODERATION_CONTRACT,
   version: MODERATION_CACHE_VERSION,
-  high: MODERATION_FIRST_BLOCK - 1,
+  // The node reads blocks from 1 (a test contract given as @0 starts there).
+  high: Math.max(1, MODERATION_FIRST_BLOCK) - 1,
   events: [],
 })
 
