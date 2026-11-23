@@ -245,9 +245,17 @@ export async function prepareDraft(
   let message = text.trim()
   if (textOnIpfs && message) message = await add('text', utf8(message))
   const items = []
-  for (const item of media) {
-    // eslint-disable-next-line no-await-in-loop
-    const address = await add(item.what || 'image', item.bytes)
+  for (const [index, item] of media.entries()) {
+    let address
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      address = await add(item.what || 'image', item.bytes)
+    } catch (error) {
+      // Which of several media it is: the draft shows them in this order.
+      if (media.length > 1)
+        error.message = `media ${index + 1}: ${error.message}`
+      throw error
+    }
     items.push({media: address, mediaType: item.type || IMAGE_TYPE})
   }
   const socialCall = SocialCall.post(

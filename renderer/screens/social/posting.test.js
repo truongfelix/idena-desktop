@@ -244,14 +244,24 @@ describe('preparing', () => {
     })
     const one = read({message: 'one', media: ['ipfs://b1'], mediaType: ['x']})
     expect(one).not.toHaveProperty('more')
-    // Another client's longer list: five are read; a missing type is blank.
+    // Another client's longer list: five are read (mediaCount: all).
     const seven = read({
       message: '',
       media: Array.from({length: 7}, (_, i) => `ipfs://b${i}`),
       mediaType: ['image/webp'],
     })
-    expect(seven.more).toHaveLength(4)
-    expect(seven.more[3]).toEqual({media: 'ipfs://b4', mediaType: ''})
+    // A media without its type is left out, as the website does.
+    expect(seven).toMatchObject({media: 'ipfs://b0', mediaType: 'image/webp'})
+    expect(seven).not.toHaveProperty('more')
+    const many = read({
+      message: '',
+      media: Array.from({length: 7}, (_, i) => `ipfs://b${i}`),
+      mediaType: Array.from({length: 7}, () => 'image/webp'),
+    })
+    expect(many.more).toHaveLength(4)
+    expect(many.more[3]).toEqual({media: 'ipfs://b4', mediaType: 'image/webp'})
+    expect(many.mediaCount).toBe(7)
+    expect(two).not.toHaveProperty('mediaCount')
   })
 
   it("passes on the contract's refusal", async () => {
@@ -364,6 +374,14 @@ describe('several media and self-hosting (B-311)', () => {
       '{"message":"look","media":["ipfs://bone","ipfs://btwo","ipfs://bone"],"mediaType":["image/webp","video/mp4","image/webp"]}'
     )
     expect(fromWei(totalFee(pending), 2)).toBe('2.00')
+    // Which one is too large, among several.
+    await expect(
+      prepareDraft(node.call, {
+        text: '',
+        media: [{bytes: Uint8Array.from([1])}, {bytes: new Uint8Array(900001)}],
+        target: PostTarget.newPost(),
+      })
+    ).rejects.toThrow('media 2: the image is too large')
   })
 
   it('hosts the files on this node alone: no storage fee, no storeToIpfs', async () => {

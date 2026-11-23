@@ -1974,5 +1974,7 @@
   "The video is hosted by your node ({{size}} KB): no storage fee.": "La vidéo est hébergée par votre nœud ({{size}} Ko) : pas de frais de stockage.",
   "only {{number}} more media fit in a post": "seulement {{number}} médias de plus tiennent dans une publication",
   "🖼 {{number}} media. Click to show them.": "🖼 {{number}} médias. Cliquez pour les afficher.",
-  "🖼 {{number}} media: open the post to show them.": "🖼 {{number}} médias : ouvrez la publication pour les afficher."
+  "🖼 {{number}} media: open the post to show them.": "🖼 {{number}} médias : ouvrez la publication pour les afficher.",
+  "🖼 {{number}} more media: open the post to show them.": "🖼 {{number}} médias de plus : ouvrez la publication pour les afficher.",
+  "The post holds {{number}} more media, not shown: the app shows {{most}} a post.": "La publication contient {{number}} médias de plus, non affichés : l'app en affiche {{most}} par publication."
 }

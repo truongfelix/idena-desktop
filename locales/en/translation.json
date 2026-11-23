@@ -1974,5 +1974,7 @@
   "The video is hosted by your node ({{size}} KB): no storage fee.": "The video is hosted by your node ({{size}} KB): no storage fee.",
   "only {{number}} more media fit in a post": "only {{number}} more media fit in a post",
   "🖼 {{number}} media. Click to show them.": "🖼 {{number}} media. Click to show them.",
-  "🖼 {{number}} media: open the post to show them.": "🖼 {{number}} media: open the post to show them."
+  "🖼 {{number}} media: open the post to show them.": "🖼 {{number}} media: open the post to show them.",
+  "🖼 {{number}} more media: open the post to show them.": "🖼 {{number}} more media: open the post to show them.",
+  "The post holds {{number}} more media, not shown: the app shows {{most}} a post.": "The post holds {{number}} more media, not shown: the app shows {{most}} a post."
 }

@@ -64,8 +64,10 @@ export function parsePost(
     media.length > 0 &&
     Array.isArray(mediaType) &&
     mediaType.length > 0
+  // A media without its type is left out, as the website does; at most MAX_POST_MEDIA are read (mediaCount: all).
+  const count = hasMedia ? Math.min(media.length, mediaType.length) : 0
   const items = hasMedia
-    ? media.slice(0, MAX_POST_MEDIA).map((item, i) => {
+    ? media.slice(0, Math.min(count, MAX_POST_MEDIA)).map((item, i) => {
         const address = text(item)
         return {
           media:
@@ -92,6 +94,7 @@ export function parsePost(
     mediaType: items[0]?.mediaType ?? '',
     // The media after the first (B-311), in order; a build before it reads the first alone.
     ...(items.length > 1 ? {more: items.slice(1)} : {}),
+    ...(count > MAX_POST_MEDIA ? {mediaCount: count} : {}),
   }
 }
 

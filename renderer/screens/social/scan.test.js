@@ -8,7 +8,9 @@ import {
   groupsPending,
   historyDone,
   messagesPending,
+  mediaPending,
   readCache,
+  scanMediaPosts,
   scanOlderMessages,
   withMessages,
   scannedShare,
@@ -193,6 +195,9 @@ describe('the scan', () => {
       onePartLow: first.low,
       onePartTo: first.high,
       onePartMessagesLow: first.high + 1,
+      mediaLow: first.low,
+      mediaTo: first.high,
+      mediaPending: [],
     })
     expect(historyDone(read)).toBe(false)
     expect(readCache({...cache, contract: '0x0'})).toBeNull()
@@ -462,5 +467,84 @@ describe('the private messages of the scan', () => {
       GROUPS_FROM + 2000,
       GROUPS_FROM + 3000,
     ])
+  })
+})
+
+describe('the media of posts read before B-311', () => {
+  const withMedia = (hash, height) => ({
+    ...post(hash, a, 'look', height, {hasMedia: true}),
+    media: 'ipfs://bfirst',
+    mediaType: 'image/webp',
+  })
+  const saved = (extra) => ({
+    ...emptyCache(1000),
+    low: 100,
+    high: 1000,
+    posts: [
+      withMedia('0x1', 200),
+      post('0x2', b, 'text only', 300),
+      withMedia('0x3', 900),
+      withMedia('0x4', 950),
+    ],
+    ...extra,
+  })
+
+  it('are read again for a scan without the marks, the newest first', () => {
+    const {mediaLow, mediaTo, mediaPending: none, ...unmarked} = saved()
+    expect([mediaLow, mediaTo, none]).toEqual([1001, 1000, []])
+    const read = readCache(unmarked)
+    expect(read.mediaPending).toEqual([950, 900, 200])
+    expect([read.mediaLow, read.mediaTo]).toEqual([100, 1000])
+    expect(mediaPending(read)).toBe(true)
+  })
+
+  it('only where an older build read blocks the marks do not cover', () => {
+    // This build read 250..920; an older build then read up to 1000 (and down to 100) and moved no mark.
+    const read = readCache(
+      saved({mediaLow: 250, mediaTo: 920, mediaPending: []})
+    )
+    expect(read.mediaPending).toEqual([950, 200])
+    // Read again with the marks it sets: nothing more.
+    expect(readCache(JSON.parse(JSON.stringify(read))).mediaPending).toEqual([
+      950, 200,
+    ])
+    // A scan this build read whole: nothing to read again.
+    expect(
+      readCache(saved({mediaLow: 100, mediaTo: 1000})).mediaPending
+    ).toEqual([])
+  })
+
+  it('take each post again with all its media, and keep the others', async () => {
+    const again = {
+      ...withMedia('0x4', 950),
+      more: [{media: 'ipfs://bsecond', mediaType: 'video/mp4'}],
+    }
+    const source = scriptedSource([1000], {950: again})
+    const saves = []
+    const cache = readCache(saved({mediaLow: 250, mediaTo: 920}))
+    const next = await scanMediaPosts(cache, source, {
+      save: (value) => saves.push(value),
+    })
+    expect(source.ranges).toEqual([
+      [950, 950],
+      [200, 200],
+    ])
+    expect(next.posts.find(({hash}) => hash === '0x4').more).toEqual(again.more)
+    expect(next.posts.map(({hash}) => hash)).toEqual([
+      '0x1',
+      '0x2',
+      '0x3',
+      '0x4',
+    ])
+    expect(next.mediaPending).toEqual([])
+    expect(saves).toHaveLength(1)
+    expect(await scanMediaPosts(next, source)).toBe(next)
+  })
+
+  it('stay marked as read by the scans that go on', async () => {
+    const source = scriptedSource([1500])
+    const cache = readCache(saved())
+    const newer = await checkNewBlocks(cache, source)
+    expect([newer.mediaLow, newer.mediaTo]).toEqual([100, 1500])
   })
 })

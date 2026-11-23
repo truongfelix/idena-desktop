@@ -320,10 +320,12 @@ export function Editor({now, status, underThread = false}) {
   const [imageNote, setImageNote] = React.useState(null)
   const fileRef = React.useRef()
   const audioRef = React.useRef()
-  // Each media gets a key of its own: two equal files stay apart in the list.
+  // Each media gets a key of its own: two equal files stay apart in the list. The draft outlives the editor
+  // (Cancel keeps it), so the keys go on above those it holds.
   const keyRef = React.useRef(0)
   const withKey = (item) => {
-    keyRef.current += 1
+    keyRef.current =
+      Math.max(keyRef.current, ...draftMedia.map(({key}) => key ?? 0)) + 1
     return {...item, key: keyRef.current}
   }
   const full = draftMedia.length >= MAX_POST_MEDIA
@@ -563,7 +565,7 @@ export function Editor({now, status, underThread = false}) {
               )}
         </SmallText>
       )}
-      {(draftMedia.length > 0 || textOnIpfs) && (
+      {(draftMedia.length > 0 || textOnIpfs || selfHosted) && (
         <HostingChoice selfHosted={selfHosted} onChange={setSelfHosted} />
       )}
       {myBan && (

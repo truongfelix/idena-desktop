@@ -25,6 +25,7 @@ import {ModeratedAnswers, ModeratedLine} from './moderated'
 import {TopicTag} from './topic'
 import {PersonAvatar} from './profile-public'
 import {MediaKind, kindOfType, playableKind} from '../media-type'
+import {MAX_POST_MEDIA} from '../contract'
 
 const textDecoder = new TextDecoder()
 
@@ -258,20 +259,50 @@ export const mediaItems = (call) =>
       ]
     : []
 
-/** All of a post's media (B-311): one as PostMedia shows it, several side by side, two a row. */
+/**
+ * All of a post's media (B-311): one as PostMedia shows it; in a list the first and how many more (nothing else is
+ * fetched there), in its thread all of them side by side, two a row, and how many it holds past those read.
+ */
 export function PostMediaList({call, maxH, inThread = false}) {
+  const {t} = useTranslation()
   const items = mediaItems(call)
   if (items.length <= 1)
     return <PostMedia call={call} maxH={maxH} inThread={inThread} />
+  if (!inThread)
+    return (
+      <Stack spacing={1}>
+        <PostMedia call={call} maxH={maxH} />
+        <SmallText>
+          {t('🖼 {{number}} more media: open the post to show them.', {
+            number: (call.mediaCount ?? items.length) - 1,
+            nsSeparator: '|',
+          })}
+        </SmallText>
+      </Stack>
+    )
   return (
-    <SimpleGrid columns={2} spacing={2} w="full">
-      {items.map((item, index) => (
-        // eslint-disable-next-line react/no-array-index-key
-        <Box key={index} minW={0}>
-          <PostMedia call={item} maxH={maxH} inThread={inThread} />
-        </Box>
-      ))}
-    </SimpleGrid>
+    <Stack spacing={1}>
+      <SimpleGrid columns={2} spacing={2} w="full">
+        {items.map((item, index) => (
+          // eslint-disable-next-line react/no-array-index-key
+          <Box key={index} minW={0}>
+            <PostMedia call={item} maxH={maxH} inThread />
+          </Box>
+        ))}
+      </SimpleGrid>
+      {call.mediaCount > items.length && (
+        <SmallText>
+          {t(
+            'The post holds {{number}} more media, not shown: the app shows {{most}} a post.',
+            {
+              number: call.mediaCount - items.length,
+              most: MAX_POST_MEDIA,
+              nsSeparator: '|',
+            }
+          )}
+        </SmallText>
+      )}
+    </Stack>
   )
 }
 
@@ -310,7 +341,7 @@ function TapToShowMedia({call, maxH, inThread}) {
   if (shown)
     return <PostMediaList call={call} maxH={maxH} inThread={inThread} />
   const kind = kindOfType(call.mediaType)
-  const count = mediaItems(call).length
+  const count = call.mediaCount ?? mediaItems(call).length
   if (count > 1)
     return inThread ? (
       <Button
