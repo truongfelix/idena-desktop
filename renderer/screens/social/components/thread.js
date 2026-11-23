@@ -14,6 +14,7 @@ import {timeAgo} from '../format'
 import {postTopic} from '../topics'
 import {hidesText, leavesFeeds} from '../hiding'
 import {TopicLine} from './topic'
+import {ModeratedLine} from './moderated'
 
 /**
  * The author's picture in a thread: an answer to the post (depth 0) a little bigger than a comment under it. Steps
@@ -86,7 +87,8 @@ function ThreadItem({
         <Flex onClick={() => setFolded(!folded)} cursor="pointer">
           <Rails count={rails} />
         </Flex>
-        {folded ? (
+        {node.moderated && <ModeratedLine node={node} flex={1} />}
+        {!node.moderated && folded && (
           <Text
             fontSize="sm"
             noOfLines={1}
@@ -108,7 +110,8 @@ function ThreadItem({
               </Text>
             )}
           </Text>
-        ) : (
+        )}
+        {!node.moderated && !folded && (
           <Stack
             spacing={1.5}
             flex={1}
@@ -170,15 +173,21 @@ export function SocialThread({node, now, focusId, onProfile}) {
         rounded="md"
       >
         {topic !== null && <TopicLine name={topic} large />}
-        <FullHeader
-          address={node.call.author}
-          time={node.call.time}
-          now={now}
-          onProfile={onProfile}
-          call={node.call}
-        />
-        <PostBody call={node.call} maxH="360px" inThread />
-        <ActionBar node={node} onProfile={onProfile} showAnswers={false} />
+        {node.moderated ? (
+          <ModeratedLine node={node} />
+        ) : (
+          <>
+            <FullHeader
+              address={node.call.author}
+              time={node.call.time}
+              now={now}
+              onProfile={onProfile}
+              call={node.call}
+            />
+            <PostBody call={node.call} maxH="360px" inThread />
+            <ActionBar node={node} onProfile={onProfile} showAnswers={false} />
+          </>
+        )}
         {node.call.version && (
           <SmallText>
             {t(

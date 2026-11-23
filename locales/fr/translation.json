@@ -1827,5 +1827,17 @@
   "Your short answers are not in a block yet: keep the app open and connected": "Vos réponses courtes ne sont pas encore dans un bloc : gardez l'application ouverte et connectée",
   "Your answers are not in a block yet: keep the app open and connected": "Vos réponses ne sont pas encore dans un bloc : gardez l'application ouverte et connectée",
   "Your answers were sent to your node": "Vos réponses ont été transmises à votre nœud",
-  "Answers for this identity were already sent, by this app earlier or by another app with the same key. Validating one identity in two apps at once can make the validation fail.": "Les réponses de cette identité ont déjà été envoyées, par cette application plus tôt ou par une autre application avec la même clé. Valider une identité dans deux applications à la fois peut faire échouer la validation."
+  "Answers for this identity were already sent, by this app earlier or by another app with the same key. Validating one identity in two apps at once can make the validation fail.": "Les réponses de cette identité ont déjà été envoyées, par cette application plus tôt ou par une autre application avec la même clé. Valider une identité dans deux applications à la fois peut faire échouer la validation.",
+  "Post hidden by moderators · {{reason}}": "Publication masquée par les modérateurs · {{reason}}",
+  "Post hidden by moderators": "Publication masquée par les modérateurs",
+  "Banned permanently by the community moderators": "Banni définitivement par les modérateurs de la communauté",
+  "Banned until epoch {{epoch}} by the community moderators": "Banni jusqu'à l'époque {{epoch}} par les modérateurs de la communauté",
+  "Banned by {{moderator}}: write to them to ask for a review.": "Banni par {{moderator}} : écrivez-lui pour demander un réexamen.",
+  "Off: show everything": "Désactivée : tout afficher",
+  "On: follow the community moderators": "Activée : suivre les modérateurs de la communauté",
+  "The community moderators record on the blockchain which accounts are banned and which posts are hidden, as on the Idena Social website. A moderator is an identity with at least 1,000,000 iDNA staked, or an account such an identity vouched for.": "Les modérateurs de la communauté inscrivent dans la blockchain quels comptes sont bannis et quelles publications sont masquées, comme sur le site Idena Social. Un modérateur est une identité qui a au moins 1 000 000 iDNA en stake, ou un compte dont une telle identité s'est portée garante.",
+  "With it on, a post made while its author is banned is not shown. An older post of theirs, or a post hidden by the moderators, shows as a line while replies under it are shown, and goes otherwise; its text and pictures are not downloaded. Likes, tips and messages still count. Your node reads the moderators' decisions: nothing is sent.": "Activée, une publication faite pendant le bannissement de son auteur n'est pas affichée. Une publication plus ancienne de sa part, ou une publication masquée par les modérateurs, devient une ligne tant que des réponses en dessous sont affichées, et disparaît sinon ; son texte et ses images ne sont pas téléchargés. Les j'aime, les pourboires et les messages comptent toujours. Votre nœud lit les décisions des modérateurs : rien n'est envoyé.",
+  "Cannot read the moderation decisions: {{message}}": "Impossible de lire les décisions de modération : {{message}}",
+  "Decisions read through block {{block}}.": "Décisions lues jusqu'au bloc {{block}}.",
+  "Community moderation": "Modération communautaire"
 }

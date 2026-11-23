@@ -1827,5 +1827,17 @@
   "Your short answers are not in a block yet: keep the app open and connected": "Your short answers are not in a block yet: keep the app open and connected",
   "Your answers are not in a block yet: keep the app open and connected": "Your answers are not in a block yet: keep the app open and connected",
   "Your answers were sent to your node": "Your answers were sent to your node",
-  "Answers for this identity were already sent, by this app earlier or by another app with the same key. Validating one identity in two apps at once can make the validation fail.": "Answers for this identity were already sent, by this app earlier or by another app with the same key. Validating one identity in two apps at once can make the validation fail."
+  "Answers for this identity were already sent, by this app earlier or by another app with the same key. Validating one identity in two apps at once can make the validation fail.": "Answers for this identity were already sent, by this app earlier or by another app with the same key. Validating one identity in two apps at once can make the validation fail.",
+  "Post hidden by moderators · {{reason}}": "Post hidden by moderators · {{reason}}",
+  "Post hidden by moderators": "Post hidden by moderators",
+  "Banned permanently by the community moderators": "Banned permanently by the community moderators",
+  "Banned until epoch {{epoch}} by the community moderators": "Banned until epoch {{epoch}} by the community moderators",
+  "Banned by {{moderator}}: write to them to ask for a review.": "Banned by {{moderator}}: write to them to ask for a review.",
+  "Off: show everything": "Off: show everything",
+  "On: follow the community moderators": "On: follow the community moderators",
+  "The community moderators record on the blockchain which accounts are banned and which posts are hidden, as on the Idena Social website. A moderator is an identity with at least 1,000,000 iDNA staked, or an account such an identity vouched for.": "The community moderators record on the blockchain which accounts are banned and which posts are hidden, as on the Idena Social website. A moderator is an identity with at least 1,000,000 iDNA staked, or an account such an identity vouched for.",
+  "With it on, a post made while its author is banned is not shown. An older post of theirs, or a post hidden by the moderators, shows as a line while replies under it are shown, and goes otherwise; its text and pictures are not downloaded. Likes, tips and messages still count. Your node reads the moderators' decisions: nothing is sent.": "With it on, a post made while its author is banned is not shown. An older post of theirs, or a post hidden by the moderators, shows as a line while replies under it are shown, and goes otherwise; its text and pictures are not downloaded. Likes, tips and messages still count. Your node reads the moderators' decisions: nothing is sent.",
+  "Cannot read the moderation decisions: {{message}}": "Cannot read the moderation decisions: {{message}}",
+  "Decisions read through block {{block}}.": "Decisions read through block {{block}}.",
+  "Community moderation": "Community moderation"
 }
