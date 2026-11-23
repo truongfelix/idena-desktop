@@ -13,6 +13,7 @@ import {
   MutedList,
   PicturesSetting,
 } from './hidden-lists'
+import {CommunityModerationSetting} from './moderation-setting'
 
 export const SettingsTab = {
   People: 'people',
@@ -23,12 +24,13 @@ export const SettingsTab = {
   Posts: 'posts',
   BlockedTopics: 'blocked-topics',
   Pictures: 'pictures',
+  Moderation: 'moderation',
 }
 
 /**
  * Social settings (the ⚙ next to Home's Following chip), as the phone app's: the people and the topics followed,
  * the accounts muted and blocked, the hidden words, the posts hidden and the topics blocked, all kept on this
- * computer only, each undone here, and "Pictures in posts"; `tab` is the one shown. Export and import of the lists
+ * computer only, each undone here, "Pictures in posts" and "Community moderation"; `tab` is the one shown. Export and import of the lists
  * are in Social's ⓘ.
  */
 export function SocialSettingsView({
@@ -65,6 +67,7 @@ export function SocialSettingsView({
       t('Blocked topics {{count}}', {count: blockedTopics.length}),
     ],
     [SettingsTab.Pictures, t('Pictures in posts')],
+    [SettingsTab.Moderation, t('Community moderation')],
   ]
   return (
     <Stack spacing={3} w="full">
@@ -94,6 +97,7 @@ export function SocialSettingsView({
       )}
       {tab === SettingsTab.BlockedTopics && <BlockedTopicsList />}
       {tab === SettingsTab.Pictures && <PicturesSetting />}
+      {tab === SettingsTab.Moderation && <CommunityModerationSetting />}
     </Stack>
   )
 }

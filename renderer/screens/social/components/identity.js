@@ -1,4 +1,5 @@
 /* eslint-disable react/prop-types */
+import React from 'react'
 import {useTranslation} from 'react-i18next'
 import {Box, Text} from '@chakra-ui/react'
 import {useSocialIdentity} from '../hooks'
@@ -6,6 +7,8 @@ import {useSocial} from '../provider'
 import {shortAddress} from '../people'
 import {LINK, MUTED} from './theme'
 import {identityColor, identityStatus} from '../format'
+import {activeBan} from '../moderation'
+import {ModerationContext} from '../moderation-hooks'
 
 /** The dot colors of the phone app's status. */
 export const healthColor = {
@@ -88,6 +91,9 @@ export function NameLink({address, onProfile, ...props}) {
 export function IdentityLabel({address, withAge = false, ...props}) {
   const {t} = useTranslation()
   const {data: identity} = useSocialIdentity(address)
+  // With Community moderation on, a banned account's likes, tips and posts still show: it is labelled (B-308).
+  const {state, epoch} = React.useContext(ModerationContext)
+  const banned = Boolean(activeBan(state, address, epoch))
   if (!identity) return null
   const status = identityStatus(identity.state)
   const label =
@@ -102,6 +108,23 @@ export function IdentityLabel({address, withAge = false, ...props}) {
       {...props}
     >
       {label}
+      {banned && (
+        <Text as="span" color="red.500">{`  ·  ${t('Banned', {
+          context: 'account',
+        })}`}</Text>
+      )}
+    </Text>
+  )
+}
+
+/** "Banned" alone, for a banned account while Community moderation is on (B-308); nothing otherwise. */
+export function BannedLabel({address, ...props}) {
+  const {t} = useTranslation()
+  const {state, epoch} = React.useContext(ModerationContext)
+  if (!activeBan(state, address, epoch)) return null
+  return (
+    <Text as="span" fontWeight={500} color="red.500" {...props}>
+      {t('Banned', {context: 'account'})}
     </Text>
   )
 }

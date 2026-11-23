@@ -15,6 +15,7 @@ import {
   Textarea,
 } from '@chakra-ui/react'
 import {SmallText} from '../../../shared/components/components'
+import {activeBan} from '../moderation'
 import {PrimaryButton, SecondaryButton} from '../../../shared/components/button'
 import {socialRpc} from '../node'
 import {useSocial} from '../provider'
@@ -243,7 +244,12 @@ function TopicField({value, onChange}) {
 /** The editor of the open draft; `underThread`: pinned under the thread it answers, so it starts smaller. */
 export function Editor({now, status, underThread = false}) {
   const {t} = useTranslation()
-  const {names, sending} = useSocial()
+  const {names, sending, me, communityModeration, moderation, epoch} =
+    useSocial()
+  // With Community moderation on, a banned account is told before paying: its posts are not shown (B-308).
+  const myBan = communityModeration
+    ? activeBan(moderation.state, me, epoch?.epoch ?? null)
+    : null
   const {
     draft,
     draftText,
@@ -449,6 +455,19 @@ export function Editor({now, status, underThread = false}) {
           {t(
             'The text is stored on IPFS (a storeToIpfs transaction, cheaper than the post for long texts) and the post holds its address. It stays readable while IPFS nodes keep it.'
           )}
+        </SmallText>
+      )}
+      {myBan && (
+        <SmallText color="red.500">
+          {myBan.permanent
+            ? t(
+                "Your account is banned permanently by the community moderators: your posts won't be shown on Idena Social.",
+                {nsSeparator: '|'}
+              )
+            : t(
+                "Your account is banned until epoch {{epoch}} by the community moderators: your posts won't be shown on Idena Social.",
+                {epoch: myBan.endEpoch, nsSeparator: '|'}
+              )}
         </SmallText>
       )}
       <SmallText color={MUTED}>

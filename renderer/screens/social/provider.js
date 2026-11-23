@@ -38,6 +38,8 @@ import {
 } from './profile-hooks'
 import {profilesEnabled, shownNames} from './profiles'
 import {socialNewsCount} from './news-count'
+import {moderatedFeed, moderatedProfile} from './moderation-feed'
+import {ModerationContext, useModeration} from './moderation-hooks'
 
 /** How long a group message waits for the blocks up to the node's last one to be read (sendGroupMessage). */
 const CATCH_UP_MS = 90 * 1000
@@ -84,6 +86,7 @@ export function SocialProvider({children}) {
         hiddenPosts: [],
         blockedTopics: [],
         picturesInPosts: picturesMode(null),
+        communityModeration: false,
       })),
     ]).then(([saved, savedSettings]) => {
       if (!alive) return
@@ -111,7 +114,24 @@ export function SocialProvider({children}) {
     setCache,
   })
 
-  const feed = React.useMemo(() => (cache ? cacheFeed(cache) : []), [cache])
+  // Community moderation (moderation.js), off unless turned on: the feed every view reads is the moderated one.
+  // While its first read of the contract runs, the feed waits, so that nothing about to be hidden is fetched.
+  const moderation = useModeration({
+    enabled: settings?.communityModeration === true,
+    ready,
+  })
+  const epochNumber = epoch?.epoch ?? null
+  const scannedFeed = React.useMemo(
+    () => (cache ? cacheFeed(cache) : []),
+    [cache]
+  )
+  const feed = React.useMemo(
+    () =>
+      moderation.loading
+        ? []
+        : moderatedFeed(scannedFeed, moderation.state, epochNumber),
+    [epochNumber, moderation.loading, moderation.state, scannedFeed]
+  )
   const targets = React.useMemo(() => postTargets(feed), [feed])
   const refreshProfiles = useRefreshProfiles()
   const sending = useSocialSending({
@@ -119,6 +139,7 @@ export function SocialProvider({children}) {
     readNewBlocks,
     scannedThrough: cache?.authorsHeight ?? 0,
     onProfileChange: refreshProfiles,
+    onModerationChange: moderation.refresh,
   })
   const people = React.useMemo(() => settings?.people || {}, [settings])
   const blocked = React.useMemo(() => blockedAddresses(people), [people])
@@ -164,7 +185,31 @@ export function SocialProvider({children}) {
     if (me) addresses.add(me)
     return addresses
   }, [chats.conversations, feed, me, people])
-  const {profiles, reading: readingProfiles} = useProfiles(shownAddresses)
+  const {profiles: readProfiles, reading: readingProfiles} =
+    useProfiles(shownAddresses)
+  // Banned accounts show no name, bio or picture while Community moderation is on.
+  const profiles = React.useMemo(
+    () =>
+      moderation.state.bans.size === 0
+        ? readProfiles
+        : Object.fromEntries(
+            Object.entries(readProfiles).map(([address, profile]) => [
+              address,
+              moderatedProfile(
+                profile,
+                address,
+                moderation.state,
+                epochNumber,
+                me
+              ),
+            ])
+          ),
+    [epochNumber, me, moderation.state, readProfiles]
+  )
+  const moderationContext = React.useMemo(
+    () => ({state: moderation.state, epoch: epochNumber, me}),
+    [epochNumber, me, moderation.state]
+  )
   const {names, parts: nameParts} = React.useMemo(
     () => socialNames(shownNames(profiles), people, me),
     [me, people, profiles]
@@ -178,7 +223,13 @@ export function SocialProvider({children}) {
   )
   // What others did on your posts, without what is hidden.
   const activity = React.useMemo(
-    () => (me ? visibleActivity(socialActivity(feed, me), hidden, me) : []),
+    () =>
+      me
+        ? visibleActivity(socialActivity(feed, me), hidden, me).filter(
+            // An answer Community moderation hid is no notification.
+            ({answer}) => !answer?.moderated
+          )
+        : [],
     [feed, hidden, me]
   )
   const seenThrough = settings?.seenThrough ?? null
@@ -220,9 +271,11 @@ export function SocialProvider({children}) {
     [activity, notifyKinds, seenThrough]
   )
 
+  // While the feed waits for the first read of the moderation contract, the notices wait too: they would mark as
+  // announced what the empty feed does not hold.
   useActivityNotices({
     activity,
-    cache,
+    cache: moderation.loading ? null : cache,
     seenThrough,
     notifyKinds,
     names,
@@ -358,6 +411,9 @@ export function SocialProvider({children}) {
     () => ({
       cache,
       feed,
+      // The feed as scanned, before Community moderation: for the moderators' tools only (what they review).
+      scannedFeed,
+      moderation,
       head,
       error,
       missingMethod,
@@ -387,6 +443,9 @@ export function SocialProvider({children}) {
       setBlockedTopics: (list) => updateSettings('blockedTopics', list),
       picturesInPosts,
       setPicturesInPosts: (mode) => updateSettings('picturesInPosts', mode),
+      communityModeration: settings?.communityModeration === true,
+      setCommunityModeration: (on) =>
+        updateSettings('communityModeration', on === true),
       activity,
       unread,
       offersTo,
@@ -434,6 +493,8 @@ export function SocialProvider({children}) {
       markSeen,
       me,
       missingMethod,
+      moderation,
+      scannedFeed,
       names,
       nameParts,
       notifyKinds,
@@ -447,6 +508,7 @@ export function SocialProvider({children}) {
       scanOff,
       sendMessage,
       sending,
+      settings?.communityModeration,
       setPeople,
       setPerson,
       setPostHidden,
@@ -468,6 +530,8 @@ export function SocialProvider({children}) {
   }, [newsCount])
 
   return (
-    <SocialContext.Provider value={value}>{children}</SocialContext.Provider>
+    <ModerationContext.Provider value={moderationContext}>
+      <SocialContext.Provider value={value}>{children}</SocialContext.Provider>
+    </ModerationContext.Provider>
   )
 }

@@ -13,6 +13,7 @@ import {MUTED} from './theme'
 import {timeAgo} from '../format'
 import {postTopic} from '../topics'
 import {PicturesMode} from '../hiding'
+import {ModeratedAnswers, ModeratedLine} from './moderated'
 import {TopicTag} from './topic'
 import {PersonAvatar} from './profile-public'
 import {MediaKind, kindOfType, playableKind} from '../media-type'
@@ -356,6 +357,13 @@ export function PostRow({
 }) {
   const {call} = node
   const topic = topicShown === TopicShown.Not ? null : postTopic(node)
+  if (node.moderated)
+    return (
+      <Stack spacing={1} py={3} w="full" cursor="pointer" onClick={onOpen}>
+        <ModeratedLine node={node} />
+        <ModeratedAnswers node={node} />
+      </Stack>
+    )
   return (
     <Stack spacing={1.5} py={3} w="full">
       <Stack spacing={1} cursor="pointer" onClick={onOpen}>

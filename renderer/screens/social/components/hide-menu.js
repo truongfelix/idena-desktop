@@ -6,6 +6,7 @@ import {
   IconButton,
   Menu,
   MenuButton,
+  MenuDivider,
   MenuItem,
   MenuList,
   Stack,
@@ -22,6 +23,9 @@ import {displayName, person} from '../people'
 import {topicChannel, topicOf} from '../topics'
 import {useTrust} from '../profile-hooks'
 import {ProfileCall, profilesEnabled} from '../profiles'
+import {activeBan} from '../moderation'
+import {ReportDialog} from './moderation-dialogs'
+import {ModeratorDialog, useModerator} from './moderator-actions'
 
 // Muting and blocking an account (⋯ on its profile or on its posts), hiding a post and blocking a topic (⋯, or the
 // topic's page), as the phone app's SocialBlocking.kt and SocialMuting.kt. What they hide: hiding.js; the lists to undo them: Social settings.
@@ -115,6 +119,70 @@ export function BlockDialog({address, onClose}) {
   )
 }
 
+/**
+ * What Community moderation adds to a ⋯ menu for `address` (and a post's `hash`), while the setting is on and the
+ * account not banned itself: for a moderator, Hide this post… and Ban (or Unban) {name}… (moderator-actions.js); for
+ * everyone, Report post… and Report {name}… while the author is not banned already (moderation-dialogs.js);
+ * [items, dialog].
+ */
+function useModerationItems(address, hash = null) {
+  const {t} = useTranslation()
+  const {me, names, communityModeration, moderation, epoch} = useSocial()
+  const {role} = useModerator()
+  const [reporting, setReporting] = React.useState(null)
+  const [acting, setActing] = React.useState(null)
+  if (!communityModeration || !me) return [null, null]
+  const epochNumber = epoch?.epoch ?? null
+  if (activeBan(moderation.state, me, epochNumber)) return [null, null]
+  const name = displayName(address, names)
+  const authorBanned = Boolean(
+    activeBan(moderation.state, address, epochNumber)
+  )
+  const items = (
+    <>
+      {role && <MenuDivider />}
+      {role && hash && (
+        <MenuItem onClick={() => setActing({action: 'hidePost', hash})}>
+          {t('Hide this post…')}
+        </MenuItem>
+      )}
+      {role && (
+        <MenuItem
+          onClick={() =>
+            setActing({action: authorBanned ? 'unban' : 'ban', address})
+          }
+        >
+          {authorBanned
+            ? t('Unban {{name}}…', {name})
+            : t('Ban {{name}}…', {name})}
+        </MenuItem>
+      )}
+      {role && !authorBanned && <MenuDivider />}
+      {hash && !authorBanned && (
+        <MenuItem onClick={() => setReporting({hash, author: address})}>
+          {t('Report post…')}
+        </MenuItem>
+      )}
+      {!authorBanned && (
+        <MenuItem onClick={() => setReporting({address})}>
+          {t('Report {{name}}…', {name})}
+        </MenuItem>
+      )}
+    </>
+  )
+  const dialog = (
+    <>
+      {reporting && (
+        <ReportDialog {...reporting} onClose={() => setReporting(null)} />
+      )}
+      {acting && (
+        <ModeratorDialog {...acting} onClose={() => setActing(null)} />
+      )}
+    </>
+  )
+  return [items, dialog]
+}
+
 /** Mutes `address` (its posts leave the feeds: hiding.js, leavesFeeds), or unmutes it: [isMuted, toggle]. */
 function useMute(address) {
   const {people, setPerson} = useSocial()
@@ -122,11 +190,15 @@ function useMute(address) {
   return [one.muted, () => setPerson({...one, muted: !one.muted})]
 }
 
-/** ⋯ on another's profile: Name on this computer (`onRename`), Mute (or Unmute) and Block (asked first). */
+/**
+ * ⋯ on another's profile: Name on this computer (`onRename`), Mute (or Unmute) and Block (asked first); with
+ * Community moderation on, Report.
+ */
 export function ProfileMenu({address, onRename}) {
   const {t} = useTranslation()
   const [isBlocking, setIsBlocking] = React.useState(false)
   const [isMuted, toggleMute] = useMute(address)
+  const [reportItems, reportDialog] = useModerationItems(address)
   return (
     <Box onClick={stop}>
       <Menu autoSelect={false} placement="bottom-end">
@@ -141,11 +213,13 @@ export function ProfileMenu({address, onRename}) {
           <MenuItem onClick={() => setIsBlocking(true)}>
             {t('Block', {context: 'person'})}
           </MenuItem>
+          {reportItems}
         </MenuList>
       </Menu>
       {isBlocking && (
         <BlockDialog address={address} onClose={() => setIsBlocking(false)} />
       )}
+      {reportDialog}
     </Box>
   )
 }
@@ -188,13 +262,14 @@ export function OwnProfileMenu({onEdit, openSettings}) {
 
 /**
  * ⋯ at the top right of a post, reply or comment of another (none on one's own): Hide (or Show again), Mute (or
- * Unmute) its author, Block its author (asked first), Block its topic.
+ * Unmute) its author, Block its author (asked first), Block its topic; with Community moderation on, Report.
  */
 export function PostMenu({call}) {
   const {t} = useTranslation()
   const {me, names, hidden, setPostHidden, setTopicBlocked} = useSocial()
   const [isBlocking, setIsBlocking] = React.useState(false)
   const [isMuted, toggleMute] = useMute(call.author)
+  const [reportItems, reportDialog] = useModerationItems(call.author, call.hash)
   if (call.author === me) return null
   const name = displayName(call.author, names)
   const isHidden = hidden.posts.has(String(call.hash).toLowerCase())
@@ -220,6 +295,7 @@ export function PostMenu({call}) {
               {t('Block the topic {{topic}}', {topic: topicChannel(topic)})}
             </MenuItem>
           )}
+          {reportItems}
         </MenuList>
       </Menu>
       {isBlocking && (
@@ -228,6 +304,7 @@ export function PostMenu({call}) {
           onClose={() => setIsBlocking(false)}
         />
       )}
+      {reportDialog}
     </Box>
   )
 }
