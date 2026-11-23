@@ -1855,6 +1855,7 @@
   "Ban {{name}}…": "Bannir {{name}}…",
   "banned": "a banni",
   "Banned": "Bannis",
+  "Banned_account": "Banni",
   "Banned by": "Banni par",
   "Ban the account…": "Bannir le compte…",
   "{{bytes}} / {{max}} bytes": "{{bytes}} / {{max}} octets",
