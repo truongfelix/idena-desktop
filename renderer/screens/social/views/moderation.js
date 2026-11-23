@@ -105,7 +105,7 @@ function ReviewedPost({node, openProfile, openThread}) {
 
 function Reports({now, openProfile, openThread, act}) {
   const {t} = useTranslation()
-  const {scannedFeed} = useSocial()
+  const {scannedFeed, me} = useSocial()
   const {state, epoch} = useModerator()
   const byHash = React.useMemo(() => postsByHash(scannedFeed), [scannedFeed])
   const groups = reportGroups(state, epoch)
@@ -163,7 +163,7 @@ function Reports({now, openProfile, openThread, act}) {
                 {t('Hide this post…')}
               </SecondaryButton>
             )}
-            {author && (
+            {author && author !== me && (
               <SecondaryButton
                 size="sm"
                 onClick={() => act({action: 'ban', address: author})}
