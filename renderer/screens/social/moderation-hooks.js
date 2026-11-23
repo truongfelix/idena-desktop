@@ -17,15 +17,16 @@ const NOTHING = emptyModeration()
 export const ModerationContext = React.createContext({
   state: NOTHING,
   epoch: null,
+  me: null,
 })
 
 /** A profile read for `address` as Community moderation shows it (moderatedProfile). */
 export function useModeratedProfile(profile, address) {
-  const {state, epoch} = React.useContext(ModerationContext)
+  const {state, epoch, me} = React.useContext(ModerationContext)
   return React.useMemo(
     () =>
-      address ? moderatedProfile(profile, address, state, epoch) : profile,
-    [address, epoch, profile, state]
+      address ? moderatedProfile(profile, address, state, epoch, me) : profile,
+    [address, epoch, me, profile, state]
   )
 }
 
@@ -39,7 +40,6 @@ export function useModeration({enabled, ready, call = socialRpc}) {
   const [cache, setCache] = React.useState()
   const [synced, setSynced] = React.useState(false)
   const [error, setError] = React.useState(null)
-  const running = React.useRef(false)
   const cacheRef = React.useRef()
 
   React.useEffect(() => {
@@ -66,22 +66,29 @@ export function useModeration({enabled, ready, call = socialRpc}) {
   const loaded = cache !== undefined
   React.useEffect(() => {
     if (!enabled || !ready || !loaded) return undefined
+    // One sync at a time in this effect; a sync of an effect cleaned up stops (its `alive`) and never holds the next.
     let alive = true
+    let running = false
     const sync = async () => {
-      if (running.current) return
-      running.current = true
+      if (running) return
+      running = true
       try {
-        const next = await syncModeration(cacheRef.current, call, (range) => {
-          if (!alive) return
-          cacheRef.current = range
-          setCache(range)
-          saveModerationCache(range).catch((saveError) =>
-            global.logger?.error(
-              'Cannot save the moderation cache',
-              saveError?.message
+        const next = await syncModeration(
+          cacheRef.current,
+          call,
+          (range) => {
+            if (!alive) return
+            cacheRef.current = range
+            setCache(range)
+            saveModerationCache(range).catch((saveError) =>
+              global.logger?.error(
+                'Cannot save the moderation cache',
+                saveError?.message
+              )
             )
-          )
-        })
+          },
+          () => !alive
+        )
         if (alive) {
           cacheRef.current = next
           setError(null)
@@ -89,7 +96,7 @@ export function useModeration({enabled, ready, call = socialRpc}) {
       } catch (syncError) {
         if (alive) setError(syncError)
       } finally {
-        running.current = false
+        running = false
         if (alive) setSynced(true)
       }
     }

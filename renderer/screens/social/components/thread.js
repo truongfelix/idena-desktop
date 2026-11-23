@@ -172,7 +172,7 @@ export function SocialThread({node, now, focusId, onProfile}) {
         bg={focusId === idKey(node.id) ? 'gray.50' : undefined}
         rounded="md"
       >
-        {topic !== null && <TopicLine name={topic} large />}
+        {topic !== null && !node.moderated && <TopicLine name={topic} large />}
         {node.moderated ? (
           <ModeratedLine node={node} />
         ) : (

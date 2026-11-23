@@ -176,8 +176,8 @@ export const emptyModeration = () => ({
 
 /**
  * The state the events (in chain order) leave: the accounts banned (by lowercase address: moderator, epoch,
- * permanent, endEpoch, reason, bannedAt, and `since`, the time the uninterrupted ban started: a ban that replaces
- * one still in effect keeps it), the posts hidden (by lowercase hash), who vouches for each vouched moderator, and
+ * permanent, endEpoch, reason, bannedAt, and `since`, where the uninterrupted ban started: its time, block height and
+ * index there; a ban that replaces one still in effect keeps it), the posts hidden (by lowercase hash), who vouches for each vouched moderator, and
  * every report.
  */
 export function replay(events) {
@@ -195,7 +195,9 @@ export function replay(events) {
           endEpoch: event.endEpoch,
           reason: event.reason,
           bannedAt: event.time,
-          since: goesOn ? previous.since : event.time,
+          since: goesOn
+            ? previous.since
+            : {time: event.time, height: event.height, index: event.index},
         })
         break
       }

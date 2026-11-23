@@ -37,12 +37,19 @@ export function readModerationCache(saved) {
 /**
  * The cache read on through the node's last block: bcn_blocksWithAddress finds the blocks with a call of the
  * contract, bcn_contractCalls (with their events) reads them. `onRange(cache)` gets the cache after each range read,
- * to save it. An error stops at the last range read whole, never skipping a block.
+ * to save it. An error stops at the last range read whole, never skipping a block. Once `stopped()` is true it asks
+ * the node nothing more and returns the cache as it was.
  */
-export async function syncModeration(cache, call, onRange = () => {}) {
+export async function syncModeration(
+  cache,
+  call,
+  onRange = () => {},
+  stopped = () => false
+) {
   const head = (await call('bcn_lastBlock')).height
   let current = cache
   while (current.high < head) {
+    if (stopped()) return cache
     const from = current.high + 1
     const to = Math.min(head, from + MODERATION_RANGE - 1)
     // eslint-disable-next-line no-await-in-loop
@@ -51,6 +58,7 @@ export async function syncModeration(cache, call, onRange = () => {}) {
     ])
     const found = []
     for (let i = 0; i < (heights || []).length; i += BLOCKS_PER_CALL) {
+      if (stopped()) return cache
       // eslint-disable-next-line no-await-in-loop
       const calls = await call('bcn_contractCalls', [
         {

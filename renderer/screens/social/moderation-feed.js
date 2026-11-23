@@ -14,7 +14,12 @@ import {activeBan, normalHex} from './moderation'
 export function hiddenStatus(call, state, epoch) {
   if (isLike(call) && !call.hasMedia) return null
   const ban = activeBan(state, call.author, epoch)
-  if (ban && call.time >= ban.since) return {kind: 'duringBan'}
+  // Made during the ban: at or after the ban's call in chain order (a post earlier in the ban's block was before it).
+  const during =
+    ban &&
+    (call.height > ban.since.height ||
+      (call.height === ban.since.height && call.index > ban.since.index))
+  if (during) return {kind: 'duringBan'}
   const hidden = state.hidden.get(normalHex(call.hash))
   if (hidden) return {kind: 'hidden', reason: hidden.reason}
   if (ban) return {kind: 'hidden', reason: ban.reason}
@@ -23,11 +28,15 @@ export function hiddenStatus(call, state, epoch) {
 
 /**
  * A profile (profiles.js) as shown while its address is banned: out of good standing, without its name, bio and
- * picture (the website shows only the address and the robot), `banned` holding the ban; else the same profile.
+ * picture (the website shows only the address and the robot), `banned` holding the ban; `me`'s keeps them; else the
+ * same profile.
  */
-export function moderatedProfile(profile, address, state, epoch) {
+export function moderatedProfile(profile, address, state, epoch, me = null) {
   const ban = activeBan(state, address, epoch)
   if (!ban) return profile
+  // One's own profile keeps what it holds (its edit starts from it), with the ban for the banner.
+  if (me && String(address).toLowerCase() === me)
+    return {...profile, banned: ban}
   return {
     ...(profile || {}),
     inStanding: false,

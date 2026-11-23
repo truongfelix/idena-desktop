@@ -74,6 +74,20 @@ describe('the moderation sync', () => {
     expect(asked.map(([m]) => m)).toEqual(['bcn_lastBlock'])
   })
 
+  it('asks nothing more once stopped', async () => {
+    const {call, asked} = fakeNode(first + 5, [first + 1])
+    const cache = emptyModerationCache()
+    expect(
+      await syncModeration(
+        cache,
+        call,
+        () => {},
+        () => true
+      )
+    ).toBe(cache)
+    expect(asked.map(([m]) => m)).toEqual(['bcn_lastBlock'])
+  })
+
   it('stops on a node that does not return the events', async () => {
     const {call} = fakeNode(first + 5, [first + 1], {events: false})
     const saved = []

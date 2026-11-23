@@ -9,7 +9,7 @@ import {
   replay,
   vouchersOf,
 } from './moderation'
-import {hiddenStatus, moderatedFeed} from './moderation-feed'
+import {hiddenStatus, moderatedFeed, moderatedProfile} from './moderation-feed'
 import {a, authorsOf, b, c, hex, post} from './test-helpers'
 
 // The events as the contract writes them (idena.social-mod assembly/index.ts): addresses 20 bytes, numbers
@@ -137,8 +137,14 @@ describe('the moderation state', () => {
       }),
       contractCall([['ban', banArgs(c, b, 241, true, 0, 'Again')]], {time: 300})
     )
-    expect(state.bans.get(a)).toMatchObject({reason: 'Two', since: 100})
-    expect(state.bans.get(c)).toMatchObject({permanent: true, since: 300})
+    expect(state.bans.get(a)).toMatchObject({
+      reason: 'Two',
+      since: {time: 100},
+    })
+    expect(state.bans.get(c)).toMatchObject({
+      permanent: true,
+      since: {time: 300},
+    })
   })
 
   it('keeps the hidden posts, the vouches and the reports', () => {
@@ -165,13 +171,14 @@ describe('the moderation state', () => {
 })
 
 describe('the feed under moderation', () => {
+  // Banned from the call at height `since`, index 0 (post() gives a post its time as its height).
   const banned = (address, since, extra = {}) => {
     const state = emptyModeration()
     state.bans.set(address, {
       permanent: true,
       endEpoch: 0,
       reason: 'Spam',
-      since,
+      since: {time: since, height: since, index: 0},
       ...extra,
     })
     return state
@@ -188,7 +195,7 @@ describe('the feed under moderation', () => {
       post(hx(1), b, 'during the ban', 20),
       post(hx(2), a, 'a reply', 30, {replyTo: '1'}),
     ]
-    expect(moderatedFeed(feedOf(posts), banned(b, 20), 240)).toEqual([])
+    expect(moderatedFeed(feedOf(posts), banned(b, 19), 240)).toEqual([])
   })
 
   it('keeps an older post as a placeholder while an answer is shown', () => {
@@ -248,6 +255,35 @@ describe('the feed under moderation', () => {
     ]
     const [shown] = moderatedFeed(feedOf(posts), banned(b, 15), 240)
     expect(shown.replies).toEqual([])
+  })
+
+  it('counts a post earlier in the ban block as made before it', () => {
+    const state = banned(b, 20)
+    state.bans.get(b).since.index = 3
+    const at = (index) => ({...post(hx(1), b, 'text', 20), index})
+    expect(hiddenStatus(at(2), state, 240)).toEqual({
+      kind: 'hidden',
+      reason: 'Spam',
+    })
+    expect(hiddenStatus(at(4), state, 240)).toEqual({kind: 'duringBan'})
+  })
+
+  it('shows a banned profile without its details, but to its owner', () => {
+    const profile = {address: b, name: 'bee', bio: 'hi', picture: 'ipfs://x'}
+    const state = banned(b, 0)
+    expect(moderatedProfile(profile, b, state, 240)).toMatchObject({
+      name: '',
+      bio: '',
+      picture: '',
+      inStanding: false,
+      banned: expect.objectContaining({reason: 'Spam'}),
+    })
+    expect(moderatedProfile(profile, b, state, 240, b)).toMatchObject({
+      name: 'bee',
+      bio: 'hi',
+      banned: expect.objectContaining({reason: 'Spam'}),
+    })
+    expect(moderatedProfile(profile, a, state, 240)).toBe(profile)
   })
 
   it('never hides a like, but a like with media', () => {

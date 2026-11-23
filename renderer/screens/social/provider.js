@@ -194,14 +194,20 @@ export function SocialProvider({children}) {
         : Object.fromEntries(
             Object.entries(readProfiles).map(([address, profile]) => [
               address,
-              moderatedProfile(profile, address, moderation.state, epochNumber),
+              moderatedProfile(
+                profile,
+                address,
+                moderation.state,
+                epochNumber,
+                me
+              ),
             ])
           ),
-    [epochNumber, moderation.state, readProfiles]
+    [epochNumber, me, moderation.state, readProfiles]
   )
   const moderationContext = React.useMemo(
-    () => ({state: moderation.state, epoch: epochNumber}),
-    [epochNumber, moderation.state]
+    () => ({state: moderation.state, epoch: epochNumber, me}),
+    [epochNumber, me, moderation.state]
   )
   const {names, parts: nameParts} = React.useMemo(
     () => socialNames(shownNames(profiles), people, me),
@@ -264,9 +270,11 @@ export function SocialProvider({children}) {
     [activity, notifyKinds, seenThrough]
   )
 
+  // While the feed waits for the first read of the moderation contract, the notices wait too: they would mark as
+  // announced what the empty feed does not hold.
   useActivityNotices({
     activity,
-    cache,
+    cache: moderation.loading ? null : cache,
     seenThrough,
     notifyKinds,
     names,
