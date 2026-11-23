@@ -143,26 +143,39 @@ export function withMediaGaps(cache) {
 /** Whether posts read by a build before B-311 wait to be read again for all their media (withMediaGaps). */
 export const mediaPending = (cache) => (cache.mediaPending || []).length > 0
 
-/** How many blocks the media pass reads at once. */
+/** How many blocks the media pass reads at once: one bcn_contractCalls. */
 const MEDIA_HEIGHTS_AT_ONCE = 8
 
 /**
- * For posts read by a build before B-311 (mediaPending): the blocks of a few of them read again, the newest first,
- * and their posts taken again with all their media.
+ * For posts read by a build before B-311 (mediaPending): the blocks of a few of them, of one contract version, read
+ * again in one call (source.callsAt), the newest first, and their posts taken again with all their media. A read
+ * that fails puts those blocks at the end of the list, so the others go on.
  */
 export async function scanMediaPosts(cache, source, {save = () => {}} = {}) {
   if (!mediaPending(cache)) return cache
-  const heights = cache.mediaPending.slice(0, MEDIA_HEIGHTS_AT_ONCE)
-  const again = new Map()
-  for (const height of heights) {
-    // eslint-disable-next-line no-await-in-loop
-    const read = await source.calls(height, height, versionAt(height))
-    for (const post of read.posts) again.set(post.hash, post)
+  const version = versionAt(cache.mediaPending[0])
+  const heights = cache.mediaPending
+    .filter((height) => versionAt(height) === version)
+    .slice(0, MEDIA_HEIGHTS_AT_ONCE)
+  const rest = cache.mediaPending.filter((height) => !heights.includes(height))
+  // A block before the history holds no post of the contract.
+  if (!version) {
+    const next = {...cache, mediaPending: rest}
+    await save(next)
+    return next
   }
+  let read
+  try {
+    read = await source.callsAt(heights, version)
+  } catch (error) {
+    await save({...cache, mediaPending: [...rest, ...heights]})
+    throw error
+  }
+  const again = new Map(read.posts.map((post) => [post.hash, post]))
   const next = {
     ...cache,
     posts: cache.posts.map((post) => again.get(post.hash) ?? post),
-    mediaPending: cache.mediaPending.slice(heights.length),
+    mediaPending: rest,
   }
   await save(next)
   return next

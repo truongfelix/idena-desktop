@@ -471,64 +471,70 @@ describe('the private messages of the scan', () => {
 })
 
 describe('the media of posts read before B-311', () => {
+  // Heights of the current contract: H + n.
+  const H = CURRENT_VERSION.from
   const withMedia = (hash, height) => ({
     ...post(hash, a, 'look', height, {hasMedia: true}),
     media: 'ipfs://bfirst',
     mediaType: 'image/webp',
   })
   const saved = (extra) => ({
-    ...emptyCache(1000),
-    low: 100,
-    high: 1000,
+    ...emptyCache(H + 1000),
+    low: H + 100,
+    high: H + 1000,
     posts: [
-      withMedia('0x1', 200),
-      post('0x2', b, 'text only', 300),
-      withMedia('0x3', 900),
-      withMedia('0x4', 950),
+      withMedia('0x1', H + 200),
+      post('0x2', b, 'text only', H + 300),
+      withMedia('0x3', H + 900),
+      withMedia('0x4', H + 950),
     ],
     ...extra,
   })
 
   it('are read again for a scan without the marks, the newest first', () => {
     const {mediaLow, mediaTo, mediaPending: none, ...unmarked} = saved()
-    expect([mediaLow, mediaTo, none]).toEqual([1001, 1000, []])
+    expect([mediaLow, mediaTo, none]).toEqual([H + 1001, H + 1000, []])
     const read = readCache(unmarked)
-    expect(read.mediaPending).toEqual([950, 900, 200])
-    expect([read.mediaLow, read.mediaTo]).toEqual([100, 1000])
+    expect(read.mediaPending).toEqual([H + 950, H + 900, H + 200])
+    expect([read.mediaLow, read.mediaTo]).toEqual([H + 100, H + 1000])
     expect(mediaPending(read)).toBe(true)
   })
 
   it('only where an older build read blocks the marks do not cover', () => {
-    // This build read 250..920; an older build then read up to 1000 (and down to 100) and moved no mark.
+    // This build read H+250..H+920; an older build then read up to H+1000 (and down to H+100) and moved no mark.
     const read = readCache(
-      saved({mediaLow: 250, mediaTo: 920, mediaPending: []})
+      saved({mediaLow: H + 250, mediaTo: H + 920, mediaPending: []})
     )
-    expect(read.mediaPending).toEqual([950, 200])
+    expect(read.mediaPending).toEqual([H + 950, H + 200])
     // Read again with the marks it sets: nothing more.
     expect(readCache(JSON.parse(JSON.stringify(read))).mediaPending).toEqual([
-      950, 200,
+      H + 950,
+      H + 200,
     ])
     // A scan this build read whole: nothing to read again.
     expect(
-      readCache(saved({mediaLow: 100, mediaTo: 1000})).mediaPending
+      readCache(saved({mediaLow: H + 100, mediaTo: H + 1000})).mediaPending
     ).toEqual([])
   })
 
-  it('take each post again with all its media, and keep the others', async () => {
+  it('take each post again with all its media in one read, and keep the others', async () => {
     const again = {
-      ...withMedia('0x4', 950),
+      ...withMedia('0x4', H + 950),
       more: [{media: 'ipfs://bsecond', mediaType: 'video/mp4'}],
     }
-    const source = scriptedSource([1000], {950: again})
+    const reads = []
+    const source = {
+      callsAt: async (heights, version) => {
+        reads.push([heights, version.name])
+        return {posts: heights.includes(H + 950) ? [again] : [], tips: []}
+      },
+    }
     const saves = []
-    const cache = readCache(saved({mediaLow: 250, mediaTo: 920}))
+    const cache = readCache(saved({mediaLow: H + 250, mediaTo: H + 920}))
     const next = await scanMediaPosts(cache, source, {
       save: (value) => saves.push(value),
     })
-    expect(source.ranges).toEqual([
-      [950, 950],
-      [200, 200],
-    ])
+    expect(reads).toEqual([[[H + 950, H + 200], CURRENT_VERSION.name]])
     expect(next.posts.find(({hash}) => hash === '0x4').more).toEqual(again.more)
     expect(next.posts.map(({hash}) => hash)).toEqual([
       '0x1',
@@ -541,10 +547,30 @@ describe('the media of posts read before B-311', () => {
     expect(await scanMediaPosts(next, source)).toBe(next)
   })
 
+  it('read one contract version at a time, and put a failed read at the end', async () => {
+    const older = SOCIAL_VERSIONS[1]
+    const cache = {
+      ...readCache(saved({mediaLow: H + 250, mediaTo: H + 920})),
+      mediaPending: [H + 950, older.from, H + 200],
+    }
+    const saves = []
+    const failing = {
+      callsAt: async (heights, version) => {
+        saves.push(['read', heights, version.name])
+        throw new Error('timeout')
+      },
+    }
+    await expect(
+      scanMediaPosts(cache, failing, {save: (value) => saves.push(value)})
+    ).rejects.toThrow('timeout')
+    expect(saves[0]).toEqual(['read', [H + 950, H + 200], CURRENT_VERSION.name])
+    expect(saves[1].mediaPending).toEqual([older.from, H + 950, H + 200])
+  })
+
   it('stay marked as read by the scans that go on', async () => {
-    const source = scriptedSource([1500])
+    const source = scriptedSource([H + 1500])
     const cache = readCache(saved())
     const newer = await checkNewBlocks(cache, source)
-    expect([newer.mediaLow, newer.mediaTo]).toEqual([100, 1500])
+    expect([newer.mediaLow, newer.mediaTo]).toEqual([H + 100, H + 1500])
   })
 })

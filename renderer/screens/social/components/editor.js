@@ -228,7 +228,7 @@ function HostingChoice({selfHosted, onChange}) {
       <SmallText color={MUTED}>
         {selfHosted
           ? t(
-              'No storage fee: your node keeps the files. Others see them while your node is online, or while a node that already loaded them keeps a copy.',
+              'No storage fee: your node keeps the files. Others see them while your node is online.',
               {nsSeparator: '|'}
             )
           : t(
@@ -558,7 +558,7 @@ export function Editor({now, status, underThread = false}) {
         <SmallText>
           {selfHosted
             ? t(
-                'The text is hosted by your node, without a storage fee, and the post holds its address. It stays readable while your node is online, or while a node that read it keeps a copy.'
+                'The text is hosted by your node, without a storage fee, and the post holds its address. It stays readable while your node is online.'
               )
             : t(
                 'The text is stored on IPFS (a storeToIpfs transaction, cheaper than the post for long texts) and the post holds its address. It stays readable while IPFS nodes keep it.'
