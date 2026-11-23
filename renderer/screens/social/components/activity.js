@@ -84,6 +84,7 @@ export function ProfileItemCard({item, tab, now, onOpen, onProfile}) {
       amount: tipText(validTipAmount(tip)),
       name: displayName(node.call.author, names),
     })}  ·  ${timeAgo(tip.time, now)}`
+  else if (parent?.moderated) context = t('Post hidden by moderators')
   else if (parent)
     context =
       tab === 'replies'
@@ -101,7 +102,7 @@ export function ProfileItemCard({item, tab, now, onOpen, onProfile}) {
       onClick={onOpen}
     >
       {context && <SmallText>{context}</SmallText>}
-      {parent && showHeader && (
+      {parent && !parent.moderated && showHeader && (
         <>
           <Box color={MUTED}>
             <PostBody call={parent} lines={2} media={false} />

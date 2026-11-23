@@ -4,6 +4,7 @@ import {cleanTopics} from './topics'
 import {firstChatStore, readChatStore} from './messages'
 import {cleanHiddenPosts, cleanHiddenWords} from './lists'
 import {picturesMode} from './hiding'
+import {readModerationCache} from './moderation-sync'
 
 function socialDb() {
   return subDb(requestDb(), 'social', {valueEncoding: 'json'})
@@ -35,7 +36,8 @@ async function getOr(db, key, fallback) {
 /**
  * The Social settings kept on this computer: the contacts (the phone's people.json format, blocks included), the
  * topics followed and blocked (names), the hidden words, the posts hidden (transaction hashes), the block through
- * which the notifications were seen, the kinds switched off, whether the scan is off, and "Pictures in posts".
+ * which the notifications were seen, the kinds switched off, whether the scan is off, "Pictures in posts", and
+ * whether Community moderation is on (off unless turned on).
  */
 export async function loadSocialSettings(db = socialDb()) {
   const [
@@ -48,6 +50,7 @@ export async function loadSocialSettings(db = socialDb()) {
     hiddenPosts,
     blockedTopics,
     picturesInPosts,
+    communityModeration,
   ] = await Promise.all([
     getOr(db, 'people', null),
     getOr(db, 'topics', []),
@@ -58,6 +61,7 @@ export async function loadSocialSettings(db = socialDb()) {
     getOr(db, 'hiddenPosts', []),
     getOr(db, 'blockedTopics', []),
     getOr(db, 'picturesInPosts', null),
+    getOr(db, 'communityModeration', false),
   ])
   return {
     people,
@@ -69,7 +73,17 @@ export async function loadSocialSettings(db = socialDb()) {
     hiddenPosts: cleanHiddenPosts(hiddenPosts),
     blockedTopics: cleanTopics(blockedTopics),
     picturesInPosts: picturesMode(picturesInPosts),
+    communityModeration: communityModeration === true,
   }
+}
+
+/** What the app has read of the moderation contract (moderation-sync.js); a new cache when there is none. */
+export async function loadModerationCache(db = socialDb()) {
+  return readModerationCache(await getOr(db, 'moderation', null))
+}
+
+export function saveModerationCache(cache, db = socialDb()) {
+  return db.put('moderation', cache)
 }
 
 export function saveSocialSetting(key, value, db = socialDb()) {

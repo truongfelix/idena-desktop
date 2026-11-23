@@ -156,6 +156,8 @@ expose(
     IDENA_SOCIAL_CONTRACT: process.env.IDENA_SOCIAL_CONTRACT ?? null,
     // A test network's profiles contract: <address> (screens/social/profiles.js).
     IDENA_PROFILE_CONTRACT: process.env.IDENA_PROFILE_CONTRACT ?? null,
+    // A test network's moderation contract: <address>@<first block> (screens/social/moderation.js).
+    IDENA_MODERATION_CONTRACT: process.env.IDENA_MODERATION_CONTRACT ?? null,
   })
 )
 expose('toggleFullScreen', () => {

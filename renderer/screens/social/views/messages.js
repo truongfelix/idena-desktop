@@ -28,6 +28,7 @@ import {
   MyMessageCode,
   NewChatSearch,
 } from './new-chat'
+import {BannedLabel} from '../components/identity'
 import {GroupAvatar, GroupEventLine, GroupMembers, groupTitle} from './groups'
 
 /** The most characters of a message written here (the fee grows with the text). */
@@ -272,6 +273,8 @@ function Bubble({message, mine, showSender, names, now}) {
         {showSender && !mine && (
           <Text fontSize="sm" fontWeight={500} color="blue.500">
             {displayName(message.from, names)}
+            {'  '}
+            <BannedLabel address={message.from} fontSize="xs" />
           </Text>
         )}
         {message.isReply && (
@@ -382,6 +385,9 @@ export function ChatView({chatKey, now, openProfile, editGroup}) {
             {title}
           </Text>
           {group && !conversation.removedMe && <GroupMembers group={group} />}
+          {!group && others[0] && (
+            <BannedLabel address={others[0]} fontSize="sm" />
+          )}
         </Stack>
         {group && group.admin === me && (
           <SecondaryButton onClick={() => editGroup(chatKey)}>

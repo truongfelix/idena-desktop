@@ -63,6 +63,25 @@ describe('a profile', () => {
     ).toEqual(new Set([1, 10, 9]))
   })
 
+  it('lists no post Community moderation hid, and still counts its likes', () => {
+    const posts = [
+      post('p1', a, "a's post", 100),
+      post('p2', b, LIKE, 110, {replyTo: '1'}),
+      post('p3', a, "a's reply", 120, {replyTo: '1'}),
+    ]
+    const [node] = socialFeed(posts, authorsOf(posts))
+    const hidden = {
+      ...node,
+      call: {...node.call, message: '', moderated: true},
+      moderated: {reason: 'Spam'},
+    }
+    const profile = socialProfile([hidden], a)
+    expect(profile.posts).toEqual([])
+    expect(profile.replies.map((i) => i.node.id)).toEqual([3])
+    expect(profile.replies[0].parent.moderated).toBe(true)
+    expect(profile.likesReceived).toBe(1)
+  })
+
   it('is empty without posts', () => {
     const profile = socialProfile(
       socialFeed([post('p1', a, "a's post", 100)], {1: a}),

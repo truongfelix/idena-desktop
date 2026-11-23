@@ -18,6 +18,7 @@ import {
   readOffersTo,
 } from './vouching'
 import {readIdentities} from './profile-lists'
+import {useModeratedProfile} from './moderation-hooks'
 
 /** How long a read profile or Trust count is shown before it is read again. */
 const PROFILE_STALE_MS = 10 * 60 * 1000
@@ -83,11 +84,14 @@ export function useProfiles(addresses) {
 /** The profile of one address (readProfiles), with its loading state and error. */
 export function useProfile(address) {
   const key = address ? address.toLowerCase() : null
-  return useQuery(
+  const query = useQuery(
     ['profile', key],
     async () => (await readProfiles(socialRpcSettled, [key]))[key],
     {enabled: profilesEnabled && Boolean(key), staleTime: PROFILE_STALE_MS}
   )
+  // A banned account shows no name, bio or picture while Community moderation is on (moderation-feed.js).
+  const data = useModeratedProfile(query.data, key)
+  return data === query.data ? query : {...query, data}
 }
 
 /** The Trust of `target` (an address or "r/<topic>"): its givers and the counts (readTrust). */

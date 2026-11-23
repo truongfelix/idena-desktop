@@ -20,22 +20,26 @@ export function socialProfile(feed, address) {
   let tipsReceived = 0
   let tipsGiven = 0
 
+  // A post Community moderation hid (`moderated`, moderation-feed.js) is in no list: it shows no author; its likes
+  // and tips still count.
   const visit = (node, threadId, parent, list) => {
     const own = node.call.author === me
+    const listed = !node.moderated
     if (own) {
       const item = {node, threadId, parent}
-      list.push(item)
-      if (node.call.hasMedia) lists.media.push(item)
+      if (listed) list.push(item)
+      if (listed && node.call.hasMedia) lists.media.push(item)
       likesReceived += likeCount(node)
     }
     for (const like of node.likeCalls)
-      if (like.author === me) lists.likes.push({node, threadId, parent, like})
+      if (listed && like.author === me)
+        lists.likes.push({node, threadId, parent, like})
     for (const tip of node.tips) {
       const amount = validTipAmount(tip) || 0
       if (own) tipsReceived += amount
       if (tip.from === me) {
         tipsGiven += amount
-        lists.tips.push({node, threadId, parent, tip})
+        if (listed) lists.tips.push({node, threadId, parent, tip})
       }
     }
   }
