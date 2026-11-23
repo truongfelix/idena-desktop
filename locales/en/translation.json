@@ -1923,7 +1923,7 @@
   "Show (on this screen only)": "Show (on this screen only)",
   "Spam": "Spam",
   "Stakers can't be banned.": "Stakers can't be banned.",
-  "The ban is too long.": "The ban is too long.",
+  "The ban's length: a number of epochs, at most 65,535.": "The ban's length: a number of epochs, at most 65,535.",
   "Their posts made during the ban are not shown; older ones show as a line while answers under them are shown. Any moderator can unban.": "Their posts made during the ban are not shown; older ones show as a line while answers under them are shown. Any moderator can unban.",
   "The post is not in the blocks read yet.": "The post is not in the blocks read yet.",
   "The reason is too long.": "The reason is too long.",
@@ -1957,5 +1957,7 @@
   "Your account is banned permanently by the community moderators: your posts won't be shown on Idena Social.": "Your account is banned permanently by the community moderators: your posts won't be shown on Idena Social.",
   "Your account is banned until epoch {{epoch}} by the community moderators: your posts won't be shown on Idena Social.": "Your account is banned until epoch {{epoch}} by the community moderators: your posts won't be shown on Idena Social.",
   "You reported this on {{date}}: {{reason}}": "You reported this on {{date}}: {{reason}}",
-  "You vouch for nobody.": "You vouch for nobody."
+  "You vouch for nobody.": "You vouch for nobody.",
+  "the contract refused it": "the contract refused it",
+  "Reading your identity…": "Reading your identity…"
 }

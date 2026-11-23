@@ -157,7 +157,7 @@ function useModerationItems(address, hash = null) {
             : t('Ban {{name}}…', {name})}
         </MenuItem>
       )}
-      {role && <MenuDivider />}
+      {role && (hash || !authorBanned) && <MenuDivider />}
       {hash && (
         <MenuItem onClick={() => setReporting({hash, author: address})}>
           {t('Report post…')}

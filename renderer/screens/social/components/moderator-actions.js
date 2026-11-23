@@ -30,7 +30,9 @@ import {ReasonField, useRefusalText} from './moderation-dialogs'
 /** The account's moderator role ('staker', 'vouched' or null) with the state and the epoch; none while it is off. */
 export function useModerator() {
   const {me, communityModeration, moderation, epoch} = useSocial()
-  const {data: identity} = useSocialIdentity(communityModeration ? me : null)
+  const {data: identity, isLoading} = useSocialIdentity(
+    communityModeration ? me : null
+  )
   const epochNumber = epoch?.epoch ?? null
   const role = communityModeration
     ? moderatorRole(
@@ -41,7 +43,14 @@ export function useModerator() {
         MODERATOR_STAKE
       )
     : null
-  return {role, me, state: moderation.state, epoch: epochNumber}
+  return {
+    role,
+    me,
+    state: moderation.state,
+    epoch: epochNumber,
+    // The account's stake is being read: its role is not known yet.
+    loading: communityModeration && Boolean(me) && isLoading,
+  }
 }
 
 /** The role of `address` itself (a staker or a vouched moderator cannot be banned), from its live stake. */
@@ -77,7 +86,10 @@ export function ModeratorDialog({
   const target = useTargetRole(action === 'ban' ? address : null)
   const refusalText = useRefusalText()
   const [reason, setReason] = React.useState('')
-  const [epochs, setEpochs] = React.useState(1)
+  // The ban's length as typed: an empty or broken entry is refused, never read as 0 (a permanent ban).
+  const [epochsText, setEpochsText] = React.useState('1')
+  const epochs = /^[0-9]{1,5}$/.test(epochsText) ? Number(epochsText) : -1
+  const setEpochs = (value) => setEpochsText(String(value))
   const name = address ? displayName(address, names) : ''
   const withReason = ['ban', 'unban', 'hidePost', 'restorePost', 'hidePosts']
   const needsStake = ['modVouch', 'revokeVouches'].includes(action)
@@ -160,17 +172,19 @@ export function ModeratorDialog({
                   size="sm"
                   type="number"
                   min={0}
-                  value={epochs}
-                  onChange={(e) => setEpochs(Number(e.target.value))}
+                  value={epochsText}
+                  onChange={(e) => setEpochsText(e.target.value)}
                 />
               </HStack>
-              <SmallText>
-                {epochs === 0
-                  ? t('Until a moderator unbans them.')
-                  : t('It ends by itself after {{count}} validations.', {
-                      count: epochs,
-                    })}
-              </SmallText>
+              {epochs >= 0 && (
+                <SmallText>
+                  {epochs === 0
+                    ? t('Until a moderator unbans them.')
+                    : t('It ends by itself after {{count}} validations.', {
+                        count: epochs,
+                      })}
+                </SmallText>
+              )}
             </Stack>
           )}
           {withReason.includes(action) && (

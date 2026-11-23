@@ -20,10 +20,18 @@ import {
 } from '../moderation-calls'
 import {Chip} from './chips'
 
-/** The reasons offered first, as the Idena Social website's, then Other (a text of one's own). */
+/**
+ * The reasons offered first, as the Idena Social website's: written to the chain in English, whatever the app's
+ * language (moderators and the website read them), shown translated.
+ */
 function useReasons() {
   const {t} = useTranslation()
-  return [t('Spam'), t('Scam or phishing'), t('Illegal'), t('Harassment')]
+  return [
+    ['Spam', t('Spam')],
+    ['Scam or phishing', t('Scam or phishing')],
+    ['Illegal', t('Illegal')],
+    ['Harassment', t('Harassment')],
+  ]
 }
 
 /** Why a report or a moderator action cannot be sent, by the key moderation-calls.js gives. */
@@ -43,7 +51,9 @@ export function useRefusalText() {
         "Moderators can't be banned: a staker must revoke their vouches first.",
         {nsSeparator: '|'}
       ),
-      epochs: t('The ban is too long.'),
+      epochs: t("The ban's length: a number of epochs, at most 65,535.", {
+        nsSeparator: '|',
+      }),
       batch: t('Too many posts at once.'),
       notStaker: t('Only identities with 1,000,000 iDNA staked can do this.'),
       vouchLimit: t('You already vouch for 5 moderators.'),
@@ -60,16 +70,16 @@ export function ReasonField({reason, setReason, required}) {
   return (
     <Stack spacing={2}>
       <HStack spacing={2} flexWrap="wrap" rowGap={2}>
-        {[...reasons, other].map((value) => (
+        {[...reasons, [null, other]].map(([value, label]) => (
           <Chip
-            key={value}
-            isSelected={chosen === value}
+            key={label}
+            isSelected={chosen === label}
             onClick={() => {
-              setChosen(value)
-              setReason(value === other ? '' : value)
+              setChosen(label)
+              setReason(value ?? '')
             }}
           >
-            {value}
+            {label}
           </Chip>
         ))}
       </HStack>

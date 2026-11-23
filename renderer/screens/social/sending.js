@@ -681,11 +681,17 @@ export function useSocialSending({
       kind,
       async () => {
         const from = await socialRpc('dna_getCoinbaseAddr')
-        let estimate = await estimateCall(socialRpc, from, call)
-        const sized = withSizedCallbacks(call, estimate.receipt)
-        if (sized !== call)
-          estimate = await estimateCall(socialRpc, from, sized)
-        const {fee, maxFee} = estimate
+        // estimateCall's words for a refusal without a reason are about a post.
+        const estimate = (moderationCall) =>
+          estimateCall(socialRpc, from, moderationCall).catch((error) => {
+            if (/refused the post/.test(error?.message))
+              throw new Error(t('the contract refused it'))
+            throw error
+          })
+        let dryRun = await estimate(call)
+        const sized = withSizedCallbacks(call, dryRun.receipt)
+        if (sized !== call) dryRun = await estimate(sized)
+        const {fee, maxFee} = dryRun
         return {from, socialCall: sized, fee: {fee, maxFee}, files: []}
       },
       {detail}

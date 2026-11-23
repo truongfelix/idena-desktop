@@ -184,7 +184,10 @@ function ReviewPosts({address, now, openProfile, openThread, act, onBack}) {
   const {scannedFeed} = useSocial()
   const {state} = useModerator()
   const posts = postsToReview(scannedFeed, state, address)
-  const [chosen, setChosen] = React.useState(() => new Set())
+  const [picked, setChosen] = React.useState(() => new Set())
+  // Only the posts still listed count: those hidden since leave the choice.
+  const listed = new Set(posts.map((n) => n.call.hash.toLowerCase()))
+  const chosen = new Set([...picked].filter((hash) => listed.has(hash)))
   const toggle = (hash) =>
     setChosen((current) => {
       const next = new Set(current)
@@ -223,7 +226,10 @@ function ReviewPosts({address, now, openProfile, openThread, act, onBack}) {
         <SecondaryButton
           size="sm"
           isDisabled={chosen.size === 0}
-          onClick={() => act({action: 'hidePosts', hashes: [...chosen]})}
+          onClick={() => {
+            act({action: 'hidePosts', hashes: [...chosen]})
+            setChosen(new Set())
+          }}
         >
           {t('Hide {{count}} posts…', {count: chosen.size})}
         </SecondaryButton>
@@ -352,7 +358,7 @@ function Log({now, openProfile}) {
   return log.map((event) => {
     const actor = event.moderator || event.voucher || event.staker
     return (
-      <SmallText key={`${event.hash}:${event.eventIndex}`}>
+      <SmallText key={`${event.height}:${event.index}:${event.eventIndex}`}>
         <Who address={actor} openProfile={openProfile} />
         {` ${what[event.name]} `}
         {event.address && (
@@ -429,8 +435,9 @@ function MyVouches({openProfile, act}) {
  */
 export function ModerationView({tab, setTab, now, openProfile, openThread}) {
   const {t} = useTranslation()
-  const {role} = useModerator()
+  const {role, loading} = useModerator()
   const [acting, setActing] = React.useState(null)
+  if (loading) return <SmallText>{t('Reading your identity…')}</SmallText>
   if (!role)
     return (
       <SmallText>

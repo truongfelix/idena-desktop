@@ -1923,7 +1923,7 @@
   "Show (on this screen only)": "Afficher (sur cet écran seulement)",
   "Spam": "Spam",
   "Stakers can't be banned.": "Les stakers ne peuvent pas être bannis.",
-  "The ban is too long.": "Le bannissement est trop long.",
+  "The ban's length: a number of epochs, at most 65,535.": "La durée du bannissement : un nombre d'époques, 65 535 au plus.",
   "Their posts made during the ban are not shown; older ones show as a line while answers under them are shown. Any moderator can unban.": "Ses publications faites pendant le bannissement ne sont pas affichées ; les plus anciennes deviennent une ligne tant que des réponses en dessous sont affichées. N'importe quel modérateur peut lever le bannissement.",
   "The post is not in the blocks read yet.": "La publication n'est pas encore dans les blocs lus.",
   "The reason is too long.": "La raison est trop longue.",
@@ -1957,5 +1957,7 @@
   "Your account is banned permanently by the community moderators: your posts won't be shown on Idena Social.": "Votre compte est banni définitivement par les modérateurs de la communauté : vos publications ne seront pas affichées sur Idena Social.",
   "Your account is banned until epoch {{epoch}} by the community moderators: your posts won't be shown on Idena Social.": "Votre compte est banni jusqu'à l'époque {{epoch}} par les modérateurs de la communauté : vos publications ne seront pas affichées sur Idena Social.",
   "You reported this on {{date}}: {{reason}}": "Vous l'avez signalé le {{date}} : {{reason}}",
-  "You vouch for nobody.": "Vous n'êtes garant de personne."
+  "You vouch for nobody.": "Vous n'êtes garant de personne.",
+  "the contract refused it": "le contrat l'a refusé",
+  "Reading your identity…": "Lecture de votre identité…"
 }
