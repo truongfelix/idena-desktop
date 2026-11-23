@@ -3,7 +3,7 @@
 // idena.social-ui (getNewPosterAndPost in src/logic/asyncUtils.ts, PostComponent.tsx) and the phone app
 // (Social.kt); each contract version's calls are read in its own format (versions.js).
 
-import {LIKE, MAX_INLINE_MEDIA} from './contract'
+import {LIKE, MAX_INLINE_MEDIA, MAX_POST_MEDIA} from './contract'
 import {parseMessageCall, publicKeyHex} from './messages'
 
 const textDecoder = new TextDecoder()
@@ -64,7 +64,20 @@ export function parsePost(
     media.length > 0 &&
     Array.isArray(mediaType) &&
     mediaType.length > 0
-  const first = hasMedia ? text(media[0]) : ''
+  // A media without its type is left out, as the website does; at most MAX_POST_MEDIA are read (mediaCount: all).
+  const count = hasMedia ? Math.min(media.length, mediaType.length) : 0
+  const items = hasMedia
+    ? media.slice(0, Math.min(count, MAX_POST_MEDIA)).map((item, i) => {
+        const address = text(item)
+        return {
+          media:
+            address.startsWith('ipfs://') || address.length <= MAX_INLINE_MEDIA
+              ? address
+              : '',
+          mediaType: text(mediaType[i]),
+        }
+      })
+    : []
   const replyTo = text(arg.replyToPostId)
   return {
     ...(version?.prefix ? {version: version.name} : {}),
@@ -77,11 +90,11 @@ export function parsePost(
     replyTo: older ? olderReplyTo(replyTo) : replyTo,
     channel: text(arg.channelId),
     hasMedia,
-    media:
-      first.startsWith('ipfs://') || first.length <= MAX_INLINE_MEDIA
-        ? first
-        : '',
-    mediaType: hasMedia ? text(mediaType[0]) : '',
+    media: items[0]?.media ?? '',
+    mediaType: items[0]?.mediaType ?? '',
+    // The media after the first (B-311), in order; a build before it reads the first alone.
+    ...(items.length > 1 ? {more: items.slice(1)} : {}),
+    ...(count > MAX_POST_MEDIA ? {mediaCount: count} : {}),
   }
 }
 

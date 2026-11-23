@@ -1,7 +1,15 @@
 /* eslint-disable react/prop-types */
 import React from 'react'
 import {useTranslation} from 'react-i18next'
-import {Box, Button, HStack, Image, Stack, Text} from '@chakra-ui/react'
+import {
+  Box,
+  Button,
+  HStack,
+  Image,
+  SimpleGrid,
+  Stack,
+  Text,
+} from '@chakra-ui/react'
 import {SmallText} from '../../../shared/components/components'
 import {useIpfsContent} from '../hooks'
 import {ipfsCid} from '../calls'
@@ -17,6 +25,7 @@ import {ModeratedAnswers, ModeratedLine} from './moderated'
 import {TopicTag} from './topic'
 import {PersonAvatar} from './profile-public'
 import {MediaKind, kindOfType, playableKind} from '../media-type'
+import {MAX_POST_MEDIA} from '../contract'
 
 const textDecoder = new TextDecoder()
 
@@ -241,6 +250,62 @@ export function PostMedia({
   return <InlineMedia media={media} type={type} maxH={maxH} />
 }
 
+/** A post's media as PostMedia reads each: the first, then those after it (`more`, B-311). */
+export const mediaItems = (call) =>
+  call.hasMedia
+    ? [
+        {hasMedia: true, media: call.media, mediaType: call.mediaType},
+        ...(call.more || []).map((item) => ({hasMedia: true, ...item})),
+      ]
+    : []
+
+/**
+ * All of a post's media (B-311): one as PostMedia shows it; in a list the first and how many more (nothing else is
+ * fetched there), in its thread all of them side by side, two a row, and how many it holds past those read.
+ */
+export function PostMediaList({call, maxH, inThread = false}) {
+  const {t} = useTranslation()
+  const items = mediaItems(call)
+  if (items.length <= 1)
+    return <PostMedia call={call} maxH={maxH} inThread={inThread} />
+  if (!inThread)
+    return (
+      <Stack spacing={1}>
+        <PostMedia call={call} maxH={maxH} />
+        <SmallText>
+          {t('🖼 {{number}} more media: open the post to show them.', {
+            number: (call.mediaCount ?? items.length) - 1,
+            nsSeparator: '|',
+          })}
+        </SmallText>
+      </Stack>
+    )
+  return (
+    <Stack spacing={1}>
+      <SimpleGrid columns={2} spacing={2} w="full">
+        {items.map((item, index) => (
+          // eslint-disable-next-line react/no-array-index-key
+          <Box key={index} minW={0}>
+            <PostMedia call={item} maxH={maxH} inThread />
+          </Box>
+        ))}
+      </SimpleGrid>
+      {call.mediaCount > items.length && (
+        <SmallText>
+          {t(
+            'The post holds {{number}} more media, not shown: the app shows {{most}} a post.',
+            {
+              number: call.mediaCount - items.length,
+              most: MAX_POST_MEDIA,
+              nsSeparator: '|',
+            }
+          )}
+        </SmallText>
+      )}
+    </Stack>
+  )
+}
+
 /** Media written in the post itself (base64); a video's or a sound's first bytes for the type check. */
 function InlineMedia({media, type, maxH}) {
   const bytes = React.useMemo(() => {
@@ -273,8 +338,34 @@ function InlineMedia({media, type, maxH}) {
 function TapToShowMedia({call, maxH, inThread}) {
   const {t} = useTranslation()
   const [shown, setShown] = React.useState(false)
-  if (shown) return <PostMedia call={call} maxH={maxH} inThread={inThread} />
+  if (shown)
+    return <PostMediaList call={call} maxH={maxH} inThread={inThread} />
   const kind = kindOfType(call.mediaType)
+  const count = call.mediaCount ?? mediaItems(call).length
+  if (count > 1)
+    return inThread ? (
+      <Button
+        variant="link"
+        size="sm"
+        alignSelf="flex-start"
+        onClick={(e) => {
+          e.stopPropagation()
+          setShown(true)
+        }}
+      >
+        {t('🖼 {{number}} media. Click to show them.', {
+          number: count,
+          nsSeparator: '|',
+        })}
+      </Button>
+    ) : (
+      <SmallText>
+        {t('🖼 {{number}} media: open the post to show them.', {
+          number: count,
+          nsSeparator: '|',
+        })}
+      </SmallText>
+    )
   if (!inThread)
     return (
       <SmallText>
@@ -332,7 +423,7 @@ export function PostBody({call, lines, maxH, media = true, inThread = false}) {
         (hidden.pictures === PicturesMode.TapToShow && !own && call.hasMedia ? (
           <TapToShowMedia call={call} maxH={maxH} inThread={inThread} />
         ) : (
-          <PostMedia call={call} maxH={maxH} inThread={inThread} />
+          <PostMediaList call={call} maxH={maxH} inThread={inThread} />
         ))}
     </>
   )

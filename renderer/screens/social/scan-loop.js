@@ -4,8 +4,10 @@ import {
   checkNewBlocks,
   groupsPending,
   historyDone,
+  mediaPending,
   messagesPending,
   scanOlderBlocks,
+  scanMediaPosts,
   scanOlderGroups,
   scanOlderMessages,
 } from './scan'
@@ -72,6 +74,10 @@ export async function runSocialScan({
       } else if (onPage && !historyDone(current)) {
         // eslint-disable-next-line no-await-in-loop
         await scanOlderBlocks(current, source, {save})
+      } else if (onPage && mediaPending(current)) {
+        // Once, after the history (never holding it back), for posts a build before B-311 read: all their media.
+        // eslint-disable-next-line no-await-in-loop
+        await scanMediaPosts(current, source, {save})
       } else {
         // eslint-disable-next-line no-await-in-loop
         await pause(NEW_BLOCK_MS)

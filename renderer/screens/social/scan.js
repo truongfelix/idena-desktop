@@ -1,6 +1,7 @@
 import {SOCIAL_CONTRACT} from './contract'
 import {socialFeed, withPrefix} from './feed'
 import {GROUPS_FROM} from './groups'
+import {BLOCKS_PER_CALL} from './node'
 import {
   CURRENT_VERSION,
   HISTORY_START,
@@ -43,6 +44,9 @@ export const emptyCache = (head) => ({
   onePartLow: head + 1,
   onePartTo: head,
   onePartMessagesLow: head + 1,
+  mediaLow: head + 1,
+  mediaTo: head,
+  mediaPending: [],
 })
 
 /**
@@ -97,10 +101,12 @@ export function readCache(saved) {
     String(saved.contract).toLowerCase() !== SOCIAL_CONTRACT.toLowerCase()
   )
     return null
-  if (saved.version === CACHE_VERSION) return withOnePartGaps(saved)
+  if (saved.version === CACHE_VERSION)
+    return withMediaGaps(withOnePartGaps(saved))
   if (saved.version !== 1 && saved.version !== 2) return null
-  // An older scan read no messages: those of its blocks are read again once (scanOlderMessages), one-part calls too.
-  return {
+  // An older scan read no messages: those of its blocks are read again once (scanOlderMessages), one-part calls too;
+  // its posts with media, for all their media.
+  return withMediaGaps({
     ...saved,
     version: CACHE_VERSION,
     olderAuthors: saved.version === 1 ? {} : saved.olderAuthors,
@@ -110,7 +116,68 @@ export function readCache(saved) {
     onePartLow: saved.low,
     onePartTo: saved.high,
     onePartMessagesLow: saved.high + 1,
+  })
+}
+
+/**
+ * `cache` with the heights of its posts with media that a build before B-311 read (it kept their first media alone)
+ * to read again (mediaPending, the newest first): all of them for a scan without the marks, else those outside
+ * mediaLow..mediaTo, the blocks this build read (an older build moves neither mark). The marks become the scan's own.
+ */
+export function withMediaGaps(cache) {
+  const {low, high, posts} = cache
+  const marked =
+    Number.isFinite(cache.mediaLow) && Number.isFinite(cache.mediaTo)
+  const outside = posts
+    .filter(
+      ({hasMedia, height}) =>
+        hasMedia &&
+        (!marked || height < cache.mediaLow || height > cache.mediaTo)
+    )
+    .map(({height}) => height)
+  const pending = [
+    ...new Set([...(cache.mediaPending || []), ...outside]),
+  ].sort((a, b) => b - a)
+  return {...cache, mediaLow: low, mediaTo: high, mediaPending: pending}
+}
+
+/** Whether posts read by a build before B-311 wait to be read again for all their media (withMediaGaps). */
+export const mediaPending = (cache) => (cache.mediaPending || []).length > 0
+
+/**
+ * For posts read by a build before B-311 (mediaPending): the blocks of a few of them, of one contract version, read
+ * again in one call (source.callsAt), the newest first, and their posts taken again with all their media. A read
+ * that fails puts those blocks at the end of the list (out of order until the next start), so the others go on;
+ * like the history's, a block that never reads keeps the scan reporting its error.
+ */
+export async function scanMediaPosts(cache, source, {save = () => {}} = {}) {
+  if (!mediaPending(cache)) return cache
+  const version = versionAt(cache.mediaPending[0])
+  const heights = cache.mediaPending
+    .filter((height) => versionAt(height) === version)
+    .slice(0, BLOCKS_PER_CALL)
+  const rest = cache.mediaPending.filter((height) => !heights.includes(height))
+  // A block before the history holds no post of the contract.
+  if (!version) {
+    const next = {...cache, mediaPending: rest}
+    await save(next)
+    return next
   }
+  let read
+  try {
+    read = await source.callsAt(heights, version)
+  } catch (error) {
+    await save({...cache, mediaPending: [...rest, ...heights]})
+    throw error
+  }
+  const again = new Map(read.posts.map((post) => [post.hash, post]))
+  const next = {
+    ...cache,
+    posts: cache.posts.map((post) => again.get(post.hash) ?? post),
+    mediaPending: rest,
+  }
+  await save(next)
+  return next
 }
 
 /**
@@ -216,6 +283,7 @@ export async function checkNewBlocks(
         messages: withMessages(next.messages, found.messages),
         keys: {...next.keys, ...found.keys},
         onePartTo: to,
+        mediaTo: to,
       }
       // eslint-disable-next-line no-await-in-loop
       await save(next)
@@ -261,6 +329,7 @@ export async function scanOlderBlocks(cache, source, {save = () => {}} = {}) {
     onePartMessagesLow: messagesPending(cache) ? cache.messagesLow : from,
     keys: {...older.keys, ...cache.keys},
     onePartLow: from,
+    mediaLow: from,
   }
   await save(next)
   return next

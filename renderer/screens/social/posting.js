@@ -184,9 +184,17 @@ export async function estimateCall(call, from, socialCall) {
 
 /**
  * A file to store on IPFS before the post: its CID as the node computes it, and the fee of its storeToIpfs
- * transaction. A file this app already stored (`stored`, by CID) costs nothing again.
+ * transaction. A file this app already stored (`stored`, by CID) costs nothing again, nor one the author's node
+ * hosts alone (`selfHosted`, B-311: pinned there, no storeToIpfs).
  */
-export async function prepareFile(call, from, what, bytes, stored = new Set()) {
+export async function prepareFile(
+  call,
+  from,
+  what,
+  bytes,
+  stored = new Set(),
+  {selfHosted = false} = {}
+) {
   if (bytes.length > MAX_IPFS_FILE)
     throw new Error(
       `the ${what} is too large (${Math.floor(
@@ -195,6 +203,8 @@ export async function prepareFile(call, from, what, bytes, stored = new Set()) {
     )
   const cid = await call('ipfs_cid', [toHex(bytes)])
   if (stored.has(cid)) return {what, bytes, cid, fee: BigInt(0), stored: true}
+  if (selfHosted)
+    return {what, bytes, cid, fee: BigInt(0), stored: false, selfHosted: true}
   const estimate = await call('bcn_estimateTx', [
     {
       type: STORE_TO_IPFS_TX,
@@ -213,41 +223,49 @@ export async function prepareCall(call, socialCall) {
 }
 
 /**
- * A post, reply or comment from the editor, ready to confirm: its files (the text when it goes on IPFS, then the
- * image, or a file sent as it is: `mediaType` and `mediaWhat`, its name in a refusal), the call and the fees. Throws when the balance cannot pay the most it may cost.
+ * A post, reply or comment from the editor, ready to confirm: its files (the text when it goes on IPFS, then each
+ * media in order: [{bytes, type, what}], `what` its name in a refusal), the call and the fees. With `selfHosted`
+ * (B-311) the author's node hosts the files alone: no storeToIpfs, no storage fee. The same file twice is stored
+ * once. Throws when the balance cannot pay the most it may cost.
  */
 export async function prepareDraft(
   call,
-  {
-    text,
-    textOnIpfs = false,
-    image = null,
-    mediaType = IMAGE_TYPE,
-    mediaWhat = 'image',
-    target,
-  },
+  {text, textOnIpfs = false, media = [], selfHosted = false, target},
   stored = new Set()
 ) {
   const from = await call('dna_getCoinbaseAddr')
   const files = []
-  let message = text.trim()
-  if (textOnIpfs && message) {
-    const file = await prepareFile(call, from, 'text', utf8(message), stored)
-    files.push(file)
-    message = `ipfs://${file.cid}`
+  const add = async (what, bytes) => {
+    const file = await prepareFile(call, from, what, bytes, stored, {
+      selfHosted,
+    })
+    if (!files.some((other) => other.cid === file.cid)) files.push(file)
+    return `ipfs://${file.cid}`
   }
-  let media = null
-  if (image) {
-    const file = await prepareFile(call, from, mediaWhat, image, stored)
-    files.push(file)
-    media = `ipfs://${file.cid}`
+  let message = text.trim()
+  if (textOnIpfs && message) message = await add('text', utf8(message))
+  const items = []
+  for (const [index, item] of media.entries()) {
+    let address
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      address = await add(item.what || 'image', item.bytes)
+    } catch (error) {
+      // Which of several media it is: the draft shows them in this order.
+      if (media.length > 1)
+        throw Object.assign(
+          new Error(`media ${index + 1}: ${error?.message ?? error}`),
+          {cause: error, timeout: error?.timeout}
+        )
+      throw error
+    }
+    items.push({media: address, mediaType: item.type || IMAGE_TYPE})
   }
   const socialCall = SocialCall.post(
     makePostArgument(message, {
       replyTo: target.replyTo,
       channel: target.channel,
-      media,
-      mediaType: media ? mediaType : null,
+      media: items,
     })
   )
   const fee = await estimateCall(call, from, socialCall)
@@ -271,8 +289,9 @@ export const totalFee = (pending) =>
   pending.files.reduce((sum, file) => sum + file.fee, pending.fee.fee)
 
 /**
- * Sends a prepared call: each file not stored yet goes to IPFS (`onFile(what)` before each, `onStored(cid)` once
- * the network is asked to keep it), then the call itself. Returns the call's transaction hash.
+ * Sends a prepared call: each file not stored yet goes to IPFS, pinned on this node (`onFile(what)` before each,
+ * `onStored(cid)` once the network is asked to keep it; a self-hosted file stays on this node alone), then the call
+ * itself. Returns the call's transaction hash.
  */
 export async function sendPrepared(call, pending, {onFile, onStored} = {}) {
   for (const file of pending.files) {
@@ -289,6 +308,8 @@ export async function sendPrepared(call, pending, {onFile, onStored} = {}) {
       throw new Error(
         `the node stored the ${file.what} under another CID (${cid})`
       )
+    // eslint-disable-next-line no-continue
+    if (file.selfHosted) continue
     // eslint-disable-next-line no-await-in-loop
     await call('dna_storeToIpfs', [{cid}])
     onStored?.(cid)

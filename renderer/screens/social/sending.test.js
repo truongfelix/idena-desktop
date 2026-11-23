@@ -34,20 +34,20 @@ describe('the sent actions', () => {
 })
 
 describe('a draft whose send failed', () => {
-  const draft = {text: 'hello', image: {bytes: [1]}, textOnIpfs: true}
+  const draft = {text: 'hello', media: [{bytes: [1]}], textOnIpfs: true}
 
   it('goes back to an editor that holds nothing', () => {
-    expect(draftToPutBack(draft, {text: '', image: null})).toBe(draft)
-    expect(draftToPutBack(draft, {text: '  \n', image: null})).toBe(draft)
+    expect(draftToPutBack(draft, {text: '', media: []})).toBe(draft)
+    expect(draftToPutBack(draft, {text: '  \n', media: []})).toBe(draft)
   })
 
   it('leaves an editor that holds a text or an image as it is', () => {
-    expect(draftToPutBack(draft, {text: 'new text', image: null})).toBeNull()
-    expect(draftToPutBack(draft, {text: '', image: {bytes: [2]}})).toBeNull()
+    expect(draftToPutBack(draft, {text: 'new text', media: []})).toBeNull()
+    expect(draftToPutBack(draft, {text: '', media: [{bytes: [2]}]})).toBeNull()
   })
 
   it('is nothing for a like or a tip', () => {
-    expect(draftToPutBack(null, {text: '', image: null})).toBeNull()
+    expect(draftToPutBack(null, {text: '', media: []})).toBeNull()
   })
 })
 
