@@ -25,6 +25,7 @@ import {
   withCallbackGas,
 } from './profiles'
 import {memberExtraFor} from './vouching'
+import {withSizedCallbacks} from './moderation-calls'
 import {mediaWhat} from './media-type'
 import {
   IMAGE_TYPE,
@@ -83,7 +84,8 @@ export const stillWaiting = (waiting, scannedThrough) =>
 export const actionKey = ({contract = '', method, argument}) =>
   `${String(contract).toLowerCase()}:${method}:${String(argument ?? '')
     .replace(/,"_gas":\d+/, '')
-    .replace(/,"_keepGas":\d+/, '')}`
+    .replace(/,"_keepGas":\d+/, '')
+    .replace(/,"_gasLimit":\d+/, '')}`
 
 /**
  * What the editor gets back when a draft it sent (`sent`: {text, image, textOnIpfs}) is dropped by the node or
@@ -114,6 +116,23 @@ const PROFILE_KINDS = new Set([
   'endVouch',
   // Not the profiles contract, but a profile's list (its invitees) changes with it.
   'killInvitee',
+])
+
+/**
+ * The kinds of action written to the moderation contract (prepareModeration, moderation-calls.js): one at a time per
+ * target, and the contract read again once one is in a block.
+ */
+export const MODERATION_KINDS = new Set([
+  'report',
+  'reportPost',
+  'ban',
+  'unban',
+  'hidePost',
+  'hidePosts',
+  'restorePost',
+  'modVouch',
+  'withdrawVouch',
+  'revokeVouches',
 ])
 
 /** A KillInviteeTx: it ends an invitation not yet validated (the invitee still Invite or Candidate). */
@@ -148,6 +167,7 @@ export function useSocialSending({
   readNewBlocks,
   scannedThrough,
   onProfileChange,
+  onModerationChange,
 }) {
   const {t} = useTranslation()
   const [busy, setBusy] = React.useState(false)
@@ -201,6 +221,16 @@ export function useSocialSending({
       cancelOffer: t('Withdraw the offer'),
       endVouch: t('End the vouch'),
       killInvitee: t('Terminate the invitation'),
+      report: t('Report'),
+      reportPost: t('Report'),
+      ban: t('Ban'),
+      unban: t('Unban'),
+      hidePost: t('Hide the post'),
+      hidePosts: t('Hide the posts'),
+      restorePost: t('Restore the post'),
+      modVouch: t('Vouch as moderator'),
+      withdrawVouch: t('Withdraw the vouch'),
+      revokeVouches: t('Revoke moderator status'),
     }),
     [t]
   )
@@ -563,6 +593,7 @@ export function useSocialSending({
       )
       show(t('{{what}} is in a block.', {what}), {ms: MINED_MS})
       if (PROFILE_KINDS.has(kind)) onProfileChange?.()
+      else if (MODERATION_KINDS.has(kind)) onModerationChange?.()
       else readNewBlocks()
     }
   }
@@ -572,9 +603,10 @@ export function useSocialSending({
     setConfirm(null)
     if (!pending) return
     const what = whatOf[pending.kind]
-    const key = PROFILE_KINDS.has(pending.kind)
-      ? actionKey(pending.socialCall)
-      : null
+    const key =
+      PROFILE_KINDS.has(pending.kind) || MODERATION_KINDS.has(pending.kind)
+        ? actionKey(pending.socialCall)
+        : null
     if (key !== null && inFlight.some((item) => item.key === key)) {
       refused(pending.kind, new Error(t('it already waits for its block')))
       return
@@ -639,6 +671,26 @@ export function useSocialSending({
     watch(pending.kind, hash)
   }
 
+  /**
+   * A call to the moderation contract (`kind`: one of MODERATION_KINDS, `call` from ModerationCall), its fee from the
+   * node's dry run: a refusal there (the contract's reason) is shown and nothing is sent. A second dry run sizes the
+   * callbacks' gas, so the max fee reserves less.
+   */
+  const prepareModeration = (kind, call, {detail = null} = {}) =>
+    prepare(
+      kind,
+      async () => {
+        const from = await socialRpc('dna_getCoinbaseAddr')
+        let estimate = await estimateCall(socialRpc, from, call)
+        const sized = withSizedCallbacks(call, estimate.receipt)
+        if (sized !== call)
+          estimate = await estimateCall(socialRpc, from, sized)
+        const {fee, maxFee} = estimate
+        return {from, socialCall: sized, fee: {fee, maxFee}, files: []}
+      },
+      {detail}
+    )
+
   /** Terminating the invitation of `invitee` (an Invite or a Candidate), its fee shown first under `title`. */
   const prepareTerminate = (invitee, {title, detail}) =>
     prepare('killInvitee', () => prepareKillInvitee(socialRpc, invitee), {
@@ -676,6 +728,7 @@ export function useSocialSending({
     prepareGroupMessage,
     prepareGroupNotice,
     prepareProfile,
+    prepareModeration,
     prepareTerminate,
     messagesSent,
     pendingLikes,

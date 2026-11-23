@@ -1,5 +1,8 @@
 import {useTranslation} from 'react-i18next'
+import {useRouter} from 'next/router'
 import {Radio, RadioGroup, Stack} from '@chakra-ui/react'
+import {SecondaryButton} from '../../../shared/components/button'
+import {useModerator} from '../components/moderator-actions'
 import {SmallText} from '../../../shared/components/components'
 import {MODERATION_FIRST_BLOCK} from '../moderation'
 import {useSocial} from '../provider'
@@ -11,6 +14,8 @@ import {useSocial} from '../provider'
 export function CommunityModerationSetting() {
   const {t} = useTranslation()
   const {communityModeration, setCommunityModeration, moderation} = useSocial()
+  const {role} = useModerator()
+  const router = useRouter()
   return (
     <Stack spacing={2}>
       <RadioGroup
@@ -54,6 +59,16 @@ export function CommunityModerationSetting() {
             })}
           </SmallText>
         )}
+      {role && (
+        <SecondaryButton
+          alignSelf="flex-start"
+          onClick={() =>
+            router.push({pathname: '/social', query: {view: 'moderation'}})
+          }
+        >
+          {t('Open the moderation page')}
+        </SecondaryButton>
+      )}
     </Stack>
   )
 }

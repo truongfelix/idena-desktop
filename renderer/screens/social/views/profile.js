@@ -19,6 +19,7 @@ import {ProfileHeader, ProfileList} from './profile-header'
 import {ProfileListPage} from './profile-list-page'
 import {useKeptState} from '../kept-state'
 import {BanBanner} from '../components/moderated'
+import {ModeratePanel} from '../components/moderator-actions'
 
 /**
  * The profile of `address`, as the phone app's: its header (profile-header.js: the people as counts, the likes and
@@ -146,6 +147,7 @@ export function ProfileView({
       {publicProfile?.banned && (
         <BanBanner ban={publicProfile.banned} onProfile={openProfile} />
       )}
+      {!isMe && <ModeratePanel address={address} />}
       <PublicProfile address={address} isMe={isMe} profile={publicProfile} />
       {editing && (
         <ProfileEditDialog

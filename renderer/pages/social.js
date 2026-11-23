@@ -31,6 +31,7 @@ import {WaitingLine} from '../screens/social/components/waiting-line'
 import {BackToTop} from '../screens/social/components/back-to-top'
 import {TopicView} from '../screens/social/views/topic'
 import {SettingsTab, SocialSettingsView} from '../screens/social/views/settings'
+import {ModerationTab, ModerationView} from '../screens/social/views/moderation'
 import {ChatView, MessagesList} from '../screens/social/views/messages'
 import {GroupEditView} from '../screens/social/views/groups'
 import {OpenTopicContext} from '../screens/social/components/topic'
@@ -49,6 +50,7 @@ const View = {
   Notifications: 'notifications',
   Profile: 'profile',
   Settings: 'settings',
+  Moderation: 'moderation',
 }
 
 /** A view of an older link: Home is the Feed; the Inbox, its Messages or its Notifications. */
@@ -333,6 +335,26 @@ export default function SocialPage() {
         openThread={openThread}
         openProfile={openProfile}
         onRename={setRenaming}
+      />
+    )
+  else if (view === View.Moderation)
+    content = (
+      <ModerationView
+        tab={
+          Object.values(ModerationTab).includes(query.tab)
+            ? query.tab
+            : ModerationTab.Reports
+        }
+        setTab={(next) =>
+          router.replace(
+            {pathname: '/social', query: {view: View.Moderation, tab: next}},
+            undefined,
+            {shallow: true}
+          )
+        }
+        now={now}
+        openThread={openThread}
+        openProfile={openProfile}
       />
     )
   else if (view === View.Messages)

@@ -139,6 +139,7 @@ export function SocialProvider({children}) {
     readNewBlocks,
     scannedThrough: cache?.authorsHeight ?? 0,
     onProfileChange: refreshProfiles,
+    onModerationChange: moderation.refresh,
   })
   const people = React.useMemo(() => settings?.people || {}, [settings])
   const blocked = React.useMemo(() => blockedAddresses(people), [people])
@@ -410,6 +411,8 @@ export function SocialProvider({children}) {
     () => ({
       cache,
       feed,
+      // The feed as scanned, before Community moderation: for the moderators' tools only (what they review).
+      scannedFeed,
       moderation,
       head,
       error,
@@ -491,6 +494,7 @@ export function SocialProvider({children}) {
       me,
       missingMethod,
       moderation,
+      scannedFeed,
       names,
       nameParts,
       notifyKinds,

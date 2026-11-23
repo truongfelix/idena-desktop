@@ -9,6 +9,7 @@ import {moderatedProfile} from './moderation-feed'
 export const MODERATION_POLL_MS = 60 * 1000
 
 const NOTHING = emptyModeration()
+const NO_EVENTS = []
 
 /**
  * The moderation state and the epoch, for the hooks outside the Social provider's own (profile-hooks.js): given by
@@ -40,6 +41,8 @@ export function useModeration({enabled, ready, call = socialRpc}) {
   const [cache, setCache] = React.useState()
   const [synced, setSynced] = React.useState(false)
   const [error, setError] = React.useState(null)
+  // Raised to read the contract at once (an action of the account in a block): the sync starts again.
+  const [nudge, setNudge] = React.useState(0)
   const cacheRef = React.useRef()
 
   React.useEffect(() => {
@@ -106,7 +109,7 @@ export function useModeration({enabled, ready, call = socialRpc}) {
       alive = false
       clearInterval(timer)
     }
-  }, [call, enabled, loaded, ready])
+  }, [call, enabled, loaded, nudge, ready])
 
   const state = React.useMemo(
     () => (enabled && cache ? replay(cache.events) : NOTHING),
@@ -114,8 +117,11 @@ export function useModeration({enabled, ready, call = socialRpc}) {
   )
   const loading = enabled && (!loaded || (ready && !synced))
   const high = cache?.high ?? null
+  const refresh = React.useCallback(() => setNudge((n) => n + 1), [])
+  // Every event read, in chain order: the moderators' log.
+  const events = enabled && cache ? cache.events : NO_EVENTS
   return React.useMemo(
-    () => ({state, loading, error, high}),
-    [error, high, loading, state]
+    () => ({state, events, loading, error, high, refresh}),
+    [error, events, high, loading, refresh, state]
   )
 }
