@@ -62,20 +62,34 @@ export const PostTarget = {
   }),
 }
 
+/** The most media a post holds (B-311): pictures, videos and sounds mixed. */
+export const MAX_POST_MEDIA = 5
+
+/** A media type without its parameters ("video/webm;codecs=vp8,opus" is "video/webm"). */
+export const baseMediaType = (type) =>
+  String(type ?? '')
+    .split(';')[0]
+    .trim()
+
 /**
  * The argument of a makePost call, with idena.social's keys in its order: the message, what it answers (a post id
- * as text), the channel of a comment, and one media ("ipfs://<cid>") with its type. Absent keys are left out.
+ * as text), the channel of a comment, and its media ([{media: "ipfs://<cid>", mediaType}], at most MAX_POST_MEDIA),
+ * in order. Absent keys are left out. The contract's event joins each list with commas, so no item holds one.
  */
 export function makePostArgument(
   message,
-  {replyTo = null, channel = null, media = null, mediaType = null} = {}
+  {replyTo = null, channel = null, media = []} = {}
 ) {
   const arg = {message}
   if (replyTo !== null) arg.replyToPostId = String(replyTo)
   if (channel !== null) arg.channelId = channel
-  if (media !== null && mediaType !== null) {
-    arg.media = [media]
-    arg.mediaType = [mediaType]
+  if (media.length > MAX_POST_MEDIA)
+    throw new Error(`at most ${MAX_POST_MEDIA} media in a post`)
+  if (media.length > 0) {
+    arg.media = media.map((item) => String(item.media))
+    arg.mediaType = media.map((item) => baseMediaType(item.mediaType))
+    if ([...arg.media, ...arg.mediaType].some((item) => item.includes(',')))
+      throw new Error('a media or its type holds a comma')
   }
   return JSON.stringify(arg)
 }

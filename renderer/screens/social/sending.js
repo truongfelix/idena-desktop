@@ -88,12 +88,12 @@ export const actionKey = ({contract = '', method, argument}) =>
     .replace(/,"_gasLimit":\d+/, '')}`
 
 /**
- * What the editor gets back when a draft it sent (`sent`: {text, image, textOnIpfs}) is dropped by the node or
- * refused by the contract: the draft, if the editor holds no text and no image (`editor`: {text, image}); null when
- * it holds something, which stays. The editor does not open: as after Cancel, the next draft starts from it.
+ * What the editor gets back when a draft it sent (`sent`: {text, media, textOnIpfs, selfHosted}) is dropped by the
+ * node or refused by the contract: the draft, if the editor holds no text and no media (`editor`: {text, media});
+ * null when it holds something, which stays. The editor does not open: as after Cancel, the next draft starts from it.
  */
 export const draftToPutBack = (sent, editor) =>
-  sent && editor.text.trim() === '' && editor.image === null ? sent : null
+  sent && editor.text.trim() === '' && editor.media.length === 0 ? sent : null
 
 /**
  * Writing to idena.social, as the phone app does (SocialModel): the editor's draft, the confirmation with the fees,
@@ -195,7 +195,10 @@ export function useSocialSending({
   const [confirm, setConfirm] = React.useState(null)
   const [draft, setDraft] = React.useState(null)
   const [draftText, setDraftText] = React.useState('')
-  const [draftImage, setDraftImage] = React.useState(null)
+  // The draft's media in order (B-311: at most MAX_POST_MEDIA), each as pickMedia makes it.
+  const [draftMedia, setDraftMedia] = React.useState([])
+  // B-311: the draft's files hosted by this node alone, without the storage fee; off (the network keeps them) by default.
+  const [selfHosted, setSelfHosted] = React.useState(false)
   const [textOnIpfs, setTextOnIpfs] = React.useState(false)
   const [draftTopic, setDraftTopic] = React.useState('')
   const [waiting, setWaiting] = React.useState([])
@@ -207,10 +210,10 @@ export function useSocialSending({
   const storedRef = React.useRef(new Set())
   // The drafts sent from the editor, by transaction hash, until their block; what the editor holds now.
   const sentDraftsRef = React.useRef(new Map())
-  const editorRef = React.useRef({text: '', image: null})
+  const editorRef = React.useRef({text: '', media: []})
   React.useEffect(() => {
-    editorRef.current = {text: draftText, image: draftImage}
-  }, [draftText, draftImage])
+    editorRef.current = {text: draftText, media: draftMedia}
+  }, [draftText, draftMedia])
   const aliveRef = React.useRef(true)
   React.useEffect(
     () => () => {
@@ -537,9 +540,12 @@ export function useSocialSending({
           {
             text: draftText,
             textOnIpfs,
-            image: draftImage?.bytes || null,
-            mediaType: draftImage?.type || IMAGE_TYPE,
-            mediaWhat: mediaWhat(draftImage?.type),
+            media: draftMedia.map((item) => ({
+              bytes: item.bytes,
+              type: item.type || IMAGE_TYPE,
+              what: mediaWhat(item.type),
+            })),
+            selfHosted,
             target: draftTarget(draft.target, draftTopic),
           },
           storedRef.current
@@ -547,8 +553,9 @@ export function useSocialSending({
       {
         sentDraft: {
           text: draftText,
-          image: draftImage,
+          media: draftMedia,
           textOnIpfs,
+          selfHosted,
           topic: draft.target.level ? '' : draftTopic,
         },
       }
@@ -574,10 +581,11 @@ export function useSocialSending({
       const back = draftToPutBack(sentDraft, editorRef.current)
       if (back) {
         setDraftText(back.text)
-        setDraftImage(back.image)
+        setDraftMedia(back.media)
         setTextOnIpfs(back.textOnIpfs)
+        setSelfHosted(Boolean(back.selfHosted))
         setDraftTopic(back.topic ?? '')
-        editorRef.current = {text: back.text, image: back.image}
+        editorRef.current = {text: back.text, media: back.media}
         draftNote = t('The draft is back in the editor.')
       } else if (sentDraft)
         draftNote = t(
@@ -673,8 +681,9 @@ export function useSocialSending({
       sentDraftsRef.current.set(hash, pending.sentDraft)
       setDraft(null)
       setDraftText('')
-      setDraftImage(null)
+      setDraftMedia([])
       setTextOnIpfs(false)
+      setSelfHosted(false)
       setDraftTopic('')
     }
     if (key !== null)
@@ -770,8 +779,10 @@ export function useSocialSending({
     cancelDraft: () => setDraft(null),
     draftText,
     setDraftText,
-    draftImage,
-    setDraftImage,
+    draftMedia,
+    setDraftMedia,
+    selfHosted,
+    setSelfHosted,
     textOnIpfs,
     setTextOnIpfs,
     draftTopic,

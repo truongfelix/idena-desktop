@@ -101,9 +101,32 @@ export function ConfirmDialog({pending, onSend, onCancel}) {
                 )}
           </Text>
           {pending.files.map((file) => {
+            if (file.selfHosted)
+              return (
+                <Text key={file.cid}>
+                  {{
+                    text: t(
+                      'The text is hosted by your node ({{size}} KB): no storage fee.',
+                      {size: kilobytes(file.bytes.length), nsSeparator: '|'}
+                    ),
+                    video: t(
+                      'The video is hosted by your node ({{size}} KB): no storage fee.',
+                      {size: kilobytes(file.bytes.length), nsSeparator: '|'}
+                    ),
+                    sound: t(
+                      'The sound is hosted by your node ({{size}} KB): no storage fee.',
+                      {size: kilobytes(file.bytes.length), nsSeparator: '|'}
+                    ),
+                  }[file.what] ||
+                    t(
+                      'The image is hosted by your node ({{size}} KB): no storage fee.',
+                      {size: kilobytes(file.bytes.length), nsSeparator: '|'}
+                    )}
+                </Text>
+              )
             if (file.stored)
               return (
-                <Text key={file.what}>
+                <Text key={file.cid}>
                   {{
                     text: t('The text is already stored on IPFS: no new fee.', {
                       nsSeparator: '|',
@@ -128,7 +151,7 @@ export function ConfirmDialog({pending, onSend, onCancel}) {
               most: fee(file.fee * BigInt(2)),
             }
             return (
-              <Text key={file.what}>
+              <Text key={file.cid}>
                 {{
                   text: t(
                     'Storing the text on IPFS ({{size}} KB): about {{fee}} iDNA (at most {{most}}).',

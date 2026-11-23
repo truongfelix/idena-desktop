@@ -23,6 +23,7 @@ import {displayName} from '../people'
 import {timeAgo} from '../format'
 import {pickMedia} from '../image'
 import {IMAGE_TYPE, fromWei, storeFeeHint} from '../posting'
+import {MAX_POST_MEDIA} from '../contract'
 import {MediaKind, kindOfType} from '../media-type'
 import {
   MAX_VOICE_BYTES,
@@ -52,8 +53,11 @@ function useFeePerGas() {
   return feePerGas
 }
 
-/** A draft's file sent as it is (B-222): a moving picture, a video or a sound, its weight and what storing it costs. */
-function DraftFile({image, url, feePerGas, onRemove}) {
+/**
+ * A draft's file sent as it is (B-222): a moving picture, a video or a sound, its weight and what storing it costs
+ * (nothing when `selfHosted`); `onEarlier` moves it before the one above.
+ */
+function DraftFile({image, url, feePerGas, onRemove, onEarlier, selfHosted}) {
   const {t} = useTranslation()
   const kind = kindOfType(image.type)
   const size = Math.ceil(image.bytes.length / 1000)
@@ -87,31 +91,40 @@ function DraftFile({image, url, feePerGas, onRemove}) {
       <HStack spacing={2} flexWrap="wrap">
         <Chip isSelected>{t('{{size}} KB', {size})}</Chip>
         <Chip onClick={onRemove}>✕ {t('Remove it')}</Chip>
+        {onEarlier && <Chip onClick={onEarlier}>↑ {t('Move up')}</Chip>}
       </HStack>
       <SmallText>
-        {t(
-          "It is stored on IPFS (a storeToIpfs transaction): {{fee}}, on top of the post's fee. The file is sent as it is; an MP4 or M4A file is sent without its details (place, camera, title), another file keeps its own.",
-          {
-            fee:
-              feePerGas === null
-                ? t('a fee that grows with its size')
-                : t('about {{fee}} iDNA', {
-                    fee: fromWei(
-                      storeFeeHint(feePerGas, image.bytes.length),
-                      2,
-                      true
-                    ),
-                  }),
-            nsSeparator: '|',
-          }
-        )}
+        {selfHosted
+          ? t(
+              'Hosted by your node: no storage fee. The file is sent as it is; an MP4 or M4A file is sent without its details (place, camera, title), another file keeps its own.',
+              {nsSeparator: '|'}
+            )
+          : t(
+              "It is stored on IPFS (a storeToIpfs transaction): {{fee}}, on top of the post's fee. The file is sent as it is; an MP4 or M4A file is sent without its details (place, camera, title), another file keeps its own.",
+              {
+                fee:
+                  feePerGas === null
+                    ? t('a fee that grows with its size')
+                    : t('about {{fee}} iDNA', {
+                        fee: fromWei(
+                          storeFeeHint(feePerGas, image.bytes.length),
+                          2,
+                          true
+                        ),
+                      }),
+                nsSeparator: '|',
+              }
+            )}
       </SmallText>
     </Stack>
   )
 }
 
-/** The image of the draft: its preview, the sizes to choose from, and what storing it costs; a file sent as it is apart. */
-function DraftImage({image, onSide, onRemove}) {
+/**
+ * A media of the draft: its preview, the sizes to choose from, and what storing it costs (nothing when `selfHosted`);
+ * a file sent as it is apart. `onEarlier` moves it before the one above.
+ */
+function DraftImage({image, onSide, onRemove, onEarlier, selfHosted}) {
   const {t} = useTranslation()
   const url = React.useMemo(
     () =>
@@ -129,6 +142,8 @@ function DraftImage({image, onSide, onRemove}) {
         url={url}
         feePerGas={feePerGas}
         onRemove={onRemove}
+        onEarlier={onEarlier}
+        selfHosted={selfHosted}
       />
     )
   return (
@@ -156,6 +171,7 @@ function DraftImage({image, onSide, onRemove}) {
           </Chip>
         ))}
         <Chip onClick={onRemove}>✕ {t('Remove the image')}</Chip>
+        {onEarlier && <Chip onClick={onEarlier}>↑ {t('Move up')}</Chip>}
       </HStack>
       {image.stillInstead > 0 && (
         <SmallText>
@@ -166,12 +182,18 @@ function DraftImage({image, onSide, onRemove}) {
         </SmallText>
       )}
       <SmallText>
-        {feePerGas === null
+        {selfHosted &&
+          t(
+            "Hosted by your node: no storage fee. It is sent as WebP, without the photo's details (place, camera).",
+            {nsSeparator: '|'}
+          )}
+        {!selfHosted && feePerGas === null
           ? t(
               "The image is stored on IPFS (a storeToIpfs transaction): a fee that grows with its size, on top of the post's fee. It is sent as WebP, without the photo's details (place, camera).",
               {nsSeparator: '|'}
             )
-          : t(
+          : !selfHosted &&
+            t(
               "The image is stored on IPFS (a storeToIpfs transaction): about {{fee}} iDNA, on top of the post's fee. It is sent as WebP, without the photo's details (place, camera).",
               {
                 fee: fromWei(
@@ -181,6 +203,37 @@ function DraftImage({image, onSide, onRemove}) {
                 ),
                 nsSeparator: '|',
               }
+            )}
+      </SmallText>
+    </Stack>
+  )
+}
+
+/**
+ * Where the draft's files are kept (B-311): stored by the network (a storeToIpfs transaction each, with its fee, the
+ * default), or hosted by this node alone, without that fee.
+ */
+function HostingChoice({selfHosted, onChange}) {
+  const {t} = useTranslation()
+  return (
+    <Stack spacing={1}>
+      <HStack spacing={2} flexWrap="wrap">
+        <Chip isSelected={!selfHosted} onClick={() => onChange(false)}>
+          {t('Stored by the network')}
+        </Chip>
+        <Chip isSelected={selfHosted} onClick={() => onChange(true)}>
+          {t('Hosted by my node')}
+        </Chip>
+      </HStack>
+      <SmallText color={MUTED}>
+        {selfHosted
+          ? t(
+              'No storage fee: your node keeps the files. Others see them while your node is online, or while a node that already loaded them keeps a copy.',
+              {nsSeparator: '|'}
+            )
+          : t(
+              'The network keeps the files: about one node in five stores each of them, for a fee that grows with its size.',
+              {nsSeparator: '|'}
             )}
       </SmallText>
     </Stack>
@@ -237,9 +290,9 @@ function TopicField({value, onChange}) {
 }
 
 /**
- * The editor of a post, a reply or a comment, as the phone app's: the text, one image (WebP, size to choose), the
- * text on IPFS if wanted, and Post, which shows the fees before anything is sent. Cancel keeps the text and the
- * image for the next draft.
+ * The editor of a post, a reply or a comment, as the phone app's: the text, up to MAX_POST_MEDIA media (an image in
+ * WebP, size to choose, a video, a sound; B-311), the text on IPFS if wanted, where the files are kept (the network,
+ * with a fee, or this node alone), and Post, which shows the fees before anything is sent. Cancel keeps the draft.
  */
 /** The editor of the open draft; `underThread`: pinned under the thread it answers, so it starts smaller. */
 export function Editor({now, status, underThread = false}) {
@@ -254,8 +307,10 @@ export function Editor({now, status, underThread = false}) {
     draft,
     draftText,
     setDraftText,
-    draftImage,
-    setDraftImage,
+    draftMedia,
+    setDraftMedia,
+    selfHosted,
+    setSelfHosted,
     textOnIpfs,
     setTextOnIpfs,
     draftTopic,
@@ -265,17 +320,29 @@ export function Editor({now, status, underThread = false}) {
   const [imageNote, setImageNote] = React.useState(null)
   const fileRef = React.useRef()
   const audioRef = React.useRef()
+  // Each media gets a key of its own: two equal files stay apart in the list.
+  const keyRef = React.useRef(0)
+  const withKey = (item) => {
+    keyRef.current += 1
+    return {...item, key: keyRef.current}
+  }
+  const full = draftMedia.length >= MAX_POST_MEDIA
   const voice = useVoiceRecorder((result) => {
     if (result.error) setImageNote(result.error)
     else {
       setImageNote(null)
-      // A limit reached is said under the editor while this note is the draft's (`voiceLimit`).
-      setDraftImage({
-        asIs: true,
-        type: result.type,
-        bytes: result.bytes,
-        voiceLimit: result.limited,
-      })
+      // A limit reached is said under the editor while this note is in the draft (`voiceLimit`).
+      setDraftMedia((current) =>
+        [
+          ...current,
+          withKey({
+            asIs: true,
+            type: result.type,
+            bytes: result.bytes,
+            voiceLimit: result.limited,
+          }),
+        ].slice(0, MAX_POST_MEDIA)
+      )
     }
   })
   const textRef = React.useRef()
@@ -296,22 +363,52 @@ export function Editor({now, status, underThread = false}) {
   const canPost =
     sending.canAct &&
     topicValid &&
-    (draftText.trim() !== '' || draftImage !== null) &&
+    (draftText.trim() !== '' || draftMedia.length > 0) &&
     !preparing &&
     !voice.recording
 
-  const pickFile = async (file, audio = false) => {
-    if (!file) return
+  // The files picked, added after the draft's media while there is room; a file that cannot be used is said.
+  const pickFiles = async (files, audio = false) => {
+    const room = MAX_POST_MEDIA - draftMedia.length
+    const picked = Array.from(files || [])
+    if (picked.length === 0 || room <= 0) return
     setPreparing(true)
     setImageNote(null)
-    try {
-      setDraftImage(await pickMedia(file, {audio}))
-    } catch (error) {
-      setImageNote(error.message)
-    } finally {
-      setPreparing(false)
+    const added = []
+    const notes = []
+    for (const file of picked.slice(0, room)) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        added.push(withKey(await pickMedia(file, {audio})))
+      } catch (error) {
+        notes.push(
+          picked.length > 1 ? `${file.name}: ${error.message}` : error.message
+        )
+      }
     }
+    if (picked.length > room)
+      notes.push(
+        t('only {{number}} more media fit in a post', {
+          number: room,
+          nsSeparator: '|',
+        })
+      )
+    setDraftMedia((current) => [...current, ...added].slice(0, MAX_POST_MEDIA))
+    setImageNote(notes.length > 0 ? notes.join('; ') : null)
+    setPreparing(false)
   }
+  const replaceAt = (index, item) =>
+    setDraftMedia((current) =>
+      current.map((other, i) => (i === index ? item : other))
+    )
+  const removeAt = (index) =>
+    setDraftMedia((current) => current.filter((_, i) => i !== index))
+  const moveUp = (index) =>
+    setDraftMedia((current) => {
+      const next = [...current]
+      ;[next[index - 1], next[index]] = [next[index], next[index - 1]]
+      return next
+    })
 
   const {answered} = draft
   return (
@@ -348,21 +445,24 @@ export function Editor({now, status, underThread = false}) {
         placeholder={isPost ? t("What's new?") : t('Your answer')}
         onChange={(e) => setDraftText(e.target.value)}
       />
-      {draftImage && (
+      {draftMedia.map((item, index) => (
         <DraftImage
-          image={draftImage}
+          key={item.key}
+          image={item}
+          selfHosted={selfHosted}
           onSide={(side) =>
-            setDraftImage({
-              ...draftImage,
+            replaceAt(index, {
+              ...item,
               side,
-              bytes: draftImage.sides.find((item) => item.side === side).bytes,
+              bytes: item.sides.find((other) => other.side === side).bytes,
             })
           }
-          onRemove={() => setDraftImage(null)}
+          onRemove={() => removeAt(index)}
+          onEarlier={index > 0 ? () => moveUp(index) : null}
         />
-      )}
+      ))}
       {preparing && <SmallText>{t('Preparing the image…')}</SmallText>}
-      {draftImage?.voiceLimit === 'size' && (
+      {draftMedia.some((item) => item.voiceLimit === 'size') && (
         <SmallText>
           {t(
             'The recording stopped at its limit: the {{size}} KB a voice note can hold.',
@@ -370,7 +470,7 @@ export function Editor({now, status, underThread = false}) {
           )}
         </SmallText>
       )}
-      {draftImage?.voiceLimit === 'time' && (
+      {draftMedia.some((item) => item.voiceLimit === 'time') && (
         <SmallText>
           {t('The recording stopped at its limit: {{minutes}} minutes.', {
             minutes: MAX_VOICE_MS / 60000,
@@ -391,27 +491,28 @@ export function Editor({now, status, underThread = false}) {
           size="sm"
           variant="outline"
           borderColor="gray.100"
-          isDisabled={preparing || voice.recording}
+          isDisabled={preparing || voice.recording || full}
           onClick={() => fileRef.current?.click()}
         >
-          🖼 {draftImage ? t('Other image or video') : t('Image or video')}
+          🖼 {t('Image or video')}
         </Button>
         <input
           ref={fileRef}
           type="file"
           accept="image/*,video/*"
+          multiple
           hidden
           onChange={(e) => {
-            const [file] = e.target.files || []
+            const files = Array.from(e.target.files || [])
             e.target.value = ''
-            pickFile(file)
+            pickFiles(files)
           }}
         />
         <Button
           size="sm"
           variant="outline"
           borderColor="gray.100"
-          isDisabled={preparing || voice.recording}
+          isDisabled={preparing || voice.recording || full}
           onClick={() => audioRef.current?.click()}
         >
           🎵 {t('Sound file')}
@@ -420,19 +521,20 @@ export function Editor({now, status, underThread = false}) {
           ref={audioRef}
           type="file"
           accept="audio/*"
+          multiple
           hidden
           onChange={(e) => {
-            const [file] = e.target.files || []
+            const files = Array.from(e.target.files || [])
             e.target.value = ''
-            pickFile(file, true)
+            pickFiles(files, true)
           }}
         />
         <Button
           size="sm"
           variant="outline"
           borderColor="gray.100"
-          // One media per post: Record once the draft's picture or file is removed.
-          isDisabled={preparing || (!voice.recording && draftImage !== null)}
+          // A recording joins the draft's media while there is room.
+          isDisabled={preparing || (!voice.recording && full)}
           onClick={() => {
             setImageNote(null)
             if (voice.recording) voice.stop()
@@ -452,10 +554,17 @@ export function Editor({now, status, underThread = false}) {
       </HStack>
       {textOnIpfs && (
         <SmallText>
-          {t(
-            'The text is stored on IPFS (a storeToIpfs transaction, cheaper than the post for long texts) and the post holds its address. It stays readable while IPFS nodes keep it.'
-          )}
+          {selfHosted
+            ? t(
+                'The text is hosted by your node, without a storage fee, and the post holds its address. It stays readable while your node is online, or while a node that read it keeps a copy.'
+              )
+            : t(
+                'The text is stored on IPFS (a storeToIpfs transaction, cheaper than the post for long texts) and the post holds its address. It stays readable while IPFS nodes keep it.'
+              )}
         </SmallText>
+      )}
+      {(draftMedia.length > 0 || textOnIpfs) && (
+        <HostingChoice selfHosted={selfHosted} onChange={setSelfHosted} />
       )}
       {myBan && (
         <SmallText color="red.500">
