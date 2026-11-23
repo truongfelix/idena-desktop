@@ -272,7 +272,7 @@ function TopicField({value, onChange}) {
       <SmallText color={valid ? MUTED : 'red.500'}>
         {valid
           ? t(
-              'Shown with the topic in our apps; the Idena Social website does not show posts in a topic.'
+              'Shown with the topic in our apps and on the Idena Social website.'
             )
           : t('a-z, 0-9 and _, 3 to 21 characters')}
       </SmallText>
