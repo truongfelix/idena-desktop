@@ -75,7 +75,7 @@ export async function runSocialScan({
         // eslint-disable-next-line no-await-in-loop
         await scanOlderBlocks(current, source, {save})
       } else if (onPage && mediaPending(current)) {
-        // Once, after the history, for posts a build before B-311 read: all their media.
+        // Once, after the history (never holding it back), for posts a build before B-311 read: all their media.
         // eslint-disable-next-line no-await-in-loop
         await scanMediaPosts(current, source, {save})
       } else {

@@ -1,6 +1,7 @@
 import {SOCIAL_CONTRACT} from './contract'
 import {socialFeed, withPrefix} from './feed'
 import {GROUPS_FROM} from './groups'
+import {BLOCKS_PER_CALL} from './node'
 import {
   CURRENT_VERSION,
   HISTORY_START,
@@ -143,20 +144,18 @@ export function withMediaGaps(cache) {
 /** Whether posts read by a build before B-311 wait to be read again for all their media (withMediaGaps). */
 export const mediaPending = (cache) => (cache.mediaPending || []).length > 0
 
-/** How many blocks the media pass reads at once: one bcn_contractCalls. */
-const MEDIA_HEIGHTS_AT_ONCE = 8
-
 /**
  * For posts read by a build before B-311 (mediaPending): the blocks of a few of them, of one contract version, read
  * again in one call (source.callsAt), the newest first, and their posts taken again with all their media. A read
- * that fails puts those blocks at the end of the list, so the others go on.
+ * that fails puts those blocks at the end of the list (out of order until the next start), so the others go on;
+ * like the history's, a block that never reads keeps the scan reporting its error.
  */
 export async function scanMediaPosts(cache, source, {save = () => {}} = {}) {
   if (!mediaPending(cache)) return cache
   const version = versionAt(cache.mediaPending[0])
   const heights = cache.mediaPending
     .filter((height) => versionAt(height) === version)
-    .slice(0, MEDIA_HEIGHTS_AT_ONCE)
+    .slice(0, BLOCKS_PER_CALL)
   const rest = cache.mediaPending.filter((height) => !heights.includes(height))
   // A block before the history holds no post of the contract.
   if (!version) {

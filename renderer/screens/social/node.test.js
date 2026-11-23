@@ -63,6 +63,41 @@ describe('the node source', () => {
     expect(chunks).toEqual([BLOCKS_PER_CALL, BLOCKS_PER_CALL, 3])
   })
 
+  it('reads the calls of given blocks in one call, the batch size unchanged (B-311)', async () => {
+    const node = scriptedNode({
+      bcn_contractCalls: ({heights: asked}) =>
+        asked.map((h) => ({
+          ...makePost(h, 'two'),
+          args: [
+            hex(
+              JSON.stringify({
+                message: 'two',
+                media: ['ipfs://b1', 'ipfs://b2'],
+                mediaType: ['image/webp', 'video/mp4'],
+              })
+            ),
+          ],
+        })),
+    })
+    const source = nodeSocialSource(node.call, node.now)
+    const {posts} = await source.callsAt([300, 120])
+    expect(node.requests).toEqual([
+      {
+        method: 'bcn_contractCalls',
+        params: [{contract: SOCIAL_CONTRACT, heights: [300, 120]}],
+      },
+    ])
+    expect(posts.map(({height, more}) => [height, more?.length])).toEqual([
+      [300, 1],
+      [120, 1],
+    ])
+    expect(source.batchSize()).toBe(FIRST_BATCH)
+    const empty = scriptedNode({bcn_contractCalls: null})
+    expect(
+      (await nodeSocialSource(empty.call, empty.now).callsAt([5])).posts
+    ).toEqual([])
+  })
+
   it('asks for no calls without blocks', async () => {
     const node = scriptedNode({bcn_blocksWithAddress: []})
     expect(await nodeSocialSource(node.call, node.now).calls(1, 2)).toEqual({

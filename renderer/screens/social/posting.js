@@ -253,7 +253,10 @@ export async function prepareDraft(
     } catch (error) {
       // Which of several media it is: the draft shows them in this order.
       if (media.length > 1)
-        throw new Error(`media ${index + 1}: ${error?.message ?? error}`)
+        throw Object.assign(
+          new Error(`media ${index + 1}: ${error?.message ?? error}`),
+          {cause: error, timeout: error?.timeout}
+        )
       throw error
     }
     items.push({media: address, mediaType: item.type || IMAGE_TYPE})
