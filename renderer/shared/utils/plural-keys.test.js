@@ -110,4 +110,15 @@ describe('the variables of a translation', () => {
   it('read as nothing when the call does not pass them', () => {
     expect(instance('en').t('Epoch #{{epoch}}')).toBe('Epoch #')
   })
+
+  it('read as nothing in the app too: both processes set the handler', () => {
+    const root = path.join(__dirname, '..', '..', '..')
+    const missing = ['renderer/i18n.js', 'main/language.js'].filter(
+      (file) =>
+        !fs
+          .readFileSync(path.join(root, file), 'utf8')
+          .includes("missingInterpolationHandler: () => '',")
+    )
+    expect(missing).toEqual([])
+  })
 })
