@@ -2,6 +2,12 @@
 export const identityStatus = (state) =>
   !state || state === 'Undefined' ? 'Not validated' : state
 
+/** The statuses shown without an age: no identity of its own. */
+const NO_AGE = new Set(['Not validated', 'Vouched'])
+
+/** Whether a status (identityStatus, memberStatus) is shown with its identity's age. */
+export const showsAge = (status, age) => age > 0 && !NO_AGE.has(status)
+
 /**
  * How long ago `time` was at `now` (Unix seconds), as Reddit shows it: 5s, 10min, 7h, 1d, 5mo, 2y (a month counted
  * as 30 days, a year as 365); "now" for a time in the future (a computer clock behind the block's).
@@ -37,14 +43,13 @@ export const IDENTITY_COLORS = {
   Suspended: '#E65100',
   Zombie: '#C62828',
   Killed: '#5D4037',
+  Vouched: '#AD1457',
 }
 
 export const identityColor = (state) => IDENTITY_COLORS[state] || null
 
-/** "Human · age 12"; the state alone without an identity or at age 0. */
-export function identityLabel(state, age) {
-  const status = identityStatus(state)
-  return age > 0 && status !== 'Not validated'
-    ? `${status} · age ${age}`
-    : status
+/** "Human · age 12"; the state or status (identityStatus, memberStatus) alone without an identity or at age 0. */
+export function identityLabel(stateOrStatus, age) {
+  const status = identityStatus(stateOrStatus)
+  return showsAge(status, age) ? `${status} · age ${age}` : status
 }

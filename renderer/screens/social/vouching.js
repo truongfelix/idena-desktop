@@ -1,6 +1,7 @@
 /* global BigInt */
 import {fromWei} from './posting'
 import {isValidated, isVouchable, iterateEntries, readEntries} from './profiles'
+import {identityStatus} from './format'
 
 // Vouched members and name challenges in the profiles contract (idena-profile, rulings Q-46 and Q-47): a validated
 // identity vouches for accounts without an identity, which may then hold a name, write a profile and give Trust; a
@@ -20,6 +21,13 @@ export const isActingMember = (profile) =>
   Boolean(profile?.voucher) &&
   isVouchable(profile.state) &&
   isValidated(profile.voucherState)
+
+/**
+ * The status the apps show for an identity `state` and its `profile` (readProfiles, null when not read): "Vouched"
+ * for an account acting as a vouched member, its identity status otherwise ("Not validated" without one).
+ */
+export const memberStatus = (state, profile) =>
+  isActingMember(profile) ? 'Vouched' : identityStatus(state)
 
 /**
  * Whether a profile (readProfiles) is shown as vouched for: only while it has no identity of its own. The contract

@@ -15,7 +15,7 @@ import {
   useProfile,
 } from '../profile-hooks'
 import {ProfileCall, isValidated} from '../profiles'
-import {isVouchable, vouchCap} from '../vouching'
+import {isVouchable, memberStatus, vouchCap} from '../vouching'
 import {PersonAvatar, useShownName} from '../components/profile-public'
 import {Action} from '../components/profile-vouch'
 import {OpenTopicContext, TopicAvatar} from '../components/topic'
@@ -33,6 +33,9 @@ export function PersonRow({
   suffix = '',
 }) {
   const name = useShownName(address)
+  // A vouched member reads "Vouched" (B-316).
+  const {data: profile} = useProfile(address)
+  const status = identity ? memberStatus(identity.state, profile) : null
   return (
     <HStack
       spacing={3}
@@ -51,10 +54,10 @@ export function PersonRow({
         {identity && (
           <Text
             fontSize="sm"
-            color={identityColor(identity.state) || 'muted'}
+            color={identityColor(status) || 'muted'}
             noOfLines={1}
           >
-            {identityLabel(identity.state, identity.age)}
+            {identityLabel(status, identity.age)}
             {suffix}
           </Text>
         )}
