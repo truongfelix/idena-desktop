@@ -43,6 +43,8 @@ const svTranslation = require('../locales/sv/translation.json')
 const svError = require('../locales/sv/error.json')
 const jaTranslation = require('../locales/ja/translation.json')
 const jaError = require('../locales/ja/error.json')
+const elTranslation = require('../locales/el/translation.json')
+const elError = require('../locales/el/error.json')
 
 const getCurrentLang = () => {
   const local = app.getLocale()
@@ -78,10 +80,14 @@ const getI18nConfig = (isDev) => ({
     bg: {translation: bgTranslation, error: bgError},
     sv: {translation: svTranslation, error: svError},
     ja: {translation: jaTranslation, error: jaError},
+    el: {translation: elTranslation, error: elError},
   },
   lng: getCurrentLang(),
   fallbackLng: 'en',
   keySeparator: false,
+  // A variable the call does not pass reads as nothing, as with i18next 19 (27 shows it as written: a
+  // translation naming another variable showed "{{name}}" on screen).
+  missingInterpolationHandler: () => '',
   interpolation: {
     escapeValue: false,
   },

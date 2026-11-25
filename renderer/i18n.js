@@ -833,6 +833,9 @@ i18n.use(initReactI18next).init({
   lng: loadPersistentStateValue('settings', 'lng'),
   fallbackLng: 'en',
   keySeparator: false,
+  // A variable the call does not pass reads as nothing, as with i18next 19 (27 shows it as written: a
+  // translation naming another variable showed "{{name}}" on screen).
+  missingInterpolationHandler: () => '',
   interpolation: {
     escapeValue: false,
   },
