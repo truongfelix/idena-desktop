@@ -33,7 +33,7 @@ export function tipText(amount) {
   return rounded === 0 && value > 0 ? '0.000' : String(rounded)
 }
 
-/** The color of an identity state, as the phone app shows it (light theme); null for no identity. */
+/** The color of an identity state or status ("Vouched"), as the phone app shows it (light theme); null for none. */
 export const IDENTITY_COLORS = {
   Human: '#B8860B',
   Verified: '#1565C0',

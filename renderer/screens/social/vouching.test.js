@@ -107,9 +107,13 @@ describe('vouched members', () => {
   it('reads "Vouched" for an acting member, its identity status otherwise (B-316)', () => {
     const member = {voucher: alice, state: 'Undefined', voucherState: 'Human'}
     expect(memberStatus('Undefined', member)).toBe('Vouched')
+    expect(memberStatus('Killed', {...member, state: 'Killed'})).toBe('Vouched')
+    // Invite and Candidate keep their status; the state read now decides over an older profile.
     expect(memberStatus('Candidate', {...member, state: 'Candidate'})).toBe(
-      'Vouched'
+      'Candidate'
     )
+    expect(memberStatus('Invite', member)).toBe('Invite')
+    expect(memberStatus('Newbie', member)).toBe('Newbie')
     // A voucher out of its validation, a member who validated, no profile read: the identity's own status.
     expect(
       memberStatus('Undefined', {...member, voucherState: 'Suspended'})

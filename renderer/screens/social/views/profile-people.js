@@ -7,7 +7,7 @@ import {useSocial} from '../provider'
 import {shortAddress} from '../people'
 import {topicOf} from '../contract'
 import {topicChannel} from '../topics'
-import {identityColor, identityLabel} from '../format'
+import {identityColor, showsAge} from '../format'
 import {
   useIdentities,
   useMembers,
@@ -32,6 +32,7 @@ export function PersonRow({
   action = null,
   suffix = '',
 }) {
+  const {t} = useTranslation()
   const name = useShownName(address)
   // A vouched member reads "Vouched" (B-316).
   const {data: profile} = useProfile(address)
@@ -57,7 +58,9 @@ export function PersonRow({
             color={identityColor(status) || 'muted'}
             noOfLines={1}
           >
-            {identityLabel(status, identity.age)}
+            {showsAge(status, identity.age)
+              ? `${t(status)} · ${t('age {{age}}', {age: identity.age})}`
+              : t(status)}
             {suffix}
           </Text>
         )}
