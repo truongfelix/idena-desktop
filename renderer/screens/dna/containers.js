@@ -91,14 +91,16 @@ export function DnaSignInDialog({
     faviconUrl
   )
 
-  // Idena Connect (B-318): whether this account signed in to the site before, read when the dialog opens.
+  // Idena Connect (B-318): whether this account signed in to the site before, read again each time the dialog opens
+  // (it stays mounted between links).
   const site = signInSite({authenticationEndpoint, nonceEndpoint, callbackUrl})
+  const {isOpen} = props
   const known = React.useMemo(
     () =>
-      site.site && address
+      isOpen && site.site && address
         ? findSite(loadConnectedSites(), site.site, address)
         : null,
-    [address, site.site]
+    [address, isOpen, site.site]
   )
 
   return (
@@ -165,6 +167,8 @@ export function DnaSignInDialog({
           overflow="hidden"
           wordBreak="break-all"
           ref={initialRef}
+          // No sign-in before the account is read: the site would get no address.
+          isDisabled={!address}
           onClick={async () => {
             startSession(nonceEndpoint, {
               token,
