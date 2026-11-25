@@ -45,5 +45,6 @@
   "stake {{stake}} iDNA",
   "{{committeeSize}} oracles",
   "{{count}} votes",
-  "{{count}} votes_plural"
+  "{{count}} votes_one",
+  "{{count}} votes_other"
 ]

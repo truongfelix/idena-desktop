@@ -199,7 +199,7 @@
     "progress-stream": "^2.0.0",
     "qrcode.react": "^4.2.0",
     "react": "^18.2.0",
-    "react-i18next": "^11.2.5",
+    "react-i18next": "^18.0.3",
     "react-query": "^3.39.0",
     "react-scroll": "^1.8.7",
     "react-swipeable": "^7.0.0",
