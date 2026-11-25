@@ -226,7 +226,7 @@
   "Drafts": "草稿",
   "Archived": "存档",
   "Add flip": "添加翻转",
-  "Please submit required flips.": "请提交 {{remainingrequiredflipps}} 所要求的翻转。",
+  "Please submit required flips.": "请提交 {{remainingRequiredFlips}} 所要求的翻转。",
   "You can also submit optional flips if you want.": "如果需要，您还可以提交 {{remainingOptionalFlips}} 可选翻转。",
   "Missing keywords": "缺少关键字",
   "Mining error": "挖矿错误",

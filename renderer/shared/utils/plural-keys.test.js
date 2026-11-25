@@ -21,6 +21,7 @@ function instance(lng) {
     resources,
     fallbackLng: 'en',
     keySeparator: false,
+    missingInterpolationHandler: () => '',
     interpolation: {escapeValue: false},
     initAsync: false,
   })
@@ -80,5 +81,33 @@ describe('plural texts', () => {
     ['ja', '{{count}} votes', 3, '3 件の投票'],
   ])('%s: %s at %d reads %s', (lng, key, count, text) => {
     expect(instance(lng).t(key, {count})).toBe(text)
+  })
+})
+
+describe('the variables of a translation', () => {
+  // i18next shows a variable the call does not pass as nothing (missingInterpolationHandler): a translation that
+  // names another variable than the English text loses its value ("{{remainingrequiredflipps}}" in Chinese).
+  const names = (text) =>
+    [...String(text || '').matchAll(/\{\{\s*([^}\s,]+)/g)].map((m) => m[1])
+
+  it('are among the English text’s', () => {
+    const en = read('en', 'translation')
+    const wrong = []
+    for (const lang of langs)
+      for (const [key, text] of Object.entries(read(lang, 'translation'))) {
+        const base = key.replace(/_(zero|one|two|few|many|other)$/, '')
+        const known = new Set([
+          ...names(base),
+          ...names(en[key]),
+          ...names(en[base]),
+        ])
+        const unknown = names(text).filter((name) => !known.has(name))
+        if (unknown.length) wrong.push(`${lang}: ${key} -> ${unknown}`)
+      }
+    expect(wrong).toEqual([])
+  })
+
+  it('read as nothing when the call does not pass them', () => {
+    expect(instance('en').t('Epoch #{{epoch}}')).toBe('Epoch #')
   })
 })
