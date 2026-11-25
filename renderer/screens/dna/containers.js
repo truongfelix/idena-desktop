@@ -12,6 +12,13 @@ import {
   useDisclosure,
 } from '@chakra-ui/react'
 import {useIdentityState} from '../../shared/providers/identity-context'
+import {
+  findSite,
+  loadConnectedSites,
+  recordSignIn,
+  saveConnectedSites,
+  signInSite,
+} from './connected-sites'
 import {SecondaryButton, PrimaryButton} from '../../shared/components/button'
 import {
   DnaDialog,
@@ -84,6 +91,16 @@ export function DnaSignInDialog({
     faviconUrl
   )
 
+  // Idena Connect (B-318): whether this account signed in to the site before, read when the dialog opens.
+  const site = signInSite({authenticationEndpoint, nonceEndpoint, callbackUrl})
+  const known = React.useMemo(
+    () =>
+      site.site && address
+        ? findSite(loadConnectedSites(), site.site, address)
+        : null,
+    [address, site.site]
+  )
+
   return (
     <DnaDialog
       initialFocusRef={initialRef}
@@ -117,6 +134,27 @@ export function DnaSignInDialog({
             </MediaDnaDialogStat>
             <SimpleDnaDialogStat label={t('Token')} value={token} />
           </Stack>
+          <Text color="muted" fontSize="sm">
+            {known
+              ? t(
+                  'You signed in to {{host}} with this account before, last on {{date}}.',
+                  {
+                    host: site.host,
+                    date: new Date(known.lastAt).toLocaleString(),
+                  }
+                )
+              : t('First sign-in to {{host}} with this account.', {
+                  host: site.host,
+                })}
+          </Text>
+          {site.otherHosts.length > 0 && (
+            <Text color="red.500" fontSize="sm">
+              {t(
+                'The signature is sent to {{host}}, while the link also names {{others}}. Confirm only if you trust {{host}}.',
+                {host: site.host, others: site.otherHosts.join(', ')}
+              )}
+            </Text>
+          )}
         </Stack>
       </DialogBody>
       <DialogFooter>
@@ -140,6 +178,15 @@ export function DnaSignInDialog({
                 })
               )
               .then(() => {
+                // The list of Idena Connect: the sign-in the site accepted.
+                if (site.site)
+                  saveConnectedSites(
+                    recordSignIn(
+                      loadConnectedSites(),
+                      {site: site.site, address},
+                      Date.now()
+                    )
+                  )
                 if (isValidUrl(callbackUrl)) global.openExternal(callbackUrl)
                 else onSignInError('Invalid callback URL')
               })

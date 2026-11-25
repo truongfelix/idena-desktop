@@ -2024,5 +2024,14 @@
   "🖼 {{number}} media. Click to show them.": "🖼 {{number}} médias. Cliquez pour les afficher.",
   "🖼 {{number}} media: open the post to show them.": "🖼 {{number}} médias : ouvrez la publication pour les afficher.",
   "🖼 {{number}} more media: open the post to show them.": "🖼 {{number}} médias de plus : ouvrez la publication pour les afficher.",
-  "The post holds {{number}} more media, not shown: the app shows {{most}} a post.": "La publication contient {{number}} médias de plus, non affichés : l'app en affiche {{most}} par publication."
+  "The post holds {{number}} more media, not shown: the app shows {{most}} a post.": "La publication contient {{number}} médias de plus, non affichés : l'app en affiche {{most}} par publication.",
+  "You signed in to {{host}} with this account before, last on {{date}}.": "Vous vous êtes déjà connecté à {{host}} avec ce compte, la dernière fois le {{date}}.",
+  "First sign-in to {{host}} with this account.": "Première connexion à {{host}} avec ce compte.",
+  "The signature is sent to {{host}}, while the link also names {{others}}. Confirm only if you trust {{host}}.": "La signature est envoyée à {{host}}, alors que le lien nomme aussi {{others}}. Ne confirmez que si vous faites confiance à {{host}}.",
+  "Idena Connect": "Idena Connect",
+  "Websites you signed in to with Idena": "Les sites où vous vous êtes connecté avec Idena",
+  "Kept on this computer only. Forget removes a website from this list: the website itself may keep you signed in.": "Gardé sur cet ordinateur seulement. Oublier retire un site de cette liste : le site lui-même peut vous garder connecté.",
+  "No website yet. A website that offers Sign in with Idena shows here after you confirm its sign-in.": "Aucun site pour l'instant. Un site qui propose la connexion avec Idena apparaît ici une fois sa connexion confirmée.",
+  "First sign-in {{first}} · last {{last}} · sign-ins: {{number}}": "Première connexion {{first}} · dernière {{last}} · connexions : {{number}}",
+  "Forget": "Oublier"
 }

@@ -2000,5 +2000,14 @@
   "🖼 {{number}} media. Click to show them.": "🖼 {{number}} media. Click to show them.",
   "🖼 {{number}} media: open the post to show them.": "🖼 {{number}} media: open the post to show them.",
   "🖼 {{number}} more media: open the post to show them.": "🖼 {{number}} more media: open the post to show them.",
-  "The post holds {{number}} more media, not shown: the app shows {{most}} a post.": "The post holds {{number}} more media, not shown: the app shows {{most}} a post."
+  "The post holds {{number}} more media, not shown: the app shows {{most}} a post.": "The post holds {{number}} more media, not shown: the app shows {{most}} a post.",
+  "You signed in to {{host}} with this account before, last on {{date}}.": "You signed in to {{host}} with this account before, last on {{date}}.",
+  "First sign-in to {{host}} with this account.": "First sign-in to {{host}} with this account.",
+  "The signature is sent to {{host}}, while the link also names {{others}}. Confirm only if you trust {{host}}.": "The signature is sent to {{host}}, while the link also names {{others}}. Confirm only if you trust {{host}}.",
+  "Idena Connect": "Idena Connect",
+  "Websites you signed in to with Idena": "Websites you signed in to with Idena",
+  "Kept on this computer only. Forget removes a website from this list: the website itself may keep you signed in.": "Kept on this computer only. Forget removes a website from this list: the website itself may keep you signed in.",
+  "No website yet. A website that offers Sign in with Idena shows here after you confirm its sign-in.": "No website yet. A website that offers Sign in with Idena shows here after you confirm its sign-in.",
+  "First sign-in {{first}} · last {{last}} · sign-ins: {{number}}": "First sign-in {{first}} · last {{last}} · sign-ins: {{number}}",
+  "Forget": "Forget"
 }
