@@ -230,6 +230,14 @@ export function nodeSocialSource(call = socialRpc, now = () => Date.now()) {
       return callsToActivity(found, version)
     },
 
+    // The calls of a few blocks (at most BLOCKS_PER_CALL) of one contract version, in one read: the batch size stays.
+    async callsAt(heights, version = CURRENT_VERSION) {
+      const calls = await call('bcn_contractCalls', [
+        {contract: version.address, heights},
+      ])
+      return callsToActivity(calls || [], version)
+    },
+
     async authors(version = CURRENT_VERSION) {
       const authors = {}
       const seen = new Set()

@@ -1,7 +1,8 @@
 // Topics: a post whose channelId is "r/<name>" is in topic <name>. Anyone writes in any topic, there is no
 // moderation and no contract: the name is only the post's channel. Its replies, comments, likes and tips keep
-// today's format and follow it. idena.social shows no post in such a channel; our apps show them in the feed with
-// their topic, and in the topic's own feed. The same rules as the phone app (SocialTopics.kt).
+// today's format and follow it. Our apps show them in the feed with their topic, and in the topic's own feed;
+// idena.social does too, with the same name rule (its src/logic/topics.ts, read 2026-11-23). The same rules as the
+// phone app (SocialTopics.kt).
 
 import {TOPIC_NAME, TOPIC_PREFIX, topicChannel, topicOf} from './contract'
 import {lastActivityHeight} from './feed'

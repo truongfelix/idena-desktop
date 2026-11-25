@@ -56,8 +56,7 @@ describe('the arguments', () => {
     )
     expect(
       makePostArgument('look', {
-        media: 'ipfs://bafkreiabc',
-        mediaType: 'image/webp',
+        media: [{media: 'ipfs://bafkreiabc', mediaType: 'image/webp'}],
       })
     ).toBe(
       '{"message":"look","media":["ipfs://bafkreiabc"],"mediaType":["image/webp"]}'
@@ -65,8 +64,7 @@ describe('the arguments', () => {
     expect(
       makePostArgument('', {
         ...PostTarget.onReply(7),
-        media: 'ipfs://bafkreiabc',
-        mediaType: 'image/webp',
+        media: [{media: 'ipfs://bafkreiabc', mediaType: 'image/webp'}],
       })
     ).toBe(
       '{"message":"","replyToPostId":"7","channelId":"discuss:7","media":["ipfs://bafkreiabc"],"mediaType":["image/webp"]}'
@@ -98,8 +96,7 @@ describe('the arguments', () => {
       args: [
         hex(
           makePostArgument('ipfs://bafkreitext', {
-            media: 'ipfs://bafkreiimg',
-            mediaType: 'image/webp',
+            media: [{media: 'ipfs://bafkreiimg', mediaType: 'image/webp'}],
           })
         ),
       ],
@@ -200,6 +197,73 @@ describe('preparing', () => {
     expect(totalFee(pending)).toBe(pending.fee.fee)
   })
 
+  it('writes up to five media in order, each type without its parameters (B-311)', () => {
+    const media = [
+      {media: 'ipfs://b1', mediaType: 'image/webp'},
+      {media: 'ipfs://b2', mediaType: 'video/webm;codecs="vp8,opus"'},
+      {media: 'ipfs://b3', mediaType: 'audio/mp4'},
+    ]
+    expect(makePostArgument('three', {media})).toBe(
+      '{"message":"three","media":["ipfs://b1","ipfs://b2","ipfs://b3"],"mediaType":["image/webp","video/webm","audio/mp4"]}'
+    )
+    const six = Array.from({length: 6}, (_, i) => ({
+      media: `ipfs://b${i}`,
+      mediaType: 'image/webp',
+    }))
+    expect(() => makePostArgument('', {media: six})).toThrow(
+      'at most 5 media in a post'
+    )
+    expect(makePostArgument('', {media: six.slice(0, 5)})).toContain(
+      '"ipfs://b4"]'
+    )
+    expect(() =>
+      makePostArgument('', {media: [{media: 'a,b', mediaType: 'image/webp'}]})
+    ).toThrow('a media or its type holds a comma')
+  })
+
+  it("reads all of a post's media, the first as before (B-311)", () => {
+    const read = (arg) =>
+      parsePost({
+        hash: '0x01',
+        height: 1,
+        timestamp: 1,
+        index: 0,
+        from: me,
+        args: [hex(JSON.stringify(arg))],
+      })
+    const two = read({
+      message: 'two',
+      media: ['ipfs://b1', 'ipfs://b2'],
+      mediaType: ['image/webp', 'video/mp4'],
+    })
+    expect(two).toMatchObject({
+      hasMedia: true,
+      media: 'ipfs://b1',
+      mediaType: 'image/webp',
+      more: [{media: 'ipfs://b2', mediaType: 'video/mp4'}],
+    })
+    const one = read({message: 'one', media: ['ipfs://b1'], mediaType: ['x']})
+    expect(one).not.toHaveProperty('more')
+    // Another client's longer list: five are read (mediaCount: all).
+    const seven = read({
+      message: '',
+      media: Array.from({length: 7}, (_, i) => `ipfs://b${i}`),
+      mediaType: ['image/webp'],
+    })
+    // A media without its type is left out, as the website does.
+    expect(seven).toMatchObject({media: 'ipfs://b0', mediaType: 'image/webp'})
+    expect(seven).not.toHaveProperty('more')
+    const many = read({
+      message: '',
+      media: Array.from({length: 7}, (_, i) => `ipfs://b${i}`),
+      mediaType: Array.from({length: 7}, () => 'image/webp'),
+    })
+    expect(many.more).toHaveLength(4)
+    expect(many.more[3]).toEqual({media: 'ipfs://b4', mediaType: 'image/webp'})
+    expect(many.mediaCount).toBe(7)
+    expect(two).not.toHaveProperty('mediaCount')
+  })
+
   it("passes on the contract's refusal", async () => {
     const node = scriptedNode({
       contract_estimateCall: {success: false, error: 'non-existent post'},
@@ -224,7 +288,7 @@ describe('preparing', () => {
     const pending = await prepareDraft(node.call, {
       text: '  long text ',
       textOnIpfs: true,
-      image: Uint8Array.from([1, 2, 3]),
+      media: [{bytes: Uint8Array.from([1, 2, 3]), type: 'image/webp'}],
       target: PostTarget.onReply(7),
     })
     expect(node.methods()).toEqual([
@@ -266,17 +330,112 @@ describe('preparing', () => {
     await expect(
       prepareDraft(node.call, {
         text: '',
-        image: new Uint8Array(900001),
+        media: [{bytes: new Uint8Array(900001)}],
         target: PostTarget.newPost(),
       })
     ).rejects.toThrow('the image is too large (900 KB, at most 900 KB)')
     const pending = await prepareDraft(
       node.call,
-      {text: '', image: Uint8Array.from([1]), target: PostTarget.newPost()},
+      {
+        text: '',
+        media: [{bytes: Uint8Array.from([1])}],
+        target: PostTarget.newPost(),
+      },
       new Set(['bimage'])
     )
     expect(pending.files[0]).toMatchObject({stored: true, fee: BigInt(0)})
     expect(node.methods()).not.toContain('bcn_estimateTx')
+  })
+})
+
+describe('several media and self-hosting (B-311)', () => {
+  it('stores each media in order, the same file once', async () => {
+    const node = scriptedNode({
+      dna_getCoinbaseAddr: me,
+      ipfs_cid: ([data]) => (data === '0x01' ? 'bone' : 'btwo'),
+      bcn_estimateTx: {txFee: '0.5'},
+      contract_estimateCall: {success: true, txFee: '1', gasCost: '0'},
+      dna_getBalance: {balance: '10'},
+    })
+    const pending = await prepareDraft(node.call, {
+      text: 'look',
+      media: [
+        {bytes: Uint8Array.from([1]), type: 'image/webp'},
+        {bytes: Uint8Array.from([2]), type: 'video/mp4', what: 'video'},
+        {bytes: Uint8Array.from([1]), type: 'image/webp'},
+      ],
+      target: PostTarget.newPost(),
+    })
+    expect(pending.files.map(({what, cid}) => [what, cid])).toEqual([
+      ['image', 'bone'],
+      ['video', 'btwo'],
+    ])
+    expect(pending.socialCall.argument).toBe(
+      '{"message":"look","media":["ipfs://bone","ipfs://btwo","ipfs://bone"],"mediaType":["image/webp","video/mp4","image/webp"]}'
+    )
+    expect(fromWei(totalFee(pending), 2)).toBe('2.00')
+    // Which one is too large, among several.
+    await expect(
+      prepareDraft(node.call, {
+        text: '',
+        media: [{bytes: Uint8Array.from([1])}, {bytes: new Uint8Array(900001)}],
+        target: PostTarget.newPost(),
+      })
+    ).rejects.toThrow('media 2: the image is too large')
+  })
+
+  it('hosts the files on this node alone: no storage fee, no storeToIpfs', async () => {
+    const node = scriptedNode({
+      dna_getCoinbaseAddr: me,
+      ipfs_cid: ([data]) => (data === hex('long text') ? 'btext' : 'bimage'),
+      contract_estimateCall: {success: true, txFee: '1', gasCost: '0'},
+      dna_getBalance: {balance: '2.1'},
+      ipfs_add: ([data]) => (data === hex('long text') ? 'btext' : 'bimage'),
+      contract_call: '0xcall',
+    })
+    const pending = await prepareDraft(node.call, {
+      text: 'long text',
+      textOnIpfs: true,
+      media: [{bytes: Uint8Array.from([1])}],
+      selfHosted: true,
+      target: PostTarget.newPost(),
+    })
+    expect(node.methods()).not.toContain('bcn_estimateTx')
+    expect(pending.files).toMatchObject([
+      {what: 'text', cid: 'btext', fee: BigInt(0), selfHosted: true},
+      {what: 'image', cid: 'bimage', fee: BigInt(0), selfHosted: true},
+    ])
+    expect(fromWei(totalFee(pending), 2)).toBe('1.00')
+    const stored = []
+    await sendPrepared(node.call, pending, {
+      onStored: (cid) => stored.push(cid),
+    })
+    const sent = node.calls.filter(({method}) => method === 'ipfs_add')
+    // Pinned on this node, never handed to the network.
+    expect(sent.map(({params}) => params[1])).toEqual([true, true])
+    expect(node.methods()).not.toContain('dna_storeToIpfs')
+    expect(stored).toEqual([])
+  })
+
+  it('still costs nothing for a file the network already keeps', async () => {
+    const node = scriptedNode({
+      dna_getCoinbaseAddr: me,
+      ipfs_cid: 'bimage',
+      contract_estimateCall: {success: true, txFee: '1', gasCost: '0'},
+      dna_getBalance: {balance: '10'},
+    })
+    const pending = await prepareDraft(
+      node.call,
+      {
+        text: '',
+        media: [{bytes: Uint8Array.from([1])}],
+        selfHosted: true,
+        target: PostTarget.newPost(),
+      },
+      new Set(['bimage'])
+    )
+    expect(pending.files[0]).toMatchObject({stored: true, fee: BigInt(0)})
+    expect(pending.files[0].selfHosted).toBeUndefined()
   })
 })
 
