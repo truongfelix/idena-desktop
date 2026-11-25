@@ -52,5 +52,9 @@ module.exports = {
       lineEnding: '\n',
     },
     keySeparator: false,
+    // The locales use i18next's v4 plural keys (key_one, key_few, key_other, key_zero): this scanner (2.x) would add
+    // v3 keys (key_plural) that i18next 27 no longer reads. Plural texts are added by hand. Its "No plural rule found"
+    // warnings come from the same mismatch and are expected.
+    plural: false,
   },
 }

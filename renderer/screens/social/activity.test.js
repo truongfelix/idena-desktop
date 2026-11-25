@@ -108,7 +108,7 @@ describe('the notice of several new things', () => {
     resources: {en: {translation}},
     lng: 'en',
     keySeparator: false,
-    initImmediate: false,
+    initAsync: false,
     interpolation: {escapeValue: false},
   })
   const t = i18n.t.bind(i18n)
