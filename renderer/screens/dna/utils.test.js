@@ -9,6 +9,7 @@ import {
   isOpenableDnaUrl,
   isValidDnaUrl,
   newerDnaLink,
+  nonceSiteMismatch,
   signNonce,
   urlLogContext,
 } from './utils'
@@ -73,6 +74,60 @@ describe('Idena Connect disconnect (B-318)', () => {
     // No message of the site's: an empty one, which the page replaces with its own text.
     axios.post.mockResolvedValueOnce({data: {data: {}}})
     await expect(disconnect('https://a.example/d', args)).rejects.toThrow(/^$/)
+  })
+})
+
+describe('a sign-in nonce made for a site', () => {
+  const link = {
+    authenticationEndpoint: 'https://duelbelote.fr/auth/v1/authenticate',
+    nonceEndpoint: 'https://duelbelote.fr/auth/v1/start-session',
+  }
+
+  it('signs a nonce naming the site of the link, or naming none', () => {
+    expect(nonceSiteMismatch('signin-duelbelote.fr/ab12', link)).toBeNull()
+    expect(nonceSiteMismatch('signin-ab12', link)).toBeNull()
+    expect(nonceSiteMismatch('signin-ab-12', link)).toBeNull()
+    expect(
+      nonceSiteMismatch('signin-127.0.0.1:29780/x', {
+        authenticationEndpoint: 'http://127.0.0.1:29780/auth/v1/authenticate',
+        nonceEndpoint: 'http://127.0.0.1:29780/auth/v1/start-session',
+      })
+    ).toBeNull()
+  })
+
+  it('refuses a nonce another site made, passed on by this one', () => {
+    const evil = {
+      authenticationEndpoint: 'https://evil.example/auth',
+      nonceEndpoint: 'https://evil.example/nonce',
+    }
+    expect(nonceSiteMismatch('signin-duelbelote.fr/ab12', evil)).toEqual({
+      named: 'duelbelote.fr',
+      site: 'evil.example',
+    })
+  })
+
+  it('compares the whole host as URL.host writes it', () => {
+    expect(
+      nonceSiteMismatch('signin-duelbelote.fr.evil.example/x', link)
+    ).toEqual({named: 'duelbelote.fr.evil.example', site: 'duelbelote.fr'})
+    expect(nonceSiteMismatch('signin-www.duelbelote.fr/x', link)).not.toBeNull()
+    expect(nonceSiteMismatch('signin-duelbelote.fr:443/x', link)).not.toBeNull()
+    expect(nonceSiteMismatch('signin-DuelBelote.fr/x', link)).not.toBeNull()
+    expect(nonceSiteMismatch('signin-/x', link)).toEqual({
+      named: '',
+      site: 'duelbelote.fr',
+    })
+    // The first "/" ends the host: a "/" in the random part changes nothing.
+    expect(nonceSiteMismatch('signin-duelbelote.fr/a/b', link)).toBeNull()
+  })
+
+  it('refuses a nonce naming the site when the nonce comes from another host', () => {
+    expect(
+      nonceSiteMismatch('signin-duelbelote.fr/x', {
+        ...link,
+        nonceEndpoint: 'https://evil.example/nonce',
+      })
+    ).not.toBeNull()
   })
 })
 

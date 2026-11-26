@@ -35,6 +35,7 @@ import {
   startSession,
   authenticate,
   signNonce,
+  nonceSiteMismatch,
   isReservedSignText,
   isValidUrl,
   sendDna,
@@ -190,7 +191,21 @@ export function DnaSignInDialog({
               token,
               address,
             })
-              .then(signNonce)
+              .then((nonce) => {
+                // A nonce made for another site: this site would sign in there with the signature.
+                const other = nonceSiteMismatch(nonce, {
+                  authenticationEndpoint,
+                  nonceEndpoint,
+                })
+                if (other)
+                  throw new Error(
+                    t('This sign-in was made for {{named}}, not {{site}}', {
+                      named: other.named || '?',
+                      site: other.site,
+                    })
+                  )
+                return signNonce(nonce)
+              })
               .then((signature) =>
                 authenticate(authenticationEndpoint, {
                   token,

@@ -2032,6 +2032,7 @@
   "Idena Connect": "Idena Connect",
   "Websites you signed in to with Idena": "Les sites où vous vous êtes connecté avec Idena",
   "Kept on this computer only. Disconnect asks the website to end your sign-in, where it offers it; Forget only removes it from this list: the website may keep you signed in.": "Gardé sur cet ordinateur seulement. Déconnecter demande au site de mettre fin à votre connexion, s'il le propose ; Oublier le retire seulement de cette liste : le site peut vous garder connecté.",
+  "This sign-in was made for {{named}}, not {{site}}": "Cette connexion a été faite pour {{named}}, pas pour {{site}}",
   "Disconnected from {{host}}": "Déconnecté de {{host}}",
   "The website did not disconnect you": "Le site ne vous a pas déconnecté",
   "No website yet. A website that offers Sign in with Idena shows here after you confirm its sign-in.": "Aucun site pour l'instant. Un site qui propose la connexion avec Idena apparaît ici une fois sa connexion confirmée.",

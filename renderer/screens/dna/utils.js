@@ -184,6 +184,28 @@ export async function startSession(nonceEndpoint, {token, address}) {
   throw new Error(`You must start prefix with ${DNA_NONCE_PREFIX}`)
 }
 
+/**
+ * The site a sign-in nonce was made for, when it is not the site of this link. A nonce may name its site:
+ * `signin-<host>/<random>`, the host as `URL.host` writes it (lower case, the port only when it is not the default
+ * one). A site that passed on another site's nonce as its own would get a signature that signs in there: the app
+ * signs a nonce naming a site only for that site, the host of the authentication endpoint (which receives the
+ * signature) and of the nonce endpoint. A nonce naming no site (no "/") is signed as before. Returns
+ * `{named, site}` for a nonce made for another site, else null.
+ */
+export function nonceSiteMismatch(
+  nonce,
+  {authenticationEndpoint, nonceEndpoint}
+) {
+  const rest = String(nonce).slice(DNA_NONCE_PREFIX.length)
+  const slash = rest.indexOf('/')
+  if (slash < 0) return null
+  const named = rest.slice(0, slash)
+  const site = new URL(authenticationEndpoint).host
+  return named === site && new URL(nonceEndpoint).host === site
+    ? null
+    : {named, site}
+}
+
 export async function signNonce(nonce, format) {
   const params = [nonce]
   if (format) {

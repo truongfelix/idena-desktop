@@ -2008,6 +2008,7 @@
   "Idena Connect": "Idena Connect",
   "Websites you signed in to with Idena": "Websites you signed in to with Idena",
   "Kept on this computer only. Disconnect asks the website to end your sign-in, where it offers it; Forget only removes it from this list: the website may keep you signed in.": "Kept on this computer only. Disconnect asks the website to end your sign-in, where it offers it; Forget only removes it from this list: the website may keep you signed in.",
+  "This sign-in was made for {{named}}, not {{site}}": "This sign-in was made for {{named}}, not {{site}}",
   "Disconnected from {{host}}": "Disconnected from {{host}}",
   "The website did not disconnect you": "The website did not disconnect you",
   "No website yet. A website that offers Sign in with Idena shows here after you confirm its sign-in.": "No website yet. A website that offers Sign in with Idena shows here after you confirm its sign-in.",
