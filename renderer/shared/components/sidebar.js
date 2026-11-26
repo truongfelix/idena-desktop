@@ -31,6 +31,7 @@ import {useEpochState} from '../providers/epoch-context'
 import {useChainState, useSyncStep} from '../providers/chain-context'
 import {SyncPhase} from '../utils/sync-steps'
 import {NodeStatus, nodeStatus, peerCounts} from '../utils/node-status'
+import {isNavItemActive} from '../utils/nav'
 import {useAutoUpdate} from '../providers/update-context'
 import useRpc from '../hooks/use-rpc'
 import {usePoll} from '../hooks/use-interval'
@@ -475,7 +476,7 @@ function Nav(props) {
 
 function NavItem({href, icon, children}) {
   const {pathname} = useRouter()
-  const isActive = pathname.startsWith(href)
+  const isActive = isNavItemActive(pathname, href)
 
   return (
     <LinkBox
