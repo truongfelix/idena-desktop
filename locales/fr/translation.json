@@ -2055,5 +2055,6 @@
   "Validation rewards and penalties in My Idena": "Récompenses et pénalités de validation dans Mon Idena",
   "All your validations in My Idena": "Toutes vos validations dans Mon Idena",
   "The history could not be read from your node.": "L'historique n'a pas pu être lu sur votre nœud.",
-  "A read from your node failed: the list may be incomplete or not up to date.": "Une lecture sur votre nœud a échoué : la liste est peut-être incomplète ou pas à jour."
+  "A read from your node failed: the list may be incomplete or not up to date.": "Une lecture sur votre nœud a échoué : la liste est peut-être incomplète ou pas à jour.",
+  "The history shows once your node answers.": "L'historique s'affiche dès que votre nœud répond."
 }

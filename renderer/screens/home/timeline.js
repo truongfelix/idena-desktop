@@ -7,6 +7,7 @@ import {useQuery} from 'react-query'
 import {FillPlaceholder} from '../oracles/components'
 import {TextLink} from '../../shared/components/components'
 import {callRpc, toLocaleDna} from '../../shared/utils/utils'
+import {useChainState} from '../../shared/providers/chain-context'
 import {useIdentityHistory} from '../history/hooks'
 import {HistoryTab, parseHistoryTab} from '../history/utils'
 import {CeremoniesTab, MiningTab, StaleReadNote} from '../history/components'
@@ -18,6 +19,7 @@ export function TimelineContent({
   history,
   isError,
   isSuccess,
+  offline,
   error,
 }) {
   const {t} = useTranslation()
@@ -41,6 +43,13 @@ export function TimelineContent({
           : t(
               'No validation of this address in the ceremonies your node knows.'
             )}
+      </FillPlaceholder>
+    )
+  // Nothing read and the node down (also from the start, before the own address is known): no read is coming.
+  if (!history && offline)
+    return (
+      <FillPlaceholder py={12}>
+        {t('The history shows once your node answers.')}
       </FillPlaceholder>
     )
   if (!history)
@@ -68,9 +77,9 @@ export function TimelineContent({
 }
 
 /**
- * My Idena's timeline (read whatever the node's state, as Wallets' list: a node down from the start shows the failed
- * read, not loading bars for good): the identity's ceremonies (results, rewards, penalties) and, for the own address, its mining
- * per epoch, from the own node (dna_identityHistory). The tab is in the address bar (?tab=mining).
+ * My Idena's timeline: the identity's ceremonies (results, rewards, penalties) and, for the own address, its mining
+ * per epoch, from the own node (dna_identityHistory), read while the node is online (again at once when it comes
+ * back). The tab is in the address bar (?tab=mining).
  */
 export function IdentityTimeline({address, isOwn}) {
   const {t} = useTranslation()
@@ -78,7 +87,13 @@ export function IdentityTimeline({address, isOwn}) {
 
   const tab = isOwn ? parseHistoryTab(router.query.tab) : HistoryTab.Ceremonies
 
-  const {data: history, isError, isSuccess, error} = useIdentityHistory(address)
+  const {offline} = useChainState()
+  const {
+    data: history,
+    isError,
+    isSuccess,
+    error,
+  } = useIdentityHistory(address, {enabled: !offline})
 
   const selectTab = (value) =>
     router.replace(
@@ -118,6 +133,7 @@ export function IdentityTimeline({address, isOwn}) {
         history={history}
         isError={isError}
         isSuccess={isSuccess}
+        offline={offline}
         error={error}
       />
     </Stack>

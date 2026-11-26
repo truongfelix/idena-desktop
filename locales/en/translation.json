@@ -2031,5 +2031,6 @@
   "Validation rewards and penalties in My Idena": "Validation rewards and penalties in My Idena",
   "All your validations in My Idena": "All your validations in My Idena",
   "The history could not be read from your node.": "The history could not be read from your node.",
-  "A read from your node failed: the list may be incomplete or not up to date.": "A read from your node failed: the list may be incomplete or not up to date."
+  "A read from your node failed: the list may be incomplete or not up to date.": "A read from your node failed: the list may be incomplete or not up to date.",
+  "The history shows once your node answers.": "The history shows once your node answers."
 }
