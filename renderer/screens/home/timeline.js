@@ -18,7 +18,9 @@ function TimelineContent({tab, isOwn, history, isError, error}) {
   if (isError)
     return (
       <FillPlaceholder py={12}>
-        {t('Your node did not answer the history request.')} {error?.message}
+        {[t('The history could not be read from your node.'), error?.message]
+          .filter(Boolean)
+          .join(' ')}
       </FillPlaceholder>
     )
   if (!history)
