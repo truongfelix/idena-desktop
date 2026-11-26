@@ -13,7 +13,14 @@ import {HistoryTab, parseHistoryTab} from '../history/utils'
 import {CeremoniesTab, MiningTab, StaleReadNote} from '../history/components'
 import {UserInlineCard} from './components'
 
-function TimelineContent({tab, isOwn, history, isError, isSuccess, error}) {
+export function TimelineContent({
+  tab,
+  isOwn,
+  history,
+  isError,
+  isSuccess,
+  error,
+}) {
   const {t} = useTranslation()
   // A failed refresh keeps the timeline already read (as Wallets keeps its list).
   if (isError && !history)
@@ -115,7 +122,7 @@ export function IdentityTimeline({address, isOwn}) {
         tab={tab}
         isOwn={isOwn}
         history={history}
-        isError={isError && !offline}
+        isError={isError}
         isSuccess={isSuccess}
         error={error}
       />
