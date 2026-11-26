@@ -5,7 +5,7 @@ import {useRouter} from 'next/router'
 import {useTranslation} from 'react-i18next'
 import {useQuery} from 'react-query'
 import {FillPlaceholder} from '../oracles/components'
-import {TextLink} from '../../shared/components/components'
+import {SmallText, TextLink} from '../../shared/components/components'
 import {useChainState} from '../../shared/providers/chain-context'
 import {callRpc, toLocaleDna} from '../../shared/utils/utils'
 import {useIdentityHistory} from '../history/hooks'
@@ -13,7 +13,7 @@ import {HistoryTab, parseHistoryTab} from '../history/utils'
 import {CeremoniesTab, MiningTab} from '../history/components'
 import {UserInlineCard} from './components'
 
-function TimelineContent({tab, isOwn, history, isError, error}) {
+function TimelineContent({tab, isOwn, history, isError, isSuccess, error}) {
   const {t} = useTranslation()
   // A failed refresh keeps the timeline already read (as Wallets keeps its list).
   if (isError && !history)
@@ -24,6 +24,13 @@ function TimelineContent({tab, isOwn, history, isError, error}) {
           .join(' ')}
       </FillPlaceholder>
     )
+  // The node answered with no history at all: nothing to wait for.
+  if (!history && isSuccess)
+    return (
+      <FillPlaceholder py={12}>
+        {t('No validation of this address in the ceremonies your node knows.')}
+      </FillPlaceholder>
+    )
   if (!history)
     return (
       <Stack spacing={2}>
@@ -32,9 +39,30 @@ function TimelineContent({tab, isOwn, history, isError, error}) {
         <Skeleton h={8} />
       </Stack>
     )
-  if (tab === HistoryTab.Mining)
-    return <MiningTab history={history} isOwn={isOwn} />
-  return <CeremoniesTab history={history} isOwn={isOwn} />
+  const content =
+    tab === HistoryTab.Mining ? (
+      <MiningTab history={history} isOwn={isOwn} />
+    ) : (
+      <CeremoniesTab history={history} isOwn={isOwn} />
+    )
+  if (!isError) return content
+  // A failed refresh: the timeline already read stays, with a line saying it may be out of date (as on Wallets).
+  return (
+    <Stack spacing={4}>
+      <SmallText color="red.500">
+        {[
+          t(
+            'A read from your node failed: the list may be incomplete or not up to date.',
+            {nsSeparator: '|'}
+          ),
+          error?.message,
+        ]
+          .filter(Boolean)
+          .join(' ')}
+      </SmallText>
+      {content}
+    </Stack>
+  )
 }
 
 /**
@@ -51,6 +79,7 @@ export function IdentityTimeline({address, isOwn}) {
   const {
     data: history,
     isError,
+    isSuccess,
     error,
   } = useIdentityHistory(address, {enabled: !offline})
 
@@ -91,6 +120,7 @@ export function IdentityTimeline({address, isOwn}) {
         isOwn={isOwn}
         history={history}
         isError={isError}
+        isSuccess={isSuccess}
         error={error}
       />
     </Stack>
