@@ -1,6 +1,11 @@
 import {Flex, Stack, Text} from '@chakra-ui/react'
 import {useTranslation} from 'react-i18next'
-import {SettingsLinkButton} from '../../screens/settings/components'
+import {
+  SettingsLinkButton,
+  SettingsSection,
+} from '../../screens/settings/components'
+import {AdvancedNodeSettings} from '../../screens/settings/containers'
+import {useSettingsState} from '../../shared/providers/settings-context'
 import {HDivider} from '../../shared/components/components'
 import {useEpochState} from '../../shared/providers/epoch-context'
 import {requestDb, subDb} from '../../shared/utils/db'
@@ -15,8 +20,15 @@ export default function AdvancedSettings() {
 
   const epochState = useEpochState()
 
+  const {runInternalNode} = useSettingsState()
+
   return (
     <SettingsLayout>
+      {runInternalNode && (
+        <SettingsSection title={t('Built-in node')} maxW="xl" mt={8}>
+          <AdvancedNodeSettings />
+        </SettingsSection>
+      )}
       {epochState && (
         <Stack spacing="6" mt="8">
           <HDivider />

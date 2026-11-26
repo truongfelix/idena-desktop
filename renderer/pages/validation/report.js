@@ -8,7 +8,7 @@ import {
   Text,
   useTheme,
 } from '@chakra-ui/react'
-import router, {useRouter} from 'next/router'
+import {useRouter} from 'next/router'
 import {useTranslation} from 'react-i18next'
 import {UserInlineCard} from '../../screens/home/components'
 import {
@@ -28,6 +28,7 @@ import {
 } from '../../screens/validation/report/components'
 import {useValidationReportSummary} from '../../screens/validation/report/hooks'
 import {validationEpochLabel} from '../../screens/history/utils'
+import {useClosePage} from '../../shared/utils/page-history'
 import {
   ValidationResult,
   ValidationSummaryStatus,
@@ -62,8 +63,9 @@ export default function ValidationReport() {
 
   const {address, state} = identity
 
-  // ?epoch=: a past ceremony's report, opened from the History page.
+  // ?epoch=: a past ceremony's report, opened from My Idena's timeline.
   const {query} = useRouter()
+  const closePage = useClosePage()
   const queryEpoch = Number.parseInt(query.epoch, 10)
   const pastEpoch =
     epoch && queryEpoch >= 0 && queryEpoch < epoch.epoch
@@ -131,11 +133,7 @@ export default function ValidationReport() {
               epochNumber: validationEpochLabel(epochNumber),
             })}
           </PageTitle>
-          <CloseButton
-            onClick={() =>
-              router.push(pastEpoch === undefined ? '/home' : '/history')
-            }
-          />
+          <CloseButton onClick={() => closePage('/home')} />
         </Flex>
         <Stack spacing={6} w="full">
           <Box>
@@ -374,8 +372,8 @@ export default function ValidationReport() {
                   <Heading color="brandGray.500" fontSize="lg" fontWeight={500}>
                     {t('Earnings summary')}
                   </Heading>
-                  <TextLink href="/history" fontWeight={500}>
-                    {t('All your validations in your history')}
+                  <TextLink href="/home" fontWeight={500}>
+                    {t('All your validations in My Idena')}
                   </TextLink>
                 </Box>
                 <Table fontWeight={500}>
