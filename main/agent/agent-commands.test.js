@@ -278,20 +278,26 @@ describe('the Agents section commands', () => {
     ).resolves.toEqual([])
   })
 
-  test('a write that fails leaves no Activity line', async () => {
-    const agent = start([{id: 'aaaaaaaaaaaaaaaa', ...validation}])
-    fs.chmodSync(dir, 0o500)
-    try {
-      await expect(agent.handle('saveAgent', {name: 'X'})).rejects.toThrow()
-      await expect(
-        agent.handle('removeAgent', {agentId: 'aaaaaaaaaaaaaaaa'})
-      ).rejects.toThrow()
-      await expect(agent.handle('setPaused', {paused: true})).rejects.toThrow()
-    } finally {
-      fs.chmodSync(dir, 0o700)
+  // A read-only folder (chmod) refuses no write on Windows: the failure is made there only.
+  ;(process.platform === 'win32' ? test.skip : test)(
+    'a write that fails leaves no Activity line',
+    async () => {
+      const agent = start([{id: 'aaaaaaaaaaaaaaaa', ...validation}])
+      fs.chmodSync(dir, 0o500)
+      try {
+        await expect(agent.handle('saveAgent', {name: 'X'})).rejects.toThrow()
+        await expect(
+          agent.handle('removeAgent', {agentId: 'aaaaaaaaaaaaaaaa'})
+        ).rejects.toThrow()
+        await expect(
+          agent.handle('setPaused', {paused: true})
+        ).rejects.toThrow()
+      } finally {
+        fs.chmodSync(dir, 0o700)
+      }
+      await expect(agent.handle('activity')).resolves.toEqual([])
     }
-    await expect(agent.handle('activity')).resolves.toEqual([])
-  })
+  )
 
   test("the validation asks with the answering agent's longest answer and effort (B-265)", async () => {
     keys = [
