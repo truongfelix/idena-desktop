@@ -94,13 +94,14 @@ export function DnaSignInDialog({
     nonceEndpoint,
     callbackUrl,
     disconnectEndpoint,
+    faviconUrl,
   })
-  // The icon of the site that receives the signature, unless the link names one.
   const {host: callbackHost, favicon: callbackFaviconUrl} = dnaCallbackSite(
     callbackUrl,
-    faviconUrl ||
-      (site.site ? new URL('favicon.ico', site.site).href : undefined)
+    faviconUrl
   )
+  // The icon of the site that receives the signature.
+  const siteFavicon = site.favicon || callbackFaviconUrl
   const {isOpen} = props
   const [known, setKnown] = React.useState()
   React.useEffect(() => {
@@ -132,9 +133,9 @@ export function DnaSignInDialog({
               label={t('Website')}
               value={site.host || callbackHost}
             >
-              {callbackFaviconUrl ? (
+              {siteFavicon ? (
                 <Image
-                  src={callbackFaviconUrl}
+                  src={siteFavicon}
                   ignoreFallback
                   borderRadius="md"
                   h={10}

@@ -206,7 +206,12 @@ export function nonceSiteMismatch(
   const slash = rest.indexOf('/')
   if (slash < 0) return null
   const named = rest.slice(0, slash)
-  const site = new URL(authenticationEndpoint).host
+  let site
+  try {
+    site = new URL(authenticationEndpoint).host
+  } catch {
+    return null // no site to compare with: the request to the endpoint fails with its own error
+  }
   if (named !== site && !(HOST_NAME.test(named) && /[.:]/.test(named)))
     return null
   if (named !== site) return {named, site}

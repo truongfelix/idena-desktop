@@ -21,6 +21,7 @@ describe('Idena Connect (B-318)', () => {
       })
     ).toEqual({
       site: 'https://app.example.com',
+      favicon: 'https://app.example.com/favicon.ico',
       host: 'app.example.com',
       website: 'app.example.com',
       nonceHost: null,
@@ -38,6 +39,7 @@ describe('Idena Connect (B-318)', () => {
       })
     ).toEqual({
       site: 'https://b.example',
+      favicon: 'https://b.example/favicon.ico',
       host: 'b.example',
       website: 'a.example',
       nonceHost: 'a.example',
@@ -53,6 +55,7 @@ describe('Idena Connect (B-318)', () => {
       })
     ).toEqual({
       site: 'https://api.example.com',
+      favicon: 'https://api.example.com/favicon.ico',
       host: 'api.example.com',
       website: 'www.example.com',
       nonceHost: null,
@@ -105,12 +108,29 @@ describe('Idena Connect (B-318)', () => {
     ).toBe('duelbelote.fr.evil.example')
   })
 
+  it("shows the icon of the site that receives the signature, never another site's", () => {
+    const link = {
+      authenticationEndpoint: 'https://evil.example/auth',
+      nonceEndpoint: 'https://evil.example/nonce',
+      callbackUrl: 'https://evil.example/done',
+    }
+    expect(
+      signInSite({...link, faviconUrl: 'https://duelbelote.fr/favicon.ico'})
+        .favicon
+    ).toBe('https://evil.example/favicon.ico')
+    expect(
+      signInSite({...link, faviconUrl: 'https://evil.example/icon.png'}).favicon
+    ).toBe('https://evil.example/icon.png')
+  })
+
   it('takes two hosts for one site only with a www. or api., a port or a subdomain between them', () => {
     expect(sameSite('www.duelbelote.fr', 'api.duelbelote.fr')).toBe(true)
     expect(sameSite('duelbelote.fr', 'play.duelbelote.fr')).toBe(true)
     expect(sameSite('127.0.0.1:29780', '127.0.0.1:3000')).toBe(true)
     expect(sameSite('DuelBelote.fr.', 'duelbelote.fr')).toBe(true)
     expect(sameSite('victim.vercel.app', 'evil.vercel.app')).toBe(false)
+    expect(sameSite('www.vercel.app', 'victim.vercel.app')).toBe(false)
+    expect(sameSite('victim.co.uk', 'api.co.uk')).toBe(false)
     expect(sameSite('victim.co.uk', 'evil.co.uk')).toBe(false)
     expect(sameSite('victim.com.', 'evil.com.')).toBe(false)
     expect(sameSite('example.com', 'evil-example.com')).toBe(false)

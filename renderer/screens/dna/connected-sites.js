@@ -22,23 +22,27 @@ function hostOf(url) {
   }
 }
 
-/** A host for the return-page warning: no port, lower case, no final dot, no leading www. or api. label. */
-const bareHost = (host) =>
-  String(host)
-    .replace(/:\d+$/, '')
-    .toLowerCase()
-    .replace(/\.+$/, '')
-    .replace(/^(www|api)\./, '')
+/** A host for the return-page warning: no port, lower case, no final dot. */
+const plainHost = (host) =>
+  String(host).replace(/:\d+$/, '').toLowerCase().replace(/\.+$/, '')
 
 /**
- * Whether two hosts are one site for the return-page warning: the same host but for its port, a www. or api. in
- * front, or one a subdomain of the other. Two sites of one hosting service (a.vercel.app, b.vercel.app) or one
- * country (a.co.uk, b.co.uk) are not: the warning errs towards showing.
+ * Whether two hosts are one site for the return-page warning: the same host but for its port or a www. or api. in
+ * front, or one a subdomain of the other. Two sites of one hosting service (a.vercel.app, b.vercel.app, and
+ * www.vercel.app) or one country (a.co.uk, b.co.uk) are not: the warning errs towards showing.
  */
 export function sameSite(a, b) {
-  const x = bareHost(a)
-  const y = bareHost(b)
-  return x === y || x.endsWith(`.${y}`) || y.endsWith(`.${x}`)
+  const x = plainHost(a)
+  const y = plainHost(b)
+  const bare = (host) => host.replace(/^(www|api)\./, '')
+  return bare(x) === bare(y) || x.endsWith(`.${y}`) || y.endsWith(`.${x}`)
+}
+
+/** The icon beside a site's name: the link's when it is on that site, else the site's favicon.ico. */
+function siteFavicon(site, faviconUrl) {
+  if (!site) return null
+  if (webOrigin(faviconUrl) === site) return faviconUrl
+  return new URL('favicon.ico', site).href
 }
 
 /**
@@ -48,13 +52,15 @@ export function sameSite(a, b) {
  * another, which the dialog warns about), `returnHost`: the callback's host when it belongs to another site than
  * `host` (the person signs in to `host` and goes on to another site, which the dialog warns about: a page could
  * relay another site's endpoints; www. and api. of one site are common and show none), and
- * `disconnectEndpoint`: the link's disconnect_endpoint when it is on `site`, else null.
+ * `favicon`: the link's favicon_url when it is on `site`, else `site`'s favicon.ico (no other site's icon beside
+ * this site's name), and `disconnectEndpoint`: the link's disconnect_endpoint when it is on `site`, else null.
  */
 export function signInSite({
   authenticationEndpoint,
   nonceEndpoint,
   callbackUrl,
   disconnectEndpoint,
+  faviconUrl,
 }) {
   const site = webOrigin(authenticationEndpoint)
   const host = site ? hostOf(site) : null
@@ -68,6 +74,7 @@ export function signInSite({
       host && webOrigin(callbackUrl) && !sameSite(hostOf(callbackUrl), host)
         ? hostOf(callbackUrl)
         : null,
+    favicon: siteFavicon(site, faviconUrl),
     disconnectEndpoint:
       site && webOrigin(disconnectEndpoint) === site
         ? disconnectEndpoint
