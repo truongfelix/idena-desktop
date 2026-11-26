@@ -23,6 +23,7 @@ const INVOKE_CHANNELS = new Set([
   'search-image',
   'router-port',
   'node-reports',
+  'agent',
 ])
 
 const LISTEN_CHANNELS = new Set([
@@ -30,6 +31,7 @@ const LISTEN_CHANNELS = new Set([
   NODE_EVENT,
   'DNA_LINK',
   'confirm-quit',
+  'agent-event',
 ])
 
 const NODE_COMMANDS = new Set([
@@ -51,7 +53,7 @@ const AUTO_UPDATE_COMMANDS = new Set([
   'update-ui',
 ])
 
-const WINDOW_COMMANDS = new Set(['toggle-full-screen', 'theme'])
+const WINDOW_COMMANDS = new Set(['toggle-full-screen', 'theme', 'agent-awake'])
 
 function assertAllowedChannel(channel, allowedChannels, operation) {
   if (!allowedChannels.has(channel)) {

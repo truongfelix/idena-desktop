@@ -55,6 +55,7 @@ import {
   ZoomFlipIcon,
 } from '../../shared/components/icons'
 import {adjustDurationInSeconds} from './machine'
+import {AGENT_COLORS} from './agent/picks'
 import {useTimer} from '../../shared/hooks/use-timer'
 
 dayjs.extend(durationPlugin)
@@ -117,8 +118,10 @@ export function Flip({
   onChoose,
   onImageFail,
   timerDetails,
+  agentPick,
 }) {
   const {colors} = useTheme()
+  const {t} = useTranslation()
 
   const refContainer = useRef(null)
   const refFlipHover = useRef(null)
@@ -156,10 +159,45 @@ export function Flip({
   if ((fetched && !decoded) || failed) return <FailedFlip />
   if (!fetched) return <LoadingFlip />
 
+  // The agent's pick (Suggest): ringed in its color until the person chooses.
+  const agentColor = agentPick?.isDark ? AGENT_COLORS.dark : AGENT_COLORS.themed
+
   return (
-    <Box ref={refFlipHover}>
+    <Box ref={refFlipHover} position="relative">
+      {agentPick && (
+        <Text
+          position="absolute"
+          top={-3}
+          left="50%"
+          transform="translateX(-50%)"
+          zIndex={3}
+          whiteSpace="nowrap"
+          fontSize="sm"
+          fontWeight={600}
+          color={agentPick.isDark ? AGENT_COLORS.onDark : AGENT_COLORS.onThemed}
+          bg={agentColor}
+          borderRadius="md"
+          px={2}
+          py={1}
+        >
+          {/* eslint-disable-next-line no-nested-ternary */}
+          {agentPick.best
+            ? t("Agent's pick · it would mark this flip best")
+            : agentPick.report
+            ? t(
+                "Agent's pick · {{percent}}% sure · it would report this flip",
+                {
+                  percent: agentPick.percent,
+                }
+              )
+            : t("Agent's pick · {{percent}}% sure", {
+                percent: agentPick.percent,
+              })}
+        </Text>
+      )}
       <FlipHolder
         isZoomHovered={isZoomIconHovered}
+        {...(agentPick && !option ? {border: `solid 2px ${agentColor}`} : {})}
         // eslint-disable-next-line no-nested-ternary
         {...(option
           ? option === variant

@@ -10,6 +10,7 @@ const {
   nativeTheme,
   net,
   protocol,
+  safeStorage,
   session,
   shell,
   // eslint-disable-next-line import/no-extraneous-dependencies
@@ -26,6 +27,12 @@ const {themeSource} = require('./theme')
 const loadRoute = require('./utils/routes')
 const {getI18nConfig} = require('./language')
 const {searchImageSource, searchImages} = require('./image-search')
+const {createAgent} = require('./agent/agent')
+const {
+  createAgentProfiles,
+  validationAgentSettings,
+} = require('./agent/profiles')
+const {createAgentKey} = require('./agent/key')
 const {openExternalUrl} = require('./safe-external-url')
 const {RELEASES_API, createReleaseCheck} = require('./app-update-check')
 const {isTrustedIpcSender} = require('./ipc-sender')
@@ -96,6 +103,7 @@ const {
 const NodeUpdater = require('./node-updater')
 const {createNodeProcess} = require('./node-process')
 const {createAppBadge} = require('./app-badge')
+const {createAgentAwake} = require('./agent-awake')
 const {createQuitRequest} = require('./quit-request')
 const {createNodeReports} = require('./node-reports')
 const {READ_INTERVAL_MS} = require('./node-watch')
@@ -113,6 +121,8 @@ const {
 refuseBrotli(axios)
 
 let mainWindow
+// The validation agent's request to keep the window's timers awake (main/agent-awake.js), made with the window.
+let agentAwake = null
 let didCreateMainWindow = false
 let nodeDownloadPromise = null
 let tray
@@ -177,6 +187,30 @@ const routerPort = createRouterPortService({
   nodeRpc,
   configuredPort: () => Number(nodeConnection?.ipfsPort) || null,
   nodeLogTail: () => readNodeLogTail(),
+  logger,
+})
+
+// The agents (main/agent/agent.js, profiles.js): the file of agents and the services' encrypted keys in the user
+// data folder's agent/ folder. settings.json and key.enc are the single agent's (before B-243): read while the new
+// files do not exist, left for an older build.
+const agentFile = (name) => join(app.getPath('userData'), 'agent', name)
+const agentProfiles = createAgentProfiles({
+  file: () => agentFile('agents.json'),
+  singleFile: () => agentFile('settings.json'),
+  partsFile: () => agentFile('agent-parts.json'),
+  logger,
+})
+const agent = createAgent({
+  settings: validationAgentSettings(agentProfiles),
+  profiles: agentProfiles,
+  pendingFile: () => agentFile('pending.json'),
+  readPointsFile: () => agentFile('agent-read.json'),
+  notify: (event) => sendMainWindowMsg('agent-event', event),
+  key: createAgentKey({
+    file: () => agentFile('keys.enc'),
+    singleFile: () => agentFile('key.enc'),
+    safeStorage,
+  }),
   logger,
 })
 
@@ -359,6 +393,14 @@ const createMainWindow = () => {
   })
 
   installNavigationGuards(mainWindow)
+  // A reload or a crash ends what the page was doing: an approved agent action waits again (B-243).
+  mainWindow.webContents.on('did-finish-load', () => agent.windowLoaded())
+  // A validation agent's timers kept awake end with the page that asked for it (B-302): reset when a load starts, so
+  // a request the new page sends early is kept.
+  agentAwake = createAgentAwake((throttled) =>
+    mainWindow.webContents.setBackgroundThrottling(throttled)
+  )
+  mainWindow.webContents.on('did-start-loading', () => agentAwake.reset())
 
   if (isE2ESmoke) {
     mainWindow.webContents.once('preload-error', (_event, preloadPath, error) =>
@@ -682,6 +724,12 @@ ipcMain.on(WINDOW_COMMAND, (event, command, data) => {
     // The user's theme choice (main/theme.js): the window sends it at its start and on each change.
     case 'theme': {
       nativeTheme.themeSource = themeSource(data?.source)
+      break
+    }
+    // An agent acts in the validation (B-302): the window's timers keep their time while it is hidden or minimized,
+    // so Autopilot answers and submits on time; back to the default when it stops.
+    case 'agent-awake': {
+      agentAwake?.set(data?.source, Boolean(data?.on))
       break
     }
     default:
@@ -1103,6 +1151,11 @@ ipcMain.handle('search-image', async (event, query, source) => {
   requireIpcSender(event)
   if (source !== undefined) return searchImageSource(query, source, {logger})
   return searchImages(query, {logger})
+})
+
+ipcMain.handle('agent', async (event, command, data) => {
+  requireIpcSender(event)
+  return agent.handle(command, data)
 })
 
 ipcMain.handle('router-port', async (event, command, data) => {

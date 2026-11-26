@@ -15,6 +15,9 @@ const THEMED_COLORS = {
   graphite: ['69 72 77', '24 25 28'],
   // Dark boxes with white text (the sidebar, the validation's countdown): the text grey in the light theme.
   panel: ['83 86 92', '24 25 28'],
+  // The agent's marks in a validation (B-230), and the text on them.
+  agent: ['91 63 196', '196 181 253'],
+  'agent-on': ['255 255 255', '22 22 29'],
 }
 
 function themedVariables(index) {

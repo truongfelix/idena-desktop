@@ -26,12 +26,21 @@ import {PrimaryButton, SecondaryButton} from '../../shared/components/button'
 import {CrossSmallIcon} from '../../shared/components/icons'
 import {rem} from '../../shared/theme'
 import {createValidationMachine} from '../../screens/validation/machine'
-import {ValidationScreen} from '../../screens/validation/screen'
+import {
+  ValidationScreen,
+  agentPhase,
+  autopilotStep,
+  sessionFlips,
+} from '../../screens/validation/screen'
+import {useAgentValidation} from '../../screens/validation/agent/use-agent-validation'
 import {
   useAutoStartLottery,
   useAutoStartValidation,
 } from '../../screens/validation/hooks/use-start-validation'
-import {availableReportsNumber} from '../../screens/validation/utils'
+import {
+  availableReportsNumber,
+  hasBestFlip,
+} from '../../screens/validation/utils'
 import {
   PRACTICE_LONG_SESSION_DURATION_PER_FLIP,
   PRACTICE_SHORT_SESSION_DURATION,
@@ -40,20 +49,8 @@ import {
   practiceNodeCalls,
   practiceResults,
   practiceServices,
+  REPORT_REASONS,
 } from '../../screens/validation/practice'
-
-// The texts of the bad flip examples (BadFlipDialog), by report reason.
-const REPORT_REASONS = {
-  1: 'One of the keywords is not clearly visible in the images',
-  2: 'Numbers or letters indicating the order',
-  3: 'Sequence of enumerated objects',
-  4: 'Text necessary to read to solve the flip',
-  5: 'There is adult content (NSFW)',
-  6: 'Several unrelated stories',
-  7: 'Waking up template',
-  8: 'Thumbs up/down image at the end',
-  9: 'Images of both keywords are inserted into a page/screen/painting',
-}
 
 export default function PracticeValidationPage() {
   const router = useRouter()
@@ -229,6 +226,21 @@ function PracticeSession({practice, onDone, onLeave}) {
 
   const isShortSession = state.matches('shortSession')
 
+  // The agent, when it is on (the validation agent, in Agents): it practises as it would validate.
+  const agent = useAgentValidation({
+    flips: sessionFlips(state),
+    phase: agentPhase(state),
+    reportsUsed: state.context.reports.size,
+    // The machine's own limit: every long flip counts, ready or not.
+    reportsAllowed: availableReportsNumber(state.context.longFlips),
+    hasBest: hasBestFlip(state.context),
+    step: autopilotStep(state),
+    send,
+    validationStart,
+    shortSessionDuration: PRACTICE_SHORT_SESSION_DURATION,
+    longSessionDuration,
+  })
+
   return (
     <ValidationScreen
       state={state}
@@ -238,6 +250,7 @@ function PracticeSession({practice, onDone, onLeave}) {
       longSessionDuration={longSessionDuration}
       isExceededTooltipOpen={isExceededTooltipOpen}
       onCloseExceededTooltip={onCloseExceededTooltip}
+      agent={agent}
       headerActions={
         <Tooltip label={t('Leave the practice')} placement="bottom-end">
           <IconButton

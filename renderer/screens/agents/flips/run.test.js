@@ -1,0 +1,874 @@
+import {FlipType} from '../../../shared/types'
+import {contentsKey, draftsAt} from './drafts'
+import {evaluateDraft, runFlipsAgent} from './run'
+
+// A Flips run (B-258) against a fake flip store and a fake agent channel: the main process's checks are pending.js's,
+// played here by `levels` (each step's level) and `limits` (each step's actions a day).
+
+const ALL = [
+  'flipStory',
+  'flipPictures',
+  'flipDraft',
+  'flipJudge',
+  'flipSubmit',
+  'flipDelete',
+]
+
+function fakeStore(flips = []) {
+  let list = flips.map((flip) => ({...flip}))
+  return {
+    getFlips: () => list.map((flip) => ({...flip})),
+    getFlip: (id) => list.find((flip) => flip.id === id),
+    addDraft: (flip) => {
+      list = list.concat({...flip})
+    },
+    updateDraft: (flip) => {
+      list = list.map((one) => (one.id === flip.id ? {...one, ...flip} : one))
+    },
+    deleteDraft: (id) => {
+      list = list.map((one) =>
+        one.id === id ? {...one, type: 'Removed', images: null} : one
+      )
+    },
+  }
+}
+
+const identity = {
+  state: 'Verified',
+  availableFlips: 3,
+  flips: [],
+  flipKeyWordPairs: [{id: 4, words: [10, 11], used: false}],
+}
+const epoch = {currentPeriod: 'None'}
+// B-277: this epoch's sent flips (the node's list), and an agent may delete one.
+const sentCtx = {
+  identity: {...identity, flips: ['bafy-sent']},
+  epoch,
+  judgeSent: true,
+}
+
+/** The agent holding `levels` ({step: level}), and the run's fakes. */
+function setup({
+  levels,
+  limits = {},
+  flips = [],
+  answer,
+  pending = [],
+  // Each test its own agent: the failures of the day are kept by agent, in the module.
+  agentId = 'a1',
+}) {
+  const agent = {
+    id: agentId,
+    actions: Object.fromEntries(
+      Object.entries(levels).map(([id, level]) => [
+        id,
+        {level, limit: limits[id] ?? null},
+      ])
+    ),
+  }
+  const done = {}
+  const lines = []
+  const items = [...pending]
+  let n = 0
+  const decide = (action) => {
+    const row = agent.actions[action]
+    if (!row || row.level === 'off')
+      return {decision: 'off', reason: 'action off'}
+    if (row.level === 'ask') return {decision: 'ask', reason: 'asks first'}
+    if (row.limit !== null && (done[action] || 0) + 1 > row.limit)
+      return {decision: 'ask', reason: 'above the limit'}
+    return {decision: 'alone', reason: 'within the limit'}
+  }
+  const call = jest.fn(async (command, data) => {
+    switch (command) {
+      case 'pending':
+        return items
+      case 'mayDo':
+        return decide(data.action)
+      case 'propose': {
+        const check = decide(data.action)
+        if (check.decision === 'alone') {
+          done[data.action] = (done[data.action] || 0) + 1
+          return check
+        }
+        if (check.reason === 'above the limit')
+          return {decision: 'skipped', reason: check.reason}
+        n += 1
+        const item = {id: `item${n}`, action: data.action, target: data.target}
+        items.push(item)
+        return {...check, item}
+      }
+      case 'didAction':
+        lines.push([data.action, data.ok, data.skipped, data.detail])
+        return null
+      default:
+        throw new Error(`unexpected ${command}`)
+    }
+  })
+  const ipc = jest.fn(async (command, data) => {
+    if (command === 'writeStory')
+      return {
+        stories: [
+          {
+            title: 'Cat climbs',
+            story: 'A cat...',
+            prompts: ['p1', 'p2', 'p3', 'p4'],
+          },
+        ],
+      }
+    if (command === 'judgeFlip') return answer(data.flip)
+    throw new Error(`unexpected ${command}`)
+  })
+  const store = fakeStore(flips)
+  const settled = []
+  const deps = {
+    call,
+    ipc,
+    store,
+    loadWords: async (pair) =>
+      pair.words.map((id) => ({id, name: `w${id}`, desc: ''})),
+    draw: jest.fn(async (_, prompt) => `data:image/png;base64,${prompt}`),
+    protect: jest.fn(async (flip) => ({
+      protectedImages: flip.originalOrder.map(
+        (slot) => `data:image/jpeg;base64,P${slot}`
+      ),
+      adversarialImage: 'nonsense',
+      noise: [null, null, null, null],
+    })),
+    deleteCost: jest.fn(async () => ({
+      from: '0xme',
+      payload: '0x0a',
+      maxFee: 2,
+    })),
+    deleteSent: jest.fn(async (id) => {
+      store.updateDraft({id, type: FlipType.Deleting})
+      return '0xtx'
+    }),
+    submit: jest.fn(async (id) => {
+      store.updateDraft({
+        id,
+        type: FlipType.Publishing,
+        agentFlip: {...store.getFlip(id).agentFlip, stage: 'submitted'},
+      })
+      return '0xhash'
+    }),
+    settle: (id, step) => settled.push([id, step]),
+    verdictText: (verdict) => (verdict && verdict.pass ? 'passes' : 'fails'),
+    newId: () => 'new',
+    now: () => Date.UTC(2026, 10, 16),
+    random: () => 0.3,
+    t: (text, values) =>
+      text.replace(/\{\{(\w+)\}\}/g, (_, key) => String(values[key])),
+  }
+  return {agent, deps, store, lines, items, settled}
+}
+
+/** The judge's answer: the story's side (found by its order), keywords shown, nothing reported. */
+const rightAnswer = (story) => (flip) => ({
+  answer: flip.orders[0].join() === story.join() ? 'left' : 'right',
+  relevance: 'relevant',
+  report: false,
+  reasons: [],
+})
+
+describe('a Flips run', () => {
+  test('one agent holding every step Alone takes a flip from its story to the chain in one run', async () => {
+    const levels = Object.fromEntries(ALL.map((id) => [id, 'alone']))
+    const {agent, deps, store} = setup({levels, answer: () => null})
+    // The judge answers with the story's side of the draft it is sent.
+    deps.ipc.mockImplementation(async (command, data) => {
+      if (command === 'writeStory')
+        return {
+          stories: [{title: 'T', story: 'S', prompts: ['p1', 'p2', 'p3']}],
+        }
+      return rightAnswer(store.getFlip('new').originalOrder)(data.flip)
+    })
+    const outcome = await runFlipsAgent(agent, {identity, epoch}, deps)
+    const flip = store.getFlip('new')
+    expect(flip.type).toBe(FlipType.Publishing)
+    expect(flip.agentFlip.stage).toBe('submitted')
+    expect(flip.keywordPairId).toBe(4)
+    expect(flip.story.words).toEqual(['w10', 'w11'])
+    // Three pictures in the free slots, the nonsense picture's slot left for Protect.
+    expect(flip.images.filter(Boolean)).toHaveLength(3)
+    expect(flip.images[flip.adversarialImageId]).toBeNull()
+    expect(flip.agentVerdict).toMatchObject({pass: true, by: 'a1'})
+    expect(flip.agentVerdict.contents).toBe(contentsKey(flip))
+    expect(deps.submit).toHaveBeenCalledWith('new')
+    expect(outcome).toMatchObject({
+      result: 'done',
+      count: {alone: 5, ask: 0, skipped: 0, failed: 0},
+    })
+  })
+
+  test('with Ask me, the story waits in To approve and the next steps wait for it', async () => {
+    const {agent, deps, store, items} = setup({
+      levels: {flipStory: 'ask', flipPictures: 'alone', flipDraft: 'alone'},
+    })
+    await runFlipsAgent(agent, {identity, epoch}, deps)
+    const flip = store.getFlip('new')
+    expect(flip.agentFlip.waiting).toEqual({step: 'flipStory', id: 'item1'})
+    expect(items).toEqual([
+      {id: 'item1', action: 'flipStory', target: {flipId: 'new'}},
+    ])
+    expect(deps.draw).not.toHaveBeenCalled()
+    // Approved (the wait cleared), the next run draws its pictures and drafts it.
+    store.updateDraft({
+      id: 'new',
+      agentFlip: {...flip.agentFlip, waiting: null},
+    })
+    await runFlipsAgent(agent, {identity, epoch}, deps)
+    // The story has four prompts (B-283): four story pictures, no nonsense picture.
+    expect(deps.draw).toHaveBeenCalledTimes(4)
+    const drafted = store.getFlip('new')
+    expect(drafted.adversarialImageId).toBe(-1)
+    expect(drafted.images.filter(Boolean)).toHaveLength(4)
+    expect(deps.draw.mock.calls.map(([, prompt]) => prompt)).toEqual([
+      'p1',
+      'p2',
+      'p3',
+      'p4',
+    ])
+    expect(drafted.agentFlip.stage).toBe('drafted')
+  })
+
+  test('a story of four prompts goes to the chain with four story pictures (B-283)', async () => {
+    const levels = Object.fromEntries(ALL.map((id) => [id, 'alone']))
+    const {agent, deps, store} = setup({levels, answer: () => null})
+    deps.ipc.mockImplementation(async (command, data) => {
+      if (command === 'writeStory')
+        return {
+          stories: [
+            {title: 'T', story: 'S', prompts: ['p1', 'p2', 'p3', 'p4', 'p5']},
+          ],
+        }
+      return rightAnswer(store.getFlip('new').originalOrder)(data.flip)
+    })
+    await runFlipsAgent(agent, {identity, epoch}, deps)
+    const flip = store.getFlip('new')
+    expect(flip.type).toBe(FlipType.Publishing)
+    expect(flip.adversarialImageId).toBe(-1)
+    expect(flip.originalOrder).toEqual([0, 1, 2, 3])
+    // Four prompts kept of the five, each picture in its slot, a shuffled side that is not the story's.
+    expect(flip.story.stories[0].prompts).toEqual(['p1', 'p2', 'p3', 'p4'])
+    expect(flip.images.filter(Boolean)).toHaveLength(4)
+    expect(flip.order).not.toEqual(flip.originalOrder)
+    expect(deps.submit).toHaveBeenCalledWith('new')
+  })
+
+  test('past its limit a day, a step asks the model nothing', async () => {
+    const {agent, deps, lines} = setup({
+      levels: {flipStory: 'alone'},
+      limits: {flipStory: 0},
+    })
+    const outcome = await runFlipsAgent(agent, {identity, epoch}, deps)
+    expect(deps.ipc).not.toHaveBeenCalled()
+    expect(lines).toEqual([['flipStory', undefined, true, 'above the limit']])
+    expect(outcome.count).toMatchObject({skipped: 1})
+  })
+
+  test('no new draft during a validation, nor for an identity that cannot make flips', async () => {
+    const {agent, deps} = setup({levels: {flipStory: 'alone'}})
+    expect(
+      await runFlipsAgent(
+        agent,
+        {identity, epoch: {currentPeriod: 'ShortSession'}},
+        deps
+      )
+    ).toMatchObject({result: 'nothing new'})
+    await runFlipsAgent(
+      agent,
+      {identity: {...identity, state: 'Candidate'}, epoch},
+      deps
+    )
+    expect(deps.ipc).not.toHaveBeenCalled()
+  })
+
+  test("the judge judges the person's draft but nothing else touches it; a failed agent draft is deleted", async () => {
+    const shuffled = {
+      type: FlipType.Draft,
+      createdAt: '2026-11-16T09:00:00.000Z',
+      keywordPairId: 7,
+      keywords: {words: [{name: 'cat'}, {name: 'tree'}]},
+      originalOrder: [0, 3, 1, 2],
+      order: [2, 1, 3, 0],
+      adversarialImageId: 3,
+      protectedImages: ['data:a,AA', 'data:a,BB', 'data:a,CC', 'data:a,DD'],
+    }
+    const person = {...shuffled, id: 'person'}
+    const agents = {
+      ...shuffled,
+      id: 'agents',
+      keywordPairId: 8,
+      agentFlip: {by: 'a2', stage: 'drafted', waiting: null, declined: {}},
+    }
+    const {agent, deps, store} = setup({
+      levels: {flipJudge: 'alone', flipSubmit: 'alone', flipDelete: 'alone'},
+      flips: [person, agents],
+      // Wrong side every time: both fail.
+      answer: (flip) => ({
+        answer: flip.orders[0].join() === '0,3,1,2' ? 'right' : 'left',
+        relevance: 'relevant',
+        report: false,
+      }),
+    })
+    await runFlipsAgent(agent, {identity, epoch}, deps)
+    expect(store.getFlip('person').agentVerdict).toMatchObject({pass: false})
+    expect(store.getFlip('person').type).toBe(FlipType.Draft)
+    expect(store.getFlip('agents').type).toBe('Removed')
+    expect(deps.submit).not.toHaveBeenCalled()
+    // Judged as it is: the next run asks nothing more.
+    deps.ipc.mockClear()
+    await runFlipsAgent(agent, {identity, epoch}, deps)
+    expect(deps.ipc).not.toHaveBeenCalled()
+  })
+
+  test('a draft waiting on an item gone from To approve is settled first', async () => {
+    const waiting = {
+      id: 'w',
+      type: FlipType.Draft,
+      agentFlip: {
+        by: 'a1',
+        stage: 'story',
+        waiting: {step: 'flipStory', id: 'gone'},
+      },
+    }
+    const {agent, deps, settled} = setup({
+      levels: {flipPictures: 'alone'},
+      flips: [waiting],
+    })
+    await runFlipsAgent(agent, {identity, epoch}, deps)
+    expect(settled).toEqual([['w', 'flipStory']])
+  })
+
+  test('a failed answer of the model is not written twice in Activity, nor asked again that day', async () => {
+    const {agent, deps, lines} = setup({
+      levels: {flipStory: 'alone'},
+      agentId: 'failing',
+    })
+    deps.ipc.mockImplementation(async () => {
+      const error = new Error('the service did not answer')
+      error.logged = true
+      throw error
+    })
+    const outcome = await runFlipsAgent(agent, {identity, epoch}, deps)
+    expect(lines).toEqual([])
+    expect(outcome.count).toMatchObject({failed: 1})
+    // The same pair is not asked again today.
+    deps.ipc.mockClear()
+    await runFlipsAgent(agent, {identity, epoch}, deps)
+    expect(deps.ipc).not.toHaveBeenCalled()
+  })
+
+  const ready = (fields = {}) => ({
+    id: 'agents',
+    type: FlipType.Draft,
+    createdAt: '2026-11-16T09:00:00.000Z',
+    keywordPairId: 8,
+    keywords: {words: [{name: 'cat'}, {name: 'tree'}]},
+    originalOrder: [0, 3, 1, 2],
+    order: [2, 1, 3, 0],
+    adversarialImageId: 3,
+    protectedImages: ['data:a,AA', 'data:a,BB', 'data:a,CC', 'data:a,DD'],
+    agentFlip: {by: 'a2', stage: 'drafted', waiting: null, declined: {}},
+    ...fields,
+  })
+
+  test('an answer of the judge it cannot read is no verdict: the draft is not deleted', async () => {
+    const {agent, deps, store} = setup({
+      levels: {flipJudge: 'alone', flipDelete: 'alone'},
+      flips: [ready()],
+      answer: () => ({answer: null, relevance: null, report: false}),
+      agentId: 'unreadable',
+    })
+    const outcome = await runFlipsAgent(agent, {identity, epoch}, deps)
+    expect(store.getFlip('agents').agentVerdict).toBeUndefined()
+    expect(store.getFlip('agents').type).toBe(FlipType.Draft)
+    expect(outcome.count).toMatchObject({failed: 1})
+  })
+
+  test('a draft changed while the step worked is not written over', async () => {
+    const story = {
+      id: 'drawn',
+      type: FlipType.Draft,
+      createdAt: '2026-11-16T09:00:00.000Z',
+      keywordPairId: 9,
+      originalOrder: [0, 3, 1, 2],
+      adversarialImageId: 3,
+      images: [null, null, null, null],
+      story: {stories: [{title: 'T', prompts: ['p1', 'p2', 'p3']}]},
+      agentFlip: {by: 'a1', stage: 'story', waiting: null, declined: {}},
+    }
+    const {agent, deps, store, lines} = setup({
+      levels: {flipPictures: 'alone'},
+      flips: [story],
+      agentId: 'overwrite',
+    })
+    // The person puts a picture of their own in while the agent draws.
+    deps.draw.mockImplementation(async (_, prompt) => {
+      if (prompt === 'p3')
+        store.updateDraft({id: 'drawn', images: ['mine', null, null, null]})
+      return `data:image/png;base64,${prompt}`
+    })
+    await runFlipsAgent(agent, {identity, epoch}, deps)
+    expect(store.getFlip('drawn').images).toEqual(['mine', null, null, null])
+    expect(store.getFlip('drawn').agentFlip.stage).toBe('story')
+    expect(lines).toEqual([
+      [
+        'flipPictures',
+        undefined,
+        true,
+        'the draft changed meanwhile: not written over',
+      ],
+    ])
+  })
+
+  test('a reply that picks no side but reports the flip is a failing verdict: the draft is deleted', async () => {
+    const {agent, deps, store} = setup({
+      levels: {flipJudge: 'alone', flipDelete: 'alone'},
+      flips: [ready()],
+      answer: () => ({
+        answer: null,
+        relevance: 'irrelevant',
+        report: true,
+        reasons: [{reason: 4, confidence: 0.9}],
+      }),
+      agentId: 'reports',
+    })
+    await runFlipsAgent(agent, {identity, epoch}, deps)
+    expect(store.getFlip('agents').agentVerdict).toMatchObject({
+      pass: false,
+      reported: true,
+    })
+    expect(store.getFlip('agents').type).toBe('Removed')
+  })
+
+  test('a submit that failed (the node away) is tried again at the next run', async () => {
+    const passed = ready({
+      id: 'ok',
+      agentFlip: {by: 'a2', stage: 'drafted', waiting: null, declined: {}},
+    })
+    passed.agentVerdict = {
+      contents: contentsKey(passed),
+      pass: true,
+      waiting: null,
+      declined: false,
+    }
+    const {agent, deps} = setup({
+      levels: {flipSubmit: 'alone'},
+      flips: [passed],
+      agentId: 'retries',
+    })
+    deps.submit.mockRejectedValueOnce(new Error('the node did not answer'))
+    expect(
+      (await runFlipsAgent(agent, {identity, epoch}, deps)).count
+    ).toMatchObject({failed: 1})
+    await runFlipsAgent(agent, {identity, epoch}, deps)
+    expect(deps.submit).toHaveBeenCalledTimes(2)
+  })
+
+  test('a failed draft reworked meanwhile is not deleted alone', async () => {
+    const failed = ready({id: 'reworked'})
+    failed.agentVerdict = {
+      contents: contentsKey(failed),
+      pass: false,
+      waiting: null,
+      declined: false,
+    }
+    const {agent, deps, store} = setup({
+      levels: {flipDelete: 'alone'},
+      flips: [failed],
+      agentId: 'rework',
+    })
+    // The person moves a picture while the step asks whether it may.
+    const {call} = deps
+    deps.call = async (command, data) => {
+      if (command === 'mayDo')
+        store.updateDraft({id: 'reworked', order: [1, 2, 3, 0]})
+      return call(command, data)
+    }
+    await runFlipsAgent(agent, {identity, epoch}, deps)
+    expect(store.getFlip('reworked').type).toBe(FlipType.Draft)
+  })
+
+  test('a sent flip the judge failed is deleted alone, its fee proposed as its cost', async () => {
+    const sent = ready({
+      id: 'sent',
+      type: FlipType.Published,
+      hash: 'bafy-sent',
+      txHash: '0xsent',
+      agentFlip: undefined,
+    })
+    sent.agentVerdict = {
+      contents: contentsKey(sent),
+      pass: false,
+      waiting: null,
+      declined: false,
+    }
+    const {agent, deps, store} = setup({
+      levels: {flipDeleteSent: 'alone'},
+      flips: [sent],
+      agentId: 'deletes-sent',
+    })
+    await runFlipsAgent(agent, sentCtx, deps)
+    expect(deps.deleteSent).toHaveBeenCalledWith(
+      'sent',
+      {from: '0xme', payload: '0x0a', maxFee: 2},
+      '0xsent'
+    )
+    expect(store.getFlip('sent').type).toBe(FlipType.Deleting)
+    // The cost goes to propose, where its iDNA a day is checked; past it, it waits for the person.
+    expect(deps.call).toHaveBeenCalledWith(
+      'propose',
+      expect.objectContaining({
+        action: 'flipDeleteSent',
+        cost: 2,
+        skipOverLimit: false,
+      })
+    )
+  })
+
+  test('with Ask me, the sent flip waits in To approve, marked', async () => {
+    const sent = ready({
+      id: 'sent',
+      type: FlipType.Published,
+      hash: 'bafy-sent',
+      txHash: '0xsent',
+      agentFlip: undefined,
+    })
+    sent.agentVerdict = {
+      contents: contentsKey(sent),
+      pass: false,
+      waiting: null,
+      declined: false,
+    }
+    const {agent, deps, store} = setup({
+      levels: {flipDeleteSent: 'ask'},
+      flips: [sent],
+      agentId: 'asks-sent',
+    })
+    await runFlipsAgent(agent, sentCtx, deps)
+    expect(deps.deleteSent).not.toHaveBeenCalled()
+    expect(store.getFlip('sent').agentSent.waiting).toEqual({
+      step: 'flipDeleteSent',
+      id: 'item1',
+    })
+    // Marked: the next run proposes it no more.
+    deps.call.mockClear()
+    await runFlipsAgent(agent, sentCtx, deps)
+    expect(deps.call).not.toHaveBeenCalledWith('propose', expect.anything())
+  })
+})
+
+// B-284: a draft the judge failed is written again in the same draft, at most as often as the person set.
+describe('a failed evaluation', () => {
+  const FIVE = [
+    'flipStory',
+    'flipPictures',
+    'flipDraft',
+    'flipJudge',
+    'flipSubmit',
+  ]
+  const alone = (steps) => Object.fromEntries(steps.map((id) => [id, 'alone']))
+  /** The judge's answers, one per question: true finds the story's side, false the other. */
+  const judging = (store, answers) => {
+    let asked = 0
+    return (flip) => {
+      const story = store.getFlip('new').originalOrder.join()
+      const right = flip.orders[0].join() === story ? 'left' : 'right'
+      const wrong = right === 'left' ? 'right' : 'left'
+      const pass = answers[Math.min(asked, answers.length - 1)]
+      asked += 1
+      return {
+        answer: pass ? right : wrong,
+        relevance: 'relevant',
+        report: false,
+        reasons: [],
+      }
+    }
+  }
+  const failed = () => {
+    const flip = {
+      id: 'f',
+      type: FlipType.Draft,
+      createdAt: '2026-11-16T09:00:00.000Z',
+      keywordPairId: 4,
+      keywords: {words: [{name: 'cat'}, {name: 'tree'}]},
+      originalOrder: [0, 3, 1, 2],
+      order: [2, 1, 3, 0],
+      adversarialImageId: 3,
+      images: ['i0', 'i1', 'i2', null],
+      protectedImages: ['data:a,AA', 'data:a,BB', 'data:a,CC', 'data:a,DD'],
+      story: {titles: ['Old title'], stories: []},
+      agentFlip: {by: 'a2', stage: 'drafted', waiting: null, declined: {}},
+    }
+    return {
+      ...flip,
+      agentVerdict: {
+        contents: contentsKey(flip),
+        pass: false,
+        waiting: null,
+        declined: false,
+      },
+    }
+  }
+
+  test('alone and without Delete a draft: reported, written again in the same draft, passed and sent in one run', async () => {
+    const {agent, deps, store, lines} = setup({
+      levels: alone(FIVE),
+      answer: () => null,
+      agentId: 'rewrites-1',
+    })
+    const judge = judging(store, [false, true])
+    const stories = []
+    deps.ipc.mockImplementation(async (command, data) => {
+      if (command === 'judgeFlip') return judge(data.flip)
+      stories.push(data)
+      return {
+        stories: [
+          {
+            title: `T${stories.length}`,
+            story: 'S',
+            prompts: ['p1', 'p2', 'p3'],
+          },
+        ],
+      }
+    })
+    const outcome = await runFlipsAgent(agent, {identity, epoch}, deps)
+    const flip = store.getFlip('new')
+    // One draft all along: its keywords held, never a second draft.
+    expect(store.getFlips()).toHaveLength(1)
+    expect(flip.type).toBe(FlipType.Publishing)
+    expect(flip.keywordPairId).toBe(4)
+    expect(flip.agentFlip.rewrites).toBe(1)
+    expect(flip.agentFlip.lastFail).toMatchObject({pass: false})
+    expect(flip.agentVerdict).toMatchObject({pass: true})
+    expect(flip.story.stories[0].title).toBe('T2')
+    // The second story is asked with the first one's title as one not to write again.
+    expect(stories).toHaveLength(2)
+    expect(stories[1].notThese).toEqual(['T1'])
+    // Reported: the failed verdict, then the rewrite, in Activity.
+    expect(lines).toContainEqual([
+      'flipJudge',
+      true,
+      undefined,
+      'w10 / w11 · fails',
+    ])
+    expect(lines).toContainEqual([
+      'flipStory',
+      true,
+      undefined,
+      'w10 / w11 · written again (1 of 2) after its evaluation failed · fails',
+    ])
+    expect(deps.submit).toHaveBeenCalledTimes(1)
+    expect(outcome.count).toMatchObject({failed: 0, skipped: 0})
+  })
+
+  test('past the rewrites the person set, the draft is left to them and reported once', async () => {
+    const {agent, deps, store, lines} = setup({
+      levels: alone(FIVE),
+      answer: () => null,
+      agentId: 'rewrites-2',
+    })
+    agent.actions.flipStory.rewrites = 1
+    const judge = judging(store, [false])
+    let written = 0
+    deps.ipc.mockImplementation(async (command, data) => {
+      if (command === 'judgeFlip') return judge(data.flip)
+      written += 1
+      return {stories: [{title: 'T', story: 'S', prompts: ['p1', 'p2', 'p3']}]}
+    })
+    await runFlipsAgent(agent, {identity, epoch}, deps)
+    const flip = store.getFlip('new')
+    expect(written).toBe(2)
+    expect(flip.type).toBe(FlipType.Draft)
+    expect(flip.agentFlip.rewrites).toBe(1)
+    expect(flip.agentFlip.gaveUp).toBe(contentsKey(flip))
+    const left = () =>
+      lines.filter(([, , , detail]) => /left to you/.test(detail))
+    expect(left()).toEqual([
+      [
+        'flipStory',
+        false,
+        undefined,
+        'w10 / w11 · failed its evaluation after 1 of 1 rewrites, left to you · fails',
+      ],
+    ])
+    expect(deps.submit).not.toHaveBeenCalled()
+    // The next run asks the model nothing and says nothing more.
+    deps.ipc.mockClear()
+    await runFlipsAgent(agent, {identity, epoch}, deps)
+    expect(deps.ipc).not.toHaveBeenCalled()
+    expect(left()).toHaveLength(1)
+  })
+
+  test('an agent that may delete the draft deletes it, and writes nothing again', async () => {
+    const {agent, deps, store} = setup({
+      levels: alone([...FIVE, 'flipDelete']),
+      flips: [failed()],
+      answer: () => null,
+      agentId: 'rewrites-3',
+    })
+    await runFlipsAgent(
+      agent,
+      {identity: {...identity, flipKeyWordPairs: []}, epoch},
+      deps
+    )
+    expect(store.getFlip('f').type).toBe('Removed')
+    expect(deps.ipc).not.toHaveBeenCalled()
+  })
+
+  test('with Ask me the new story waits in To approve and the draft stays as it is', async () => {
+    const {agent, deps, store, items} = setup({
+      levels: {flipStory: 'ask'},
+      flips: [failed()],
+      answer: () => null,
+      agentId: 'rewrites-4',
+    })
+    await runFlipsAgent(
+      agent,
+      {identity: {...identity, flipKeyWordPairs: []}, epoch},
+      deps
+    )
+    const flip = store.getFlip('f')
+    expect(items).toHaveLength(1)
+    expect(flip.agentFlip.waiting).toEqual({step: 'flipStory', id: 'item1'})
+    expect(flip.agentFlip.proposed).toMatchObject({
+      pictures: 4,
+      by: 'rewrites-4',
+    })
+    expect(flip.images).toEqual(['i0', 'i1', 'i2', null])
+    expect(flip.agentVerdict.pass).toBe(false)
+    expect(deps.ipc).toHaveBeenCalledWith(
+      'writeStory',
+      expect.objectContaining({notThese: ['Old title']})
+    )
+  })
+
+  test('the new drafts come first in the stories of the day, and once a run', async () => {
+    // A failed draft on another keyword pair: its verdict is about it as it is.
+    const onPair9 = {...failed(), keywordPairId: 9}
+    onPair9.agentVerdict = {
+      ...onPair9.agentVerdict,
+      contents: contentsKey(onPair9),
+    }
+    expect(draftsAt('flipRewrite', [onPair9])).toHaveLength(1)
+    const {agent, deps, store} = setup({
+      levels: {flipStory: 'alone'},
+      limits: {flipStory: 1},
+      flips: [onPair9],
+      answer: () => null,
+      agentId: 'rewrites-6',
+    })
+    await runFlipsAgent(agent, {identity, epoch}, deps)
+    // The day's one story went to the free keyword pair; the failed draft waits.
+    expect(store.getFlip('new').keywordPairId).toBe(4)
+    expect(store.getFlip('f').agentFlip.rewrites).toBeUndefined()
+    expect(deps.ipc).toHaveBeenCalledTimes(1)
+  })
+
+  test('a failed draft judged again meanwhile is not written over', async () => {
+    const {agent, deps, store} = setup({
+      levels: {flipStory: 'alone'},
+      flips: [failed()],
+      answer: () => null,
+      agentId: 'rewrites-5',
+    })
+    deps.ipc.mockImplementation(async () => {
+      // The person's Evaluate passes it while the story is written.
+      store.updateDraft({
+        id: 'f',
+        agentVerdict: {...store.getFlip('f').agentVerdict, pass: true},
+      })
+      return {stories: [{title: 'T', story: 'S', prompts: ['p1', 'p2', 'p3']}]}
+    })
+    await runFlipsAgent(
+      agent,
+      {identity: {...identity, flipKeyWordPairs: []}, epoch},
+      deps
+    )
+    expect(store.getFlip('f').images).toEqual(['i0', 'i1', 'i2', null])
+    expect(store.getFlip('f').agentFlip.rewrites).toBeUndefined()
+  })
+})
+
+// B-284: the Flips list's Evaluate, for any draft.
+describe('Evaluate asked for a draft', () => {
+  const draft = (over = {}) => ({
+    id: 'mine',
+    type: FlipType.Draft,
+    keywordPairId: 7,
+    keywords: {words: [{name: 'cat'}, {name: 'tree'}]},
+    originalOrder: [0, 3, 1, 2],
+    order: [2, 1, 3, 0],
+    adversarialImageId: 3,
+    protectedImages: ['data:a,AA', 'data:a,BB', 'data:a,CC', 'data:a,DD'],
+    ...over,
+  })
+
+  test("the person's own draft gets its verdict, whatever the step's level, and Activity says so", async () => {
+    const {agent, deps, store, lines, items} = setup({
+      levels: {flipJudge: 'ask'},
+      flips: [draft()],
+      answer: rightAnswer([0, 3, 1, 2]),
+      agentId: 'evaluates-1',
+    })
+    const verdict = await evaluateDraft(agent, 'mine', deps)
+    expect(verdict.pass).toBe(true)
+    expect(store.getFlip('mine').agentVerdict).toMatchObject({
+      pass: true,
+      waiting: null,
+      contents: contentsKey(store.getFlip('mine')),
+    })
+    expect(items).toHaveLength(0)
+    expect(lines).toEqual([
+      ['flipJudge', true, undefined, 'cat / tree · asked in My Flips · passes'],
+    ])
+  })
+
+  test('a draft not protected and shuffled, or waiting in To approve, is not sent to the model', async () => {
+    const {agent, deps} = setup({
+      levels: {flipJudge: 'alone'},
+      flips: [
+        draft({order: [0, 3, 1, 2]}),
+        draft({
+          id: 'waits',
+          agentFlip: {
+            by: 'a2',
+            stage: 'drafted',
+            waiting: {step: 'flipSubmit', id: 'item9'},
+          },
+        }),
+      ],
+      answer: rightAnswer([0, 3, 1, 2]),
+      agentId: 'evaluates-2',
+    })
+    await expect(evaluateDraft(agent, 'mine', deps)).rejects.toThrow(
+      'not ready'
+    )
+    await expect(evaluateDraft(agent, 'waits', deps)).rejects.toThrow('waiting')
+    await expect(evaluateDraft(agent, 'none', deps)).rejects.toThrow('gone')
+    expect(deps.ipc).not.toHaveBeenCalled()
+  })
+
+  test('a verdict a run put in To approve while the model answered is not written over', async () => {
+    const {agent, deps, store} = setup({
+      levels: {flipJudge: 'ask'},
+      flips: [draft()],
+      answer: () => null,
+      agentId: 'evaluates-3',
+    })
+    deps.ipc.mockImplementation(async (command, data) => {
+      store.updateDraft({
+        id: 'mine',
+        agentVerdict: {pass: false, waiting: 'item7'},
+      })
+      return rightAnswer([0, 3, 1, 2])(data.flip)
+    })
+    await expect(evaluateDraft(agent, 'mine', deps)).rejects.toThrow('waiting')
+    expect(store.getFlip('mine').agentVerdict).toEqual({
+      pass: false,
+      waiting: 'item7',
+    })
+  })
+})

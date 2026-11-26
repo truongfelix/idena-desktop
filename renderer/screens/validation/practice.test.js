@@ -125,6 +125,28 @@ describe('createPractice', () => {
 })
 
 describe('a practice through the validation machine', () => {
+  it("the agent's best flip is set, never toggled, and only while none is marked (B-260)", async () => {
+    const practice = createPractice(sample)
+    const service = startPractice(practice)
+    await advance(3000)
+    for (const {hash, answer} of practice.short)
+      service.send({type: 'ANSWER', hash, option: answer})
+    service.send('SUBMIT')
+    await settle()
+    await advance(12000)
+    service.send('START_LONG_SESSION')
+    const [one, two] = practice.long.filter(({reportReason}) => !reportReason)
+    const best = () => Object.keys(service.state.context.bestFlipHashes)
+    service.send({type: 'MARK_BEST', hash: one.hash})
+    expect(best()).toEqual([one.hash])
+    // Sent again (a stale pass), or for another flip: nothing changes; the toggle is the person's only.
+    service.send({type: 'MARK_BEST', hash: one.hash})
+    service.send({type: 'MARK_BEST', hash: two.hash})
+    expect(best()).toEqual([one.hash])
+    service.send({type: 'FAVORITE', hash: one.hash})
+    expect(best()).toEqual([])
+  })
+
   it('ends with the results and sends nothing to the node', async () => {
     const practice = createPractice(sample)
     const service = startPractice(practice)

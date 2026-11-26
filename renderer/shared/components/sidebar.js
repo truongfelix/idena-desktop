@@ -62,8 +62,11 @@ import {TodoVotingCountBadge} from '../../screens/oracles/components'
 import {socialNewsCount} from '../../screens/social/news-count'
 import {useSocial} from '../../screens/social/provider'
 import {ReleaseNoteDialog} from './release-check'
+import {useAgentsState} from '../../screens/agents/menu-state'
+import {usePendingActions} from '../../screens/agents/pending-api'
 import {
   AdsIcon,
+  AgentIcon,
   ClockIcon,
   CommunityIcon,
   ContactsIcon,
@@ -418,6 +421,8 @@ function Navbar() {
 
   const [{todoCount}] = useVotingNotification()
   const socialNews = socialNewsCount(useSocial() || {})
+  const toApprove = (usePendingActions() || []).length
+  const agents = useAgentsState(toApprove)
 
   return (
     <Nav>
@@ -444,6 +449,32 @@ function Navbar() {
         ) : (
           t('Social')
         )}
+      </NavItem>
+      <NavItem href="/agents" icon={AgentIcon}>
+        <Flex flex={1} align="center" justify="space-between">
+          <Flex as="span" align="center" gap={2}>
+            <Text as="span">{t('Agents')}</Text>
+            {agents.dot && (
+              <Box
+                as="span"
+                w={2}
+                h={2}
+                borderRadius="full"
+                bg={agents.dot === 'waiting' ? 'orange.500' : 'green.500'}
+                title={
+                  agents.dot === 'waiting'
+                    ? t('An agent waits for you')
+                    : t('An agent is on')
+                }
+              />
+            )}
+          </Flex>
+          {toApprove > 0 && (
+            <TodoVotingCountBadge aria-label={t('To approve')}>
+              {toApprove > 99 ? '99+' : toApprove}
+            </TodoVotingCountBadge>
+          )}
+        </Flex>
       </NavItem>
       <NavItem href="/oracles/list" icon={OracleIcon} display>
         {todoCount > 0 ? (
