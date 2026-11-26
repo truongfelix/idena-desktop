@@ -15,7 +15,8 @@ import {UserInlineCard} from './components'
 
 function TimelineContent({tab, isOwn, history, isError, error}) {
   const {t} = useTranslation()
-  if (isError)
+  // A failed refresh keeps the timeline already read (as Wallets keeps its list).
+  if (isError && !history)
     return (
       <FillPlaceholder py={12}>
         {[t('The history could not be read from your node.'), error?.message]
