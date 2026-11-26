@@ -6,6 +6,18 @@ import {bufferToHex} from '../../shared/utils/string'
 export const DNA_LINK_VERSION = `v1`
 export const DNA_NONCE_PREFIX = 'signin-'
 
+/**
+ * Whether a text is one the app signs only for its own flows: a sign-in nonce (`signin-`) or an Idena Connect
+ * disconnect (`disconnect-`, B-318). A sign link (dna://sign) with such a text is refused: its signature would serve
+ * a sign-in or a disconnect on another website.
+ */
+export const isReservedSignText = (text) =>
+  String(text).startsWith(DNA_NONCE_PREFIX) ||
+  String(text).startsWith('disconnect-')
+
+/** How long a website has to answer a disconnect (ms). */
+const DISCONNECT_TIMEOUT_MS = 20000
+
 export const DNA_SEND_CONFIRM_TRESHOLD = 0.05
 
 export function isValidUrl(string) {
@@ -172,6 +184,66 @@ export async function startSession(nonceEndpoint, {token, address}) {
   throw new Error(`You must start prefix with ${DNA_NONCE_PREFIX}`)
 }
 
+/**
+ * The site a sign-in nonce was made for, when it is not the site of this link. A nonce may name its site:
+ * `signin-<host>/<random>`, the host as `URL.host` writes it (lower case, the port only when it is not the default
+ * one). A site that passed on another site's nonce as its own would get a signature that signs in there: the app
+ * signs a nonce naming a site only for that site, the host of the authentication endpoint (which receives the
+ * signature) and of the nonce endpoint. The text before the first "/" names a site when it is that host, or when
+ * it has a host's shape with a "." or a ":": a random part with a "/" (base64) is no site name. A nonce naming no
+ * site is signed as before (so is one naming a host with neither, such as localhost, for another site). Returns `{named, site}` for a nonce made for another site (`site`: the endpoint's host that differs),
+ * else null.
+ */
+// A host as URL.host writes it: lower-case labels and an optional port, or an IPv6 address in brackets.
+const HOST_NAME =
+  /^(?:[a-z0-9-]+\.)*[a-z0-9-]+(?::\d+)?$|^\[[0-9a-f:.]+\](?::\d+)?$/
+
+export function nonceSiteMismatch(
+  nonce,
+  {authenticationEndpoint, nonceEndpoint}
+) {
+  const rest = String(nonce).slice(DNA_NONCE_PREFIX.length)
+  const slash = rest.indexOf('/')
+  if (slash < 0) return null
+  const named = rest.slice(0, slash)
+  const hostOrNull = (url) => {
+    try {
+      return new URL(url).host
+    } catch {
+      return null
+    }
+  }
+  const site = hostOrNull(authenticationEndpoint)
+  if (named !== site && !(HOST_NAME.test(named) && /[.:]/.test(named)))
+    return null
+  // A nonce naming a site is signed only when both endpoints are that site: an endpoint that does not parse is not.
+  if (named !== site)
+    return {named, site: site ?? String(authenticationEndpoint)}
+  const nonceHost = hostOrNull(nonceEndpoint)
+  return nonceHost === site
+    ? null
+    : {named, site: nonceHost ?? String(nonceEndpoint)}
+}
+
+/**
+ * A sign-in (dna://signin): asks the site's nonce endpoint for a nonce for `address`, has the node sign it and sends
+ * the signature to the authentication endpoint. A nonce made for another site is refused before it is signed:
+ * `siteError({named, site})` gives the error's text.
+ */
+export async function signIn(
+  {token, address, nonceEndpoint, authenticationEndpoint},
+  {siteError}
+) {
+  const nonce = await startSession(nonceEndpoint, {token, address})
+  const other = nonceSiteMismatch(nonce, {
+    authenticationEndpoint,
+    nonceEndpoint,
+  })
+  if (other) throw new Error(siteError(other))
+  const signature = await signNonce(nonce)
+  return authenticate(authenticationEndpoint, {token, signature})
+}
+
 export async function signNonce(nonce, format) {
   const params = [nonce]
   if (format) {
@@ -194,7 +266,7 @@ export async function authenticate(authenticationEndpoint, {token, signature}) {
     signature,
   })
 
-  const {error} = {data}
+  const {error} = data
 
   if (error) throw new Error(error)
 
@@ -205,6 +277,23 @@ export async function authenticate(authenticationEndpoint, {token, signature}) {
   if (authenticated) return true
 
   throw new Error('Error authenticating identity')
+}
+
+/**
+ * Asks a site (Idena Connect, B-318) to end the sessions of `address`: the account signs `message`
+ * (disconnectMessage) with the node, and the site's disconnect endpoint answers {data: {disconnected: true}}.
+ */
+export async function disconnect(disconnectEndpoint, {address, message, time}) {
+  const signature = await signNonce(message)
+  const {data} = await axios.post(
+    disconnectEndpoint,
+    {address, time, signature},
+    {timeout: DISCONNECT_TIMEOUT_MS}
+  )
+  if (data?.error) throw new Error(data.error)
+  if (data?.data?.disconnected) return true
+  // No message of the site's: the page says it in the app's language.
+  throw new Error('')
 }
 
 export async function sendDna({from, to, amount, comment}) {
