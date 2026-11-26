@@ -189,11 +189,15 @@ export async function startSession(nonceEndpoint, {token, address}) {
  * `signin-<host>/<random>`, the host as `URL.host` writes it (lower case, the port only when it is not the default
  * one). A site that passed on another site's nonce as its own would get a signature that signs in there: the app
  * signs a nonce naming a site only for that site, the host of the authentication endpoint (which receives the
- * signature) and of the nonce endpoint. The text before the first "/" names a site only when it holds a "." or a
- * ":", as a host does: a random part with a "/" (base64) is no site name. A nonce naming no site is signed as
- * before. Returns `{named, site}` for a nonce made for another site (`site`: the endpoint's host that differs),
+ * signature) and of the nonce endpoint. The text before the first "/" names a site when it is that host, or when
+ * it has a host's shape with a "." or a ":": a random part with a "/" (base64) is no site name. A nonce naming no
+ * site is signed as before (so is one naming a host with neither, such as localhost, for another site). Returns `{named, site}` for a nonce made for another site (`site`: the endpoint's host that differs),
  * else null.
  */
+// A host as URL.host writes it: lower-case labels and an optional port, or an IPv6 address in brackets.
+const HOST_NAME =
+  /^(?:[a-z0-9-]+\.)*[a-z0-9-]+(?::\d+)?$|^\[[0-9a-f:.]+\](?::\d+)?$/
+
 export function nonceSiteMismatch(
   nonce,
   {authenticationEndpoint, nonceEndpoint}
@@ -202,8 +206,9 @@ export function nonceSiteMismatch(
   const slash = rest.indexOf('/')
   if (slash < 0) return null
   const named = rest.slice(0, slash)
-  if (!/[.:]/.test(named)) return null
   const site = new URL(authenticationEndpoint).host
+  if (named !== site && !(HOST_NAME.test(named) && /[.:]/.test(named)))
+    return null
   if (named !== site) return {named, site}
   const nonceHost = new URL(nonceEndpoint).host
   return nonceHost === site ? null : {named, site: nonceHost}

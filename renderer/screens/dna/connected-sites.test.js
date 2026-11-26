@@ -5,7 +5,7 @@ import {
   readConnectedSites,
   recordSignIn,
   signInSite,
-  siteOfHost,
+  sameSite,
 } from './connected-sites'
 
 const alice = '0xAAAA000000000000000000000000000000000001'
@@ -105,13 +105,16 @@ describe('Idena Connect (B-318)', () => {
     ).toBe('duelbelote.fr.evil.example')
   })
 
-  it('takes the site of a host by its last labels', () => {
-    expect(siteOfHost('www.duelbelote.fr')).toBe('duelbelote.fr')
-    expect(siteOfHost('API.DuelBelote.fr:8443')).toBe('duelbelote.fr')
-    expect(siteOfHost('shop.example.co.uk')).toBe('example.co.uk')
-    expect(siteOfHost('evil.co.uk')).toBe('evil.co.uk')
-    expect(siteOfHost('127.0.0.1:29780')).toBe('127.0.0.1')
-    expect(siteOfHost('localhost:29780')).toBe('localhost')
+  it('takes two hosts for one site only with a www. or api., a port or a subdomain between them', () => {
+    expect(sameSite('www.duelbelote.fr', 'api.duelbelote.fr')).toBe(true)
+    expect(sameSite('duelbelote.fr', 'play.duelbelote.fr')).toBe(true)
+    expect(sameSite('127.0.0.1:29780', '127.0.0.1:3000')).toBe(true)
+    expect(sameSite('DuelBelote.fr.', 'duelbelote.fr')).toBe(true)
+    expect(sameSite('victim.vercel.app', 'evil.vercel.app')).toBe(false)
+    expect(sameSite('victim.co.uk', 'evil.co.uk')).toBe(false)
+    expect(sameSite('victim.com.', 'evil.com.')).toBe(false)
+    expect(sameSite('example.com', 'evil-example.com')).toBe(false)
+    expect(sameSite('127.0.0.1', 'localhost')).toBe(false)
   })
 
   it('keeps a disconnect endpoint only on the site that receives the signature', () => {

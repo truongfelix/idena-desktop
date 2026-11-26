@@ -22,25 +22,23 @@ function hostOf(url) {
   }
 }
 
-// The second-level names under which a country's sites register (example.co.uk): the site is then three labels.
-const SECOND_LEVELS = new Set(['co', 'com', 'net', 'org', 'gov', 'edu', 'ac'])
+/** A host for the return-page warning: no port, lower case, no final dot, no leading www. or api. label. */
+const bareHost = (host) =>
+  String(host)
+    .replace(/:\d+$/, '')
+    .toLowerCase()
+    .replace(/\.+$/, '')
+    .replace(/^(www|api)\./, '')
 
 /**
- * The site a host belongs to, for the return-page warning: an IP address or a one-label host as it is, else its last
- * two labels, or three under a country's second level (shop.co.uk). A rule of thumb, not the public suffix list: the
- * warning errs towards showing.
+ * Whether two hosts are one site for the return-page warning: the same host but for its port, a www. or api. in
+ * front, or one a subdomain of the other. Two sites of one hosting service (a.vercel.app, b.vercel.app) or one
+ * country (a.co.uk, b.co.uk) are not: the warning errs towards showing.
  */
-export function siteOfHost(host) {
-  const name = String(host).replace(/:\d+$/, '').toLowerCase()
-  if (/^[\d.]+$/.test(name) || name.startsWith('[')) return name
-  const labels = name.split('.')
-  if (labels.length < 3) return name
-  const n =
-    labels[labels.length - 1].length === 2 &&
-    SECOND_LEVELS.has(labels[labels.length - 2])
-      ? 3
-      : 2
-  return labels.slice(-n).join('.')
+export function sameSite(a, b) {
+  const x = bareHost(a)
+  const y = bareHost(b)
+  return x === y || x.endsWith(`.${y}`) || y.endsWith(`.${x}`)
 }
 
 /**
@@ -67,9 +65,7 @@ export function signInSite({
     website: webOrigin(callbackUrl) ? hostOf(callbackUrl) : null,
     nonceHost: nonce && nonce !== host ? nonce : null,
     returnHost:
-      host &&
-      webOrigin(callbackUrl) &&
-      siteOfHost(hostOf(callbackUrl)) !== siteOfHost(host)
+      host && webOrigin(callbackUrl) && !sameSite(hostOf(callbackUrl), host)
         ? hostOf(callbackUrl)
         : null,
     disconnectEndpoint:

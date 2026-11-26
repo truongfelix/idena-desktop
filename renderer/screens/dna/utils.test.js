@@ -113,10 +113,19 @@ describe('a sign-in nonce made for a site', () => {
     ).toEqual({named: 'duelbelote.fr.evil.example', site: 'duelbelote.fr'})
     expect(nonceSiteMismatch('signin-www.duelbelote.fr/x', link)).not.toBeNull()
     expect(nonceSiteMismatch('signin-duelbelote.fr:443/x', link)).not.toBeNull()
-    expect(nonceSiteMismatch('signin-DuelBelote.fr/x', link)).not.toBeNull()
+    // Capitals: no host as URL.host writes it, so no site name (signed as before).
+    expect(nonceSiteMismatch('signin-DuelBelote.fr/x', link)).toBeNull()
     // No "." nor ":" before the "/": no site name (a base64 random part), signed as before.
     expect(nonceSiteMismatch('signin-/x', link)).toBeNull()
     expect(nonceSiteMismatch('signin-q8Zk/3fA+9w==', link)).toBeNull()
+    expect(nonceSiteMismatch('signin-1732600000.q8Zk/3fA==', link)).toBeNull()
+    expect(nonceSiteMismatch('signin-localhost/x', link)).toBeNull()
+    expect(
+      nonceSiteMismatch('signin-localhost/x', {
+        authenticationEndpoint: 'http://localhost/auth',
+        nonceEndpoint: 'http://localhost/nonce',
+      })
+    ).toBeNull()
     // The first "/" ends the host: a "/" in the random part changes nothing.
     expect(nonceSiteMismatch('signin-duelbelote.fr/a/b', link)).toBeNull()
   })
