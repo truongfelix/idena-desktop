@@ -5,6 +5,7 @@ import SettingsLayout from '../../screens/settings/layout'
 import {SecondaryButton} from '../../shared/components/button'
 import {HDivider} from '../../shared/components/components'
 import {
+  CONNECTED_SITES_EVENT,
   forgetSite,
   loadConnectedSites,
   saveConnectedSites,
@@ -13,14 +14,17 @@ import {
 // Idena Connect (B-318): the websites this computer signed in to with Idena, the latest first; Forget takes one off
 // the list (the website itself may keep the sign-in: no call tells it).
 export default function ConnectSettings() {
-  const {t} = useTranslation()
+  const {t, i18n} = useTranslation()
   const [sites, setSites] = React.useState(() => loadConnectedSites())
+  // A sign-in confirmed while this page is open (its dialog is over the page) shows at once.
+  React.useEffect(() => {
+    const reload = () => setSites(loadConnectedSites())
+    window.addEventListener(CONNECTED_SITES_EVENT, reload)
+    return () => window.removeEventListener(CONNECTED_SITES_EVENT, reload)
+  }, [])
 
-  const forget = ({site, address}) => {
-    const next = forgetSite(loadConnectedSites(), site, address)
-    saveConnectedSites(next)
-    setSites(next)
-  }
+  const forget = ({site, address}) =>
+    saveConnectedSites(forgetSite(loadConnectedSites(), site, address))
 
   return (
     <SettingsLayout>
@@ -52,6 +56,14 @@ export default function ConnectSettings() {
             >
               <Box flex={1} minW={0}>
                 <Text fontWeight={500}>{new URL(entry.site).host}</Text>
+                {entry.website &&
+                  entry.website !== new URL(entry.site).host && (
+                    <Text fontSize="sm" color="muted">
+                      {t('From the website {{website}}', {
+                        website: entry.website,
+                      })}
+                    </Text>
+                  )}
                 <Text fontSize="sm" color="muted" wordBreak="break-all">
                   {entry.address}
                 </Text>
@@ -59,8 +71,12 @@ export default function ConnectSettings() {
                   {t(
                     'First sign-in {{first}} · last {{last}} · sign-ins: {{number}}',
                     {
-                      first: new Date(entry.firstAt).toLocaleDateString(),
-                      last: new Date(entry.lastAt).toLocaleString(),
+                      first: new Date(entry.firstAt).toLocaleDateString(
+                        i18n.language
+                      ),
+                      last: new Date(entry.lastAt).toLocaleString(
+                        i18n.language
+                      ),
                       number: entry.count,
                       nsSeparator: '|',
                     }

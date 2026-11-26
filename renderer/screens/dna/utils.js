@@ -194,7 +194,7 @@ export async function authenticate(authenticationEndpoint, {token, signature}) {
     signature,
   })
 
-  const {error} = {data}
+  const {error} = data
 
   if (error) throw new Error(error)
 

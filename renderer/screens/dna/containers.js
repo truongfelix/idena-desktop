@@ -80,7 +80,7 @@ export function DnaSignInDialog({
   onClose,
   ...props
 }) {
-  const {t} = useTranslation()
+  const {t, i18n} = useTranslation()
 
   const initialRef = React.useRef()
 
@@ -91,17 +91,19 @@ export function DnaSignInDialog({
     faviconUrl
   )
 
-  // Idena Connect (B-318): whether this account signed in to the site before, read again each time the dialog opens
-  // (it stays mounted between links).
+  // Idena Connect (B-318): whether this account signed in to the site before, read each time the dialog opens (it
+  // stays mounted between links) once the address is known, and kept while it closes; undefined: not read yet.
   const site = signInSite({authenticationEndpoint, nonceEndpoint, callbackUrl})
   const {isOpen} = props
-  const known = React.useMemo(
-    () =>
-      isOpen && site.site && address
-        ? findSite(loadConnectedSites(), site.site, address)
-        : null,
-    [address, isOpen, site.site]
-  )
+  const [known, setKnown] = React.useState()
+  React.useEffect(() => {
+    if (isOpen && site.site && address)
+      setKnown(findSite(loadConnectedSites(), site.site, address))
+    else if (isOpen) setKnown(undefined)
+  }, [address, isOpen, site.site])
+
+  // One sign-in per click: the button waits for the site's answer.
+  const [isSigningIn, setIsSigningIn] = React.useState(false)
 
   return (
     <DnaDialog
@@ -136,24 +138,28 @@ export function DnaSignInDialog({
             </MediaDnaDialogStat>
             <SimpleDnaDialogStat label={t('Token')} value={token} />
           </Stack>
-          <Text color="muted" fontSize="sm">
-            {known
-              ? t(
-                  'You signed in to {{host}} with this account before, last on {{date}}.',
-                  {
+          {known !== undefined && (
+            <Text color="muted" fontSize="sm">
+              {known
+                ? t(
+                    'You signed in to {{host}} with this account before, last on {{date}}.',
+                    {
+                      host: site.host,
+                      date: new Date(known.lastAt).toLocaleString(
+                        i18n.language
+                      ),
+                    }
+                  )
+                : t('First sign-in to {{host}} with this account.', {
                     host: site.host,
-                    date: new Date(known.lastAt).toLocaleString(),
-                  }
-                )
-              : t('First sign-in to {{host}} with this account.', {
-                  host: site.host,
-                })}
-          </Text>
-          {site.otherHosts.length > 0 && (
+                  })}
+            </Text>
+          )}
+          {site.nonceHost && (
             <Text color="red.500" fontSize="sm">
               {t(
-                'The signature is sent to {{host}}, while the link also names {{others}}. Confirm only if you trust {{host}}.',
-                {host: site.host, others: site.otherHosts.join(', ')}
+                'The signature is sent to {{host}}, for a code asked of {{other}}. Confirm only if you trust {{host}}.',
+                {host: site.host, other: site.nonceHost}
               )}
             </Text>
           )}
@@ -169,7 +175,10 @@ export function DnaSignInDialog({
           ref={initialRef}
           // No sign-in before the account is read: the site would get no address.
           isDisabled={!address}
+          isLoading={isSigningIn}
           onClick={async () => {
+            if (isSigningIn) return
+            setIsSigningIn(true)
             startSession(nonceEndpoint, {
               token,
               address,
@@ -187,7 +196,7 @@ export function DnaSignInDialog({
                   saveConnectedSites(
                     recordSignIn(
                       loadConnectedSites(),
-                      {site: site.site, address},
+                      {site: site.site, address, website: site.website},
                       Date.now()
                     )
                   )
@@ -198,7 +207,10 @@ export function DnaSignInDialog({
                 global.logger.error(message)
                 if (onSignInError) onSignInError(message)
               })
-              .finally(onClose)
+              .finally(() => {
+                setIsSigningIn(false)
+                onClose()
+              })
           }}
         >
           {t('Confirm')}

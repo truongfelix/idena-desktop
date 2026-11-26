@@ -2,7 +2,7 @@ import {loadPersistentState, persistState} from '../../shared/utils/persist'
 
 // Idena Connect (B-318): the websites this computer signed in to with Idena (dna://signin), kept on this computer
 // only. A site is the origin that receives the signature, the link's authentication_endpoint: the callback and the
-// nonce endpoint are only named by the link, and may be another site's.
+// nonce endpoint are only named by the link, and may be another host's.
 
 /** The origin of an http(s) URL ("https://example.com"), null for anything else. */
 function webOrigin(url) {
@@ -23,9 +23,10 @@ function hostOf(url) {
 }
 
 /**
- * The site a sign-in link signs in to: `site` (the origin of its authentication endpoint), its `host`, and
- * `otherHosts`: the hosts of its nonce endpoint and its http(s) callback that are not that host, which the dialog
- * names (a link can show one website and send the signature to another).
+ * The site a sign-in link signs in to: `site` (the origin of its authentication endpoint), its `host`, `website`
+ * (the host of its http(s) callback, the page the person comes from; null for another callback), and `nonceHost`:
+ * the host of its nonce endpoint when it is not `host` (the code is then asked of one host and its signature sent to
+ * another, which the dialog warns about; a callback on another host of the same service is common).
  */
 export function signInSite({
   authenticationEndpoint,
@@ -34,10 +35,13 @@ export function signInSite({
 }) {
   const site = webOrigin(authenticationEndpoint)
   const host = site ? hostOf(site) : null
-  const others = [nonceEndpoint, webOrigin(callbackUrl) && callbackUrl]
-    .map((url) => (url ? hostOf(url) : null))
-    .filter((other) => other && other !== host)
-  return {site, host, otherHosts: [...new Set(others)]}
+  const nonce = nonceEndpoint ? hostOf(nonceEndpoint) : null
+  return {
+    site,
+    host,
+    website: webOrigin(callbackUrl) ? hostOf(callbackUrl) : null,
+    nonceHost: nonce && nonce !== host ? nonce : null,
+  }
 }
 
 const sameEntry = (entry, site, address) =>
@@ -49,16 +53,17 @@ export function findSite(sites, site, address) {
 }
 
 /**
- * `sites` with a sign-in to `site` by `address` at `now` (ms): the entry's last time and count updated, or a new
- * entry; the latest first.
+ * `sites` with a sign-in to `site` by `address` at `now` (ms), from the page of `website` (a host, or null): the
+ * entry's last time, count and website updated, or a new entry; the latest first.
  */
-export function recordSignIn(sites, {site, address}, now) {
+export function recordSignIn(sites, {site, address, website = null}, now) {
   const known = findSite(sites, site, address)
   const entry = known
-    ? {...known, lastAt: now, count: known.count + 1}
+    ? {...known, website, lastAt: now, count: known.count + 1}
     : {
         site,
         address: String(address).toLowerCase(),
+        website,
         firstAt: now,
         lastAt: now,
         count: 1,
@@ -78,6 +83,7 @@ const isEntry = (entry) =>
   typeof entry.site === 'string' &&
   webOrigin(entry.site) === entry.site &&
   typeof entry.address === 'string' &&
+  (entry.website == null || typeof entry.website === 'string') &&
   Number.isFinite(entry.firstAt) &&
   Number.isFinite(entry.lastAt) &&
   Number.isFinite(entry.count)
@@ -88,6 +94,9 @@ export function readConnectedSites(state) {
   return Array.isArray(sites) ? sites.filter(isEntry) : []
 }
 
+/** The window event sent once the list is saved, for a page that shows it. */
+export const CONNECTED_SITES_EVENT = 'idena-connected-sites'
+
 // The store 'connectedSites', named in each call: main/safe-store-bridge.test.js reads the names from the calls.
 export function loadConnectedSites() {
   return readConnectedSites(loadPersistentState('connectedSites'))
@@ -95,4 +104,5 @@ export function loadConnectedSites() {
 
 export function saveConnectedSites(sites) {
   persistState('connectedSites', {sites})
+  window.dispatchEvent(new Event(CONNECTED_SITES_EVENT))
 }

@@ -20,29 +20,44 @@ describe('Idena Connect (B-318)', () => {
     ).toEqual({
       site: 'https://app.example.com',
       host: 'app.example.com',
-      otherHosts: [],
+      website: 'app.example.com',
+      nonceHost: null,
     })
   })
 
-  it('names the other hosts a link shows, and no dna: callback', () => {
+  it('names a nonce endpoint on another host, never a callback on another host', () => {
     expect(
       signInSite({
-        authenticationEndpoint: 'https://evil.example/auth',
-        nonceEndpoint: 'https://good.example/nonce',
-        callbackUrl: 'https://good.example/done',
+        authenticationEndpoint: 'https://b.example/auth',
+        nonceEndpoint: 'https://a.example/nonce',
+        callbackUrl: 'https://a.example/done',
       })
     ).toEqual({
-      site: 'https://evil.example',
-      host: 'evil.example',
-      otherHosts: ['good.example'],
+      site: 'https://b.example',
+      host: 'b.example',
+      website: 'a.example',
+      nonceHost: 'a.example',
+    })
+    // A front end on www., its endpoints on api.: no warning.
+    expect(
+      signInSite({
+        authenticationEndpoint: 'https://api.example.com/auth',
+        nonceEndpoint: 'https://api.example.com/start',
+        callbackUrl: 'https://www.example.com/done',
+      })
+    ).toEqual({
+      site: 'https://api.example.com',
+      host: 'api.example.com',
+      website: 'www.example.com',
+      nonceHost: null,
     })
     expect(
       signInSite({
         authenticationEndpoint: 'http://localhost:29780/auth',
         nonceEndpoint: 'http://localhost:29780/nonce',
         callbackUrl: 'dna://signin-done',
-      }).otherHosts
-    ).toEqual([])
+      }).website
+    ).toBeNull()
   })
 
   it('has no site for an endpoint that is no web address', () => {
@@ -53,11 +68,16 @@ describe('Idena Connect (B-318)', () => {
 
   it('records a first sign-in, then counts the next ones, the latest first', () => {
     const site = 'https://app.example.com'
-    const first = recordSignIn([], {site, address: alice}, 1000)
+    const first = recordSignIn(
+      [],
+      {site, address: alice, website: 'www.example.com'},
+      1000
+    )
     expect(first).toEqual([
       {
         site,
         address: alice.toLowerCase(),
+        website: 'www.example.com',
         firstAt: 1000,
         lastAt: 1000,
         count: 1,
