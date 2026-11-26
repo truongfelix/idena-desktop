@@ -164,6 +164,7 @@ export default function Layout({
     params: {
       nonce_endpoint: nonceEndpoint,
       authentication_endpoint: authenticationEndpoint,
+      disconnect_endpoint: disconnectEndpoint,
       favicon_url: faviconUrl,
       ...dnaSignInParams
     },
@@ -213,6 +214,7 @@ export default function Layout({
         <DnaSignInDialog
           authenticationEndpoint={authenticationEndpoint}
           nonceEndpoint={nonceEndpoint}
+          disconnectEndpoint={disconnectEndpoint}
           faviconUrl={faviconUrl}
           {...dnaSignInParams}
           {...dnaSignInDisclosure}

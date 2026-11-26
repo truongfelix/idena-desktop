@@ -6,7 +6,8 @@ import {useSocialIdentity} from '../hooks'
 import {useSocial} from '../provider'
 import {shortAddress} from '../people'
 import {LINK, MUTED} from './theme'
-import {identityColor, identityStatus} from '../format'
+import {identityColor, showsAge} from '../format'
+import {memberStatus} from '../vouching'
 import {activeBan} from '../moderation'
 import {ModerationContext} from '../moderation-hooks'
 
@@ -91,20 +92,25 @@ export function NameLink({address, onProfile, ...props}) {
 export function IdentityLabel({address, withAge = false, ...props}) {
   const {t} = useTranslation()
   const {data: identity} = useSocialIdentity(address)
+  const {profiles} = useSocial()
   // With Community moderation on, a banned account's likes, tips and posts still show: it is labelled (B-308).
   const {state, epoch} = React.useContext(ModerationContext)
   const banned = Boolean(activeBan(state, address, epoch))
   if (!identity) return null
-  const status = identityStatus(identity.state)
+  // A vouched member reads "Vouched" (B-316), from the profiles the feed already read.
+  const status = memberStatus(
+    identity.state,
+    profiles?.[String(address).toLowerCase()]
+  )
   const label =
-    withAge && identity.age > 0 && status !== 'Not validated'
+    withAge && showsAge(status, identity.age)
       ? `${t(status)} · ${t('age {{age}}', {age: identity.age})}`
       : t(status)
   return (
     <Text
       as="span"
       fontWeight={500}
-      color={identityColor(identity.state) || MUTED}
+      color={identityColor(status) || MUTED}
       {...props}
     >
       {label}
