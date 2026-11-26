@@ -1,10 +1,19 @@
 import React from 'react'
 import {renderToStaticMarkup} from 'react-dom/server'
-import {TimelineContent} from './timeline'
+import {IdentityTimeline, TimelineContent} from './timeline'
+import {useIdentityHistory} from '../history/hooks'
+import {useChainState} from '../../shared/providers/chain-context'
 import {HistoryTab} from '../history/utils'
 
 // The identity card and its machines are not rendered here.
 jest.mock('./components', () => ({UserInlineCard: () => null}))
+jest.mock('next/router', () => ({
+  useRouter: () => ({query: {}, pathname: '/home', replace: () => {}}),
+}))
+jest.mock('../history/hooks', () => ({useIdentityHistory: jest.fn()}))
+jest.mock('../../shared/providers/chain-context', () => ({
+  useChainState: jest.fn(),
+}))
 
 const history = {epoch: 232, ceremoniesComplete: true, ceremonies: []}
 
@@ -61,9 +70,40 @@ describe("My Idena's timeline with its node down (B-317)", () => {
     expect(html).not.toContain('chakra-skeleton')
   })
 
-  it('keeps a timeline already read while the node is down', () => {
+  it('keeps a timeline already read while the node is down, saying it may be out of date', () => {
     const html = render({history, offline: true})
     expect(html).toContain('No validation of this address')
+    expect(html).toContain(STALE)
     expect(html).not.toContain('once your node answers')
+  })
+})
+
+describe("My Idena's timeline and the node's state (B-317)", () => {
+  const timeline = (chain) => {
+    useChainState.mockReturnValue(chain)
+    useIdentityHistory.mockClear()
+    useIdentityHistory.mockReturnValue({})
+    const html = renderToStaticMarkup(<IdentityTimeline address="0x1" isOwn />)
+    const [, options] = useIdentityHistory.mock.calls[0]
+    return {html, enabled: options?.enabled}
+  }
+
+  it('reads while the node is online', () => {
+    const {html, enabled} = timeline({offline: false, loading: false})
+    expect(enabled).toBe(true)
+    expect(html).toContain('chakra-skeleton')
+  })
+
+  it("waits for the app's first answer from the node with the loading bars", () => {
+    const {html, enabled} = timeline({offline: true, loading: true})
+    expect(enabled).toBe(false)
+    expect(html).toContain('chakra-skeleton')
+    expect(html).not.toContain('once your node answers')
+  })
+
+  it('says it waits for the node once the node did not answer', () => {
+    const {html, enabled} = timeline({offline: true, loading: false})
+    expect(enabled).toBe(false)
+    expect(html).toContain('The history shows once your node answers.')
   })
 })

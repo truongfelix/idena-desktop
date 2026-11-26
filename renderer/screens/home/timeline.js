@@ -45,7 +45,8 @@ export function TimelineContent({
             )}
       </FillPlaceholder>
     )
-  // Nothing read and the node down (also from the start, before the own address is known): no read is coming.
+  // Nothing read and the node down (also from the start, before the own address is known): no read is coming. The
+  // app counts its node offline until its first answer: the caller passes `offline` only once that answer failed.
   if (!history && offline)
     return (
       <FillPlaceholder py={12}>
@@ -66,8 +67,9 @@ export function TimelineContent({
     ) : (
       <CeremoniesTab history={history} isOwn={isOwn} />
     )
-  if (!isError) return content
-  // A failed refresh: the timeline already read stays, with a line saying it may be out of date (as on Wallets).
+  if (!isError && !offline) return content
+  // A failed refresh, or the node down since the last read: the timeline already read stays, with a line saying it
+  // may be out of date (as on Wallets).
   return (
     <Stack spacing={4}>
       <StaleReadNote error={error} />
@@ -87,7 +89,7 @@ export function IdentityTimeline({address, isOwn}) {
 
   const tab = isOwn ? parseHistoryTab(router.query.tab) : HistoryTab.Ceremonies
 
-  const {offline} = useChainState()
+  const {offline, loading} = useChainState()
   const {
     data: history,
     isError,
@@ -133,7 +135,7 @@ export function IdentityTimeline({address, isOwn}) {
         history={history}
         isError={isError}
         isSuccess={isSuccess}
-        offline={offline}
+        offline={offline && !loading}
         error={error}
       />
     </Stack>
