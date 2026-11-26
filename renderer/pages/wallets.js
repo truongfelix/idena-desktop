@@ -1,5 +1,6 @@
 import React from 'react'
 import {useTranslation} from 'react-i18next'
+import {useQueryClient} from 'react-query'
 import {Flex, Stack, Box, Heading, useDisclosure} from '@chakra-ui/react'
 import {useWallets} from '../shared/hooks/use-wallets'
 import {IconButton2} from '../shared/components/button'
@@ -36,10 +37,18 @@ export default function WalletsPage() {
   const {wallets, totalAmount, txs} = useWallets()
 
   // The node's list (TransactionHistory) has the mined transactions only: the ones still in the mempool come first.
-  const pendingTxs = React.useMemo(
-    () => (txs ?? []).filter((tx) => tx.isMining),
-    [txs]
-  )
+  // useWallets reads the mempool only (B-317).
+  const pendingTxs = React.useMemo(() => txs ?? [], [txs])
+
+  // A transaction that leaves the mempool was mined: the list reads it at once instead of at its next refresh.
+  const queryClient = useQueryClient()
+  const pendingHashes = React.useRef(new Set())
+  React.useEffect(() => {
+    const now = new Set(pendingTxs.map((tx) => tx.hash))
+    const mined = [...pendingHashes.current].some((hash) => !now.has(hash))
+    pendingHashes.current = now
+    if (mined) queryClient.invalidateQueries(['bcn_transactions', address])
+  }, [address, pendingTxs, queryClient])
 
   const sendDnaDisclosure = useDisclosure()
   const {onOpen: onOpenSendDnaDrawer} = sendDnaDisclosure

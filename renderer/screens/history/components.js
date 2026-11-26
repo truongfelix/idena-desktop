@@ -13,6 +13,7 @@ import {FillPlaceholder, OutlineButton} from '../oracles/components'
 import {mapToFriendlyStatus} from '../../shared/providers/identity-context'
 import {toLocaleDna} from '../../shared/utils/utils'
 import {useTransactionPages} from './hooks'
+import {useChainState} from '../../shared/providers/chain-context'
 import {
   TransactionDetailsDrawer,
   TransactionDetailsLink,
@@ -347,6 +348,7 @@ export function TransactionHistory({address}) {
   const {t, i18n} = useTranslation()
   const amountText = useAmount(5)
   const [filter, setFilter] = React.useState(TxFilter.All)
+  const {offline} = useChainState()
   const {
     data,
     isLoading,
@@ -355,7 +357,7 @@ export function TransactionHistory({address}) {
     hasNextPage,
     fetchNextPage,
     isFetchingNextPage,
-  } = useTransactionPages(address)
+  } = useTransactionPages(address, {enabled: !offline})
 
   const {open: openDetails, drawerProps} = useTransactionDetailsDrawer()
 
@@ -368,7 +370,9 @@ export function TransactionHistory({address}) {
   )
 
   let placeholder = null
-  if (isError) placeholder = error?.message
+  if (isError && !data)
+    placeholder =
+      error?.message || t('Your node did not answer the history request.')
   else if (isLoading) placeholder = t('Loading...')
   else if (txs.length === 0)
     placeholder =

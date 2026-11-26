@@ -128,7 +128,10 @@ export function OtherIdentity({address}) {
     <Stack spacing={8} w="full">
       <Stack spacing={2}>
         {identity || isError ? (
-          <UserInlineCard identity={{address, state: identity?.state}} h={24} />
+          <UserInlineCard
+            identity={{address, state: identity?.state}}
+            minH={24}
+          />
         ) : (
           <Skeleton h={24} />
         )}

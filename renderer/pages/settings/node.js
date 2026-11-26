@@ -147,7 +147,7 @@ function NodeSettings() {
   return (
     <SettingsLayout>
       <Stack spacing={8} mt={8}>
-        <Stack spacing={4} maxW="md">
+        <Stack spacing={4} maxW="xl">
           <Stack isInline spacing={4} align="center">
             <Box>
               <Switch

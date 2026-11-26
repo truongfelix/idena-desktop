@@ -97,6 +97,7 @@ export function UserInlineCard({
         address={address}
         profile={profile}
         boxSize={20}
+        rounded="lg"
         bg="surface"
         borderWidth={1}
         borderColor="gray.016"

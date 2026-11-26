@@ -137,6 +137,7 @@ export default function ProfilePage() {
   // My Idena opened for another address (a transaction's details): read-only, its ceremonies only.
   const queryAddress = router.query.address
   const otherAddress =
+    Boolean(address) &&
     isAddress(queryAddress) &&
     queryAddress.toLowerCase() !== address?.toLowerCase()
       ? queryAddress
@@ -283,7 +284,7 @@ export default function ProfilePage() {
               <Stack isInline spacing="10">
                 <Box>
                   <Stack spacing={8} w="md" ref={activateInviteRef}>
-                    <UserInlineCard identity={identity} h={24}>
+                    <UserInlineCard identity={identity} minH={24}>
                       <ProfileTagList />
                     </UserInlineCard>
 
