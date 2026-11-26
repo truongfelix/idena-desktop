@@ -22,11 +22,34 @@ function hostOf(url) {
   }
 }
 
+// The second-level names under which a country's sites register (example.co.uk): the site is then three labels.
+const SECOND_LEVELS = new Set(['co', 'com', 'net', 'org', 'gov', 'edu', 'ac'])
+
+/**
+ * The site a host belongs to, for the return-page warning: an IP address or a one-label host as it is, else its last
+ * two labels, or three under a country's second level (shop.co.uk). A rule of thumb, not the public suffix list: the
+ * warning errs towards showing.
+ */
+export function siteOfHost(host) {
+  const name = String(host).replace(/:\d+$/, '').toLowerCase()
+  if (/^[\d.]+$/.test(name) || name.startsWith('[')) return name
+  const labels = name.split('.')
+  if (labels.length < 3) return name
+  const n =
+    labels[labels.length - 1].length === 2 &&
+    SECOND_LEVELS.has(labels[labels.length - 2])
+      ? 3
+      : 2
+  return labels.slice(-n).join('.')
+}
+
 /**
  * The site a sign-in link signs in to: `site` (the origin of its authentication endpoint), its `host`, `website`
  * (the host of its http(s) callback, the page the person comes from; null for another callback), `nonceHost`: the
  * host of its nonce endpoint when it is not `host` (the code is then asked of one host and its signature sent to
- * another, which the dialog warns about; a callback on another host of the same service is common), and
+ * another, which the dialog warns about), `returnHost`: the callback's host when it belongs to another site than
+ * `host` (the person signs in to `host` and goes on to another site, which the dialog warns about: a page could
+ * relay another site's endpoints; www. and api. of one site are common and show none), and
  * `disconnectEndpoint`: the link's disconnect_endpoint when it is on `site`, else null.
  */
 export function signInSite({
@@ -43,6 +66,12 @@ export function signInSite({
     host,
     website: webOrigin(callbackUrl) ? hostOf(callbackUrl) : null,
     nonceHost: nonce && nonce !== host ? nonce : null,
+    returnHost:
+      host &&
+      webOrigin(callbackUrl) &&
+      siteOfHost(hostOf(callbackUrl)) !== siteOfHost(host)
+        ? hostOf(callbackUrl)
+        : null,
     disconnectEndpoint:
       site && webOrigin(disconnectEndpoint) === site
         ? disconnectEndpoint

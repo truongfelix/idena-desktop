@@ -5,6 +5,7 @@ import {
   readConnectedSites,
   recordSignIn,
   signInSite,
+  siteOfHost,
 } from './connected-sites'
 
 const alice = '0xAAAA000000000000000000000000000000000001'
@@ -23,11 +24,12 @@ describe('Idena Connect (B-318)', () => {
       host: 'app.example.com',
       website: 'app.example.com',
       nonceHost: null,
+      returnHost: null,
       disconnectEndpoint: null,
     })
   })
 
-  it('names a nonce endpoint on another host, never a callback on another host', () => {
+  it('names a nonce endpoint on another host, and a callback on another site', () => {
     expect(
       signInSite({
         authenticationEndpoint: 'https://b.example/auth',
@@ -39,9 +41,10 @@ describe('Idena Connect (B-318)', () => {
       host: 'b.example',
       website: 'a.example',
       nonceHost: 'a.example',
+      returnHost: 'a.example',
       disconnectEndpoint: null,
     })
-    // A front end on www., its endpoints on api.: no warning.
+    // A front end on www., its endpoints on api.: one site, no warning.
     expect(
       signInSite({
         authenticationEndpoint: 'https://api.example.com/auth',
@@ -53,6 +56,7 @@ describe('Idena Connect (B-318)', () => {
       host: 'api.example.com',
       website: 'www.example.com',
       nonceHost: null,
+      returnHost: null,
       disconnectEndpoint: null,
     })
     expect(
@@ -62,6 +66,52 @@ describe('Idena Connect (B-318)', () => {
         callbackUrl: 'dna://signin-done',
       }).website
     ).toBeNull()
+  })
+
+  it('names a callback on another site than the one that receives the signature', () => {
+    const relay = signInSite({
+      authenticationEndpoint: 'https://duelbelote.fr/auth/v1/authenticate',
+      nonceEndpoint: 'https://duelbelote.fr/auth/v1/start-session',
+      callbackUrl: 'https://evil.example/done',
+    })
+    expect(relay.host).toBe('duelbelote.fr')
+    expect(relay.returnHost).toBe('evil.example')
+    for (const callbackUrl of [
+      'https://duelbelote.fr/done',
+      'https://www.duelbelote.fr/done',
+      'dna://signin-done',
+    ])
+      expect(
+        signInSite({
+          authenticationEndpoint: 'https://api.duelbelote.fr/auth',
+          nonceEndpoint: 'https://api.duelbelote.fr/start',
+          callbackUrl,
+        }).returnHost
+      ).toBeNull()
+    // Another port of the same host is the same site; a look-alike ending is not.
+    expect(
+      signInSite({
+        authenticationEndpoint: 'http://127.0.0.1:29780/auth',
+        nonceEndpoint: 'http://127.0.0.1:29780/start',
+        callbackUrl: 'http://127.0.0.1:3000/done',
+      }).returnHost
+    ).toBeNull()
+    expect(
+      signInSite({
+        authenticationEndpoint: 'https://duelbelote.fr/auth',
+        nonceEndpoint: 'https://duelbelote.fr/start',
+        callbackUrl: 'https://duelbelote.fr.evil.example/done',
+      }).returnHost
+    ).toBe('duelbelote.fr.evil.example')
+  })
+
+  it('takes the site of a host by its last labels', () => {
+    expect(siteOfHost('www.duelbelote.fr')).toBe('duelbelote.fr')
+    expect(siteOfHost('API.DuelBelote.fr:8443')).toBe('duelbelote.fr')
+    expect(siteOfHost('shop.example.co.uk')).toBe('example.co.uk')
+    expect(siteOfHost('evil.co.uk')).toBe('evil.co.uk')
+    expect(siteOfHost('127.0.0.1:29780')).toBe('127.0.0.1')
+    expect(siteOfHost('localhost:29780')).toBe('localhost')
   })
 
   it('keeps a disconnect endpoint only on the site that receives the signature', () => {

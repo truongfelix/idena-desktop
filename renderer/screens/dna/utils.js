@@ -189,8 +189,10 @@ export async function startSession(nonceEndpoint, {token, address}) {
  * `signin-<host>/<random>`, the host as `URL.host` writes it (lower case, the port only when it is not the default
  * one). A site that passed on another site's nonce as its own would get a signature that signs in there: the app
  * signs a nonce naming a site only for that site, the host of the authentication endpoint (which receives the
- * signature) and of the nonce endpoint. A nonce naming no site (no "/") is signed as before. Returns
- * `{named, site}` for a nonce made for another site, else null.
+ * signature) and of the nonce endpoint. The text before the first "/" names a site only when it holds a "." or a
+ * ":", as a host does: a random part with a "/" (base64) is no site name. A nonce naming no site is signed as
+ * before. Returns `{named, site}` for a nonce made for another site (`site`: the endpoint's host that differs),
+ * else null.
  */
 export function nonceSiteMismatch(
   nonce,
@@ -200,10 +202,30 @@ export function nonceSiteMismatch(
   const slash = rest.indexOf('/')
   if (slash < 0) return null
   const named = rest.slice(0, slash)
+  if (!/[.:]/.test(named)) return null
   const site = new URL(authenticationEndpoint).host
-  return named === site && new URL(nonceEndpoint).host === site
-    ? null
-    : {named, site}
+  if (named !== site) return {named, site}
+  const nonceHost = new URL(nonceEndpoint).host
+  return nonceHost === site ? null : {named, site: nonceHost}
+}
+
+/**
+ * A sign-in (dna://signin): asks the site's nonce endpoint for a nonce for `address`, has the node sign it and sends
+ * the signature to the authentication endpoint. A nonce made for another site is refused before it is signed:
+ * `siteError({named, site})` gives the error's text.
+ */
+export async function signIn(
+  {token, address, nonceEndpoint, authenticationEndpoint},
+  {siteError}
+) {
+  const nonce = await startSession(nonceEndpoint, {token, address})
+  const other = nonceSiteMismatch(nonce, {
+    authenticationEndpoint,
+    nonceEndpoint,
+  })
+  if (other) throw new Error(siteError(other))
+  const signature = await signNonce(nonce)
+  return authenticate(authenticationEndpoint, {token, signature})
 }
 
 export async function signNonce(nonce, format) {

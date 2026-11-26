@@ -10,6 +10,7 @@ import {
   isValidDnaUrl,
   newerDnaLink,
   nonceSiteMismatch,
+  signIn,
   signNonce,
   urlLogContext,
 } from './utils'
@@ -113,21 +114,67 @@ describe('a sign-in nonce made for a site', () => {
     expect(nonceSiteMismatch('signin-www.duelbelote.fr/x', link)).not.toBeNull()
     expect(nonceSiteMismatch('signin-duelbelote.fr:443/x', link)).not.toBeNull()
     expect(nonceSiteMismatch('signin-DuelBelote.fr/x', link)).not.toBeNull()
-    expect(nonceSiteMismatch('signin-/x', link)).toEqual({
-      named: '',
-      site: 'duelbelote.fr',
-    })
+    // No "." nor ":" before the "/": no site name (a base64 random part), signed as before.
+    expect(nonceSiteMismatch('signin-/x', link)).toBeNull()
+    expect(nonceSiteMismatch('signin-q8Zk/3fA+9w==', link)).toBeNull()
     // The first "/" ends the host: a "/" in the random part changes nothing.
     expect(nonceSiteMismatch('signin-duelbelote.fr/a/b', link)).toBeNull()
   })
 
-  it('refuses a nonce naming the site when the nonce comes from another host', () => {
+  it('refuses a nonce naming the site when the nonce comes from another host, and names that host', () => {
     expect(
       nonceSiteMismatch('signin-duelbelote.fr/x', {
         ...link,
         nonceEndpoint: 'https://evil.example/nonce',
       })
-    ).not.toBeNull()
+    ).toEqual({named: 'duelbelote.fr', site: 'evil.example'})
+  })
+
+  describe('the sign-in', () => {
+    beforeEach(() => {
+      apiClient.mockReset()
+      axios.post.mockReset()
+    })
+    const siteError = ({named, site}) => `made for ${named}, not ${site}`
+    const evil = {
+      token: 't1',
+      address: '0xabc',
+      nonceEndpoint: 'https://evil.example/nonce',
+      authenticationEndpoint: 'https://evil.example/auth',
+    }
+
+    it('signs nothing and sends nothing for a nonce made for another site', async () => {
+      const post = jest.fn()
+      apiClient.mockReturnValue({post})
+      axios.post.mockResolvedValueOnce({
+        data: {data: {nonce: 'signin-duelbelote.fr/ab12'}},
+      })
+      await expect(signIn(evil, {siteError})).rejects.toThrow(
+        'made for duelbelote.fr, not evil.example'
+      )
+      expect(post).not.toHaveBeenCalled()
+      expect(axios.post).toHaveBeenCalledTimes(1)
+    })
+
+    it('signs a nonce naming its own site and sends the signature', async () => {
+      const post = jest.fn().mockResolvedValue({data: {result: '0xsig'}})
+      apiClient.mockReturnValue({post})
+      axios.post
+        .mockResolvedValueOnce({
+          data: {data: {nonce: 'signin-evil.example/ab12'}},
+        })
+        .mockResolvedValueOnce({data: {data: {authenticated: true}}})
+      await expect(signIn(evil, {siteError})).resolves.toBe(true)
+      expect(post).toHaveBeenCalledWith('/', {
+        method: 'dna_sign',
+        params: ['signin-evil.example/ab12'],
+        id: 1,
+      })
+      expect(axios.post).toHaveBeenLastCalledWith('https://evil.example/auth', {
+        token: 't1',
+        signature: '0xsig',
+      })
+    })
   })
 })
 
@@ -215,7 +262,7 @@ describe('dna link method', () => {
 })
 
 describe('openable dna links', () => {
-  const signIn = (params) =>
+  const signInLink = (params) =>
     `dna://signin/v1?${new URLSearchParams({
       token: 'abc',
       callback_url: 'https://example.org/done',
@@ -232,8 +279,10 @@ describe('openable dna links', () => {
   )
 
   it('opens a sign-in link with its token, callback and endpoints', () => {
-    expect(isOpenableDnaUrl(signIn())).toBe(true)
-    expect(isOpenableDnaUrl(signIn({callback_url: 'dna://send/v1'}))).toBe(true)
+    expect(isOpenableDnaUrl(signInLink())).toBe(true)
+    expect(isOpenableDnaUrl(signInLink({callback_url: 'dna://send/v1'}))).toBe(
+      true
+    )
   })
 
   it.each([
@@ -246,7 +295,7 @@ describe('openable dna links', () => {
       {authentication_endpoint: 'file:///auth'},
     ],
   ])('does not open a sign-in link with %s', (_, params) => {
-    expect(isOpenableDnaUrl(signIn(params))).toBe(false)
+    expect(isOpenableDnaUrl(signInLink(params))).toBe(false)
   })
 
   it.each([

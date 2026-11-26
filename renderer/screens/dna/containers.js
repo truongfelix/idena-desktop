@@ -32,10 +32,8 @@ import {
   SimpleDnaDialogStat,
 } from './components'
 import {
-  startSession,
-  authenticate,
+  signIn,
   signNonce,
-  nonceSiteMismatch,
   isReservedSignText,
   isValidUrl,
   sendDna,
@@ -128,7 +126,11 @@ export function DnaSignInDialog({
             )}
           </Text>
           <Stack spacing="px" borderRadius="lg" overflow="hidden">
-            <MediaDnaDialogStat label={t('Website')} value={callbackHost}>
+            {/* The site that receives the signature: the one the person signs in to. */}
+            <MediaDnaDialogStat
+              label={t('Website')}
+              value={site.host || callbackHost}
+            >
               {callbackFaviconUrl ? (
                 <Image
                   src={callbackFaviconUrl}
@@ -163,6 +165,14 @@ export function DnaSignInDialog({
                   })}
             </Text>
           )}
+          {site.returnHost && (
+            <Text color="red.500" fontSize="sm">
+              {t(
+                'After the sign-in you go to {{other}}, not {{host}}. Confirm only if you came here from {{host}}.',
+                {host: site.host, other: site.returnHost}
+              )}
+            </Text>
+          )}
           {site.nonceHost && (
             <Text color="red.500" fontSize="sm">
               {t(
@@ -187,31 +197,16 @@ export function DnaSignInDialog({
           onClick={async () => {
             if (isSigningIn) return
             setIsSigningIn(true)
-            startSession(nonceEndpoint, {
-              token,
-              address,
-            })
-              .then((nonce) => {
-                // A nonce made for another site: this site would sign in there with the signature.
-                const other = nonceSiteMismatch(nonce, {
-                  authenticationEndpoint,
-                  nonceEndpoint,
-                })
-                if (other)
-                  throw new Error(
-                    t('This sign-in was made for {{named}}, not {{site}}', {
-                      named: other.named || '?',
-                      site: other.site,
-                    })
-                  )
-                return signNonce(nonce)
-              })
-              .then((signature) =>
-                authenticate(authenticationEndpoint, {
-                  token,
-                  signature,
-                })
-              )
+            signIn(
+              {token, address, nonceEndpoint, authenticationEndpoint},
+              {
+                siteError: ({named, site: other}) =>
+                  t('This sign-in was made for {{named}}, not {{site}}', {
+                    named,
+                    site: other,
+                  }),
+              }
+            )
               .then(() => {
                 // The list of Idena Connect: the sign-in the site accepted.
                 if (site.site)
