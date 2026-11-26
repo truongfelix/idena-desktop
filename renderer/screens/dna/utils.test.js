@@ -3,6 +3,7 @@ import apiClient from '../../shared/api/api-client'
 import {
   disconnect,
   dnaCallbackSite,
+  isReservedSignText,
   dnaLinkMethod,
   dnaLinkParams,
   isOpenableDnaUrl,
@@ -44,11 +45,20 @@ describe('Idena Connect disconnect (B-318)', () => {
       params: ['disconnect-https://a.example-1700000000'],
       id: 1,
     })
-    expect(axios.post).toHaveBeenCalledWith('https://a.example/disconnect', {
-      address: '0xabc',
-      time: 1700000000,
-      signature: '0xsig',
-    })
+    expect(axios.post).toHaveBeenCalledWith(
+      'https://a.example/disconnect',
+      {address: '0xabc', time: 1700000000, signature: '0xsig'},
+      {timeout: 20000}
+    )
+  })
+
+  it('keeps sign-in and disconnect texts out of sign links', () => {
+    expect(isReservedSignText('signin-123')).toBe(true)
+    expect(isReservedSignText('disconnect-https://a.example-1700000000')).toBe(
+      true
+    )
+    expect(isReservedSignText('hello')).toBe(false)
+    expect(isReservedSignText(' disconnect-x')).toBe(false)
   })
 
   it("fails with the site's error, or when it does not say it disconnected", async () => {
@@ -60,10 +70,9 @@ describe('Idena Connect disconnect (B-318)', () => {
     await expect(disconnect('https://a.example/d', args)).rejects.toThrow(
       'too old'
     )
+    // No message of the site's: an empty one, which the page replaces with its own text.
     axios.post.mockResolvedValueOnce({data: {data: {}}})
-    await expect(disconnect('https://a.example/d', args)).rejects.toThrow(
-      'The website did not end the session'
-    )
+    await expect(disconnect('https://a.example/d', args)).rejects.toThrow(/^$/)
   })
 })
 

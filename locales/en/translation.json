@@ -2013,5 +2013,8 @@
   "No website yet. A website that offers Sign in with Idena shows here after you confirm its sign-in.": "No website yet. A website that offers Sign in with Idena shows here after you confirm its sign-in.",
   "First sign-in {{first}} · last {{last}} · sign-ins: {{number}}": "First sign-in {{first}} · last {{last}} · sign-ins: {{number}}",
   "Forget": "Forget",
-  "Disconnect": "Disconnect"
+  "Disconnect": "Disconnect",
+  "The website did not say it ended your sign-in.": "The website did not say it ended your sign-in.",
+  "Use this account in the app to disconnect it.": "Use this account in the app to disconnect it.",
+  "This text signs you in or out of a website. The app signs it only in its own sign-in and Disconnect, never here.": "This text signs you in or out of a website. The app signs it only in its own sign-in and Disconnect, never here."
 }

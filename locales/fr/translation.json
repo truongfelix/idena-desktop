@@ -2037,5 +2037,8 @@
   "No website yet. A website that offers Sign in with Idena shows here after you confirm its sign-in.": "Aucun site pour l'instant. Un site qui propose la connexion avec Idena apparaît ici une fois sa connexion confirmée.",
   "First sign-in {{first}} · last {{last}} · sign-ins: {{number}}": "Première connexion {{first}} · dernière {{last}} · connexions : {{number}}",
   "Forget": "Oublier",
-  "Disconnect": "Déconnecter"
+  "Disconnect": "Déconnecter",
+  "The website did not say it ended your sign-in.": "Le site n'a pas confirmé la fin de votre connexion.",
+  "Use this account in the app to disconnect it.": "Utilisez ce compte dans l'application pour le déconnecter.",
+  "This text signs you in or out of a website. The app signs it only in its own sign-in and Disconnect, never here.": "Ce texte vous connecte à un site ou vous en déconnecte. L'application ne le signe que dans sa propre connexion et sa déconnexion, jamais ici."
 }

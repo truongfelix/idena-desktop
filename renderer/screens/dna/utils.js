@@ -6,6 +6,18 @@ import {bufferToHex} from '../../shared/utils/string'
 export const DNA_LINK_VERSION = `v1`
 export const DNA_NONCE_PREFIX = 'signin-'
 
+/**
+ * Whether a text is one the app signs only for its own flows: a sign-in nonce (`signin-`) or an Idena Connect
+ * disconnect (`disconnect-`, B-318). A sign link (dna://sign) with such a text is refused: its signature would serve
+ * a sign-in or a disconnect on another website.
+ */
+export const isReservedSignText = (text) =>
+  String(text).startsWith(DNA_NONCE_PREFIX) ||
+  String(text).startsWith('disconnect-')
+
+/** How long a website has to answer a disconnect (ms). */
+const DISCONNECT_TIMEOUT_MS = 20000
+
 export const DNA_SEND_CONFIRM_TRESHOLD = 0.05
 
 export function isValidUrl(string) {
@@ -213,14 +225,15 @@ export async function authenticate(authenticationEndpoint, {token, signature}) {
  */
 export async function disconnect(disconnectEndpoint, {address, message, time}) {
   const signature = await signNonce(message)
-  const {data} = await axios.post(disconnectEndpoint, {
-    address,
-    time,
-    signature,
-  })
+  const {data} = await axios.post(
+    disconnectEndpoint,
+    {address, time, signature},
+    {timeout: DISCONNECT_TIMEOUT_MS}
+  )
   if (data?.error) throw new Error(data.error)
   if (data?.data?.disconnected) return true
-  throw new Error('The website did not end the session')
+  // No message of the site's: the page says it in the app's language.
+  throw new Error('')
 }
 
 export async function sendDna({from, to, amount, comment}) {

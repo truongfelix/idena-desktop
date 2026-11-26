@@ -52,7 +52,8 @@ export default function ConnectSettings() {
     } catch (error) {
       failToast({
         title: t('The website did not disconnect you'),
-        description: error?.message,
+        description:
+          error?.message || t('The website did not say it ended your sign-in.'),
       })
     } finally {
       setDisconnecting(null)
@@ -115,13 +116,25 @@ export default function ConnectSettings() {
                     }
                   )}
                 </Text>
+                {entry.disconnectEndpoint &&
+                  entry.address !== me?.toLowerCase() && (
+                    <Text fontSize="sm" color="muted">
+                      {t('Use this account in the app to disconnect it.')}
+                    </Text>
+                  )}
               </Box>
               {entry.disconnectEndpoint && (
                 <PrimaryButton
-                  // The node signs for the account in use only.
-                  isDisabled={entry.address !== me?.toLowerCase()}
+                  // The node signs for the account in use only; one disconnect at a time.
+                  isDisabled={
+                    entry.address !== me?.toLowerCase() ||
+                    (disconnecting !== null &&
+                      disconnecting !== `${entry.site}|${entry.address}`)
+                  }
                   isLoading={disconnecting === `${entry.site}|${entry.address}`}
-                  onClick={() => disconnectFrom(entry)}
+                  onClick={() => {
+                    if (disconnecting === null) disconnectFrom(entry)
+                  }}
                 >
                   {t('Disconnect')}
                 </PrimaryButton>

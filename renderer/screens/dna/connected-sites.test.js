@@ -93,11 +93,12 @@ describe('Idena Connect (B-318)', () => {
     )
     expect(saved[0].disconnectEndpoint).toBe(`${site}/bye`)
     expect(readConnectedSites({sites: saved})).toEqual(saved)
+    // An endpoint off the site is dropped, the entry and its history kept.
     expect(
       readConnectedSites({
         sites: [{...saved[0], disconnectEndpoint: 'https://b.example/bye'}],
       })
-    ).toEqual([])
+    ).toEqual([{...saved[0], disconnectEndpoint: null}])
   })
 
   it('has no site for an endpoint that is no web address', () => {

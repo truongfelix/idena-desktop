@@ -108,8 +108,6 @@ const isEntry = (entry) =>
   webOrigin(entry.site) === entry.site &&
   typeof entry.address === 'string' &&
   (entry.website == null || typeof entry.website === 'string') &&
-  (entry.disconnectEndpoint == null ||
-    webOrigin(entry.disconnectEndpoint) === entry.site) &&
   Number.isFinite(entry.firstAt) &&
   Number.isFinite(entry.lastAt) &&
   Number.isFinite(entry.count)
@@ -117,7 +115,16 @@ const isEntry = (entry) =>
 /** The saved sites (only this file writes them: {sites: [...]}), the entries it cannot read left out. */
 export function readConnectedSites(state) {
   const sites = state?.sites
-  return Array.isArray(sites) ? sites.filter(isEntry) : []
+  if (!Array.isArray(sites)) return []
+  // A disconnect endpoint off the entry's site is dropped, the entry kept.
+  return sites
+    .filter(isEntry)
+    .map((entry) =>
+      entry.disconnectEndpoint == null ||
+      webOrigin(entry.disconnectEndpoint) === entry.site
+        ? entry
+        : {...entry, disconnectEndpoint: null}
+    )
 }
 
 /** The window event sent once the list is saved, for a page that shows it. */

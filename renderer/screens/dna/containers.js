@@ -35,6 +35,7 @@ import {
   startSession,
   authenticate,
   signNonce,
+  isReservedSignText,
   isValidUrl,
   sendDna,
   DNA_SEND_CONFIRM_TRESHOLD,
@@ -248,6 +249,9 @@ export function DnaSignDialog({
 
   const isValidCallbackUrl = isValidUrl(callbackUrl)
 
+  // A sign-in or disconnect text is signed only by those flows (B-318).
+  const isReserved = isReservedSignText(message)
+
   const {host: callbackHost, favicon: callbackFaviconUrl} = dnaCallbackSite(
     callbackUrl,
     faviconUrl
@@ -282,6 +286,13 @@ export function DnaSignDialog({
             </MediaDnaDialogStat>
             <SimpleDnaDialogStat label={t('Message')} value={message} />
           </Stack>
+          {isReserved && (
+            <Text color="red.500">
+              {t(
+                'This text signs you in or out of a website. The app signs it only in its own sign-in and Disconnect, never here.'
+              )}
+            </Text>
+          )}
         </Stack>
       </DialogBody>
       <DialogFooter>
@@ -292,7 +303,9 @@ export function DnaSignDialog({
           overflow="hidden"
           wordBreak="break-all"
           ref={initialRef}
+          isDisabled={isReserved}
           onClick={async () => {
+            if (isReserved) return
             signNonce(message, format)
               .then((signature) => {
                 if (isValidCallbackUrl) {
