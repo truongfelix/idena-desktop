@@ -231,6 +231,7 @@ describe('the transaction filters on Wallets (B-317)', () => {
     mining: {type: 'online', from: me},
     stake: {type: 'replenishStake', from: me, to: me},
     burn: {type: 'burn', from: me},
+    ipfs: {type: 'storeToIpfs', from: me},
   }
   const shown = (filter) =>
     Object.keys(txs).filter((name) => matchesTxFilter(filter, txs[name], me))
@@ -247,5 +248,14 @@ describe('the transaction filters on Wallets (B-317)', () => {
   it('puts the contract and the identity transactions apart', () => {
     expect(shown(TxFilter.Contracts)).toEqual(['call', 'deploy'])
     expect(shown(TxFilter.Identity)).toEqual(['flip', 'mining', 'stake'])
+  })
+
+  it('puts every other kind under Other, each transaction under one filter', () => {
+    expect(shown(TxFilter.Other)).toEqual(['burn', 'ipfs'])
+    const filters = Object.values(TxFilter).filter((f) => f !== TxFilter.All)
+    for (const name of Object.keys(txs))
+      expect(
+        filters.filter((f) => matchesTxFilter(f, txs[name], me))
+      ).toHaveLength(1)
   })
 })

@@ -318,6 +318,7 @@ const txFilterLabels = [
   [TxFilter.Received, 'Received'],
   [TxFilter.Contracts, 'Contracts'],
   [TxFilter.Identity, 'Identity'],
+  [TxFilter.Other, 'Other'],
 ]
 
 /** The filter buttons over the transactions. */

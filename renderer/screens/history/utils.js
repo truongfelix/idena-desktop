@@ -237,6 +237,7 @@ export const TxFilter = {
   Received: 'received',
   Contracts: 'contracts',
   Identity: 'identity',
+  Other: 'other',
 }
 
 const contractTxTypes = new Set([
@@ -268,7 +269,8 @@ const sameAddress = (a, b) =>
   Boolean(a) && Boolean(b) && a.toLowerCase() === b.toLowerCase()
 
 // Whether `tx` of `address` is shown under `filter`: Sent and Received are the transfers, Contracts the contract
-// deploys, calls and terminations, Identity what the identity does (invitations, flips, answers, mining, stake).
+// deploys, calls and terminations, Identity what the identity does (invitations, flips, answers, mining, stake),
+// Other the rest (burns, IPFS storage, any kind added later).
 export function matchesTxFilter(filter, tx, address) {
   switch (filter) {
     case TxFilter.Sent:
@@ -279,6 +281,12 @@ export function matchesTxFilter(filter, tx, address) {
       return contractTxTypes.has(tx.type)
     case TxFilter.Identity:
       return identityTxTypes.has(tx.type)
+    case TxFilter.Other:
+      return (
+        tx.type !== 'send' &&
+        !contractTxTypes.has(tx.type) &&
+        !identityTxTypes.has(tx.type)
+      )
     default:
       return true
   }
