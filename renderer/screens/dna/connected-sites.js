@@ -29,7 +29,8 @@ const plainHost = (host) =>
 /**
  * Whether two hosts are one site for the return-page warning: the same host but for its port or a www. or api. in
  * front, or one a subdomain of the other. Two sites of one hosting service (a.vercel.app, b.vercel.app, and
- * www.vercel.app) or one country (a.co.uk, b.co.uk) are not: the warning errs towards showing.
+ * www.vercel.app) or one country (a.co.uk, b.co.uk) are not. A limit: www.<suffix> and api.<suffix> of a hosting
+ * service count as one (taking them apart would warn on every site with its page on www. and endpoints on api.).
  */
 export function sameSite(a, b) {
   const x = plainHost(a)

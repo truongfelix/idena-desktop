@@ -139,6 +139,21 @@ describe('a sign-in nonce made for a site', () => {
     ).toEqual({named: 'duelbelote.fr', site: 'evil.example'})
   })
 
+  it('refuses a nonce naming a site when an endpoint does not parse, and signs one naming none', () => {
+    const relative = {authenticationEndpoint: '/auth', nonceEndpoint: '/nonce'}
+    expect(nonceSiteMismatch('signin-duelbelote.fr/x', relative)).toEqual({
+      named: 'duelbelote.fr',
+      site: '/auth',
+    })
+    expect(nonceSiteMismatch('signin-q8Zk/3fA==', relative)).toBeNull()
+    expect(
+      nonceSiteMismatch('signin-duelbelote.fr/x', {
+        ...link,
+        nonceEndpoint: '//evil.example/nonce',
+      })
+    ).toEqual({named: 'duelbelote.fr', site: '//evil.example/nonce'})
+  })
+
   describe('the sign-in', () => {
     beforeEach(() => {
       apiClient.mockReset()

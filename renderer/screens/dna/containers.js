@@ -96,12 +96,9 @@ export function DnaSignInDialog({
     disconnectEndpoint,
     faviconUrl,
   })
-  const {host: callbackHost, favicon: callbackFaviconUrl} = dnaCallbackSite(
-    callbackUrl,
-    faviconUrl
-  )
-  // The icon of the site that receives the signature.
-  const siteFavicon = site.favicon || callbackFaviconUrl
+  const {host: callbackHost} = dnaCallbackSite(callbackUrl, faviconUrl)
+  // The icon of the site that receives the signature (none: the globe).
+  const siteFavicon = site.favicon
   const {isOpen} = props
   const [known, setKnown] = React.useState()
   React.useEffect(() => {

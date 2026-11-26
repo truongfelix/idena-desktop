@@ -206,17 +206,23 @@ export function nonceSiteMismatch(
   const slash = rest.indexOf('/')
   if (slash < 0) return null
   const named = rest.slice(0, slash)
-  let site
-  try {
-    site = new URL(authenticationEndpoint).host
-  } catch {
-    return null // no site to compare with: the request to the endpoint fails with its own error
+  const hostOrNull = (url) => {
+    try {
+      return new URL(url).host
+    } catch {
+      return null
+    }
   }
+  const site = hostOrNull(authenticationEndpoint)
   if (named !== site && !(HOST_NAME.test(named) && /[.:]/.test(named)))
     return null
-  if (named !== site) return {named, site}
-  const nonceHost = new URL(nonceEndpoint).host
-  return nonceHost === site ? null : {named, site: nonceHost}
+  // A nonce naming a site is signed only when both endpoints are that site: an endpoint that does not parse is not.
+  if (named !== site)
+    return {named, site: site ?? String(authenticationEndpoint)}
+  const nonceHost = hostOrNull(nonceEndpoint)
+  return nonceHost === site
+    ? null
+    : {named, site: nonceHost ?? String(nonceEndpoint)}
 }
 
 /**
