@@ -1,8 +1,8 @@
-// The History page: an address's history as its own node records it (dna_identityHistory), shaped for the tabs.
+// An address's history as its own node records it (dna_identityHistory), shaped for My Idena's timeline (its
+// ceremonies and mining) and for Wallets (its transactions).
 
 export const HistoryTab = {
   Ceremonies: 'ceremonies',
-  Transactions: 'transactions',
   Mining: 'mining',
 }
 
@@ -10,6 +10,19 @@ export function parseHistoryTab(value) {
   return Object.values(HistoryTab).includes(value)
     ? value
     : HistoryTab.Ceremonies
+}
+
+/**
+ * Where a link to the History page, gone since B-317, now leads: its transactions to Wallets, its ceremonies and
+ * mining to My Idena's timeline, and another address's history to My Idena opened for that address.
+ */
+export function historyPageTarget(query = {}) {
+  const {tab, address} = query
+  if (tab === 'transactions') return {pathname: '/wallets', query: {}}
+  const target = {}
+  if (typeof address === 'string' && address) target.address = address
+  if (Object.values(HistoryTab).includes(tab)) target.tab = tab
+  return {pathname: '/home', query: target}
 }
 
 // Amounts arrive as decimal strings (iDNA).
@@ -215,4 +228,58 @@ export function signedAmount(tx, address) {
 
 export function counterParty(tx, address) {
   return tx.from?.toLowerCase() === address?.toLowerCase() ? tx.to : tx.from
+}
+
+// The filters of the transactions on Wallets.
+export const TxFilter = {
+  All: 'all',
+  Sent: 'sent',
+  Received: 'received',
+  Contracts: 'contracts',
+  Identity: 'identity',
+}
+
+const contractTxTypes = new Set([
+  'deployContract',
+  'callContract',
+  'terminateContract',
+])
+
+const identityTxTypes = new Set([
+  'activation',
+  'invite',
+  'killInvitee',
+  'kill',
+  'killDelegator',
+  'submitFlip',
+  'deleteFlip',
+  'submitAnswersHash',
+  'submitShortAnswers',
+  'submitLongAnswers',
+  'evidence',
+  'online',
+  'delegate',
+  'undelegate',
+  'replenishStake',
+  'changeProfile',
+])
+
+const sameAddress = (a, b) =>
+  Boolean(a) && Boolean(b) && a.toLowerCase() === b.toLowerCase()
+
+// Whether `tx` of `address` is shown under `filter`: Sent and Received are the transfers, Contracts the contract
+// deploys, calls and terminations, Identity what the identity does (invitations, flips, answers, mining, stake).
+export function matchesTxFilter(filter, tx, address) {
+  switch (filter) {
+    case TxFilter.Sent:
+      return tx.type === 'send' && sameAddress(tx.from, address)
+    case TxFilter.Received:
+      return tx.type === 'send' && !sameAddress(tx.from, address)
+    case TxFilter.Contracts:
+      return contractTxTypes.has(tx.type)
+    case TxFilter.Identity:
+      return identityTxTypes.has(tx.type)
+    default:
+      return true
+  }
 }

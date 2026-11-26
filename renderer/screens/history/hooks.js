@@ -19,7 +19,8 @@ export function useIdentityHistory(address, {enabled = true} = {}) {
 
 export const TRANSACTIONS_PAGE = 30
 
-// bcn_transactions, page by page (the node keeps its own addresses' transactions).
+// bcn_transactions, page by page (the node keeps its own addresses' transactions), read again every 20 s while
+// shown, so that a transaction sent from Wallets appears once mined.
 export function useTransactionPages(address, {enabled = true} = {}) {
   return useInfiniteQuery(
     ['bcn_transactions', address],
@@ -31,6 +32,7 @@ export function useTransactionPages(address, {enabled = true} = {}) {
     {
       enabled: Boolean(address) && enabled,
       getNextPageParam: (page) => page?.token ?? undefined,
+      refetchInterval: 20 * 1000,
       notifyOnChangeProps: 'tracked',
     }
   )

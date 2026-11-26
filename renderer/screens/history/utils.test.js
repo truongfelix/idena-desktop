@@ -7,6 +7,9 @@ import {
   earnedRewards,
   miningRows,
   parseHistoryTab,
+  historyPageTarget,
+  matchesTxFilter,
+  TxFilter,
   signedAmount,
   txTypeName,
   validationEpochLabel,
@@ -75,6 +78,33 @@ describe('History page', () => {
     expect(parseHistoryTab('mining')).toBe(HistoryTab.Mining)
     expect(parseHistoryTab(undefined)).toBe(HistoryTab.Ceremonies)
     expect(parseHistoryTab('other')).toBe(HistoryTab.Ceremonies)
+    // The transactions are on Wallets since B-317.
+    expect(parseHistoryTab('transactions')).toBe(HistoryTab.Ceremonies)
+  })
+
+  it('sends an old History link to its new place (B-317)', () => {
+    const other = '0x34004a3e0000000000000000000000000000b850'
+    expect(historyPageTarget()).toEqual({pathname: '/home', query: {}})
+    expect(historyPageTarget({tab: 'transactions'})).toEqual({
+      pathname: '/wallets',
+      query: {},
+    })
+    expect(historyPageTarget({tab: 'mining'})).toEqual({
+      pathname: '/home',
+      query: {tab: 'mining'},
+    })
+    expect(historyPageTarget({address: other})).toEqual({
+      pathname: '/home',
+      query: {address: other},
+    })
+    expect(historyPageTarget({address: other, tab: 'ceremonies'})).toEqual({
+      pathname: '/home',
+      query: {address: other, tab: 'ceremonies'},
+    })
+    expect(historyPageTarget({tab: 'other', address: ['a', 'b']})).toEqual({
+      pathname: '/home',
+      query: {},
+    })
   })
 
   it('adds the earned rewards of a summary', () => {
@@ -186,5 +216,36 @@ describe('validationEpochLabel', () => {
   it('shows nothing for an unknown epoch', () => {
     expect(validationEpochLabel(undefined)).toBeUndefined()
     expect(validationEpochLabel(Number.NaN)).toBeUndefined()
+  })
+})
+
+describe('the transaction filters on Wallets (B-317)', () => {
+  const me = '0xAAAA000000000000000000000000000000000001'
+  const other = '0xbbbb000000000000000000000000000000000002'
+  const txs = {
+    sent: {type: 'send', from: me.toLowerCase(), to: other},
+    received: {type: 'send', from: other, to: me},
+    call: {type: 'callContract', from: me, to: other},
+    deploy: {type: 'deployContract', from: me},
+    flip: {type: 'submitFlip', from: me},
+    mining: {type: 'online', from: me},
+    stake: {type: 'replenishStake', from: me, to: me},
+    burn: {type: 'burn', from: me},
+  }
+  const shown = (filter) =>
+    Object.keys(txs).filter((name) => matchesTxFilter(filter, txs[name], me))
+
+  it('shows every transaction under All', () => {
+    expect(shown(TxFilter.All)).toEqual(Object.keys(txs))
+  })
+
+  it('splits the transfers by their direction, in any letter case', () => {
+    expect(shown(TxFilter.Sent)).toEqual(['sent'])
+    expect(shown(TxFilter.Received)).toEqual(['received'])
+  })
+
+  it('puts the contract and the identity transactions apart', () => {
+    expect(shown(TxFilter.Contracts)).toEqual(['call', 'deploy'])
+    expect(shown(TxFilter.Identity)).toEqual(['flip', 'mining', 'stake'])
   })
 })

@@ -23,7 +23,7 @@ import {useTransactionDetailsDrawer} from '../screens/wallets/hooks'
 import {useFailToast} from '../shared/hooks/use-toast'
 import {useIdentityState} from '../shared/providers/identity-context'
 import {areSameCaseInsensitive} from '../screens/oracles/utils'
-import {FillPlaceholder} from '../screens/oracles/components'
+import {TransactionHistory} from '../screens/history/components'
 import {SendOutIcon} from '../shared/components/icons'
 
 export default function WalletsPage() {
@@ -34,6 +34,12 @@ export default function WalletsPage() {
   const {address} = useIdentityState()
 
   const {wallets, totalAmount, txs} = useWallets()
+
+  // The node's list (TransactionHistory) has the mined transactions only: the ones still in the mempool come first.
+  const pendingTxs = React.useMemo(
+    () => (txs ?? []).filter((tx) => tx.isMining),
+    [txs]
+  )
 
   const sendDnaDisclosure = useDisclosure()
   const {onOpen: onOpenSendDnaDrawer} = sendDnaDisclosure
@@ -56,7 +62,7 @@ export default function WalletsPage() {
         <Stack spacing={8} w="full">
           <Flex justify="space-between" align="flex-start">
             <Box pt="1/2" pb={2}>
-              <TotalAmount address={address} amount={totalAmount} />
+              <TotalAmount amount={totalAmount} />
             </Box>
             <Stack isInline spacing={1} align="center" pt={2}>
               <VDivider />
@@ -86,31 +92,37 @@ export default function WalletsPage() {
               />
             ))}
           </Stack>
-          <Stack spacing={4}>
-            <Stack spacing="1px" mb={5}>
+          {pendingTxs.length > 0 && (
+            <Stack spacing={4}>
               <Heading
                 as="h2"
                 fontSize="lg"
                 fontWeight={500}
                 lineHeight="short"
               >
-                {t('Recent transactions')}
+                {t('Waiting to be mined')}
               </Heading>
-              <TextLink href="/history" fontWeight={500}>
-                {t('Rewards and penalties in your history')}
-              </TextLink>
-            </Stack>
-            <Box>
               <WalletTransactionList
-                txs={txs}
+                txs={pendingTxs}
                 onOpenTransaction={openTransaction}
               />
-              {txs?.length === 0 && (
-                <FillPlaceholder mt={24}>
-                  {t(`You don't have any transactions yet`)}
-                </FillPlaceholder>
-              )}
-            </Box>
+            </Stack>
+          )}
+          <Stack spacing={4}>
+            <Stack spacing="1px">
+              <Heading
+                as="h2"
+                fontSize="lg"
+                fontWeight={500}
+                lineHeight="short"
+              >
+                {t('Transactions')}
+              </Heading>
+              <TextLink href="/home" fontWeight={500}>
+                {t('Validation rewards and penalties in My Idena')}
+              </TextLink>
+            </Stack>
+            <TransactionHistory address={address} />
           </Stack>
         </Stack>
 

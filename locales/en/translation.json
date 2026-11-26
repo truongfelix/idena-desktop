@@ -2020,5 +2020,15 @@
   "Use this account in the app to disconnect it.": "Use this account in the app to disconnect it.",
   "This text signs you in or out of a website. The app signs it only in its own sign-in and Disconnect, never here.": "This text signs you in or out of a website. The app signs it only in its own sign-in and Disconnect, never here.",
   "Advanced settings of the built-in node": "Advanced settings of the built-in node",
-  "Built-in node": "Built-in node"
+  "Built-in node": "Built-in node",
+  "Timeline": "Timeline",
+  "Back to your identity": "Back to your identity",
+  "Sent": "Sent",
+  "Received": "Received",
+  "Contracts": "Contracts",
+  "Identity": "Identity",
+  "No transactions of this kind in the ones shown": "No transactions of this kind in the ones shown",
+  "Waiting to be mined": "Waiting to be mined",
+  "Validation rewards and penalties in My Idena": "Validation rewards and penalties in My Idena",
+  "All your validations in My Idena": "All your validations in My Idena"
 }

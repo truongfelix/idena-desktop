@@ -44,7 +44,6 @@ import {
   DialogHeader,
   ExternalLink,
   Page,
-  TextLink,
   Tooltip,
   HDivider,
 } from '../shared/components/components'
@@ -56,6 +55,7 @@ import {
   eitherState,
   buildNextValidationCalendarLink,
   formatValidationDate,
+  isAddress,
 } from '../shared/utils/utils'
 import {shouldExpectValidationResults} from '../screens/validation/utils'
 import {InviteProvider} from '../shared/providers/invite-context'
@@ -76,7 +76,6 @@ import {useFailToast, useSuccessToast} from '../shared/hooks/use-toast'
 import {
   AddUserIcon,
   AdsIcon,
-  ChevronRightIcon,
   DeleteIcon,
   InfoIcon,
   OracleIcon,
@@ -86,6 +85,11 @@ import {
   TelegramIcon,
 } from '../shared/components/icons'
 import {StakeProtectionBadge} from '../screens/home/stake-protection'
+import {
+  BalanceLine,
+  IdentityTimeline,
+  OtherIdentity,
+} from '../screens/home/timeline'
 
 export default function ProfilePage() {
   const {
@@ -129,6 +133,14 @@ export default function ProfilePage() {
   } = identity
 
   const epoch = useEpochState()
+
+  // My Idena opened for another address (a transaction's details): read-only, its ceremonies only.
+  const queryAddress = router.query.address
+  const otherAddress =
+    isAddress(queryAddress) &&
+    queryAddress.toLowerCase() !== address?.toLowerCase()
+      ? queryAddress
+      : null
 
   const {
     isOpen: isOpenNextValidationDialog,
@@ -179,9 +191,6 @@ export default function ProfilePage() {
     eitherState(currentOnboarding, ...states)
 
   const toDna = toLocaleDna(language, {maximumFractionDigits: 4})
-
-  const maybeDna = (amount) =>
-    !amount || Number.isNaN(amount) ? '–' : toDna(amount)
 
   const {
     isOpen: isOpenExportPk,
@@ -252,6 +261,15 @@ export default function ProfilePage() {
 
   const stakingApy = useStakingApy()
 
+  if (otherAddress)
+    return (
+      <Layout syncing={syncing} offline={offline}>
+        <Page>
+          <OtherIdentity address={otherAddress} />
+        </Page>
+      </Layout>
+    )
+
   return (
     <>
       <InviteProvider>
@@ -261,7 +279,7 @@ export default function ProfilePage() {
           )}
 
           <Page>
-            <Stack spacing={8}>
+            <Stack spacing={8} w="full">
               <Stack isInline spacing="10">
                 <Box>
                   <Stack spacing={8} w="md" ref={activateInviteRef}>
@@ -378,39 +396,7 @@ export default function ProfilePage() {
                       </Box>
                     )}
 
-                    <UserStatList title={t('My Wallet')}>
-                      <UserStat>
-                        <UserStatLabel>{t('Address')}</UserStatLabel>
-                        <UserStatValue>
-                          {address}
-                          <TextLink
-                            href="/history"
-                            fontWeight={500}
-                            display="block"
-                          >
-                            {t('Open your history')}
-                          </TextLink>
-                        </UserStatValue>
-                      </UserStat>
-
-                      <UserStat>
-                        <UserStatLabel>{t('Balance')}</UserStatLabel>
-                        <UserStatValue>
-                          {maybeDna(balance)}
-                          <TextLink href="/wallets">
-                            <Stack
-                              isInline
-                              spacing={0}
-                              align="center"
-                              fontWeight={500}
-                            >
-                              <Text as="span">{t('Send')}</Text>
-                              <ChevronRightIcon boxSize={4} />
-                            </Stack>
-                          </TextLink>
-                        </UserStatValue>
-                      </UserStat>
-                    </UserStatList>
+                    <BalanceLine balance={balance} />
 
                     {Boolean(status) && status !== IdentityStatus.Undefined && (
                       <UserStatList title={t('Stake')}>
@@ -625,6 +611,7 @@ export default function ProfilePage() {
                   </Stack>
                 </Stack>
               </Stack>
+              <IdentityTimeline address={address} isOwn />
             </Stack>
 
             <KillIdentityDrawer

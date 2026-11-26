@@ -3,7 +3,6 @@ import {isNavItemActive} from './nav'
 const LINKS = [
   '/home',
   '/wallets',
-  '/history',
   '/flips/list',
   '/contacts',
   '/social',

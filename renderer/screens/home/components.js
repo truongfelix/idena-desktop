@@ -51,6 +51,7 @@ import {
 } from '../../shared/providers/identity-context'
 import {useProfile} from '../social/profile-hooks'
 import {memberStatus} from '../social/vouching'
+import {ProfilePicture} from '../social/components/profile-public'
 import {IdentityStatus, NodeType} from '../../shared/types'
 import {useInvite} from '../../shared/providers/invite-context'
 import {activateMiningMachine} from './machines'
@@ -88,16 +89,25 @@ export function UserInlineCard({
   const {t} = useTranslation()
   // A vouched member reads "Vouched" (B-316), from its profile in the profiles contract.
   const {data: profile} = useProfile(address)
+  // The picture and name claimed in the profiles contract, while the profile is in good standing (B-317).
+  const name = profile?.inStanding && profile.name ? `@${profile.name}` : null
   return (
     <Stack isInline spacing={6} align="center" {...props}>
-      <Avatar
+      <ProfilePicture
         address={address}
+        profile={profile}
+        boxSize={20}
         bg="surface"
         borderWidth={1}
         borderColor="gray.016"
       />
       <Stack spacing="1.5" w="full">
         <Stack spacing={1}>
+          {name && (
+            <Text fontSize="lg" fontWeight={500} lineHeight="short">
+              {name}
+            </Text>
+          )}
           <Heading as="h2" fontSize="lg" fontWeight={500} lineHeight="short">
             {t(memberStatus(state, profile))}
           </Heading>
