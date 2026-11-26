@@ -85,6 +85,7 @@ import {
   TelegramIcon,
 } from '../shared/components/icons'
 import {StakeProtectionBadge} from '../screens/home/stake-protection'
+import {FillPlaceholder} from '../screens/oracles/components'
 import {
   BalanceLine,
   IdentityTimeline,
@@ -266,7 +267,9 @@ export default function ProfilePage() {
   if (!address && isAddress(queryAddress))
     return (
       <Layout syncing={syncing} offline={offline}>
-        <Page />
+        <Page>
+          <FillPlaceholder py={12}>{t('Loading...')}</FillPlaceholder>
+        </Page>
       </Layout>
     )
 

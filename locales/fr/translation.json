@@ -2054,5 +2054,6 @@
   "No transactions of this kind in the ones shown": "Aucune transaction de ce type parmi celles affichées",
   "Waiting to be mined": "En attente d'être minées",
   "Validation rewards and penalties in My Idena": "Récompenses et pénalités de validation dans Mon Idena",
-  "All your validations in My Idena": "Toutes vos validations dans Mon Idena"
+  "All your validations in My Idena": "Toutes vos validations dans Mon Idena",
+  "Your node did not answer, so the list may not be up to date.": "Votre nœud n'a pas répondu : la liste n'est peut-être pas à jour."
 }

@@ -19,8 +19,10 @@ export function useIdentityHistory(address, {enabled = true} = {}) {
 
 export const TRANSACTIONS_PAGE = 30
 
-// bcn_transactions, page by page (the node keeps its own addresses' transactions), read again every 20 s while
-// shown (Wallets also reads it again when one of its transactions leaves the mempool).
+// bcn_transactions, page by page (the node keeps its own addresses' transactions), read again every 20 s while the
+// list is on screen and the window has focus (Wallets also reads it again when one of its transactions leaves the
+// mempool). A refresh reads every loaded page again: reading the first alone would hide the transaction a new one
+// pushes onto the second.
 export function useTransactionPages(address, {enabled = true} = {}) {
   return useInfiniteQuery(
     ['bcn_transactions', address],

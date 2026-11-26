@@ -369,8 +369,9 @@ export function TransactionHistory({address}) {
 
   let placeholder = null
   if (isError && !data)
-    placeholder =
-      error?.message || t('Your node did not answer the history request.')
+    placeholder = `${t('Your node did not answer the history request.')} ${
+      error?.message ?? ''
+    }`
   else if (isLoading) placeholder = t('Loading...')
   else if (txs.length === 0)
     placeholder =
@@ -452,7 +453,8 @@ export function TransactionHistory({address}) {
       )}
       {isError && data && (
         <SmallText color="red.500">
-          {error?.message || t('Your node did not answer the history request.')}
+          {t('Your node did not answer, so the list may not be up to date.')}{' '}
+          {error?.message}
         </SmallText>
       )}
       {hasNextPage && (

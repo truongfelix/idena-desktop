@@ -2030,5 +2030,6 @@
   "No transactions of this kind in the ones shown": "No transactions of this kind in the ones shown",
   "Waiting to be mined": "Waiting to be mined",
   "Validation rewards and penalties in My Idena": "Validation rewards and penalties in My Idena",
-  "All your validations in My Idena": "All your validations in My Idena"
+  "All your validations in My Idena": "All your validations in My Idena",
+  "Your node did not answer, so the list may not be up to date.": "Your node did not answer, so the list may not be up to date."
 }
