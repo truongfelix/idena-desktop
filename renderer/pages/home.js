@@ -262,6 +262,14 @@ export default function ProfilePage() {
 
   const stakingApy = useStakingApy()
 
+  // A link to another address waits for the own one, to tell the two apart.
+  if (!address && isAddress(queryAddress))
+    return (
+      <Layout syncing={syncing} offline={offline}>
+        <Page />
+      </Layout>
+    )
+
   if (otherAddress)
     return (
       <Layout syncing={syncing} offline={offline}>

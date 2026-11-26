@@ -13,7 +13,6 @@ import {FillPlaceholder, OutlineButton} from '../oracles/components'
 import {mapToFriendlyStatus} from '../../shared/providers/identity-context'
 import {toLocaleDna} from '../../shared/utils/utils'
 import {useTransactionPages} from './hooks'
-import {useChainState} from '../../shared/providers/chain-context'
 import {
   TransactionDetailsDrawer,
   TransactionDetailsLink,
@@ -348,7 +347,6 @@ export function TransactionHistory({address}) {
   const {t, i18n} = useTranslation()
   const amountText = useAmount(5)
   const [filter, setFilter] = React.useState(TxFilter.All)
-  const {offline} = useChainState()
   const {
     data,
     isLoading,
@@ -357,7 +355,7 @@ export function TransactionHistory({address}) {
     hasNextPage,
     fetchNextPage,
     isFetchingNextPage,
-  } = useTransactionPages(address, {enabled: !offline})
+  } = useTransactionPages(address)
 
   const {open: openDetails, drawerProps} = useTransactionDetailsDrawer()
 
@@ -451,6 +449,11 @@ export function TransactionHistory({address}) {
             })}
           </tbody>
         </Table>
+      )}
+      {isError && data && (
+        <SmallText color="red.500">
+          {error?.message || t('Your node did not answer the history request.')}
+        </SmallText>
       )}
       {hasNextPage && (
         <Flex justify="center">
