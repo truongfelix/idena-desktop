@@ -1565,7 +1565,7 @@
   "The node did not answer for @{{name}}.": "Le nœud n'a pas répondu pour @{{name}}.",
   "Nobody holds @{{name}}.": "Personne ne détient @{{name}}.",
   "The holder of @{{name}} is neither validated nor vouched for: the name is hidden and may change hands. Send to an address.": "Le détenteur de @{{name}} n'est ni validé ni garanti : le nom est caché et peut changer de mains. Envoyez à une adresse.",
-  "Vouched member": "Membre garanti",
+  "Vouched": "Garanti",
   "has an identity now: End frees your slot": "a maintenant une identité : « Terminer » libère votre place",
   "Remove from your profile?": "Retirer de votre profil ?",
   "The campaign leaves your profile: no app shows it any more. The iDNA already burned for it stays burned.": "La campagne quitte votre profil : aucune application ne l'affiche plus. Les iDNA déjà brûlés pour elle restent brûlés.",

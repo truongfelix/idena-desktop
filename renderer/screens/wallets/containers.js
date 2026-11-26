@@ -38,7 +38,7 @@ import {callRpc, isAddress, toLocaleDna} from '../../shared/utils/utils'
 import {useRecipient} from '../social/profile-hooks'
 import {useShownName} from '../social/components/profile-public'
 import {profilesEnabled} from '../social/profiles'
-import {identityStatus} from '../social/format'
+import {memberStatus} from '../social/vouching'
 import {
   Table,
   TableCol,
@@ -369,7 +369,7 @@ function RecipientLine({recipient, resolved, isLoading, isError}) {
           {resolved.holder}
         </Text>
         <Text fontSize="sm" color="muted">
-          {t(identityStatus(resolved.profile.state))}
+          {t(memberStatus(resolved.profile.state, resolved.profile))}
         </Text>
       </Box>
     </HStack>

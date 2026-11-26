@@ -9,11 +9,11 @@ import {socialProfile} from '../activity'
 import {ProfileItemCard} from '../components/activity'
 import {Chip} from '../components/chips'
 import {PostRow} from '../components/post'
-import {identityStatus} from '../format'
+import {showsAge} from '../format'
 import {historyDone} from '../scan'
 import {PAGE_SIZE, Rows, ShowMore} from './common'
 import {useProfile} from '../profile-hooks'
-import {isActingMember} from '../vouching'
+import {memberStatus} from '../vouching'
 import {ProfileEditDialog, PublicProfile} from '../components/profile-public'
 import {ProfileHeader, ProfileList} from './profile-header'
 import {ProfileListPage} from './profile-list-page'
@@ -90,9 +90,7 @@ export function ProfileView({
       : null
   const isBlocked = !isMe && people[address]?.blocked === true
   // An account without an identity acts through its voucher while that one is validated.
-  const status = isActingMember(publicProfile)
-    ? 'Vouched member'
-    : identityStatus(identity?.state)
+  const status = memberStatus(identity?.state, publicProfile)
   const tabs = [
     ['posts', t('Posts')],
     ['replies', t('Replies')],
@@ -109,9 +107,7 @@ export function ProfileView({
   else if (identity)
     statusLine = [
       t(status),
-      identity.age > 0 &&
-        status !== 'Not validated' &&
-        t('age {{age}}', {age: identity.age}),
+      showsAge(status, identity.age) && t('age {{age}}', {age: identity.age}),
       Number(identity.stake) > 0 &&
         t('stake {{stake}} iDNA', {
           stake: Math.floor(Number(identity.stake)).toLocaleString(),

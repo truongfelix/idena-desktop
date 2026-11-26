@@ -5,6 +5,7 @@ import {Box, HStack, IconButton, Stack, Text} from '@chakra-ui/react'
 import {useSocial} from '../provider'
 import {person, shortAddress} from '../people'
 import {identityColor} from '../format'
+import {memberStatus} from '../vouching'
 import {Chip, FollowChip} from '../components/chips'
 import {CopyButton} from './common'
 import {useMembers, useTrust, useTrustsGiven} from '../profile-hooks'
@@ -175,7 +176,10 @@ export function ProfileHeader({
       <Stack spacing={1} fontSize="md">
         <Text
           fontWeight={500}
-          color={identityColor(identity?.state) || 'muted'}
+          color={
+            identityColor(memberStatus(identity?.state, publicProfile)) ||
+            'muted'
+          }
         >
           {statusLine}
         </Text>

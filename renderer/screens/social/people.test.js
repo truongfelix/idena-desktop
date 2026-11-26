@@ -253,6 +253,8 @@ describe('the identity colors', () => {
     expect(identityLabel('Human', 12)).toBe('Human · age 12')
     expect(identityLabel('Candidate', 0)).toBe('Candidate')
     expect(identityLabel('Undefined', 3)).toBe('Not validated')
+    expect(identityLabel('Vouched', 3)).toBe('Vouched')
+    expect(identityColor('Vouched')).toBe('#AD1457')
   })
 })
 
