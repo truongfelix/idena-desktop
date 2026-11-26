@@ -370,9 +370,12 @@ export function TransactionHistory({address}) {
 
   let placeholder = null
   if (isError && !data)
-    placeholder = `${t('Your node did not answer the history request.')} ${
-      error?.message ?? ''
-    }`
+    placeholder = [
+      t('The history could not be read from your node.'),
+      error?.message,
+    ]
+      .filter(Boolean)
+      .join(' ')
   else if (isLoading) placeholder = t('Loading...')
   else if (txs.length === 0)
     placeholder =
@@ -454,8 +457,15 @@ export function TransactionHistory({address}) {
       )}
       {isError && data && (
         <SmallText color="red.500">
-          {t('Your node did not answer, so the list may not be up to date.')}{' '}
-          {error?.message}
+          {[
+            t(
+              'A read from your node failed: the list may be incomplete or not up to date.',
+              {nsSeparator: '|'}
+            ),
+            error?.message,
+          ]
+            .filter(Boolean)
+            .join(' ')}
         </SmallText>
       )}
       {hasNextPage && (
