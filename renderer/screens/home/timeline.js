@@ -5,12 +5,12 @@ import {useRouter} from 'next/router'
 import {useTranslation} from 'react-i18next'
 import {useQuery} from 'react-query'
 import {FillPlaceholder} from '../oracles/components'
-import {SmallText, TextLink} from '../../shared/components/components'
+import {TextLink} from '../../shared/components/components'
 import {useChainState} from '../../shared/providers/chain-context'
 import {callRpc, toLocaleDna} from '../../shared/utils/utils'
 import {useIdentityHistory} from '../history/hooks'
 import {HistoryTab, parseHistoryTab} from '../history/utils'
-import {CeremoniesTab, MiningTab} from '../history/components'
+import {CeremoniesTab, MiningTab, StaleReadNote} from '../history/components'
 import {UserInlineCard} from './components'
 
 function TimelineContent({tab, isOwn, history, isError, isSuccess, error}) {
@@ -24,11 +24,17 @@ function TimelineContent({tab, isOwn, history, isError, isSuccess, error}) {
           .join(' ')}
       </FillPlaceholder>
     )
-  // The node answered with no history at all: nothing to wait for.
+  // The node answered with no history at all: nothing to wait for (each tab's own empty text).
   if (!history && isSuccess)
     return (
       <FillPlaceholder py={12}>
-        {t('No validation of this address in the ceremonies your node knows.')}
+        {tab === HistoryTab.Mining
+          ? t(
+              'No mining reward recorded yet. Your node records them from this version on, for the blocks it adds.'
+            )
+          : t(
+              'No validation of this address in the ceremonies your node knows.'
+            )}
       </FillPlaceholder>
     )
   if (!history)
@@ -49,17 +55,7 @@ function TimelineContent({tab, isOwn, history, isError, isSuccess, error}) {
   // A failed refresh: the timeline already read stays, with a line saying it may be out of date (as on Wallets).
   return (
     <Stack spacing={4}>
-      <SmallText color="red.500">
-        {[
-          t(
-            'A read from your node failed: the list may be incomplete or not up to date.',
-            {nsSeparator: '|'}
-          ),
-          error?.message,
-        ]
-          .filter(Boolean)
-          .join(' ')}
-      </SmallText>
+      <StaleReadNote error={error} />
       {content}
     </Stack>
   )
@@ -119,7 +115,7 @@ export function IdentityTimeline({address, isOwn}) {
         tab={tab}
         isOwn={isOwn}
         history={history}
-        isError={isError}
+        isError={isError && !offline}
         isSuccess={isSuccess}
         error={error}
       />

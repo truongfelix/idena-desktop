@@ -61,6 +61,24 @@ function formatDateTime(time, language) {
   })
 }
 
+/** The line over a list already shown when the next read of it failed (Wallets, My Idena's timeline). */
+export function StaleReadNote({error}) {
+  const {t} = useTranslation()
+  return (
+    <SmallText color="red.500">
+      {[
+        t(
+          'A read from your node failed: the list may be incomplete or not up to date.',
+          {nsSeparator: '|'}
+        ),
+        error?.message,
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    </SmallText>
+  )
+}
+
 function ShowMore({onClick}) {
   const {t} = useTranslation()
   return (
@@ -455,19 +473,7 @@ export function TransactionHistory({address}) {
           </tbody>
         </Table>
       )}
-      {isError && data && (
-        <SmallText color="red.500">
-          {[
-            t(
-              'A read from your node failed: the list may be incomplete or not up to date.',
-              {nsSeparator: '|'}
-            ),
-            error?.message,
-          ]
-            .filter(Boolean)
-            .join(' ')}
-        </SmallText>
-      )}
+      {isError && data && <StaleReadNote error={error} />}
       {hasNextPage && (
         <Flex justify="center">
           <OutlineButton
