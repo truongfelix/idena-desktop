@@ -74,6 +74,7 @@ export function DnaSignInDialog({
   token,
   authenticationEndpoint,
   nonceEndpoint,
+  disconnectEndpoint,
   callbackUrl,
   faviconUrl,
   onSignInError,
@@ -93,7 +94,12 @@ export function DnaSignInDialog({
 
   // Idena Connect (B-318): whether this account signed in to the site before, read each time the dialog opens (it
   // stays mounted between links) once the address is known, and kept while it closes; undefined: not read yet.
-  const site = signInSite({authenticationEndpoint, nonceEndpoint, callbackUrl})
+  const site = signInSite({
+    authenticationEndpoint,
+    nonceEndpoint,
+    callbackUrl,
+    disconnectEndpoint,
+  })
   const {isOpen} = props
   const [known, setKnown] = React.useState()
   React.useEffect(() => {
@@ -196,7 +202,12 @@ export function DnaSignInDialog({
                   saveConnectedSites(
                     recordSignIn(
                       loadConnectedSites(),
-                      {site: site.site, address, website: site.website},
+                      {
+                        site: site.site,
+                        address,
+                        website: site.website,
+                        disconnectEndpoint: site.disconnectEndpoint,
+                      },
                       Date.now()
                     )
                   )

@@ -207,6 +207,22 @@ export async function authenticate(authenticationEndpoint, {token, signature}) {
   throw new Error('Error authenticating identity')
 }
 
+/**
+ * Asks a site (Idena Connect, B-318) to end the sessions of `address`: the account signs `message`
+ * (disconnectMessage) with the node, and the site's disconnect endpoint answers {data: {disconnected: true}}.
+ */
+export async function disconnect(disconnectEndpoint, {address, message, time}) {
+  const signature = await signNonce(message)
+  const {data} = await axios.post(disconnectEndpoint, {
+    address,
+    time,
+    signature,
+  })
+  if (data?.error) throw new Error(data.error)
+  if (data?.data?.disconnected) return true
+  throw new Error('The website did not end the session')
+}
+
 export async function sendDna({from, to, amount, comment}) {
   const {result, error} = await sendTransaction(
     from,

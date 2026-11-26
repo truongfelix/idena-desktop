@@ -24,14 +24,16 @@ function hostOf(url) {
 
 /**
  * The site a sign-in link signs in to: `site` (the origin of its authentication endpoint), its `host`, `website`
- * (the host of its http(s) callback, the page the person comes from; null for another callback), and `nonceHost`:
- * the host of its nonce endpoint when it is not `host` (the code is then asked of one host and its signature sent to
- * another, which the dialog warns about; a callback on another host of the same service is common).
+ * (the host of its http(s) callback, the page the person comes from; null for another callback), `nonceHost`: the
+ * host of its nonce endpoint when it is not `host` (the code is then asked of one host and its signature sent to
+ * another, which the dialog warns about; a callback on another host of the same service is common), and
+ * `disconnectEndpoint`: the link's disconnect_endpoint when it is on `site`, else null.
  */
 export function signInSite({
   authenticationEndpoint,
   nonceEndpoint,
   callbackUrl,
+  disconnectEndpoint,
 }) {
   const site = webOrigin(authenticationEndpoint)
   const host = site ? hostOf(site) : null
@@ -41,8 +43,18 @@ export function signInSite({
     host,
     website: webOrigin(callbackUrl) ? hostOf(callbackUrl) : null,
     nonceHost: nonce && nonce !== host ? nonce : null,
+    disconnectEndpoint:
+      site && webOrigin(disconnectEndpoint) === site
+        ? disconnectEndpoint
+        : null,
   }
 }
+
+/**
+ * The text an account signs to disconnect from `site` (an origin) at `time` (Unix seconds): the site checks that it
+ * names its own origin and a time within a few minutes of its clock, so the signature serves no other site or day.
+ */
+export const disconnectMessage = (site, time) => `disconnect-${site}-${time}`
 
 const sameEntry = (entry, site, address) =>
   entry.site === site && entry.address === String(address).toLowerCase()
@@ -53,17 +65,29 @@ export function findSite(sites, site, address) {
 }
 
 /**
- * `sites` with a sign-in to `site` by `address` at `now` (ms), from the page of `website` (a host, or null): the
- * entry's last time, count and website updated, or a new entry; the latest first.
+ * `sites` with a sign-in to `site` by `address` at `now` (ms), from the page of `website` (a host, or null), with
+ * the site's `disconnectEndpoint` (or null): the entry's last time, count, website and endpoint updated, or a new
+ * entry; the latest first.
  */
-export function recordSignIn(sites, {site, address, website = null}, now) {
+export function recordSignIn(
+  sites,
+  {site, address, website = null, disconnectEndpoint = null},
+  now
+) {
   const known = findSite(sites, site, address)
   const entry = known
-    ? {...known, website, lastAt: now, count: known.count + 1}
+    ? {
+        ...known,
+        website,
+        disconnectEndpoint,
+        lastAt: now,
+        count: known.count + 1,
+      }
     : {
         site,
         address: String(address).toLowerCase(),
         website,
+        disconnectEndpoint,
         firstAt: now,
         lastAt: now,
         count: 1,
@@ -84,6 +108,8 @@ const isEntry = (entry) =>
   webOrigin(entry.site) === entry.site &&
   typeof entry.address === 'string' &&
   (entry.website == null || typeof entry.website === 'string') &&
+  (entry.disconnectEndpoint == null ||
+    webOrigin(entry.disconnectEndpoint) === entry.site) &&
   Number.isFinite(entry.firstAt) &&
   Number.isFinite(entry.lastAt) &&
   Number.isFinite(entry.count)

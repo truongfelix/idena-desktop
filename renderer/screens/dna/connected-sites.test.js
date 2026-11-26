@@ -1,4 +1,5 @@
 import {
+  disconnectMessage,
   findSite,
   forgetSite,
   readConnectedSites,
@@ -22,6 +23,7 @@ describe('Idena Connect (B-318)', () => {
       host: 'app.example.com',
       website: 'app.example.com',
       nonceHost: null,
+      disconnectEndpoint: null,
     })
   })
 
@@ -37,6 +39,7 @@ describe('Idena Connect (B-318)', () => {
       host: 'b.example',
       website: 'a.example',
       nonceHost: 'a.example',
+      disconnectEndpoint: null,
     })
     // A front end on www., its endpoints on api.: no warning.
     expect(
@@ -50,6 +53,7 @@ describe('Idena Connect (B-318)', () => {
       host: 'api.example.com',
       website: 'www.example.com',
       nonceHost: null,
+      disconnectEndpoint: null,
     })
     expect(
       signInSite({
@@ -58,6 +62,42 @@ describe('Idena Connect (B-318)', () => {
         callbackUrl: 'dna://signin-done',
       }).website
     ).toBeNull()
+  })
+
+  it('keeps a disconnect endpoint only on the site that receives the signature', () => {
+    const link = {
+      authenticationEndpoint: 'https://a.example/auth',
+      nonceEndpoint: 'https://a.example/nonce',
+      callbackUrl: 'https://a.example/done',
+    }
+    expect(
+      signInSite({...link, disconnectEndpoint: 'https://a.example/bye'})
+        .disconnectEndpoint
+    ).toBe('https://a.example/bye')
+    expect(
+      signInSite({...link, disconnectEndpoint: 'https://b.example/bye'})
+        .disconnectEndpoint
+    ).toBeNull()
+    expect(signInSite(link).disconnectEndpoint).toBeNull()
+    expect(disconnectMessage('https://a.example', 1700000000)).toBe(
+      'disconnect-https://a.example-1700000000'
+    )
+  })
+
+  it('records the disconnect endpoint, and reads back only one on the site', () => {
+    const site = 'https://a.example'
+    const saved = recordSignIn(
+      [],
+      {site, address: alice, disconnectEndpoint: `${site}/bye`},
+      5
+    )
+    expect(saved[0].disconnectEndpoint).toBe(`${site}/bye`)
+    expect(readConnectedSites({sites: saved})).toEqual(saved)
+    expect(
+      readConnectedSites({
+        sites: [{...saved[0], disconnectEndpoint: 'https://b.example/bye'}],
+      })
+    ).toEqual([])
   })
 
   it('has no site for an endpoint that is no web address', () => {
@@ -78,6 +118,7 @@ describe('Idena Connect (B-318)', () => {
         site,
         address: alice.toLowerCase(),
         website: 'www.example.com',
+        disconnectEndpoint: null,
         firstAt: 1000,
         lastAt: 1000,
         count: 1,

@@ -1,5 +1,7 @@
+import axios from 'axios'
 import apiClient from '../../shared/api/api-client'
 import {
+  disconnect,
   dnaCallbackSite,
   dnaLinkMethod,
   dnaLinkParams,
@@ -16,6 +18,54 @@ jest.mock('../../shared/api/api-client', () => ({
   __esModule: true,
   default: jest.fn(),
 }))
+
+jest.mock('axios', () => ({__esModule: true, default: {post: jest.fn()}}))
+
+describe('Idena Connect disconnect (B-318)', () => {
+  beforeEach(() => {
+    apiClient.mockReset()
+    axios.post.mockReset()
+  })
+
+  it('signs the message with the node and sends it with the address and time', async () => {
+    const post = jest.fn().mockResolvedValue({data: {result: '0xsig'}})
+    apiClient.mockReturnValue({post})
+    axios.post.mockResolvedValue({data: {data: {disconnected: true}}})
+
+    await expect(
+      disconnect('https://a.example/disconnect', {
+        address: '0xabc',
+        time: 1700000000,
+        message: 'disconnect-https://a.example-1700000000',
+      })
+    ).resolves.toBe(true)
+    expect(post).toHaveBeenCalledWith('/', {
+      method: 'dna_sign',
+      params: ['disconnect-https://a.example-1700000000'],
+      id: 1,
+    })
+    expect(axios.post).toHaveBeenCalledWith('https://a.example/disconnect', {
+      address: '0xabc',
+      time: 1700000000,
+      signature: '0xsig',
+    })
+  })
+
+  it("fails with the site's error, or when it does not say it disconnected", async () => {
+    apiClient.mockReturnValue({
+      post: jest.fn().mockResolvedValue({data: {result: '0xsig'}}),
+    })
+    const args = {address: '0xabc', time: 1, message: 'm'}
+    axios.post.mockResolvedValueOnce({data: {error: 'too old'}})
+    await expect(disconnect('https://a.example/d', args)).rejects.toThrow(
+      'too old'
+    )
+    axios.post.mockResolvedValueOnce({data: {data: {}}})
+    await expect(disconnect('https://a.example/d', args)).rejects.toThrow(
+      'The website did not end the session'
+    )
+  })
+})
 
 describe('Idena signing', () => {
   beforeEach(() => {
