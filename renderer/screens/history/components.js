@@ -1,6 +1,6 @@
 /* eslint-disable react/prop-types */
 import React from 'react'
-import {Box, Flex, HStack, Stack, Text} from '@chakra-ui/react'
+import {Box, Button, Flex, HStack, Stack, Text} from '@chakra-ui/react'
 import {useTranslation} from 'react-i18next'
 import {
   Table,
@@ -22,8 +22,10 @@ import {
   CeremonyResult,
   ceremonyRows,
   counterParty,
+  matchesTxFilter,
   miningRows,
   signedAmount,
+  TxFilter,
   toNumber,
   txTypeName,
   validationEpochLabel,
@@ -57,6 +59,24 @@ function formatDateTime(time, language) {
     dateStyle: 'short',
     timeStyle: 'short',
   })
+}
+
+/** The line over a list already shown when the next read of it failed (Wallets, My Idena's timeline). */
+export function StaleReadNote({error}) {
+  const {t} = useTranslation()
+  return (
+    <SmallText color="red.500">
+      {[
+        t(
+          'A read from your node failed: the list may be incomplete or not up to date.',
+          {nsSeparator: '|'}
+        ),
+        error?.message,
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    </SmallText>
+  )
 }
 
 function ShowMore({onClick}) {
@@ -310,9 +330,42 @@ export function MiningTab({history, isOwn}) {
   )
 }
 
-export function TransactionsTab({address, isOwn}) {
+const txFilterLabels = [
+  [TxFilter.All, 'All'],
+  [TxFilter.Sent, 'Sent'],
+  [TxFilter.Received, 'Received'],
+  [TxFilter.Contracts, 'Contracts'],
+  [TxFilter.Identity, 'Identity'],
+  [TxFilter.Other, 'Other'],
+]
+
+/** The filter buttons over the transactions. */
+function TxFilterList({value, onChange}) {
+  const {t} = useTranslation()
+  return (
+    <HStack spacing={2}>
+      {txFilterLabels.map(([filter, label]) => (
+        <Button
+          key={filter}
+          variant="tab"
+          isActive={value === filter}
+          onClick={() => onChange(filter)}
+        >
+          {t(label)}
+        </Button>
+      ))}
+    </HStack>
+  )
+}
+
+/**
+ * Every transaction of the own address (Wallets, B-317), page by page from the own node (bcn_transactions), with
+ * filters on the pages read; "Show more" reads the next page.
+ */
+export function TransactionHistory({address}) {
   const {t, i18n} = useTranslation()
   const amountText = useAmount(5)
+  const [filter, setFilter] = React.useState(TxFilter.All)
   const {
     data,
     isLoading,
@@ -321,93 +374,106 @@ export function TransactionsTab({address, isOwn}) {
     hasNextPage,
     fetchNextPage,
     isFetchingNextPage,
-  } = useTransactionPages(address, {enabled: isOwn})
+  } = useTransactionPages(address)
 
   const {open: openDetails, drawerProps} = useTransactionDetailsDrawer()
 
   const txs = React.useMemo(
-    () => (data?.pages ?? []).flatMap((page) => page?.transactions ?? []),
-    [data]
+    () =>
+      (data?.pages ?? [])
+        .flatMap((page) => page?.transactions ?? [])
+        .filter((tx) => matchesTxFilter(filter, tx, address)),
+    [address, data, filter]
   )
 
-  if (!isOwn)
-    return (
-      <FillPlaceholder py={12}>
-        {t('Your node keeps the transactions of its own address only.')}
-      </FillPlaceholder>
-    )
-  if (isError)
-    return <FillPlaceholder py={12}>{error?.message}</FillPlaceholder>
-  if (isLoading)
-    return <FillPlaceholder py={12}>{t('Loading...')}</FillPlaceholder>
-  if (txs.length === 0)
-    return <FillPlaceholder py={12}>{t('No transactions')}</FillPlaceholder>
+  let placeholder = null
+  if (isError && !data)
+    placeholder = [
+      t('The history could not be read from your node.'),
+      error?.message,
+    ]
+      .filter(Boolean)
+      .join(' ')
+  else if (isLoading) placeholder = t('Loading...')
+  else if (txs.length === 0)
+    placeholder =
+      filter === TxFilter.All
+        ? t('No transactions')
+        : t('No transactions of this kind in the ones shown')
 
   return (
     <Stack spacing={4}>
-      <Table>
-        <thead>
-          <TableRow>
-            <TableHeaderCol>{t('Date')}</TableHeaderCol>
-            <TableHeaderCol>{t('Transaction')}</TableHeaderCol>
-            <TableHeaderCol>{t('Address')}</TableHeaderCol>
-            <TableHeaderCol className="text-right">
-              {t('Amount, iDNA')}
-            </TableHeaderCol>
-            <TableHeaderCol className="text-right">
-              {t('Fee, iDNA')}
-            </TableHeaderCol>
-            <TableHeaderCol className="text-right">{t('Epoch')}</TableHeaderCol>
-          </TableRow>
-        </thead>
-        <tbody>
-          {txs.map((tx) => {
-            const amount = signedAmount(tx, address)
-            const other = counterParty(tx, address)
-            return (
-              <TableRow key={tx.hash}>
-                <TableCol>
-                  {formatDateTime(tx.timestamp, i18n.language)}
-                </TableCol>
-                <TableCol>
-                  <Stack spacing={0}>
-                    <Text>{t(txTypeName(tx))}</Text>
-                    <TransactionDetailsLink
-                      hash={tx.hash}
-                      fontFamily="mono"
-                      fontSize="sm"
-                      isTruncated
-                      w={32}
-                      onClick={() => openDetails(tx.hash)}
-                    />
-                  </Stack>
-                </TableCol>
-                <TableCol>
-                  {other && <ShownName address={other} fontSize="sm" />}
-                  <Box fontFamily="mono" fontSize="sm" isTruncated maxW={48}>
-                    {other ?? '–'}
-                  </Box>
-                </TableCol>
-                <TableCol className="text-right">
-                  {amount ? (
-                    <Text color={amount < 0 ? 'red.500' : undefined}>
-                      {amountText(amount)}
-                    </Text>
-                  ) : (
-                    '–'
-                  )}
-                </TableCol>
-                <TableCol className="text-right">
-                  {toNumber(tx.usedFee)
-                    ? amountText(toNumber(tx.usedFee))
-                    : '–'}
-                </TableCol>
-                <TableCol className="text-right">#{tx.epoch}</TableCol>
-              </TableRow>
-            )
-          })}
-        </tbody>
-      </Table>
+      <TxFilterList value={filter} onChange={setFilter} />
+      {placeholder ? (
+        <FillPlaceholder py={12}>{placeholder}</FillPlaceholder>
+      ) : (
+        <Table>
+          <thead>
+            <TableRow>
+              <TableHeaderCol>{t('Date')}</TableHeaderCol>
+              <TableHeaderCol>{t('Transaction')}</TableHeaderCol>
+              <TableHeaderCol>{t('Address')}</TableHeaderCol>
+              <TableHeaderCol className="text-right">
+                {t('Amount, iDNA')}
+              </TableHeaderCol>
+              <TableHeaderCol className="text-right">
+                {t('Fee, iDNA')}
+              </TableHeaderCol>
+              <TableHeaderCol className="text-right">
+                {t('Epoch')}
+              </TableHeaderCol>
+            </TableRow>
+          </thead>
+          <tbody>
+            {txs.map((tx) => {
+              const amount = signedAmount(tx, address)
+              const other = counterParty(tx, address)
+              return (
+                <TableRow key={tx.hash}>
+                  <TableCol>
+                    {formatDateTime(tx.timestamp, i18n.language)}
+                  </TableCol>
+                  <TableCol>
+                    <Stack spacing={0}>
+                      <Text>{t(txTypeName(tx))}</Text>
+                      <TransactionDetailsLink
+                        hash={tx.hash}
+                        fontFamily="mono"
+                        fontSize="sm"
+                        isTruncated
+                        w={32}
+                        onClick={() => openDetails(tx.hash)}
+                      />
+                    </Stack>
+                  </TableCol>
+                  <TableCol>
+                    {other && <ShownName address={other} fontSize="sm" />}
+                    <Box fontFamily="mono" fontSize="sm" isTruncated maxW={48}>
+                      {other ?? '–'}
+                    </Box>
+                  </TableCol>
+                  <TableCol className="text-right">
+                    {amount ? (
+                      <Text color={amount < 0 ? 'red.500' : undefined}>
+                        {amountText(amount)}
+                      </Text>
+                    ) : (
+                      '–'
+                    )}
+                  </TableCol>
+                  <TableCol className="text-right">
+                    {toNumber(tx.usedFee)
+                      ? amountText(toNumber(tx.usedFee))
+                      : '–'}
+                  </TableCol>
+                  <TableCol className="text-right">#{tx.epoch}</TableCol>
+                </TableRow>
+              )
+            })}
+          </tbody>
+        </Table>
+      )}
+      {isError && data && <StaleReadNote error={error} />}
       {hasNextPage && (
         <Flex justify="center">
           <OutlineButton

@@ -1,11 +1,16 @@
+import axios from 'axios'
 import apiClient from '../../shared/api/api-client'
 import {
+  disconnect,
   dnaCallbackSite,
+  isReservedSignText,
   dnaLinkMethod,
   dnaLinkParams,
   isOpenableDnaUrl,
   isValidDnaUrl,
   newerDnaLink,
+  nonceSiteMismatch,
+  signIn,
   signNonce,
   urlLogContext,
 } from './utils'
@@ -16,6 +21,186 @@ jest.mock('../../shared/api/api-client', () => ({
   __esModule: true,
   default: jest.fn(),
 }))
+
+jest.mock('axios', () => ({__esModule: true, default: {post: jest.fn()}}))
+
+describe('Idena Connect disconnect (B-318)', () => {
+  beforeEach(() => {
+    apiClient.mockReset()
+    axios.post.mockReset()
+  })
+
+  it('signs the message with the node and sends it with the address and time', async () => {
+    const post = jest.fn().mockResolvedValue({data: {result: '0xsig'}})
+    apiClient.mockReturnValue({post})
+    axios.post.mockResolvedValue({data: {data: {disconnected: true}}})
+
+    await expect(
+      disconnect('https://a.example/disconnect', {
+        address: '0xabc',
+        time: 1700000000,
+        message: 'disconnect-https://a.example-1700000000',
+      })
+    ).resolves.toBe(true)
+    expect(post).toHaveBeenCalledWith('/', {
+      method: 'dna_sign',
+      params: ['disconnect-https://a.example-1700000000'],
+      id: 1,
+    })
+    expect(axios.post).toHaveBeenCalledWith(
+      'https://a.example/disconnect',
+      {address: '0xabc', time: 1700000000, signature: '0xsig'},
+      {timeout: 20000}
+    )
+  })
+
+  it('keeps sign-in and disconnect texts out of sign links', () => {
+    expect(isReservedSignText('signin-123')).toBe(true)
+    expect(isReservedSignText('disconnect-https://a.example-1700000000')).toBe(
+      true
+    )
+    expect(isReservedSignText('hello')).toBe(false)
+    expect(isReservedSignText(' disconnect-x')).toBe(false)
+  })
+
+  it("fails with the site's error, or when it does not say it disconnected", async () => {
+    apiClient.mockReturnValue({
+      post: jest.fn().mockResolvedValue({data: {result: '0xsig'}}),
+    })
+    const args = {address: '0xabc', time: 1, message: 'm'}
+    axios.post.mockResolvedValueOnce({data: {error: 'too old'}})
+    await expect(disconnect('https://a.example/d', args)).rejects.toThrow(
+      'too old'
+    )
+    // No message of the site's: an empty one, which the page replaces with its own text.
+    axios.post.mockResolvedValueOnce({data: {data: {}}})
+    await expect(disconnect('https://a.example/d', args)).rejects.toThrow(/^$/)
+  })
+})
+
+describe('a sign-in nonce made for a site', () => {
+  const link = {
+    authenticationEndpoint: 'https://duelbelote.fr/auth/v1/authenticate',
+    nonceEndpoint: 'https://duelbelote.fr/auth/v1/start-session',
+  }
+
+  it('signs a nonce naming the site of the link, or naming none', () => {
+    expect(nonceSiteMismatch('signin-duelbelote.fr/ab12', link)).toBeNull()
+    expect(nonceSiteMismatch('signin-ab12', link)).toBeNull()
+    expect(nonceSiteMismatch('signin-ab-12', link)).toBeNull()
+    expect(
+      nonceSiteMismatch('signin-127.0.0.1:29780/x', {
+        authenticationEndpoint: 'http://127.0.0.1:29780/auth/v1/authenticate',
+        nonceEndpoint: 'http://127.0.0.1:29780/auth/v1/start-session',
+      })
+    ).toBeNull()
+  })
+
+  it('refuses a nonce another site made, passed on by this one', () => {
+    const evil = {
+      authenticationEndpoint: 'https://evil.example/auth',
+      nonceEndpoint: 'https://evil.example/nonce',
+    }
+    expect(nonceSiteMismatch('signin-duelbelote.fr/ab12', evil)).toEqual({
+      named: 'duelbelote.fr',
+      site: 'evil.example',
+    })
+  })
+
+  it('compares the whole host as URL.host writes it', () => {
+    expect(
+      nonceSiteMismatch('signin-duelbelote.fr.evil.example/x', link)
+    ).toEqual({named: 'duelbelote.fr.evil.example', site: 'duelbelote.fr'})
+    expect(nonceSiteMismatch('signin-www.duelbelote.fr/x', link)).not.toBeNull()
+    expect(nonceSiteMismatch('signin-duelbelote.fr:443/x', link)).not.toBeNull()
+    // Capitals: no host as URL.host writes it, so no site name (signed as before).
+    expect(nonceSiteMismatch('signin-DuelBelote.fr/x', link)).toBeNull()
+    // No "." nor ":" before the "/": no site name (a base64 random part), signed as before.
+    expect(nonceSiteMismatch('signin-/x', link)).toBeNull()
+    expect(nonceSiteMismatch('signin-q8Zk/3fA+9w==', link)).toBeNull()
+    expect(nonceSiteMismatch('signin-1732600000.q8Zk/3fA==', link)).toBeNull()
+    expect(nonceSiteMismatch('signin-localhost/x', link)).toBeNull()
+    expect(
+      nonceSiteMismatch('signin-localhost/x', {
+        authenticationEndpoint: 'http://localhost/auth',
+        nonceEndpoint: 'http://localhost/nonce',
+      })
+    ).toBeNull()
+    // The first "/" ends the host: a "/" in the random part changes nothing.
+    expect(nonceSiteMismatch('signin-duelbelote.fr/a/b', link)).toBeNull()
+  })
+
+  it('refuses a nonce naming the site when the nonce comes from another host, and names that host', () => {
+    expect(
+      nonceSiteMismatch('signin-duelbelote.fr/x', {
+        ...link,
+        nonceEndpoint: 'https://evil.example/nonce',
+      })
+    ).toEqual({named: 'duelbelote.fr', site: 'evil.example'})
+  })
+
+  it('refuses a nonce naming a site when an endpoint does not parse, and signs one naming none', () => {
+    const relative = {authenticationEndpoint: '/auth', nonceEndpoint: '/nonce'}
+    expect(nonceSiteMismatch('signin-duelbelote.fr/x', relative)).toEqual({
+      named: 'duelbelote.fr',
+      site: '/auth',
+    })
+    expect(nonceSiteMismatch('signin-q8Zk/3fA==', relative)).toBeNull()
+    expect(
+      nonceSiteMismatch('signin-duelbelote.fr/x', {
+        ...link,
+        nonceEndpoint: '//evil.example/nonce',
+      })
+    ).toEqual({named: 'duelbelote.fr', site: '//evil.example/nonce'})
+  })
+
+  describe('the sign-in', () => {
+    beforeEach(() => {
+      apiClient.mockReset()
+      axios.post.mockReset()
+    })
+    const siteError = ({named, site}) => `made for ${named}, not ${site}`
+    const evil = {
+      token: 't1',
+      address: '0xabc',
+      nonceEndpoint: 'https://evil.example/nonce',
+      authenticationEndpoint: 'https://evil.example/auth',
+    }
+
+    it('signs nothing and sends nothing for a nonce made for another site', async () => {
+      const post = jest.fn()
+      apiClient.mockReturnValue({post})
+      axios.post.mockResolvedValueOnce({
+        data: {data: {nonce: 'signin-duelbelote.fr/ab12'}},
+      })
+      await expect(signIn(evil, {siteError})).rejects.toThrow(
+        'made for duelbelote.fr, not evil.example'
+      )
+      expect(post).not.toHaveBeenCalled()
+      expect(axios.post).toHaveBeenCalledTimes(1)
+    })
+
+    it('signs a nonce naming its own site and sends the signature', async () => {
+      const post = jest.fn().mockResolvedValue({data: {result: '0xsig'}})
+      apiClient.mockReturnValue({post})
+      axios.post
+        .mockResolvedValueOnce({
+          data: {data: {nonce: 'signin-evil.example/ab12'}},
+        })
+        .mockResolvedValueOnce({data: {data: {authenticated: true}}})
+      await expect(signIn(evil, {siteError})).resolves.toBe(true)
+      expect(post).toHaveBeenCalledWith('/', {
+        method: 'dna_sign',
+        params: ['signin-evil.example/ab12'],
+        id: 1,
+      })
+      expect(axios.post).toHaveBeenLastCalledWith('https://evil.example/auth', {
+        token: 't1',
+        signature: '0xsig',
+      })
+    })
+  })
+})
 
 describe('Idena signing', () => {
   beforeEach(() => {
@@ -101,7 +286,7 @@ describe('dna link method', () => {
 })
 
 describe('openable dna links', () => {
-  const signIn = (params) =>
+  const signInLink = (params) =>
     `dna://signin/v1?${new URLSearchParams({
       token: 'abc',
       callback_url: 'https://example.org/done',
@@ -118,8 +303,10 @@ describe('openable dna links', () => {
   )
 
   it('opens a sign-in link with its token, callback and endpoints', () => {
-    expect(isOpenableDnaUrl(signIn())).toBe(true)
-    expect(isOpenableDnaUrl(signIn({callback_url: 'dna://send/v1'}))).toBe(true)
+    expect(isOpenableDnaUrl(signInLink())).toBe(true)
+    expect(isOpenableDnaUrl(signInLink({callback_url: 'dna://send/v1'}))).toBe(
+      true
+    )
   })
 
   it.each([
@@ -132,7 +319,7 @@ describe('openable dna links', () => {
       {authentication_endpoint: 'file:///auth'},
     ],
   ])('does not open a sign-in link with %s', (_, params) => {
-    expect(isOpenableDnaUrl(signIn(params))).toBe(false)
+    expect(isOpenableDnaUrl(signInLink(params))).toBe(false)
   })
 
   it.each([

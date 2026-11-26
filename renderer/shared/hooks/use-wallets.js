@@ -6,9 +6,7 @@ import {useIdentityState} from '../providers/identity-context'
 import {
   fetchAccountList,
   fetchBalance,
-  fetchTransactions,
   fetchPendingTransactions,
-  fetchTransactionReceipt,
 } from '../api/wallet'
 
 function isAddress(address) {
@@ -57,34 +55,15 @@ async function fetchWallets(address) {
   )
 }
 
+// The address's transactions still in the mempool: Wallets lists the mined ones page by page (TransactionHistory,
+// B-317), so they are not read here every 5 s.
 async function fetchTxs({address, wallets}) {
-  const txResp = await fetchTransactions(address, 50)
   const txPendingResp = await fetchPendingTransactions(address, 50)
 
-  const txsResp = txResp && txResp.result && txResp.result.transactions
-
-  const hasReceipt = ['callContract', 'deployContract', 'terminateContract']
-
-  const txs = !txsResp
-    ? []
-    : await Promise.all(
-        txsResp.map((tx) => {
-          if (hasReceipt.find((type) => tx.type === type))
-            return fetchTransactionReceipt(tx.hash).then((resp) => {
-              const receipt = resp && resp.result
-              const nextTx = {
-                ...tx,
-                receipt,
-              }
-              return nextTx
-            })
-          return tx
-        })
-      )
   const txsPending =
     txPendingResp && txPendingResp.result && txPendingResp.result.transactions
 
-  const joinedTxs = [].concat(txsPending).concat(txs)
+  const joinedTxs = [].concat(txsPending)
 
   const hiddenTypes = [
     'evidence',

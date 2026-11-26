@@ -10,6 +10,7 @@ const ALLOWED_STORE_NAMES = new Set([
   'validationNotification',
   'flipArchive',
   'flipFilter',
+  'connectedSites',
 ])
 
 function assertSafeName(value, pattern, label) {

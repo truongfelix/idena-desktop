@@ -23,6 +23,9 @@ export default function SettingsLayout({children}) {
           <SettingsNavLink href="/settings/advanced">
             {t('Advanced')}
           </SettingsNavLink>
+          <SettingsNavLink href="/settings/connect">
+            {t('Idena Connect')}
+          </SettingsNavLink>
         </HStack>
         {children}
       </Page>

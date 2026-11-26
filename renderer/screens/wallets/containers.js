@@ -38,7 +38,7 @@ import {callRpc, isAddress, toLocaleDna} from '../../shared/utils/utils'
 import {useRecipient} from '../social/profile-hooks'
 import {useShownName} from '../social/components/profile-public'
 import {profilesEnabled} from '../social/profiles'
-import {identityStatus} from '../social/format'
+import {memberStatus} from '../social/vouching'
 import {
   Table,
   TableCol,
@@ -66,7 +66,7 @@ import {
   hasPayload,
 } from './utils'
 
-export function TotalAmount({address, amount}) {
+export function TotalAmount({amount}) {
   const {t, i18n} = useTranslation()
 
   return (
@@ -84,9 +84,6 @@ export function TotalAmount({address, amount}) {
           {toLocaleDna(i18n.language)(amount)}
         </StatNumber>
       </Stat>
-      <TextLink href="/history?tab=transactions" fontWeight={500}>
-        {t('All transactions in your history')}
-      </TextLink>
     </Stack>
   )
 }
@@ -369,7 +366,7 @@ function RecipientLine({recipient, resolved, isLoading, isError}) {
           {resolved.holder}
         </Text>
         <Text fontSize="sm" color="muted">
-          {t(identityStatus(resolved.profile.state))}
+          {t(memberStatus(resolved.profile.state, resolved.profile))}
         </Text>
       </Box>
     </HStack>
@@ -462,7 +459,7 @@ function TransactionDetail({label, action, children, ...props}) {
   )
 }
 
-// Opens the address's History page (onClick closes the drawer: on the History page only the query changes).
+// Opens My Idena for the address, read-only (onClick closes the drawer: on My Idena only the query changes).
 function TransactionAddress({address, onClick}) {
   const {t} = useTranslation()
   const {address: ownAddress} = useIdentityState()
@@ -470,7 +467,7 @@ function TransactionAddress({address, onClick}) {
   return (
     <Stack spacing={0}>
       <TextLink
-        href={`/history?address=${address}`}
+        href={`/home?address=${address}`}
         fontFamily="mono"
         onClick={onClick}
       >

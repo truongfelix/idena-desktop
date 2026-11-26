@@ -24,13 +24,16 @@ import {
   useNodeDispatch,
 } from '../../shared/providers/node-context'
 import {NODE_EVENT, NODE_COMMAND} from '../../../main/channels'
-import {HDivider, Input, Toast} from '../../shared/components/components'
+import {
+  HDivider,
+  Input,
+  TextLink,
+  Toast,
+} from '../../shared/components/components'
 import {
   SettingsFormControl,
   SettingsFormLabel,
-  SettingsSection,
 } from '../../screens/settings/components'
-import {AdvancedNodeSettings} from '../../screens/settings/containers'
 import SettingsLayout from '../../screens/settings/layout'
 import {EyeIcon, EyeOffIcon} from '../../shared/components/icons'
 
@@ -144,7 +147,7 @@ function NodeSettings() {
   return (
     <SettingsLayout>
       <Stack spacing={8} mt={8}>
-        <Stack spacing={4} maxW="md">
+        <Stack spacing={4} maxW="xl">
           <Stack isInline spacing={4} align="center">
             <Box>
               <Switch
@@ -193,6 +196,12 @@ function NodeSettings() {
             </Box>
           </Stack>
 
+          {settings.runInternalNode && (
+            <TextLink href="/settings/advanced" fontWeight={500}>
+              {t('Advanced settings of the built-in node')}
+            </TextLink>
+          )}
+
           <HDivider />
 
           <Stack isInline spacing={3} align="center">
@@ -213,19 +222,12 @@ function NodeSettings() {
               </Text>
             </Box>
           </Stack>
-        </Stack>
 
-        {settings.runInternalNode && (
-          <SettingsSection title={t('Advanced settings')} maxW="xl">
-            <AdvancedNodeSettings />
-          </SettingsSection>
-        )}
-
-        {settings.useExternalNode && (
-          <SettingsSection title={t('Node settings')}>
+          {settings.useExternalNode && (
             <Stack
               spacing={3}
               as="form"
+              pl={14}
               onSubmit={(e) => {
                 e.preventDefault()
                 setConnectionDetails(state)
@@ -284,8 +286,8 @@ function NodeSettings() {
                 <PrimaryButton type="submit">{t('Save')}</PrimaryButton>
               </Stack>
             </Stack>
-          </SettingsSection>
-        )}
+          )}
+        </Stack>
 
         {!settings.useExternalNode && (
           <Box>

@@ -1,5 +1,6 @@
 import React from 'react'
 import {useTranslation} from 'react-i18next'
+import {useQueryClient} from 'react-query'
 import {Flex, Stack, Box, Heading, useDisclosure} from '@chakra-ui/react'
 import {useWallets} from '../shared/hooks/use-wallets'
 import {IconButton2} from '../shared/components/button'
@@ -23,7 +24,7 @@ import {useTransactionDetailsDrawer} from '../screens/wallets/hooks'
 import {useFailToast} from '../shared/hooks/use-toast'
 import {useIdentityState} from '../shared/providers/identity-context'
 import {areSameCaseInsensitive} from '../screens/oracles/utils'
-import {FillPlaceholder} from '../screens/oracles/components'
+import {TransactionHistory} from '../screens/history/components'
 import {SendOutIcon} from '../shared/components/icons'
 
 export default function WalletsPage() {
@@ -34,6 +35,20 @@ export default function WalletsPage() {
   const {address} = useIdentityState()
 
   const {wallets, totalAmount, txs} = useWallets()
+
+  // The node's list (TransactionHistory) has the mined transactions only: the ones still in the mempool come first.
+  // useWallets reads the mempool only (B-317).
+  const pendingTxs = React.useMemo(() => txs ?? [], [txs])
+
+  // A transaction that leaves the mempool was mined: the list reads it at once instead of at its next refresh.
+  const queryClient = useQueryClient()
+  const pendingHashes = React.useRef(new Set())
+  React.useEffect(() => {
+    const now = new Set(pendingTxs.map((tx) => tx.hash))
+    const mined = [...pendingHashes.current].some((hash) => !now.has(hash))
+    pendingHashes.current = now
+    if (mined) queryClient.invalidateQueries(['bcn_transactions', address])
+  }, [address, pendingTxs, queryClient])
 
   const sendDnaDisclosure = useDisclosure()
   const {onOpen: onOpenSendDnaDrawer} = sendDnaDisclosure
@@ -56,7 +71,7 @@ export default function WalletsPage() {
         <Stack spacing={8} w="full">
           <Flex justify="space-between" align="flex-start">
             <Box pt="1/2" pb={2}>
-              <TotalAmount address={address} amount={totalAmount} />
+              <TotalAmount amount={totalAmount} />
             </Box>
             <Stack isInline spacing={1} align="center" pt={2}>
               <VDivider />
@@ -86,31 +101,37 @@ export default function WalletsPage() {
               />
             ))}
           </Stack>
-          <Stack spacing={4}>
-            <Stack spacing="1px" mb={5}>
+          {pendingTxs.length > 0 && (
+            <Stack spacing={4}>
               <Heading
                 as="h2"
                 fontSize="lg"
                 fontWeight={500}
                 lineHeight="short"
               >
-                {t('Recent transactions')}
+                {t('Waiting to be mined')}
               </Heading>
-              <TextLink href="/history" fontWeight={500}>
-                {t('Rewards and penalties in your history')}
-              </TextLink>
-            </Stack>
-            <Box>
               <WalletTransactionList
-                txs={txs}
+                txs={pendingTxs}
                 onOpenTransaction={openTransaction}
               />
-              {txs?.length === 0 && (
-                <FillPlaceholder mt={24}>
-                  {t(`You don't have any transactions yet`)}
-                </FillPlaceholder>
-              )}
-            </Box>
+            </Stack>
+          )}
+          <Stack spacing={4}>
+            <Stack spacing="1px">
+              <Heading
+                as="h2"
+                fontSize="lg"
+                fontWeight={500}
+                lineHeight="short"
+              >
+                {t('Transactions')}
+              </Heading>
+              <TextLink href="/home" fontWeight={500}>
+                {t('Validation rewards and penalties in My Idena')}
+              </TextLink>
+            </Stack>
+            <TransactionHistory address={address} />
           </Stack>
         </Stack>
 

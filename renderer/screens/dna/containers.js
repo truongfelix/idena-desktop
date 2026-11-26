@@ -12,6 +12,13 @@ import {
   useDisclosure,
 } from '@chakra-ui/react'
 import {useIdentityState} from '../../shared/providers/identity-context'
+import {
+  findSite,
+  loadConnectedSites,
+  recordSignIn,
+  saveConnectedSites,
+  signInSite,
+} from './connected-sites'
 import {SecondaryButton, PrimaryButton} from '../../shared/components/button'
 import {
   DnaDialog,
@@ -25,9 +32,9 @@ import {
   SimpleDnaDialogStat,
 } from './components'
 import {
-  startSession,
-  authenticate,
+  signIn,
   signNonce,
+  isReservedSignText,
   isValidUrl,
   sendDna,
   DNA_SEND_CONFIRM_TRESHOLD,
@@ -67,22 +74,41 @@ export function DnaSignInDialog({
   token,
   authenticationEndpoint,
   nonceEndpoint,
+  disconnectEndpoint,
   callbackUrl,
   faviconUrl,
   onSignInError,
   onClose,
   ...props
 }) {
-  const {t} = useTranslation()
+  const {t, i18n} = useTranslation()
 
   const initialRef = React.useRef()
 
   const {address} = useIdentityState()
 
-  const {host: callbackHost, favicon: callbackFaviconUrl} = dnaCallbackSite(
+  // Idena Connect (B-318): whether this account signed in to the site before, read each time the dialog opens (it
+  // stays mounted between links) once the address is known, and kept while it closes; undefined: not read yet.
+  const site = signInSite({
+    authenticationEndpoint,
+    nonceEndpoint,
     callbackUrl,
-    faviconUrl
-  )
+    disconnectEndpoint,
+    faviconUrl,
+  })
+  const {host: callbackHost} = dnaCallbackSite(callbackUrl, faviconUrl)
+  // The icon of the site that receives the signature (none: the globe).
+  const siteFavicon = site.favicon
+  const {isOpen} = props
+  const [known, setKnown] = React.useState()
+  React.useEffect(() => {
+    if (isOpen && site.site && address)
+      setKnown(findSite(loadConnectedSites(), site.site, address))
+    else if (isOpen) setKnown(undefined)
+  }, [address, isOpen, site.site])
+
+  // One sign-in per click: the button waits for the site's answer.
+  const [isSigningIn, setIsSigningIn] = React.useState(false)
 
   return (
     <DnaDialog
@@ -99,10 +125,14 @@ export function DnaSignInDialog({
             )}
           </Text>
           <Stack spacing="px" borderRadius="lg" overflow="hidden">
-            <MediaDnaDialogStat label={t('Website')} value={callbackHost}>
-              {callbackFaviconUrl ? (
+            {/* The site that receives the signature: the one the person signs in to. */}
+            <MediaDnaDialogStat
+              label={t('Website')}
+              value={site.host || callbackHost}
+            >
+              {siteFavicon ? (
                 <Image
-                  src={callbackFaviconUrl}
+                  src={siteFavicon}
                   ignoreFallback
                   borderRadius="md"
                   h={10}
@@ -117,6 +147,39 @@ export function DnaSignInDialog({
             </MediaDnaDialogStat>
             <SimpleDnaDialogStat label={t('Token')} value={token} />
           </Stack>
+          {known !== undefined && (
+            <Text color="muted" fontSize="sm">
+              {known
+                ? t(
+                    'You signed in to {{host}} with this account before, last on {{date}}.',
+                    {
+                      host: site.host,
+                      date: new Date(known.lastAt).toLocaleString(
+                        i18n.language
+                      ),
+                    }
+                  )
+                : t('First sign-in to {{host}} with this account.', {
+                    host: site.host,
+                  })}
+            </Text>
+          )}
+          {site.returnHost && (
+            <Text color="red.500" fontSize="sm">
+              {t(
+                'After the sign-in you go to {{other}}, not {{host}}. Confirm only if you came here from {{host}}.',
+                {host: site.host, other: site.returnHost}
+              )}
+            </Text>
+          )}
+          {site.nonceHost && (
+            <Text color="red.500" fontSize="sm">
+              {t(
+                'The signature is sent to {{host}}, for a code asked of {{other}}. Confirm only if you trust {{host}}.',
+                {host: site.host, other: site.nonceHost}
+              )}
+            </Text>
+          )}
         </Stack>
       </DialogBody>
       <DialogFooter>
@@ -127,19 +190,37 @@ export function DnaSignInDialog({
           overflow="hidden"
           wordBreak="break-all"
           ref={initialRef}
+          // No sign-in before the account is read: the site would get no address.
+          isDisabled={!address}
+          isLoading={isSigningIn}
           onClick={async () => {
-            startSession(nonceEndpoint, {
-              token,
-              address,
-            })
-              .then(signNonce)
-              .then((signature) =>
-                authenticate(authenticationEndpoint, {
-                  token,
-                  signature,
-                })
-              )
+            if (isSigningIn) return
+            setIsSigningIn(true)
+            signIn(
+              {token, address, nonceEndpoint, authenticationEndpoint},
+              {
+                siteError: ({named, site: other}) =>
+                  t('This sign-in was made for {{named}}, not {{site}}', {
+                    named,
+                    site: other,
+                  }),
+              }
+            )
               .then(() => {
+                // The list of Idena Connect: the sign-in the site accepted.
+                if (site.site)
+                  saveConnectedSites(
+                    recordSignIn(
+                      loadConnectedSites(),
+                      {
+                        site: site.site,
+                        address,
+                        website: site.website,
+                        disconnectEndpoint: site.disconnectEndpoint,
+                      },
+                      Date.now()
+                    )
+                  )
                 if (isValidUrl(callbackUrl)) global.openExternal(callbackUrl)
                 else onSignInError('Invalid callback URL')
               })
@@ -147,7 +228,10 @@ export function DnaSignInDialog({
                 global.logger.error(message)
                 if (onSignInError) onSignInError(message)
               })
-              .finally(onClose)
+              .finally(() => {
+                setIsSigningIn(false)
+                onClose()
+              })
           }}
         >
           {t('Confirm')}
@@ -173,6 +257,9 @@ export function DnaSignDialog({
   const {address} = useIdentityState()
 
   const isValidCallbackUrl = isValidUrl(callbackUrl)
+
+  // A sign-in or disconnect text is signed only by those flows (B-318).
+  const isReserved = isReservedSignText(message)
 
   const {host: callbackHost, favicon: callbackFaviconUrl} = dnaCallbackSite(
     callbackUrl,
@@ -208,6 +295,13 @@ export function DnaSignDialog({
             </MediaDnaDialogStat>
             <SimpleDnaDialogStat label={t('Message')} value={message} />
           </Stack>
+          {isReserved && (
+            <Text color="red.500">
+              {t(
+                'This text signs you in or out of a website. The app signs it only in its own sign-in and Disconnect, never here.'
+              )}
+            </Text>
+          )}
         </Stack>
       </DialogBody>
       <DialogFooter>
@@ -218,7 +312,9 @@ export function DnaSignDialog({
           overflow="hidden"
           wordBreak="break-all"
           ref={initialRef}
+          isDisabled={isReserved}
           onClick={async () => {
+            if (isReserved) return
             signNonce(message, format)
               .then((signature) => {
                 if (isValidCallbackUrl) {
