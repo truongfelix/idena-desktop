@@ -1,7 +1,15 @@
 import React from 'react'
 import {renderToStaticMarkup} from 'react-dom/server'
-import {TimelineContent} from './timeline'
+import {IdentityTimeline, TimelineContent} from './timeline'
 import {HistoryTab} from '../history/utils'
+import {useIdentityHistory} from '../history/hooks'
+
+// The identity card and its machines are not rendered here.
+jest.mock('./components', () => ({UserInlineCard: () => null}))
+jest.mock('next/router', () => ({
+  useRouter: () => ({query: {}, pathname: '/home', replace: () => {}}),
+}))
+jest.mock('../history/hooks', () => ({useIdentityHistory: jest.fn()}))
 
 const history = {epoch: 232, ceremoniesComplete: true, ceremonies: []}
 
@@ -46,5 +54,20 @@ describe("My Idena's timeline (B-317)", () => {
     expect(
       render({tab: HistoryTab.Mining, isSuccess: true, history: null})
     ).toContain('No mining reward recorded yet')
+  })
+})
+
+describe("My Idena's timeline with its node down (B-317)", () => {
+  // A node down from the start: the read is tried and fails, as on Wallets, never held back by the offline state
+  // (the loading bars then stayed for good).
+  it('tries the read and says it failed', () => {
+    useIdentityHistory.mockReturnValue({
+      isError: true,
+      error: new Error('Network Error'),
+    })
+    const html = renderToStaticMarkup(<IdentityTimeline address="0x1" isOwn />)
+    expect(html).toContain(UNREAD)
+    const [, options] = useIdentityHistory.mock.calls[0]
+    expect(options?.enabled).not.toBe(false)
   })
 })

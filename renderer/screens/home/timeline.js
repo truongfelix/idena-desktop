@@ -6,7 +6,6 @@ import {useTranslation} from 'react-i18next'
 import {useQuery} from 'react-query'
 import {FillPlaceholder} from '../oracles/components'
 import {TextLink} from '../../shared/components/components'
-import {useChainState} from '../../shared/providers/chain-context'
 import {callRpc, toLocaleDna} from '../../shared/utils/utils'
 import {useIdentityHistory} from '../history/hooks'
 import {HistoryTab, parseHistoryTab} from '../history/utils'
@@ -69,22 +68,17 @@ export function TimelineContent({
 }
 
 /**
- * My Idena's timeline: the identity's ceremonies (results, rewards, penalties) and, for the own address, its mining
+ * My Idena's timeline (read whatever the node's state, as Wallets' list: a node down from the start shows the failed
+ * read, not loading bars for good): the identity's ceremonies (results, rewards, penalties) and, for the own address, its mining
  * per epoch, from the own node (dna_identityHistory). The tab is in the address bar (?tab=mining).
  */
 export function IdentityTimeline({address, isOwn}) {
   const {t} = useTranslation()
   const router = useRouter()
-  const {offline} = useChainState()
 
   const tab = isOwn ? parseHistoryTab(router.query.tab) : HistoryTab.Ceremonies
 
-  const {
-    data: history,
-    isError,
-    isSuccess,
-    error,
-  } = useIdentityHistory(address, {enabled: !offline})
+  const {data: history, isError, isSuccess, error} = useIdentityHistory(address)
 
   const selectTab = (value) =>
     router.replace(
