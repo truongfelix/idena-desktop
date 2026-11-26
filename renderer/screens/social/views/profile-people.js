@@ -7,7 +7,7 @@ import {useSocial} from '../provider'
 import {shortAddress} from '../people'
 import {topicOf} from '../contract'
 import {topicChannel} from '../topics'
-import {identityColor, identityLabel} from '../format'
+import {identityColor, showsAge} from '../format'
 import {
   useIdentities,
   useMembers,
@@ -15,7 +15,7 @@ import {
   useProfile,
 } from '../profile-hooks'
 import {ProfileCall, isValidated} from '../profiles'
-import {isVouchable, vouchCap} from '../vouching'
+import {isVouchable, memberStatus, vouchCap} from '../vouching'
 import {PersonAvatar, useShownName} from '../components/profile-public'
 import {Action} from '../components/profile-vouch'
 import {OpenTopicContext, TopicAvatar} from '../components/topic'
@@ -32,7 +32,11 @@ export function PersonRow({
   action = null,
   suffix = '',
 }) {
+  const {t} = useTranslation()
   const name = useShownName(address)
+  // A vouched member reads "Vouched" (B-316).
+  const {data: profile} = useProfile(address)
+  const status = identity ? memberStatus(identity.state, profile) : null
   return (
     <HStack
       spacing={3}
@@ -51,10 +55,12 @@ export function PersonRow({
         {identity && (
           <Text
             fontSize="sm"
-            color={identityColor(identity.state) || 'muted'}
+            color={identityColor(status) || 'muted'}
             noOfLines={1}
           >
-            {identityLabel(identity.state, identity.age)}
+            {showsAge(status, identity.age)
+              ? `${t(status)} · ${t('age {{age}}', {age: identity.age})}`
+              : t(status)}
             {suffix}
           </Text>
         )}

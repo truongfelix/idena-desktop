@@ -2,6 +2,7 @@ import {
   challengeStep,
   isActingMember,
   isVouchable,
+  memberStatus,
   memberExtraFor,
   parseChallenge,
   readMembers,
@@ -101,6 +102,25 @@ describe('vouched members', () => {
       isActingMember({voucher: alice, state: 'Newbie', voucherState: 'Human'})
     ).toBe(false)
     expect(isActingMember({voucher: null, state: 'Undefined'})).toBe(false)
+  })
+
+  it('reads "Vouched" for an acting member, its identity status otherwise (B-316)', () => {
+    const member = {voucher: alice, state: 'Undefined', voucherState: 'Human'}
+    expect(memberStatus('Undefined', member)).toBe('Vouched')
+    expect(memberStatus('Killed', {...member, state: 'Killed'})).toBe('Vouched')
+    // Invite and Candidate keep their status; the state read now decides over an older profile.
+    expect(memberStatus('Candidate', {...member, state: 'Candidate'})).toBe(
+      'Candidate'
+    )
+    expect(memberStatus('Invite', member)).toBe('Invite')
+    expect(memberStatus('Newbie', member)).toBe('Newbie')
+    // A voucher out of its validation, a member who validated, no profile read: the identity's own status.
+    expect(
+      memberStatus('Undefined', {...member, voucherState: 'Suspended'})
+    ).toBe('Not validated')
+    expect(memberStatus('Newbie', {...member, state: 'Newbie'})).toBe('Newbie')
+    expect(memberStatus('Undefined', null)).toBe('Not validated')
+    expect(memberStatus('Human', undefined)).toBe('Human')
   })
 
   it('shows a voucher only while the profile has no identity', () => {

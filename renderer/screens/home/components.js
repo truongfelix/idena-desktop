@@ -46,10 +46,11 @@ import {
 } from '../../shared/components/components'
 import {PrimaryButton, SecondaryButton} from '../../shared/components/button'
 import {
-  mapToFriendlyStatus,
   useIdentity,
   useIdentityState,
 } from '../../shared/providers/identity-context'
+import {useProfile} from '../social/profile-hooks'
+import {memberStatus} from '../social/vouching'
 import {IdentityStatus, NodeType} from '../../shared/types'
 import {useInvite} from '../../shared/providers/invite-context'
 import {activateMiningMachine} from './machines'
@@ -84,6 +85,9 @@ export function UserInlineCard({
   children,
   ...props
 }) {
+  const {t} = useTranslation()
+  // A vouched member reads "Vouched" (B-316), from its profile in the profiles contract.
+  const {data: profile} = useProfile(address)
   return (
     <Stack isInline spacing={6} align="center" {...props}>
       <Avatar
@@ -95,7 +99,7 @@ export function UserInlineCard({
       <Stack spacing="1.5" w="full">
         <Stack spacing={1}>
           <Heading as="h2" fontSize="lg" fontWeight={500} lineHeight="short">
-            {mapToFriendlyStatus(state)}
+            {t(memberStatus(state, profile))}
           </Heading>
           <Heading
             as="h3"
